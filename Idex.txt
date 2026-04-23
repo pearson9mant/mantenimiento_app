@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Formulario Incidencias Pearson</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #f7f7f7;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h2 {
+        text-align: center;
+        font-size: 26px;
+        margin-bottom: 25px;
+    }
+
+    label {
+        font-weight: bold;
+        display: block;
+        margin-top: 15px;
+        font-size: 18px;
+    }
+
+    select, textarea, input {
+        width: 100%;
+        padding: 15px;
+        margin-top: 8px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        font-size: 18px;
+        background: white;
+        box-sizing: border-box;
+    }
+
+    button {
+        width: 100%;
+        padding: 20px;
+        background-color: #0077ff;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 22px;
+        font-weight: bold;
+        margin-top: 30px;
+    }
+
+    button:active {
+        background-color: #0059bb;
+    }
+</style>
+</head>
+
+<body>
+
+<h2>Incidencias – Pearson</h2>
+
+<!-- CENTRO -->
+<label>Centro</label>
+<select id="centro">
+    <option value="">Seleccionar centro...</option>
+    <option value="Pearson 9">Pearson 9</option>
+    <option value="Pearson 22">Pearson 22</option>
+</select>
+
+<!-- EDIFICIO -->
+<label>Edificio</label>
+<select id="edificio" onchange="cargarAulas()">
+    <option value="">Seleccionar edificio...</option>
+</select>
+
+<!-- AULA -->
+<label>Aula / Espacio</label>
+<select id="aula" onchange="mostrarOtro()">
+    <option value="">Seleccione un edificio...</option>
+</select>
+
+<input type="text" id="aula_otro" placeholder="Escribe el aula/espacio" style="display:none; margin-top:10px;">
+
+<!-- INCIDENCIA -->
+<label>Incidencia</label>
+<textarea id="incidencia" rows="4" placeholder="Describe la incidencia"></textarea>
+
+<!-- PRIORIDAD -->
+<label>Prioridad</label>
+<select id="prioridad">
+    <option value="Baja">Baja</option>
+    <option value="Media">Media</option>
+    <option value="Alta">Alta</option>
+    <option value="Urgente">Urgente</option>
+</select>
+
+<!-- SOLICITANTE -->
+<label>Nombre del solicitante</label>
+<input type="text" id="profe" placeholder="Nombre del solicitante">
+
+<button onclick="enviarCorreo()">ENVIAR</button>
+
+<script>
+
+// ====================
+// LISTAS DE AULAS
+// ====================
+
+// Pearson 22 – Infantil
+const aulasInfantil = [
+"P3A","P3B","P3C","P4A","P4B","P4C","P5A","P5B","P5C",
+"1A","1B","1C","2A","2B","2C","3A","3B","3C","4A","4B","4C",
+"5A","5B","5C","6A","6B","6C",
+"Secretaría","WC Profes","Comedor niños","Comedor profes","Vestíbulo",
+"WC niños planta -2","WC niñas planta -2",
+"WC niños patio cubierto","WC niñas patio cubierto",
+"WC niños 1ª planta","WC niñas 1ª planta",
+"WC niños 2ª planta","WC niñas 2ª planta",
+"Sala profes patio cubierto","Sala profes 1ª planta","Sala profes 2ª planta",
+"Despacho 1ª planta","Despacho 2ª planta",
+"Pasillo Izq. 1ª planta","Pasillo Dch. 1ª planta",
+"Pasillo Izq. 2ª planta","Pasillo Dch. 2ª planta",
+"Teatro planta 0","Teatro patio cubierto",
+"Sala desdoble 1","Sala desdoble 2","Sala desdoble 3","Sala desdoble 4",
+"Aula Alemán","Terrado","Servidor",
+"Otro"
+];
+
+// Pearson 22 – Llar
+const aulasLlar = [
+"P1A","P1B","P1C","P2A","P2B","P2C",
+"Sala polivalente","WC 1ª planta","WC 2ª planta",
+"Secretaría","Sala profes","Pasillo 1ª planta","Pasillo 2ª planta","Servidor",
+"Otro"
+];
+
+// Pearson 9 – Edif. A
+const aulasA = [
+"ESO 1A","ESO 1B","ESO 1C","ESO 2A","ESO 2B","ESO 2C",
+"Laboratorio","Pasillo","WC chicos","WC chicas","Otro"
+];
+
+// Pearson 9 – Edif. B
+const aulasB = [
+"Biblioteca","WC minusválido","Desdoble 1","Desdoble 2","Despacho","Otro"
+];
+
+// Pearson 9 – Edif. C
+const aulasC = [
+"1º Bach A","1º Bach B","1º Bach C",
+"2º Bach A","2º Bach B","2º Bach C",
+"WC chicos","WC chicas","WC chicos 2","WC chicas 2",
+"Desdoble 1","Desdoble 2","Despacho 1","Despacho 2",
+"Otro"
+];
+
+// ====================
+// EDIFICIOS POR CENTRO
+// ====================
+
+const edificiosPorCentro = {
+    "Pearson 9": [
+        { value: "Edif. A", text: "Edif. A" },
+        { value: "Edif. B", text: "Edif. B" },
+        { value: "Edif. C", text: "Edif. C" }
+    ],
+
+    "Pearson 22": [
+        { value: "Infantil", text: "Edif. Infantil" },
+        { value: "Llar", text: "Edif. Llar (Anexo)" }
+    ]
+};
+
+// ====================
+// CAMBIAR EDIFICIOS SEGÚN CENTRO
+// ====================
+
+document.getElementById("centro").addEventListener("change", function () {
+
+    const centro = this.value;
+    const edificioSelect = document.getElementById("edificio");
+
+    edificioSelect.innerHTML = '<option value="">Seleccionar edificio...</option>';
+
+    if (edificiosPorCentro[centro]) {
+        edificiosPorCentro[centro].forEach(ed => {
+            const opt = document.createElement("option");
+            opt.value = ed.value;
+            opt.textContent = ed.text;
+            edificioSelect.appendChild(opt);
+        });
+    }
+
+    document.getElementById("aula").innerHTML = '<option value="">Seleccione un edificio...</option>';
+});
+
+// ====================
+// CARGAR AULAS SEGÚN EDIFICIO
+// ====================
+
+function cargarAulas() {
+    const edificio = document.getElementById('edificio').value;
+    const aulaSelect = document.getElementById('aula');
+
+    aulaSelect.innerHTML = "";
+
+    let lista = [];
+
+    if (edificio === "Infantil") lista = aulasInfantil;
+    if (edificio === "Llar") lista = aulasLlar;
+
+    if (edificio === "Edif. A") lista = aulasA;
+    if (edificio === "Edif. B") lista = aulasB;
+    if (edificio === "Edif. C") lista = aulasC;
+
+    lista.forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = a;
+        aulaSelect.appendChild(opt);
+    });
+}
+
+function mostrarOtro() {
+    const aulaSelect = document.getElementById("aula");
+    const otro = document.getElementById("aula_otro");
+
+    if (aulaSelect.value === "Otro") {
+        otro.style.display = "block";
+    } else {
+        otro.style.display = "none";
+        otro.value = "";
+    }
+}
+
+// ====================
+// ENVÍO DE CORREO
+// ====================
+
+function enviarCorreo() {
+
+    const centro = document.getElementById('centro').value;
+    const edificio = document.getElementById('edificio').value;
+
+    let aula = document.getElementById('aula').value;
+    const aula_otro = document.getElementById('aula_otro').value;
+
+    if (aula === "Otro" && aula_otro.trim() !== "") {
+        aula = aula_otro;
+    }
+
+    const incidencia = document.getElementById('incidencia').value;
+    const prioridad = document.getElementById('prioridad').value;
+    const profe = document.getElementById('profe').value;
+
+    const body =
+`Centro: ${centro}%0D%0A
+Edificio: ${edificio}%0D%0A
+Aula/Espacio: ${aula}%0D%0A
+Incidencia: ${incidencia}%0D%0A
+Prioridad: ${prioridad}%0D%0A
+Solicitante: ${profe}`;
+
+    window.location.href =
+    "mailto:jalmedac@abatoliba.edu?subject=Incidencia&body=" + body;
+}
+
+</script>
+
+</body>
+</html>
