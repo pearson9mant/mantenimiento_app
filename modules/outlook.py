@@ -1,7 +1,11 @@
-import pythoncom
-import win32com.client
-import config
+try:
+    import pythoncom
+    import win32com.client
+    OUTLOOK_DISPONIBLE = True
+except Exception:
+    OUTLOOK_DISPONIBLE = False
 
+import config
 from database.db import conectar
 from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 
@@ -93,6 +97,9 @@ def clasificar_prioridad(texto, prioridad_actual):
 
 
 def importar_incidencias_outlook():
+    if not OUTLOOK_DISPONIBLE:
+        return 0, "OUTLOOK_NO_DISPONIBLE"
+
     try:
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch("Outlook.Application")
@@ -261,7 +268,13 @@ def crear_ot_desde_incidencia_outlook(id_incidencia):
 
 
 def importar_y_crear_ots_automaticamente():
+    if not OUTLOOK_DISPONIBLE:
+        return True, "Outlook no disponible en este entorno."
+
     nuevos, mensaje = importar_incidencias_outlook()
+
+    if mensaje == "OUTLOOK_NO_DISPONIBLE":
+        return True, "Outlook no disponible en este entorno."
 
     if mensaje != "OK":
         return False, f"Error al importar Outlook: {mensaje}"

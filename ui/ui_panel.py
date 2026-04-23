@@ -10,12 +10,16 @@ def pantalla_panel():
     st.subheader("📩 Incidencias Outlook")
 
     if st.button("🔄 Importar incidencias y crear OT"):
-        ok, mensaje = importar_y_crear_ots_automaticamente()
+        try:
+            ok, mensaje = importar_y_crear_ots_automaticamente()
 
-        if ok:
-            st.success(mensaje)
-        else:
-            st.error(mensaje)
+            if ok:
+                st.success(mensaje)
+            else:
+                st.error(mensaje)
+
+        except Exception as e:
+            st.warning("Outlook no disponible en este entorno (Render).")
 
     ordenes = obtener_ordenes()
     historico = obtener_historico()
