@@ -1,4 +1,4 @@
-from database.db import conectar
+from database.db import conectar, _sql
 
 ESTADOS_VALIDOS = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
 
@@ -34,29 +34,29 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
     centro_codigo = obtener_codigo_centro(centro)
     tipo_codigo = obtener_codigo_tipo(tipo_ot)
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         SELECT ultimo_numero
         FROM contador_ot
         WHERE centro_codigo = ? AND tipo_codigo = ?
-    """, (centro_codigo, tipo_codigo))
+    """), (centro_codigo, tipo_codigo))
 
     fila = cursor.fetchone()
 
     if fila:
         siguiente = int(fila[0]) + 1
 
-        cursor.execute("""
+        cursor.execute(_sql("""
             UPDATE contador_ot
             SET ultimo_numero = ?
             WHERE centro_codigo = ? AND tipo_codigo = ?
-        """, (siguiente, centro_codigo, tipo_codigo))
+        """), (siguiente, centro_codigo, tipo_codigo))
     else:
         siguiente = 1
 
-        cursor.execute("""
+        cursor.execute(_sql("""
             INSERT INTO contador_ot (centro_codigo, tipo_codigo, ultimo_numero)
             VALUES (?, ?, ?)
-        """, (centro_codigo, tipo_codigo, siguiente))
+        """), (centro_codigo, tipo_codigo, siguiente))
 
     conn.commit()
     conn.close()
@@ -68,11 +68,11 @@ def crear_orden(datos):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
         (numero_ot, descripcion, estado, centro, edificio, espacio, area, prioridad, operario, origen)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, datos)
+    """), datos)
 
     conn.commit()
     conn.close()
@@ -123,13 +123,13 @@ def obtener_ordenes_operario(operario):
     centro = mapa_operario_centro.get(operario)
 
     if centro:
-        cursor.execute("""
+        cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                    centro, edificio, espacio, area, prioridad, operario, origen
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
-        """, (centro,))
+        """), (centro,))
     else:
         cursor.execute("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
@@ -150,11 +150,11 @@ def actualizar_estado(id_orden, nuevo_estado):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         UPDATE ordenes_trabajo
         SET estado = ?
         WHERE id = ?
-    """, (nuevo_estado, id_orden))
+    """), (nuevo_estado, id_orden))
 
     conn.commit()
     conn.close()
@@ -164,22 +164,23 @@ def finalizar_orden(id_orden, observaciones=""):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         SELECT numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen
         FROM ordenes_trabajo
         WHERE id = ?
-    """, (id_orden,))
+    """), (id_orden,))
+
     orden = cursor.fetchone()
 
     if orden:
         numero_ot, descripcion, estado, fecha_creacion, centro, edificio, espacio, area, prioridad, operario, origen = orden
 
-        cursor.execute("""
+        cursor.execute(_sql("""
             INSERT INTO historico_ordenes
             (numero_ot, descripcion, estado, fecha_creacion, centro, edificio, espacio, area, prioridad, operario, origen, observaciones_cierre)
             VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        """), (
             numero_ot,
             descripcion,
             fecha_creacion,
@@ -193,7 +194,7 @@ def finalizar_orden(id_orden, observaciones=""):
             observaciones
         ))
 
-        cursor.execute("DELETE FROM ordenes_trabajo WHERE id = ?", (id_orden,))
+        cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
 
     conn.commit()
     conn.close()
@@ -203,7 +204,7 @@ def borrar_orden(id_orden):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM ordenes_trabajo WHERE id = ?", (id_orden,))
+    cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
 
     conn.commit()
     conn.close()
@@ -215,7 +216,7 @@ def borrar_orden_historico(id_orden):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM historico_ordenes WHERE id = ?", (id_orden,))
+    cursor.execute(_sql("DELETE FROM historico_ordenes WHERE id = ?"), (id_orden,))
 
     conn.commit()
     conn.close()
