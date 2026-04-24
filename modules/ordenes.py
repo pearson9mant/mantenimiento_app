@@ -5,25 +5,19 @@ ESTADOS_VALIDOS = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
 
 def obtener_codigo_centro(centro):
     centro = str(centro or "").strip().lower()
-
     if centro in ["pearson 22", "p22", "pearson22"]:
         return "P22"
-
     if centro in ["pearson 9", "p9", "pearson9"]:
         return "P9"
-
     return "GEN"
 
 
 def obtener_codigo_tipo(tipo_ot):
     tipo_ot = str(tipo_ot or "").strip().upper()
-
     if tipo_ot in ["LEG", "LEGIONELLA"]:
         return "LEG"
-
     if tipo_ot in ["PREV", "PREVENTIVO"]:
         return "PREV"
-
     return "INC"
 
 
@@ -35,8 +29,7 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
     tipo_codigo = obtener_codigo_tipo(tipo_ot)
 
     cursor.execute(_sql("""
-        SELECT ultimo_numero
-        FROM contador_ot
+        SELECT ultimo_numero FROM contador_ot
         WHERE centro_codigo = ? AND tipo_codigo = ?
     """), (centro_codigo, tipo_codigo))
 
@@ -44,15 +37,12 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
 
     if fila:
         siguiente = int(fila[0]) + 1
-
         cursor.execute(_sql("""
-            UPDATE contador_ot
-            SET ultimo_numero = ?
+            UPDATE contador_ot SET ultimo_numero = ?
             WHERE centro_codigo = ? AND tipo_codigo = ?
         """), (siguiente, centro_codigo, tipo_codigo))
     else:
         siguiente = 1
-
         cursor.execute(_sql("""
             INSERT INTO contador_ot (centro_codigo, tipo_codigo, ultimo_numero)
             VALUES (?, ?, ?)
@@ -68,10 +58,14 @@ def crear_orden(datos):
     conn = conectar()
     cursor = conn.cursor()
 
+    if len(datos) == 10:
+        datos = (*datos, "", "")
+
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
-        (numero_ot, descripcion, estado, centro, edificio, espacio, area, prioridad, operario, origen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (numero_ot, descripcion, estado, centro, edificio, espacio, area,
+         prioridad, operario, origen, solicitante, fecha_origen)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), datos)
 
     conn.commit()
@@ -84,7 +78,8 @@ def obtener_ordenes():
 
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
-               centro, edificio, espacio, area, prioridad, operario, origen
+               centro, edificio, espacio, area, prioridad, operario, origen,
+               solicitante, fecha_origen
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
@@ -100,7 +95,8 @@ def obtener_historico():
 
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
-               centro, edificio, espacio, area, prioridad, operario, origen, fecha_cierre, observaciones_cierre
+               centro, edificio, espacio, area, prioridad, operario, origen,
+               solicitante, fecha_origen, fecha_cierre, observaciones_cierre
         FROM historico_ordenes
         ORDER BY id DESC
     """)
@@ -166,7 +162,8 @@ def finalizar_orden(id_orden, observaciones=""):
 
     cursor.execute(_sql("""
         SELECT numero_ot, descripcion, estado, fecha_creacion,
-               centro, edificio, espacio, area, prioridad, operario, origen
+               centro, edificio, espacio, area, prioridad, operario, origen,
+               solicitante, fecha_origen
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -174,12 +171,18 @@ def finalizar_orden(id_orden, observaciones=""):
     orden = cursor.fetchone()
 
     if orden:
-        numero_ot, descripcion, estado, fecha_creacion, centro, edificio, espacio, area, prioridad, operario, origen = orden
+        (
+            numero_ot, descripcion, estado, fecha_creacion,
+            centro, edificio, espacio, area, prioridad, operario, origen,
+            solicitante, fecha_origen
+        ) = orden
 
         cursor.execute(_sql("""
             INSERT INTO historico_ordenes
-            (numero_ot, descripcion, estado, fecha_creacion, centro, edificio, espacio, area, prioridad, operario, origen, observaciones_cierre)
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (numero_ot, descripcion, estado, fecha_creacion, centro, edificio,
+             espacio, area, prioridad, operario, origen, solicitante,
+             fecha_origen, observaciones_cierre)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -191,6 +194,8 @@ def finalizar_orden(id_orden, observaciones=""):
             prioridad,
             operario,
             origen,
+            solicitante,
+            fecha_origen,
             observaciones
         ))
 
@@ -208,7 +213,6 @@ def borrar_orden(id_orden):
 
     conn.commit()
     conn.close()
-
     return True
 
 
@@ -220,5 +224,4 @@ def borrar_orden_historico(id_orden):
 
     conn.commit()
     conn.close()
-
     return True
