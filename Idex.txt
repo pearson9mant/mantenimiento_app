@@ -272,37 +272,53 @@ Solicitante: ${profe}`;
 
     let correoAbierto = false;
 
-    function abrirCorreo() {
-        if (correoAbierto) return;
-        correoAbierto = true;
+    async function enviarCorreo() {
+    const centro = document.getElementById("centro").value;
+    const edificio = document.getElementById("edificio").value;
 
-        window.location.href =
-            "mailto:jalmedac@abatoliba.edu?subject=Incidencia&body=" + encodeURIComponent(cuerpoPlano);
+    let aula = document.getElementById("aula").value;
+    const aula_otro = document.getElementById("aula_otro").value.trim();
+
+    if (aula === "Otro" && aula_otro !== "") {
+        aula = aula_otro;
     }
 
-    fetch("https://api-incidencias-loreto.onrender.com/api/incidencias", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-webhook-token": "1234"
-        },
-        body: JSON.stringify({
-            asunto: incidencia,
-            body: cuerpoPlano,
-            remitente: profe
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        console.log("API OK:", data);
-        setTimeout(abrirCorreo, 500);
-    })
-    .catch(error => {
-        console.log("Error API:", error);
-        abrirCorreo();
-    });
+    const incidencia = document.getElementById("incidencia").value.trim();
+    const prioridad = document.getElementById("prioridad").value;
+    const profe = document.getElementById("profe").value.trim();
 
-    setTimeout(abrirCorreo, 1500);
+    if (!centro || !edificio || !aula || !incidencia || !profe) {
+        alert("Por favor, completa todos los campos obligatorios.");
+        return;
+    }
+
+    const cuerpoPlano =
+`Centro: ${centro}
+Edificio: ${edificio}
+Aula/Espacio: ${aula}
+Incidencia: ${incidencia}
+Prioridad: ${prioridad}
+Solicitante: ${profe}`;
+
+    try {
+        await fetch("https://api-incidencias-loreto.onrender.com/api/incidencias", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-webhook-token": "1234"
+            },
+            body: JSON.stringify({
+                asunto: incidencia,
+                body: cuerpoPlano,
+                remitente: profe
+            })
+        });
+    } catch (error) {
+        console.log("ERROR API:", error);
+    }
+
+    // 👇 SOLO cuando termina el envío
+    abrirCorreo(cuerpoPlano);
 }
 
 </script>
