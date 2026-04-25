@@ -247,26 +247,62 @@ function enviarCorreo() {
     const edificio = document.getElementById('edificio').value;
 
     let aula = document.getElementById('aula').value;
-    const aula_otro = document.getElementById('aula_otro').value;
+    const aula_otro = document.getElementById('aula_otro').value.trim();
 
-    if (aula === "Otro" && aula_otro.trim() !== "") {
+    if (aula === "Otro" && aula_otro !== "") {
         aula = aula_otro;
     }
 
-    const incidencia = document.getElementById('incidencia').value;
+    const incidencia = document.getElementById('incidencia').value.trim();
     const prioridad = document.getElementById('prioridad').value;
-    const profe = document.getElementById('profe').value;
+    const profe = document.getElementById('profe').value.trim();
 
-    const body =
-`Centro: ${centro}%0D%0A
-Edificio: ${edificio}%0D%0A
-Aula/Espacio: ${aula}%0D%0A
-Incidencia: ${incidencia}%0D%0A
-Prioridad: ${prioridad}%0D%0A
+    if (!centro || !edificio || !aula || !incidencia || !profe) {
+        alert("Por favor, completa todos los campos.");
+        return;
+    }
+
+    const cuerpoPlano =
+`Centro: ${centro}
+Edificio: ${edificio}
+Aula/Espacio: ${aula}
+Incidencia: ${incidencia}
+Prioridad: ${prioridad}
 Solicitante: ${profe}`;
 
-    window.location.href =
-    "mailto:jalmedac@abatoliba.edu?subject=Incidencia&body=" + body;
+    let correoAbierto = false;
+
+    function abrirCorreo() {
+        if (correoAbierto) return;
+        correoAbierto = true;
+
+        window.location.href =
+            "mailto:jalmedac@abatoliba.edu?subject=Incidencia&body=" + encodeURIComponent(cuerpoPlano);
+    }
+
+    fetch("https://api-incidencias-loreto.onrender.com/api/incidencias", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-webhook-token": "1234"
+        },
+        body: JSON.stringify({
+            asunto: incidencia,
+            body: cuerpoPlano,
+            remitente: profe
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        console.log("API OK:", data);
+        setTimeout(abrirCorreo, 500);
+    })
+    .catch(error => {
+        console.log("Error API:", error);
+        abrirCorreo();
+    });
+
+    setTimeout(abrirCorreo, 1500);
 }
 
 </script>
