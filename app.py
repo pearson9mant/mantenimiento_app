@@ -23,20 +23,20 @@ div[role="radiogroup"] {
     display: flex !important;
     flex-direction: row !important;
     justify-content: center !important;
-    gap: 0.5rem !important;
+    gap: 0.25rem !important;
     flex-wrap: wrap !important;
 }
 
 div[role="radiogroup"] label {
     margin: 0 !important;
-    padding: 0.55rem 0.85rem !important;
-    font-size: 20px !important;
-    font-weight: 700 !important;
+    padding: 0.35rem 0.45rem !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
 }
 
 div[role="radiogroup"] p {
-    font-size: 20px !important;
-    font-weight: 700 !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
 }
 </style>
 """, unsafe_allow_html=True)
