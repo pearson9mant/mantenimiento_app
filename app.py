@@ -106,42 +106,42 @@ elif perfil == "gerencia":
 
     menu = st.radio(
         "",
-        ["📊 Panel", "📋 OT", "📦 Inv."],
+        [" Panel", " OT", " Inv."],
         horizontal=True,
         key="menu_gerencia_radio"
     )
 
     st.markdown("---")
 
-    if menu == "📊 Panel":
+    if menu == " Panel":
         pantalla_panel()
 
-    elif menu == "📋 OT":
+    elif menu == " OT":
         pantalla_ordenes_lectura()
 
-    elif menu == "📦 Inv.":
+    elif menu == " Inv.":
         pantalla_inventario_lectura()
 
 # -------------------------
 # OPERARIO
 # -------------------------
 else:
-    st.caption(f"👷 {operario_activo}")
+    st.caption(f" {operario_activo}")
 
     menu = st.radio(
         "",
-        ["👷 Res.", "📋 OT", "📦 Inv."],
+        [" Res.", " OT", " Inv."],
         horizontal=True,
         key="menu_operario_radio"
     )
 
     st.markdown("---")
 
-    if menu == "👷 Res.":
+    if menu == " Res.":
         pantalla_resumen_operario()
 
-    elif menu == "📋 OT":
+    elif menu == " OT":
         pantalla_operario()
 
-    elif menu == "📦 Inv.":
+    elif menu == " Inv.":
         pantalla_inventario()
