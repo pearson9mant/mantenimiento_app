@@ -36,9 +36,11 @@ div[role="radiogroup"] label {
     margin: 0 !important;
     padding: 0.4rem 0.6rem !important;
 }
-div[role="radiogroup"] p {
+div[role="radiogroup"] label {
     font-size: 20px !important;
-    font-weight: bold
+    font-weight: bold;
+    padding: 8px 12px;
+}
 }
 </style>
 """, unsafe_allow_html=True)
