@@ -34,10 +34,11 @@ div[role="radiogroup"] {
 }
 div[role="radiogroup"] label {
     margin: 0 !important;
-    padding: 0.25rem 0.35rem !important;
+    padding: 0.4rem 0.6rem !important;
 }
 div[role="radiogroup"] p {
-    font-size: 14px !important;
+    font-size: 20px !important;
+    font-weight: bold
 }
 </style>
 """, unsafe_allow_html=True)
@@ -71,29 +72,29 @@ if perfil == "admin":
 
     menu = st.radio(
         "",
-        ["📊 Panel", "📋 OT", "📦 Inv.", "💧 Leg.", "👷 Op.", "👷 Operarios"],
+        ["Panel", "OT", "Inv.", " Leg.", " Op.", " Operarios"],
         horizontal=True,
         key="menu_admin_radio"
     )
 
     st.markdown("---")
 
-    if menu == "📊 Panel":
+    if menu == " Panel":
         pantalla_panel()
 
-    elif menu == "📋 OT":
+    elif menu == " OT":
         pantalla_ordenes()
 
-    elif menu == "📦 Inv.":
+    elif menu == " Inv.":
         pantalla_inventario()
 
-    elif menu == "💧 Leg.":
+    elif menu == " Leg.":
         pantalla_legionella()
 
-    elif menu == "👷 Op.":
+    elif menu == " Op.":
         pantalla_operario()
 
-    elif menu == "👷 Operarios":
+    elif menu == " Operarios":
         pantalla_operarios_admin()
 
 # -------------------------
