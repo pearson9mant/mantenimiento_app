@@ -69,21 +69,28 @@ def menu_admin():
     if "menu_actual" not in st.session_state:
         st.session_state["menu_actual"] = "Panel"
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        boton_menu("📊 Panel", "btn_panel_admin", "Panel")
-    with col2:
-        boton_menu("🛠 Órdenes", "btn_ordenes_admin", "Ordenes")
-    with col3:
-        boton_menu("📦 Inventario", "btn_inventario_admin", "Inventario")
+    st.markdown("""
+    <div style="display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;">
+    """, unsafe_allow_html=True)
 
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        boton_menu("💧 Legionella", "btn_legionella_admin", "Legionella")
-    with col5:
-        boton_menu("👷 Operario", "btn_operario_admin", "Operario")
-    with col6:
-        boton_menu("⚙️ Operarios", "btn_operarios_admin", "Operarios")
+    cols = st.columns(6)
+
+    botones = [
+        ("📊 Panel", "Panel"),
+        ("🛠 Órdenes", "Ordenes"),
+        ("📦 Inventario", "Inventario"),
+        ("💧 Legionella", "Legionella"),
+        ("👷 Operario", "Operario"),
+        ("⚙️ Operarios", "Operarios"),
+    ]
+
+    for i, (texto, valor) in enumerate(botones):
+        with cols[i]:
+            if st.button(texto, key=f"btn_{valor}"):
+                st.session_state["menu_actual"] = valor
+                st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def menu_gerencia():
