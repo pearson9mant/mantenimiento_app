@@ -49,7 +49,8 @@ def adaptar_sql(sql):
     if os.getenv("DATABASE_URL"):
         return sql.replace("?", "%s")
     return sql
-    
+
+
 def ejecutar(sql, params=()):
     conn = conectar()
     cur = conn.cursor()
@@ -57,20 +58,23 @@ def ejecutar(sql, params=()):
     conn.commit()
     conn.close()
 
-df = leer_df("""
-    SELECT COUNT(*) AS total
-    FROM legionella_puntos
-    WHERE centro IS NOT NULL
-      AND edificio IS NOT NULL
-      AND nombre_punto IS NOT NULL
-""")
 
-if int(df.loc[0, "total"]) > 0:
-    return
+def leer_df(sql, params=()):
+    conn = conectar()
+    df = pd.read_sql_query(adaptar_sql(sql), conn, params=params)
+    conn.close()
+    return df
 
 
 def sembrar_puntos_si_vacio():
-    df = leer_df("SELECT COUNT(*) AS total FROM legionella_puntos")
+    df = leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_puntos
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND nombre_punto IS NOT NULL
+    """)
+
     if int(df.loc[0, "total"]) > 0:
         return
 
@@ -81,11 +85,11 @@ def sembrar_puntos_si_vacio():
         for edificio, puntos in edificios.items():
             for instalacion, nombre, tipo, ubicacion in puntos:
                 cur.execute(
-                    """
+                    adaptar_sql("""
                     INSERT INTO legionella_puntos
                     (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
                     VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-                    """,
+                    """),
                     (centro, edificio, instalacion, tipo, nombre, ubicacion, "Alta inicial automática"),
                 )
 
@@ -160,7 +164,7 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
     cur = conn.cursor()
 
     cur.execute(
-        """
+        adaptar_sql("""
         SELECT COUNT(*)
         FROM ordenes_trabajo
         WHERE centro = ?
@@ -169,7 +173,7 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
           AND origen = 'Legionella'
           AND descripcion = ?
           AND estado != 'Finalizada'
-        """,
+        """),
         (centro, edificio, descripcion),
     )
 
