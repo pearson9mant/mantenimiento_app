@@ -298,7 +298,7 @@ def generar_ots_legionella_si_toca():
     """)
 
     if df.empty:
-        return 0
+        return 0, "Sin registros todavía"
 
     df["fecha"] = pd.to_datetime(df["fecha"])
 
@@ -315,8 +315,11 @@ def generar_ots_legionella_si_toca():
     df_ultimos["estado_control"] = df_ultimos["proxima_fecha"].apply(calcular_estado_control)
 
     creadas = 0
+    ya_existia = 0
+    no_toca = 0
 
     for _, fila in df_ultimos.iterrows():
+
         if fila["estado_control"] == "🔴 TOCA":
             creada = crear_ot_legionella(
                 fila["centro"],
@@ -326,8 +329,20 @@ def generar_ots_legionella_si_toca():
             )
             if creada:
                 creadas += 1
+            else:
+                ya_existia += 1
+        else:
+            no_toca += 1
 
-    return creadas
+    # 🔽 MENSAJE INTELIGENTE
+    if creadas > 0:
+        mensaje = f"Se han creado {creadas} órdenes automáticamente"
+    elif ya_existia > 0:
+        mensaje = "Ya existen órdenes abiertas de Legionella"
+    else:
+        mensaje = "No toca todavía (controles en fecha o próximos)"
+
+    return creadas, mensaje
 
 
 def generar_informe_legionella(fecha_inicio, fecha_fin):
@@ -486,8 +501,12 @@ def pantalla_legionella():
     sembrar_puntos_si_vacio()
     ots_creadas = generar_ots_legionella_si_toca()
 
+    ots_creadas, mensaje = generar_ots_legionella_si_toca()
+
     if ots_creadas > 0:
-        st.success(f"Se han creado {ots_creadas} órdenes de Legionella automáticamente.")
+        st.success(mensaje)
+    else:
+        st.info(mensaje)
 
     st.subheader("💧 Legionella")
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
