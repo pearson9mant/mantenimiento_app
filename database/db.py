@@ -156,5 +156,78 @@ def inicializar_db():
     _add_column(cursor, "historico_ordenes", "solicitante", "TEXT")
     _add_column(cursor, "historico_ordenes", "fecha_origen", "TEXT")
 
+        # -------------------------------
+    # LEGIONELLA
+    # -------------------------------
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS legionella_puntos (
+            id {id_sql},
+            centro TEXT,
+            edificio TEXT,
+            instalacion TEXT,
+            tipo_punto TEXT,
+            nombre_punto TEXT,
+            ubicacion TEXT,
+            activo INTEGER DEFAULT 1,
+            observaciones TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS legionella_tareas (
+            id {id_sql},
+            punto_id INTEGER,
+            tarea TEXT,
+            tipo_control TEXT,
+            frecuencia TEXT,
+            valor_minimo {real_sql},
+            valor_maximo {real_sql},
+            unidad TEXT,
+            ultima_fecha TEXT,
+            proxima_fecha TEXT,
+            activo INTEGER DEFAULT 1,
+            observaciones TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS legionella_registros (
+            id {id_sql},
+            fecha {fecha_sql},
+            centro TEXT,
+            edificio TEXT,
+            instalacion TEXT,
+            punto_id INTEGER,
+            tarea_id INTEGER,
+            punto TEXT,
+            tarea TEXT,
+            tipo_control TEXT,
+            valor {real_sql},
+            valor_2 {real_sql},
+            unidad TEXT,
+            estado TEXT,
+            resultado TEXT,
+            operario TEXT,
+            observaciones TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS legionella_incidencias (
+            id {id_sql},
+            fecha_apertura {fecha_sql},
+            centro TEXT,
+            edificio TEXT,
+            punto TEXT,
+            tarea TEXT,
+            descripcion TEXT,
+            estado TEXT DEFAULT 'Abierta',
+            prioridad TEXT DEFAULT 'Alta',
+            operario TEXT,
+            fecha_cierre TEXT,
+            observaciones_cierre TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
