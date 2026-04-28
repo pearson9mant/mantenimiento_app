@@ -596,8 +596,8 @@ def pantalla_legionella():
             key=f"legionella_operario_{centro}"
         )
 
-if operario == "Otro":
-    operario = st.text_input("Nombre operario")
+        if operario == "Otro":
+            operario = st.text_input("Nombre operario")
 
         observaciones = st.text_area("Observaciones")
 
