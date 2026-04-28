@@ -25,6 +25,13 @@ def obtener_origen_ot(origen):
         return "App"
     return "General"
 
+def operario_por_centro(centro):
+    if centro == "Pearson 9":
+        return "Luis Lozano"
+    if centro == "Pearson 22":
+        return "J.A. Almeda"
+    return OPERARIOS[0] if OPERARIOS else ""
+
 
 def pantalla_ordenes():
     st.subheader("📋 Órdenes de trabajo")
@@ -66,7 +73,19 @@ def pantalla_ordenes():
                 descripcion = st.text_area("Descripción", key="orden_descripcion")
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
-                operario_sel = st.selectbox("Operario", OPERARIOS, key="orden_operario")
+                operario_auto = operario_por_centro(centro)
+
+                if operario_auto in OPERARIOS:
+                   indice_operario = OPERARIOS.index(operario_auto)
+                else:
+                   indice_operario = 0
+
+                operario_sel = st.selectbox(
+                    "Operario",
+                    OPERARIOS,
+                    index=indice_operario,
+                    key=f"orden_operario_{centro}"
+                )
 
                 if operario_sel == "Otro":
                     operario = st.text_input("Nombre operario", key="orden_operario_otro")
