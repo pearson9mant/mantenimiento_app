@@ -45,6 +45,28 @@ html, body {
 [data-testid="stMetricValue"] {
     font-size: 34px !important;
 }
+
+.logo-portada {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.titulo-portada {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 0;
+}
+
+.subtitulo-portada {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #555;
+    margin-top: 0;
+    margin-bottom: 25px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -52,6 +74,48 @@ html, body {
 def volver_menu():
     st.session_state["seccion_actual"] = None
     st.rerun()
+
+
+def volver_portada():
+    st.session_state["entrada_app"] = False
+    st.session_state["seccion_actual"] = None
+    st.rerun()
+
+
+def mostrar_portada(perfil, operario_activo):
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Si tu logo está en otra ruta, cambia esta línea.
+    try:
+        st.image("assets/logo.png", width=170)
+    except Exception:
+        st.markdown(
+            "<div class='logo-portada'>🏫</div>",
+            unsafe_allow_html=True
+        )
+
+    st.markdown("<div class='titulo-portada'>Mantenimiento</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitulo-portada'>Loreto Abat Oliba</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    if perfil == "admin":
+        texto_boton = "🔐\nEntrar en administración"
+
+    elif perfil == "gerencia":
+        texto_boton = "📊\nEntrar a gerencia"
+
+    else:
+        if operario_activo:
+            st.caption(f"Operario: {operario_activo}")
+        texto_boton = "👷\nEntrar a mi zona"
+
+    if st.button(texto_boton, key="btn_entrada_app", use_container_width=True):
+        st.session_state["entrada_app"] = True
+        st.session_state["seccion_actual"] = None
+        st.rerun()
+
+    st.stop()
 
 
 def mostrar_menu_admin():
@@ -123,14 +187,25 @@ def mostrar_menu_operario():
 inicializar_db()
 login()
 
-st.markdown("### Mantenimiento")
-barra_sesion()
-
 perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
 if "seccion_actual" not in st.session_state:
     st.session_state["seccion_actual"] = None
+
+if "entrada_app" not in st.session_state:
+    st.session_state["entrada_app"] = False
+
+
+# -------------------------------
+# PORTADA DE ENTRADA
+# -------------------------------
+if not st.session_state["entrada_app"]:
+    mostrar_portada(perfil, operario_activo)
+
+
+st.markdown("### Mantenimiento")
+barra_sesion()
 
 
 if perfil == "admin" and st.session_state.get("vista_operario", False):
@@ -149,6 +224,11 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
 # -------------------------------
 if st.session_state["seccion_actual"] is None:
 
+    if st.button("⬅\nVolver a portada", key="volver_portada_desde_menu", use_container_width=True):
+        volver_portada()
+
+    st.markdown("---")
+
     if perfil == "admin":
         mostrar_menu_admin()
 
@@ -163,10 +243,17 @@ if st.session_state["seccion_actual"] is None:
 
 
 # -------------------------------
-# BOTÓN VOLVER
+# BOTONES VOLVER
 # -------------------------------
-if st.button("⬅ Volver al menú", key="volver_menu_general"):
-    volver_menu()
+col_volver1, col_volver2 = st.columns(2)
+
+with col_volver1:
+    if st.button("⬅\nVolver al menú", key="volver_menu_general", use_container_width=True):
+        volver_menu()
+
+with col_volver2:
+    if st.button("🏠\nPortada", key="volver_portada_general", use_container_width=True):
+        volver_portada()
 
 st.markdown("---")
 
