@@ -582,10 +582,22 @@ def pantalla_legionella():
             valor_2 = None
 
         fecha_registro = st.date_input("Fecha del control", value=date.today())
-        operario = st.selectbox("Operario", OPERARIOS)
+        operario_auto = operario_por_centro(centro)
 
-        if operario == "Otro":
-            operario = st.text_input("Nombre operario")
+        if operario_auto in OPERARIOS:
+            indice_operario = OPERARIOS.index(operario_auto)
+        else:
+            indice_operario = 0
+
+        operario = st.selectbox(
+            "Operario",
+            OPERARIOS,
+            index=indice_operario,
+            key=f"legionella_operario_{centro}"
+        )
+
+if operario == "Otro":
+    operario = st.text_input("Nombre operario")
 
         observaciones = st.text_area("Observaciones")
 
