@@ -13,7 +13,7 @@ def pantalla_ordenes_lectura():
             st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen = o
+                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen, *resto = o
 
                 st.markdown(
                     f"**{numero_ot}** | {prioridad} | {area or '-'} | **{estado}**  \n"
