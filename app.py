@@ -16,6 +16,9 @@ from ui.ui_operarios_admin import pantalla_operarios_admin
 st.set_page_config(page_title="Mantenimiento", layout="wide")
 
 
+# -------------------------------
+# ESTILO MÓVIL
+# -------------------------------
 st.markdown("""
 <meta name="google" content="notranslate">
 
@@ -30,29 +33,13 @@ html, body {
     padding-right: 1rem !important;
 }
 
-div[role="radiogroup"] {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    gap: 10px !important;
-    align-items: center !important;
-}
-
-div[role="radiogroup"] label {
-    white-space: nowrap !important;
-    min-width: fit-content !important;
-    padding: 8px 10px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-}
-
 .stButton > button {
     width: 100%;
-    min-height: 42px;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    border-radius: 12px !important;
+    height: 80px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    border-radius: 16px !important;
+    white-space: pre-line !important;
 }
 
 [data-testid="stMetricValue"] {
@@ -64,73 +51,73 @@ div[role="radiogroup"] label {
 
 def volver_menu():
     st.session_state["seccion_actual"] = None
-    for key in ["menu_admin_radio", "menu_gerencia_radio", "menu_operario_radio"]:
-        if key in st.session_state:
-            del st.session_state[key]
     st.rerun()
 
 
 def mostrar_menu_admin():
-    opciones = [
-        "Selecciona",
-        "Panel",
-        "Órdenes",
-        "Inventario",
-        "Legionella",
-        "Operario",
-        "Operarios"
-    ]
+    col1, col2 = st.columns(2)
 
-    menu = st.radio(
-        "",
-        opciones,
-        horizontal=True,
-        key="menu_admin_radio"
-    )
+    with col1:
+        if st.button("📊\nPanel", key="btn_panel", use_container_width=True):
+            st.session_state["seccion_actual"] = "Panel"
+            st.rerun()
 
-    if menu != "Selecciona":
-        st.session_state["seccion_actual"] = menu
-        st.rerun()
+        if st.button("📦\nInventario", key="btn_inv", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario"
+            st.rerun()
+
+        if st.button("👷\nOperario", key="btn_op", use_container_width=True):
+            st.session_state["seccion_actual"] = "Operario"
+            st.rerun()
+
+    with col2:
+        if st.button("🛠\nÓrdenes", key="btn_ot", use_container_width=True):
+            st.session_state["seccion_actual"] = "Órdenes"
+            st.rerun()
+
+        if st.button("💧\nLegionella", key="btn_leg", use_container_width=True):
+            st.session_state["seccion_actual"] = "Legionella"
+            st.rerun()
+
+        if st.button("⚙️\nOperarios", key="btn_ops", use_container_width=True):
+            st.session_state["seccion_actual"] = "Operarios"
+            st.rerun()
 
 
 def mostrar_menu_gerencia():
-    opciones = [
-        "Selecciona",
-        "Panel",
-        "Órdenes",
-        "Inventario"
-    ]
+    col1, col2 = st.columns(2)
 
-    menu = st.radio(
-        "",
-        opciones,
-        horizontal=True,
-        key="menu_gerencia_radio"
-    )
+    with col1:
+        if st.button("📊\nPanel", key="btn_panel_gerencia", use_container_width=True):
+            st.session_state["seccion_actual"] = "Panel"
+            st.rerun()
 
-    if menu != "Selecciona":
-        st.session_state["seccion_actual"] = menu
-        st.rerun()
+        if st.button("📦\nInventario", key="btn_inv_gerencia", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario"
+            st.rerun()
+
+    with col2:
+        if st.button("🛠\nÓrdenes", key="btn_ot_gerencia", use_container_width=True):
+            st.session_state["seccion_actual"] = "Órdenes"
+            st.rerun()
 
 
 def mostrar_menu_operario():
-    opciones = [
-        "Selecciona",
-        "Resumen",
-        "Órdenes",
-        "Inventario"
-    ]
+    col1, col2 = st.columns(2)
 
-    menu = st.radio(
-        "",
-        opciones,
-        horizontal=True,
-        key="menu_operario_radio"
-    )
+    with col1:
+        if st.button("📋\nResumen", key="btn_resumen_operario", use_container_width=True):
+            st.session_state["seccion_actual"] = "Resumen"
+            st.rerun()
 
-    if menu != "Selecciona":
-        st.session_state["seccion_actual"] = menu
-        st.rerun()
+        if st.button("📦\nInventario", key="btn_inv_operario", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario"
+            st.rerun()
+
+    with col2:
+        if st.button("🛠\nÓrdenes", key="btn_ot_operario", use_container_width=True):
+            st.session_state["seccion_actual"] = "Órdenes"
+            st.rerun()
 
 
 inicializar_db()
