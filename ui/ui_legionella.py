@@ -172,7 +172,7 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
           AND area = 'Legionella'
           AND origen = 'Legionella'
           AND descripcion = ?
-          AND estado != 'Finalizada'
+          AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
         """),
         (centro, edificio, descripcion),
     )
