@@ -36,15 +36,6 @@ def pantalla_operario():
         if o[3] in ["Abierta", "En curso", "Pendiente material"]
     ]
 
-    total_abiertas = len([o for o in ordenes_operario if o[3] == "Abierta"])
-    total_curso = len([o for o in ordenes_operario if o[3] == "En curso"])
-    total_material = len([o for o in ordenes_operario if o[3] == "Pendiente material"])
-
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Abiertas", total_abiertas)
-    k2.metric("En curso", total_curso)
-    k3.metric("Material", total_material)
-
     if not ordenes_operario:
         st.success("No tienes órdenes pendientes.")
         return
