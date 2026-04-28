@@ -234,6 +234,35 @@ def inicializar_db():
             observaciones_cierre TEXT
         )
     """)
+        # -------------------------------
+    # MIGRACIONES LEGIONELLA
+    # -------------------------------
+    _add_column(cursor, "legionella_registros", "centro", "TEXT")
+    _add_column(cursor, "legionella_registros", "edificio", "TEXT")
+    _add_column(cursor, "legionella_registros", "instalacion", "TEXT")
+    _add_column(cursor, "legionella_registros", "punto_id", "INTEGER")
+    _add_column(cursor, "legionella_registros", "tarea_id", "INTEGER")
+    _add_column(cursor, "legionella_registros", "punto", "TEXT")
+    _add_column(cursor, "legionella_registros", "tarea", "TEXT")
+    _add_column(cursor, "legionella_registros", "tipo_control", "TEXT")
+    _add_column(cursor, "legionella_registros", "valor", real_sql)
+    _add_column(cursor, "legionella_registros", "valor_2", real_sql)
+    _add_column(cursor, "legionella_registros", "unidad", "TEXT")
+    _add_column(cursor, "legionella_registros", "estado", "TEXT")
+    _add_column(cursor, "legionella_registros", "resultado", "TEXT")
+    _add_column(cursor, "legionella_registros", "operario", "TEXT")
+    _add_column(cursor, "legionella_registros", "observaciones", "TEXT")
+
+    _add_column(cursor, "legionella_incidencias", "centro", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "edificio", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "punto", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "tarea", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "descripcion", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "estado", "TEXT DEFAULT 'Abierta'")
+    _add_column(cursor, "legionella_incidencias", "prioridad", "TEXT DEFAULT 'Alta'")
+    _add_column(cursor, "legionella_incidencias", "operario", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "fecha_cierre", "TEXT")
+    _add_column(cursor, "legionella_incidencias", "observaciones_cierre", "TEXT")
 
     conn.commit()
     conn.close()
