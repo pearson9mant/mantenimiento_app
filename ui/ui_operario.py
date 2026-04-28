@@ -30,6 +30,11 @@ def pantalla_operario():
     st.info(f"Operario: {operario_sel}")
 
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
+    # 🔥 MODO RÁPIDO
+    ordenes_operario = [
+        o for o in ordenes_operario
+        if o[3] in ["Abierta", "En curso", "Pendiente material"]
+    ]
     materiales_select = obtener_materiales_para_select()
 
     # -------------------
@@ -77,48 +82,53 @@ def pantalla_operario():
     # -------------------
     for fila in ordenes_operario:
 
-        (
-            id_orden,
-            num_ot,
-            desc,
-            est,
-            fecha,
-            centro,
-            edificio,
-            espacio,
-            area,
-            prioridad,
-            operario,
-            origen
-        ) = fila
+    (
+        id_orden,
+        num_ot,
+        desc,
+        est,
+        fecha,
+        centro,
+        edificio,
+        espacio,
+        area,
+        prioridad,
+        operario,
+        origen
+    ) = fila
 
-        with st.container():
-            st.markdown("---")
+    with st.container():
+        st.markdown("---")
 
-            c1, c2 = st.columns([3.5, 2])
+        # 🔴 CABECERA SIMPLE
+        estado_color = {
+            "Abierta": "🔴",
+            "En curso": "🟠",
+            "Pendiente material": "📦"
+        }.get(est, "⚪")
 
-            with c1:
-                st.markdown(
-                    f"**{num_ot}** | {prioridad} | {area or '-'}  \n"
-                    f"{desc}  \n"
-                    f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                    f"👷 {operario or '-'} | Estado actual: **{est}**"
-                )
+        st.markdown(f"### {estado_color} {num_ot}")
+        st.markdown(f"{desc}")
 
-            with c2:
-                nuevo_estado = st.selectbox(
-                    f"Estado {num_ot}",
-                    ["Abierta", "En curso", "Pendiente material", "Finalizada"],
-                    index=["Abierta", "En curso", "Pendiente material", "Finalizada"].index(est)
-                    if est in ["Abierta", "En curso", "Pendiente material", "Finalizada"] else 0,
-                    key=f"estado_operario_{id_orden}"
-                )
+        st.caption(f"{centro} · {edificio} · {espacio}")
 
-                if nuevo_estado != est and nuevo_estado != "Finalizada":
-                    if st.button(f"Actualizar {num_ot}", key=f"act_operario_{id_orden}"):
-                        actualizar_estado(id_orden, nuevo_estado)
-                        st.success(f"{num_ot} actualizada a {nuevo_estado}.")
-                        st.rerun()
+        # 🔥 BOTONES RÁPIDOS
+        b1, b2, b3 = st.columns(3)
+
+        with b1:
+            if st.button("▶ En curso", key=f"curso_{id_orden}"):
+                actualizar_estado(id_orden, "En curso")
+                st.rerun()
+
+        with b2:
+            if st.button("📦 Material", key=f"mat_{id_orden}"):
+                actualizar_estado(id_orden, "Pendiente material")
+                st.rerun()
+
+        with b3:
+            if st.button("✔ Finalizar", key=f"fin_{id_orden}"):
+                finalizar_orden(id_orden, "")
+                st.rerun()
 
             # -------------------
             # TRABAJO OT
