@@ -87,7 +87,7 @@ def mostrar_portada(perfil, operario_activo):
 
     # Si tu logo está en otra ruta, cambia esta línea.
     try:
-        st.image("assets/logo.png", width=170)
+        st.image("logo cole.jpg", width=220)
     except Exception:
         st.markdown(
             "<div class='logo-portada'>🏫</div>",
