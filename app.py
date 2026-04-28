@@ -12,34 +12,58 @@ from ui.ui_resumen_operario import pantalla_resumen_operario
 from ui.ui_legionella import pantalla_legionella
 from ui.ui_operarios_admin import pantalla_operarios_admin
 
+
+# -------------------------------
+# CONFIGURACIÓN
+# -------------------------------
 st.set_page_config(page_title="Mantenimiento", layout="wide")
 
-inicializar_db()
-login()
 
+# -------------------------------
+# ESTILO MÓVIL / MENÚ
+# -------------------------------
 st.markdown("""
 <style>
+html, body {
+    font-size: 14px !important;
+}
+
 div[role="radiogroup"] {
     display: flex !important;
     flex-direction: row !important;
     justify-content: center !important;
     gap: 0.25rem !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
 }
 
 div[role="radiogroup"] label {
     margin: 0 !important;
     padding: 0.35rem 0.45rem !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
+    min-width: fit-content !important;
 }
 
 div[role="radiogroup"] p {
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
+}
+
+.stButton > button {
+    width: 100%;
+    min-height: 42px;
+    font-size: 14px !important;
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+# -------------------------------
+# INICIO APP
+# -------------------------------
+inicializar_db()
+login()
 
 st.markdown("### Mantenimiento")
 barra_sesion()
@@ -47,6 +71,10 @@ barra_sesion()
 perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
+
+# -------------------------------
+# VISTA OPERARIO DESDE ADMIN
+# -------------------------------
 if perfil == "admin" and st.session_state.get("vista_operario", False):
     pantalla_operario()
 
@@ -57,6 +85,10 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
 
     st.stop()
 
+
+# -------------------------------
+# MENÚ ADMIN
+# -------------------------------
 if perfil == "admin":
 
     menu = st.radio(
@@ -86,6 +118,10 @@ if perfil == "admin":
     elif menu == "Operarios":
         pantalla_operarios_admin()
 
+
+# -------------------------------
+# MENÚ GERENCIA
+# -------------------------------
 elif perfil == "gerencia":
 
     menu = st.radio(
@@ -106,6 +142,10 @@ elif perfil == "gerencia":
     elif menu == "Inv.":
         pantalla_inventario_lectura()
 
+
+# -------------------------------
+# MENÚ OPERARIO
+# -------------------------------
 else:
     st.caption(f"{operario_activo}")
 
