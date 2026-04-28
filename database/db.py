@@ -263,6 +263,17 @@ def inicializar_db():
     _add_column(cursor, "legionella_incidencias", "operario", "TEXT")
     _add_column(cursor, "legionella_incidencias", "fecha_cierre", "TEXT")
     _add_column(cursor, "legionella_incidencias", "observaciones_cierre", "TEXT")
+        # -------------------------------
+    # MIGRACIONES LEGIONELLA PUNTOS
+    # -------------------------------
+    _add_column(cursor, "legionella_puntos", "centro", "TEXT")
+    _add_column(cursor, "legionella_puntos", "edificio", "TEXT")
+    _add_column(cursor, "legionella_puntos", "instalacion", "TEXT")
+    _add_column(cursor, "legionella_puntos", "tipo_punto", "TEXT")
+    _add_column(cursor, "legionella_puntos", "nombre_punto", "TEXT")
+    _add_column(cursor, "legionella_puntos", "ubicacion", "TEXT")
+    _add_column(cursor, "legionella_puntos", "activo", "INTEGER DEFAULT 1")
+    _add_column(cursor, "legionella_puntos", "observaciones", "TEXT")
 
     conn.commit()
     conn.close()
