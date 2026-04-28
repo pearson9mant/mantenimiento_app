@@ -30,7 +30,8 @@ def pantalla_ordenes_lectura():
             st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen, fecha_cierre, observaciones_cierre = h
+               
+                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen, fecha_cierre, observaciones_cierre, *resto = h
 
                 st.markdown(
                     f"**{numero_ot}** | {prioridad} | {area or '-'}  \n"
