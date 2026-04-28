@@ -510,7 +510,13 @@ def pantalla_legionella():
             return
 
         punto_nombre = st.selectbox("Punto de control", puntos_df["nombre_punto"].tolist())
-        punto = puntos_df[puntos_df["nombre_punto"] == punto_nombre].iloc[0].to_dict()
+        df_filtrado = puntos_df[puntos_df["nombre_punto"] == punto_nombre]
+
+        if df_filtrado.empty:
+            st.error("No se ha encontrado el punto de control. Revisa configuración.")
+            return
+
+        punto = df_filtrado.iloc[0].to_dict()
 
         tipo_punto = punto["tipo_punto"]
 
