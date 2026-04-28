@@ -1,70 +1,79 @@
 import streamlit as st
-from config import CLAVE_ADMIN
+
+
+USUARIOS = {
+    "juan": {
+        "password": "1234",
+        "perfil": "admin",
+        "nombre": "Juan Antonio"
+    },
+    "luis": {
+        "password": "1234",
+        "perfil": "operario",
+        "nombre": "Luis Lozano"
+    },
+    "abel": {
+        "password": "1234",
+        "perfil": "operario",
+        "nombre": "Abel Vasquez"
+    },
+    "gerencia": {
+        "password": "1234",
+        "perfil": "gerencia",
+        "nombre": "Gerencia"
+    }
+}
+
 
 def login():
-    if "perfil" not in st.session_state:
-        st.session_state.perfil = None
+    if st.session_state.get("login_ok", False):
+        return
 
-    if "operario_activo" not in st.session_state:
-        st.session_state.operario_activo = None
+    st.markdown("## Acceso mantenimiento")
 
-    if st.session_state.perfil is None:
-        st.title("🛠️ Acceso Mantenimiento")
+    usuario = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+    if st.button("Entrar", use_container_width=True):
+        usuario = usuario.strip().lower()
 
-        with c1:
-            if st.button("Abel Vasquez", key="login_abel"):
-                st.session_state.perfil = "operario"
-                st.session_state.operario_activo = "Abel Vasquez"
-                st.rerun()
+        if usuario in USUARIOS and password == USUARIOS[usuario]["password"]:
+            datos = USUARIOS[usuario]
 
-        with c2:
-            if st.button("Luis Lozano", key="login_luis"):
-                st.session_state.perfil = "operario"
-                st.session_state.operario_activo = "Luis Lozano"
-                st.rerun()
+            st.session_state["login_ok"] = True
+            st.session_state["usuario"] = usuario
+            st.session_state["perfil"] = datos["perfil"]
+            st.session_state["operario_activo"] = datos["nombre"]
+            st.session_state["entrada_app"] = False
+            st.session_state["seccion_actual"] = None
 
-        with c3:
-            if st.button("J.A. Almeda", key="login_ja"):
-                st.session_state.perfil = "operario"
-                st.session_state.operario_activo = "J.A. Almeda"
-                st.rerun()
+            st.rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos")
 
-        with c4:
-            if st.button("Gerencia", key="login_gerencia"):
-                st.session_state.perfil = "gerencia"
-                st.session_state.operario_activo = "Gerencia"
-                st.rerun()
+    st.stop()
 
-        with c5:
-            clave = st.text_input("Clave admin", type="password", key="clave_admin")
-            if st.button("Entrar admin", key="login_admin"):
-                if clave == CLAVE_ADMIN:
-                    st.session_state.perfil = "admin"
-                    st.session_state.operario_activo = "Administrador"
-                    st.rerun()
-                else:
-                    st.error("Clave incorrecta")
-
-        st.stop()
 
 def barra_sesion():
-    c1, c2 = st.columns([6, 1])
+    nombre = st.session_state.get("operario_activo", "")
+    perfil = st.session_state.get("perfil", "")
 
-    with c1:
-        perfil = st.session_state.get("perfil", "")
-        activo = st.session_state.get("operario_activo", "")
+    if nombre:
+        st.caption(f"Sesión: {nombre} · {perfil}")
 
-        if perfil == "admin":
-            st.caption("Sesión activa: Administrador")
-        elif perfil == "gerencia":
-            st.caption("Sesión activa: Gerencia")
-        else:
-            st.caption(f"Sesión activa: Operario | {activo}")
+    if st.button("Cerrar sesión", use_container_width=True):
+        claves = [
+            "login_ok",
+            "usuario",
+            "perfil",
+            "operario_activo",
+            "entrada_app",
+            "seccion_actual",
+            "vista_operario"
+        ]
 
-    with c2:
-        if st.button("Salir", key="logout_btn"):
-            st.session_state.perfil = None
-            st.session_state.operario_activo = None
-            st.rerun()
+        for clave in claves:
+            if clave in st.session_state:
+                del st.session_state[clave]
+
+        st.rerun()
