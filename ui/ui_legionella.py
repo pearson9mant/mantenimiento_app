@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
@@ -44,18 +45,21 @@ CENTROS = {
     },
 }
 
-
+def adaptar_sql(sql):
+    if os.getenv("DATABASE_URL"):
+        return sql.replace("?", "%s")
+    return sql
+    
 def ejecutar(sql, params=()):
     conn = conectar()
     cur = conn.cursor()
-    cur.execute(sql, params)
+    cur.execute(adaptar_sql(sql), params)
     conn.commit()
     conn.close()
 
-
 def leer_df(sql, params=()):
     conn = conectar()
-    df = pd.read_sql_query(sql, conn, params=params)
+    df = pd.read_sql_query(adaptar_sql(sql), conn, params=params)
     conn.close()
     return df
 
