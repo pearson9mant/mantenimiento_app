@@ -57,11 +57,16 @@ def ejecutar(sql, params=()):
     conn.commit()
     conn.close()
 
-def leer_df(sql, params=()):
-    conn = conectar()
-    df = pd.read_sql_query(adaptar_sql(sql), conn, params=params)
-    conn.close()
-    return df
+df = leer_df("""
+    SELECT COUNT(*) AS total
+    FROM legionella_puntos
+    WHERE centro IS NOT NULL
+      AND edificio IS NOT NULL
+      AND nombre_punto IS NOT NULL
+""")
+
+if int(df.loc[0, "total"]) > 0:
+    return
 
 
 def sembrar_puntos_si_vacio():
