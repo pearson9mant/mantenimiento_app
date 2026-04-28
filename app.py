@@ -20,7 +20,7 @@ st.set_page_config(page_title="Mantenimiento", layout="wide")
 
 
 # -------------------------------
-# ESTILO MÓVIL
+# ESTILO MÓVIL / MENÚ HORIZONTAL
 # -------------------------------
 st.markdown("""
 <meta name="google" content="notranslate">
@@ -36,13 +36,34 @@ html, body {
     padding-right: 1rem !important;
 }
 
+div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
+    align-items: center !important;
+}
+
+div[role="radiogroup"] label {
+    white-space: nowrap !important;
+    min-width: fit-content !important;
+    padding: 8px 10px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+div[role="radiogroup"] p {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
 .stButton > button {
     width: 100%;
-    min-height: 44px;
+    min-height: 42px;
     font-size: 14px !important;
     font-weight: 600 !important;
     border-radius: 12px !important;
-    padding: 0.4rem 0.5rem !important;
 }
 
 h1, h2, h3 {
@@ -54,69 +75,6 @@ h1, h2, h3 {
 }
 </style>
 """, unsafe_allow_html=True)
-
-
-# -------------------------------
-# FUNCIONES MENÚ
-# -------------------------------
-def boton_menu(nombre, clave, destino):
-    if st.button(nombre, key=clave):
-        st.session_state["menu_actual"] = destino
-        st.rerun()
-
-
-def menu_admin():
-    if "menu_actual" not in st.session_state:
-        st.session_state["menu_actual"] = "Panel"
-
-    st.markdown("""
-    <div style="display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;">
-    """, unsafe_allow_html=True)
-
-    cols = st.columns(6)
-
-    botones = [
-        ("📊 Panel", "Panel"),
-        ("🛠 Órdenes", "Ordenes"),
-        ("📦 Inventario", "Inventario"),
-        ("💧 Legionella", "Legionella"),
-        ("👷 Operario", "Operario"),
-        ("⚙️ Operarios", "Operarios"),
-    ]
-
-    for i, (texto, valor) in enumerate(botones):
-        with cols[i]:
-            if st.button(texto, key=f"btn_{valor}"):
-                st.session_state["menu_actual"] = valor
-                st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def menu_gerencia():
-    if "menu_actual" not in st.session_state:
-        st.session_state["menu_actual"] = "Panel"
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        boton_menu("📊 Panel", "btn_panel_gerencia", "Panel")
-    with col2:
-        boton_menu("🛠 Órdenes", "btn_ordenes_gerencia", "Ordenes")
-    with col3:
-        boton_menu("📦 Inventario", "btn_inventario_gerencia", "Inventario")
-
-
-def menu_operario():
-    if "menu_actual" not in st.session_state:
-        st.session_state["menu_actual"] = "Resumen"
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        boton_menu("📋 Resumen", "btn_resumen_operario", "Resumen")
-    with col2:
-        boton_menu("🛠 Órdenes", "btn_ordenes_operario", "Ordenes")
-    with col3:
-        boton_menu("📦 Inventario", "btn_inventario_operario", "Inventario")
 
 
 # -------------------------------
@@ -151,15 +109,19 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
 # -------------------------------
 if perfil == "admin":
 
-    menu_admin()
-    st.markdown("---")
+    menu = st.radio(
+        "",
+        ["Panel", "Órdenes", "Inventario", "Legionella", "Operario", "Operarios"],
+        horizontal=True,
+        key="menu_admin_radio"
+    )
 
-    menu = st.session_state.get("menu_actual", "Panel")
+    st.markdown("---")
 
     if menu == "Panel":
         pantalla_panel()
 
-    elif menu == "Ordenes":
+    elif menu == "Órdenes":
         pantalla_ordenes()
 
     elif menu == "Inventario":
@@ -180,15 +142,19 @@ if perfil == "admin":
 # -------------------------------
 elif perfil == "gerencia":
 
-    menu_gerencia()
-    st.markdown("---")
+    menu = st.radio(
+        "",
+        ["Panel", "Órdenes", "Inventario"],
+        horizontal=True,
+        key="menu_gerencia_radio"
+    )
 
-    menu = st.session_state.get("menu_actual", "Panel")
+    st.markdown("---")
 
     if menu == "Panel":
         pantalla_panel()
 
-    elif menu == "Ordenes":
+    elif menu == "Órdenes":
         pantalla_ordenes_lectura()
 
     elif menu == "Inventario":
@@ -202,15 +168,19 @@ else:
 
     st.caption(f"{operario_activo}")
 
-    menu_operario()
-    st.markdown("---")
+    menu = st.radio(
+        "",
+        ["Resumen", "Órdenes", "Inventario"],
+        horizontal=True,
+        key="menu_operario_radio"
+    )
 
-    menu = st.session_state.get("menu_actual", "Resumen")
+    st.markdown("---")
 
     if menu == "Resumen":
         pantalla_resumen_operario()
 
-    elif menu == "Ordenes":
+    elif menu == "Órdenes":
         pantalla_operario()
 
     elif menu == "Inventario":
