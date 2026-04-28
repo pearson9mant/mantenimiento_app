@@ -31,9 +31,15 @@ def conectar():
 
 def _add_column(cursor, tabla, columna, tipo):
     try:
+        cursor.execute("SAVEPOINT add_column_savepoint")
         cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+        cursor.execute("RELEASE SAVEPOINT add_column_savepoint")
     except Exception:
-        pass
+        try:
+            cursor.execute("ROLLBACK TO SAVEPOINT add_column_savepoint")
+            cursor.execute("RELEASE SAVEPOINT add_column_savepoint")
+        except Exception:
+            pass
 
 
 def inicializar_db():
