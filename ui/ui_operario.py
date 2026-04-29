@@ -87,9 +87,25 @@ def pantalla_operario():
 
         with b3:
             if st.button("✔\nFinalizar", key=f"fin_rapido_{id_orden}", use_container_width=True):
-                finalizar_orden(id_orden, "")
-                st.success(f"{num_ot} finalizada correctamente.")
+                st.session_state[f"confirmar_fin_rapido_{id_orden}"] = True
                 st.rerun()
+
+        if st.session_state.get(f"confirmar_fin_rapido_{id_orden}", False):
+            st.warning(f"¿Seguro que quieres finalizar {num_ot}?")
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+                if st.button("✔\nSí, finalizar", key=f"si_fin_rapido_{id_orden}", use_container_width=True):
+                    finalizar_orden(id_orden, "")
+                    st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
+                    st.success(f"{num_ot} finalizada correctamente.")
+                    st.rerun()
+
+            with c2:
+                if st.button("❌\nCancelar", key=f"no_fin_rapido_{id_orden}", use_container_width=True):
+                    st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
+                    st.rerun()
 
         with st.expander(f"Más opciones {num_ot}"):
 
@@ -135,26 +151,44 @@ def pantalla_operario():
                 key=f"fin_completo_operario_{id_orden}",
                 use_container_width=True
             ):
-                if usar_material and materiales_select:
-                    if cantidad_material <= 0:
-                        st.warning("Indica una cantidad de material mayor que 0.")
-                    else:
-                        ok, mensaje = registrar_movimiento_inventario(
-                            codigo_material=codigo_sel,
-                            tipo_movimiento="Salida",
-                            cantidad=cantidad_material,
-                            motivo=f"Consumo en OT {num_ot}",
-                            numero_ot=num_ot,
-                            operario=operario_sel
-                        )
+                st.session_state[f"confirmar_fin_completo_{id_orden}"] = True
+                st.rerun()
 
-                        if not ok:
-                            st.error(mensaje)
+            if st.session_state.get(f"confirmar_fin_completo_{id_orden}", False):
+                st.warning(f"¿Seguro que quieres finalizar {num_ot} con estas observaciones/material?")
+
+                c1, c2 = st.columns(2)
+
+                with c1:
+                    if st.button("✔\nSí, finalizar", key=f"si_fin_completo_{id_orden}", use_container_width=True):
+
+                        if usar_material and materiales_select:
+                            if cantidad_material <= 0:
+                                st.warning("Indica una cantidad de material mayor que 0.")
+                            else:
+                                ok, mensaje = registrar_movimiento_inventario(
+                                    codigo_material=codigo_sel,
+                                    tipo_movimiento="Salida",
+                                    cantidad=cantidad_material,
+                                    motivo=f"Consumo en OT {num_ot}",
+                                    numero_ot=num_ot,
+                                    operario=operario_sel
+                                )
+
+                                if not ok:
+                                    st.error(mensaje)
+                                else:
+                                    finalizar_orden(id_orden, observaciones_fin)
+                                    st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                                    st.success(f"{num_ot} finalizada y material descontado correctamente.")
+                                    st.rerun()
                         else:
                             finalizar_orden(id_orden, observaciones_fin)
-                            st.success(f"{num_ot} finalizada y material descontado correctamente.")
+                            st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                            st.success(f"{num_ot} finalizada correctamente.")
                             st.rerun()
-                else:
-                    finalizar_orden(id_orden, observaciones_fin)
-                    st.success(f"{num_ot} finalizada correctamente.")
-                    st.rerun()
+
+                with c2:
+                    if st.button("❌\nCancelar", key=f"no_fin_completo_{id_orden}", use_container_width=True):
+                        st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                        st.rerun()
