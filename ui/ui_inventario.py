@@ -2,7 +2,8 @@ import streamlit as st
 
 from modules.inventario import (
     obtener_materiales_para_select,
-    registrar_movimiento_inventario
+    registrar_movimiento_inventario,
+    crear_material  # 👈 IMPORTANTE
 )
 
 
@@ -11,6 +12,27 @@ def pantalla_inventario():
 
     operario = st.session_state.get("operario_activo", "")
 
+    # -------------------------
+    # ➕ CREAR MATERIAL (ABEL)
+    # -------------------------
+    if operario == "Abel Vasquez":
+        with st.expander("➕ Crear material nuevo"):
+
+            codigo = st.text_input("Código")
+            nombre = st.text_input("Nombre material")
+            unidad = st.text_input("Unidad (uds, m, kg...)")
+
+            if st.button("Crear material"):
+                if codigo and nombre:
+                    crear_material(codigo, nombre, unidad)
+                    st.success("Material creado correctamente.")
+                    st.rerun()
+                else:
+                    st.warning("Completa código y nombre.")
+
+    # -------------------------
+    # 📦 LISTADO
+    # -------------------------
     materiales = obtener_materiales_para_select()
 
     if not materiales:
@@ -20,12 +42,14 @@ def pantalla_inventario():
     st.markdown("### 📋 Stock actual")
 
     for codigo, material, stock_actual, unidad in materiales:
+
         st.markdown("---")
         st.markdown(f"**{codigo}** · {material}")
         st.markdown(f"Stock: **{stock_actual} {unidad}**")
 
         c1, c2 = st.columns(2)
 
+        # ➕ ENTRADA
         with c1:
             entrada = st.number_input(
                 f"Entrada {codigo}",
@@ -47,6 +71,7 @@ def pantalla_inventario():
                     st.success("Entrada registrada.")
                     st.rerun()
 
+        # ➖ SALIDA
         with c2:
             salida = st.number_input(
                 f"Salida {codigo}",
