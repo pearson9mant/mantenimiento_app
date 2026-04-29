@@ -167,6 +167,20 @@ def mostrar_menu_gerencia():
 
 
 def mostrar_menu_operario():
+    operario = st.session_state.get("operario_activo", "")
+
+    # -------------------------------
+    # ABEL: SOLO INVENTARIO
+    # -------------------------------
+    if operario == "Abel Vasquez":
+        if st.button("📦\nInventario", key="btn_inv_operario_abel", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario"
+            st.rerun()
+        return
+
+    # -------------------------------
+    # RESTO DE OPERARIOS
+    # -------------------------------
     col1, col2 = st.columns(2)
 
     with col1:
@@ -182,19 +196,6 @@ def mostrar_menu_operario():
         if st.button("🛠\nÓrdenes", key="btn_ot_operario", use_container_width=True):
             st.session_state["seccion_actual"] = "Órdenes"
             st.rerun()
-
-
-inicializar_db()
-login()
-
-perfil = st.session_state.get("perfil", "")
-operario_activo = st.session_state.get("operario_activo", "")
-
-if "seccion_actual" not in st.session_state:
-    st.session_state["seccion_actual"] = None
-
-if "entrada_app" not in st.session_state:
-    st.session_state["entrada_app"] = False
 
 
 # -------------------------------
@@ -305,6 +306,11 @@ elif perfil == "gerencia":
 else:
 
     st.caption(f"{operario_activo}")
+
+    # Abel solo puede entrar a Inventario
+    if operario_activo == "Abel Vasquez" and seccion != "Inventario":
+        st.warning("Abel solo tiene acceso a Inventario.")
+        st.stop()
 
     if seccion == "Resumen":
         pantalla_resumen_operario()
