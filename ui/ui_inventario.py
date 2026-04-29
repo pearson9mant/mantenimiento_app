@@ -4,9 +4,8 @@ from pathlib import Path
 from modules.inventario import (
     generar_codigo_material,
     crear_material_inventario,
-    obtener_materiales_para_select,
-    registrar_movimiento_inventario,
-    obtener_material_por_codigo
+    obtener_materiales_inventario,
+    registrar_movimiento_inventario
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -17,6 +16,9 @@ def pantalla_inventario():
 
     operario = st.session_state.get("operario_activo", "")
 
+    # -------------------------
+    # CREAR MATERIAL NUEVO
+    # -------------------------
     if operario == "Abel Vasquez":
         with st.expander("➕ Crear material nuevo"):
 
@@ -32,7 +34,8 @@ def pantalla_inventario():
                     "Pintura",
                     "Limpieza",
                     "Otros"
-                ]
+                ],
+                key="crear_categoria_material"
             )
 
             unidad = st.text_input("Unidad", value="uds")
@@ -108,29 +111,120 @@ def pantalla_inventario():
                     st.success(f"Material creado correctamente: {codigo}")
                     st.rerun()
 
-    materiales = obtener_materiales_para_select()
+    # -------------------------
+    # BUSCADOR / FILTROS
+    # -------------------------
+    st.markdown("### 🔎 Buscar material")
+
+    filtro_texto = st.text_input(
+        "Buscar por código, material, ubicación o proveedor",
+        key="filtro_texto_inventario"
+    )
+
+    f1, f2 = st.columns(2)
+
+    with f1:
+        filtro_centro = st.selectbox(
+            "Centro",
+            ["Todos"] + CENTROS,
+            key="filtro_centro_inventario"
+        )
+
+    with f2:
+        if filtro_centro != "Todos":
+            edificios_filtro = obtener_edificios(filtro_centro)
+        else:
+            edificios_filtro = []
+
+        filtro_edificio = st.selectbox(
+            "Edificio",
+            ["Todos"] + edificios_filtro,
+            key="filtro_edificio_inventario"
+        )
+
+    filtro_categoria = st.selectbox(
+        "Categoría",
+        [
+            "Todas",
+            "Electricidad",
+            "Fontanería",
+            "Climatización",
+            "Ferretería",
+            "Pintura",
+            "Limpieza",
+            "Otros"
+        ],
+        key="filtro_categoria_inventario"
+    )
+
+    materiales = obtener_materiales_inventario(
+        filtro_texto=filtro_texto,
+        filtro_categoria=filtro_categoria,
+        filtro_centro=filtro_centro,
+        filtro_edificio=filtro_edificio
+    )
 
     if not materiales:
-        st.info("No hay materiales en inventario.")
+        st.info("No hay materiales con esos filtros.")
         return
 
-    st.markdown("### 📋 Stock actual")
+    st.markdown(f"### 📋 Stock actual ({len(materiales)})")
 
-    for codigo, material, stock_actual, unidad in materiales:
+    for m in materiales:
+        try:
+            (
+                id_mat,
+                codigo,
+                material,
+                categoria,
+                unidad,
+                stock_actual,
+                stock_minimo,
+                centro,
+                edificio,
+                ubicacion,
+                proveedor,
+                observaciones,
+                fecha_alta,
+                foto
+            ) = m
+        except ValueError:
+            (
+                id_mat,
+                codigo,
+                material,
+                categoria,
+                unidad,
+                stock_actual,
+                stock_minimo,
+                centro,
+                edificio,
+                ubicacion,
+                proveedor,
+                observaciones,
+                fecha_alta
+            ) = m
+            foto = ""
 
         st.markdown("---")
-        st.markdown(f"**{codigo}** · {material}")
-        st.markdown(f"Stock: **{stock_actual} {unidad}**")
 
-        datos_material = obtener_material_por_codigo(codigo)
+        if stock_actual <= stock_minimo:
+            st.warning(f"⚠️ Stock bajo: {material} ({stock_actual} {unidad})")
 
-        if datos_material:
+        st.markdown(f"### **{codigo}** · {material}")
+        st.markdown(f"**Categoría:** {categoria or '-'}")
+        st.markdown(f"**Stock:** {stock_actual} {unidad} · **Mínimo:** {stock_minimo} {unidad}")
+        st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {ubicacion or '-'}")
+
+        if proveedor:
+            st.caption(f"Proveedor: {proveedor}")
+
+        if observaciones:
+            st.info(observaciones)
+
+        if foto:
             try:
-                foto = datos_material[-1]
-
-                if foto:
-                    st.image(foto, width=220)
-
+                st.image(foto, width=220)
             except Exception:
                 st.caption("Foto no disponible.")
 
