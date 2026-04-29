@@ -5,7 +5,8 @@ from modules.inventario import (
     generar_codigo_material,
     crear_material_inventario,
     obtener_materiales_inventario,
-    registrar_movimiento_inventario
+    registrar_movimiento_inventario,
+    obtener_movimientos_por_material
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -228,6 +229,32 @@ def pantalla_inventario():
             except Exception:
                 st.caption("Foto no disponible.")
 
+        # -------------------------
+        # HISTORIAL POR MATERIAL
+        # -------------------------
+        with st.expander(f"📊 Historial {codigo}"):
+
+            movimientos = obtener_movimientos_por_material(codigo)
+
+            if not movimientos:
+                st.info("Sin movimientos.")
+            else:
+                for mov in movimientos[:20]:
+                    tipo, cantidad, motivo, ot, operario_mov, fecha = mov
+
+                    icono = "➕" if tipo == "Entrada" else "➖"
+
+                    st.markdown(
+                        f"{icono} **{tipo}** · {cantidad}  \n"
+                        f"📅 {fecha} · 👷 {operario_mov or '-'}  \n"
+                        f"🛠 OT: {ot or '-'}  \n"
+                        f"📝 {motivo or '-'}"
+                    )
+                    st.markdown("---")
+
+        # -------------------------
+        # ENTRADAS / SALIDAS
+        # -------------------------
         c1, c2 = st.columns(2)
 
         with c1:
