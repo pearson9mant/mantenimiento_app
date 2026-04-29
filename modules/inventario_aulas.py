@@ -32,17 +32,42 @@ def crear_tabla_inventario_aulas():
 
 
 def guardar_inventario_aula(
-    centro, edificio, espacio, elemento, cantidad, estado,
-    ancho, alto, fondo, unidad, observaciones, foto, operario
+    centro,
+    edificio,
+    espacio,
+    elemento,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
 ):
+    crear_tabla_inventario_aulas()
+
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         INSERT INTO inventario_aulas (
-            fecha_revision, centro, edificio, espacio, elemento,
-            cantidad, estado, ancho, alto, fondo, unidad,
-            observaciones, foto, operario, fecha_creacion
+            fecha_revision,
+            centro,
+            edificio,
+            espacio,
+            elemento,
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario,
+            fecha_creacion
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
@@ -68,6 +93,8 @@ def guardar_inventario_aula(
 
 
 def obtener_inventario_aulas():
+    crear_tabla_inventario_aulas()
+
     conn = conectar()
     cursor = conn.cursor()
 
