@@ -6,6 +6,19 @@ def _ph(conn):
     return "?" if "sqlite" in modulo else "%s"
 
 
+def asegurar_columna_foto_inventario():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("ALTER TABLE inventario ADD COLUMN foto TEXT")
+        conn.commit()
+    except Exception:
+        pass
+
+    conn.close()
+
+
 def generar_codigo_material(material, categoria):
     conn = conectar()
     cursor = conn.cursor()
@@ -14,10 +27,12 @@ def generar_codigo_material(material, categoria):
     texto_material = "".join(c for c in material.upper() if c.isalnum() or c == " ")
     partes = [x for x in texto_material.split() if x]
     base_material = "".join(x[:2] for x in partes[:2])[:4]
+
     if len(base_material) < 4:
         base_material = (base_material + "XXXX")[:4]
 
     base_categoria = "".join(c for c in categoria.upper() if c.isalpha())[:3]
+
     if len(base_categoria) < 3:
         base_categoria = (base_categoria + "XXX")[:3]
 
@@ -32,6 +47,7 @@ def generar_codigo_material(material, categoria):
     conn.close()
 
     numeros = []
+
     for cod in existentes:
         try:
             numeros.append(int(cod.split("-")[-1]))
@@ -53,8 +69,11 @@ def crear_material_inventario(
     edificio,
     ubicacion,
     proveedor,
-    observaciones
+    observaciones,
+    foto=""
 ):
+    asegurar_columna_foto_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
@@ -72,9 +91,10 @@ def crear_material_inventario(
             edificio,
             ubicacion,
             proveedor,
-            observaciones
+            observaciones,
+            foto
         )
-        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
     """, (
         codigo,
         material.strip(),
@@ -86,7 +106,8 @@ def crear_material_inventario(
         edificio,
         ubicacion.strip(),
         proveedor.strip(),
-        observaciones.strip()
+        observaciones.strip(),
+        foto
     ))
 
     conn.commit()
@@ -99,16 +120,19 @@ def obtener_materiales_inventario(
     filtro_centro="Todos",
     filtro_edificio="Todos"
 ):
+    asegurar_columna_foto_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
 
     sql = """
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto
         FROM inventario
         WHERE 1=1
     """
+
     params = []
 
     if filtro_texto.strip():
@@ -133,6 +157,7 @@ def obtener_materiales_inventario(
     cursor.execute(sql, params)
     datos = cursor.fetchall()
     conn.close()
+
     return datos
 
 
@@ -148,6 +173,7 @@ def obtener_codigos_materiales():
 
     datos = cursor.fetchall()
     conn.close()
+
     return datos
 
 
@@ -188,6 +214,7 @@ def registrar_movimiento_inventario(
         if stock_actual < cantidad:
             conn.close()
             return False, f"Stock insuficiente. Disponible: {stock_actual}"
+
         nuevo_stock = stock_actual - cantidad
 
     elif tipo_movimiento == "Ajuste":
@@ -240,16 +267,19 @@ def obtener_movimientos_inventario():
 
     datos = cursor.fetchall()
     conn.close()
+
     return datos
 
 
 def obtener_stock_bajo():
+    asegurar_columna_foto_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto
         FROM inventario
         WHERE stock_actual <= stock_minimo
         ORDER BY stock_actual ASC, material ASC
@@ -257,6 +287,7 @@ def obtener_stock_bajo():
 
     datos = cursor.fetchall()
     conn.close()
+
     return datos
 
 
@@ -272,22 +303,26 @@ def obtener_materiales_para_select():
 
     datos = cursor.fetchall()
     conn.close()
+
     return datos
 
 
 def obtener_material_por_codigo(codigo):
+    asegurar_columna_foto_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
 
     cursor.execute(f"""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto
         FROM inventario
         WHERE codigo = {p}
     """, (codigo,))
 
     fila = cursor.fetchone()
     conn.close()
+
     return fila
 
