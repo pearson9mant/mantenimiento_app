@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 
 from modules.inventario_aulas import (
     crear_tabla_inventario_aulas,
@@ -19,12 +20,25 @@ def pantalla_inventario_aulas():
 
     centro = st.selectbox(
         "Centro",
-        ["Pearson 22", "Pearson 9"],
+        CENTROS,
         key="inv_aula_centro"
     )
 
-    edificio = st.text_input("Edificio", key="inv_aula_edificio")
-    espacio = st.text_input("Aula / Espacio", key="inv_aula_espacio")
+    edificios = obtener_edificios(centro)
+
+    edificio = st.selectbox(
+        "Edificio",
+        edificios,
+        key="inv_aula_edificio"
+    )
+
+    espacios = obtener_espacios(edificio)
+
+    espacio = st.selectbox(
+        "Aula / Espacio",
+        espacios,
+        key="inv_aula_espacio"
+    )
 
     elemento = st.selectbox(
         "Elemento",
@@ -97,7 +111,7 @@ def pantalla_inventario_aulas():
         st.image(ruta_foto, width=250)
 
     if st.button("💾 Guardar registro", use_container_width=True):
-        if not edificio.strip() or not espacio.strip() or not elemento.strip():
+        if not edificio or not espacio or not elemento:
             st.warning("Rellena edificio, aula/espacio y elemento.")
         else:
             guardar_inventario_aula(
