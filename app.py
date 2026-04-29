@@ -17,9 +17,6 @@ from ui.ui_inventario_aulas import pantalla_inventario_aulas
 st.set_page_config(page_title="Mantenimiento", layout="wide")
 
 
-# -------------------------------
-# ESTILO MÓVIL
-# -------------------------------
 st.markdown("""
 <meta name="google" content="notranslate">
 
@@ -89,22 +86,16 @@ def mostrar_portada(perfil, operario_activo):
     try:
         st.image("logo cole.jpg", width=220)
     except Exception:
-        st.markdown(
-            "<div class='logo-portada'>🏫</div>",
-            unsafe_allow_html=True
-        )
+        st.markdown("<div class='logo-portada'>🏫</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='titulo-portada'>Mantenimiento</div>", unsafe_allow_html=True)
     st.markdown("<div class='subtitulo-portada'>Loreto Abat Oliba</div>", unsafe_allow_html=True)
-
     st.markdown("---")
 
     if perfil == "admin":
         texto_boton = "🔐\nEntrar en administración"
-
     elif perfil == "gerencia":
         texto_boton = "📊\nEntrar a gerencia"
-
     else:
         if operario_activo:
             st.caption(f"Operario: {operario_activo}")
@@ -169,18 +160,17 @@ def mostrar_menu_gerencia():
 def mostrar_menu_operario():
     operario = st.session_state.get("operario_activo", "")
 
-    # -------------------------------
-    # ABEL: SOLO INVENTARIO
-    # -------------------------------
     if operario == "Abel Vasquez":
-        if st.button("📦\nInventario", key="btn_inv_operario_abel", use_container_width=True):
+        if st.button("📦\nInventario mantenimiento", key="btn_inv_operario_abel", use_container_width=True):
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
+
+        if st.button("🏫\nInventario aulas", key="btn_inv_aulas_abel", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario aulas"
+            st.rerun()
+
         return
 
-    # -------------------------------
-    # RESTO DE OPERARIOS
-    # -------------------------------
     col1, col2 = st.columns(2)
 
     with col1:
@@ -214,9 +204,6 @@ if "entrada_app" not in st.session_state:
     st.session_state["entrada_app"] = False
 
 
-# -------------------------------
-# PORTADA DE ENTRADA
-# -------------------------------
 if not st.session_state["entrada_app"]:
     mostrar_portada(perfil, operario_activo)
 
@@ -236,9 +223,6 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
     st.stop()
 
 
-# -------------------------------
-# MENÚ GENERAL
-# -------------------------------
 if st.session_state["seccion_actual"] is None:
 
     if st.button("⬅\nVolver a portada", key="volver_portada_desde_menu", use_container_width=True):
@@ -259,9 +243,6 @@ if st.session_state["seccion_actual"] is None:
     st.stop()
 
 
-# -------------------------------
-# BOTONES VOLVER
-# -------------------------------
 col_volver1, col_volver2 = st.columns(2)
 
 with col_volver1:
@@ -290,6 +271,9 @@ if perfil == "admin":
 
     elif seccion == "Inventario":
         pantalla_inventario()
+
+    elif seccion == "Inventario aulas":
+        pantalla_inventario_aulas()
 
     elif seccion == "Legionella":
         pantalla_legionella()
@@ -323,8 +307,7 @@ else:
 
     st.caption(f"{operario_activo}")
 
-    # Abel solo puede entrar a Inventario
-    if operario_activo == "Abel Vasquez" and seccion != "Inventario":
+    if operario_activo == "Abel Vasquez" and seccion not in ["Inventario", "Inventario aulas"]:
         st.warning("Abel solo tiene acceso a Inventario.")
         st.stop()
 
@@ -336,3 +319,6 @@ else:
 
     elif seccion == "Inventario":
         pantalla_inventario()
+
+    elif seccion == "Inventario aulas":
+        pantalla_inventario_aulas()
