@@ -11,6 +11,7 @@ from ui.ui_operario import pantalla_operario
 from ui.ui_resumen_operario import pantalla_resumen_operario
 from ui.ui_legionella import pantalla_legionella
 from ui.ui_operarios_admin import pantalla_operarios_admin
+from ui.ui_inventario_aulas import pantalla_inventario_aulas
 
 
 st.set_page_config(page_title="Mantenimiento", layout="wide")
