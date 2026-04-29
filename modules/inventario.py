@@ -321,8 +321,27 @@ def obtener_material_por_codigo(codigo):
         WHERE codigo = {p}
     """, (codigo,))
 
-    fila = cursor.fetchone()
-    conn.close()
+    def obtener_movimientos_por_material(codigo_material):
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
 
-    return fila
+    cursor.execute(f"""
+        SELECT
+            tipo_movimiento,
+            cantidad,
+            motivo,
+            numero_ot,
+            operario,
+            fecha_movimiento
+        FROM movimientos_inventario
+        WHERE codigo_material = {p}
+        ORDER BY fecha_movimiento DESC
+    """, (codigo_material,))
+
+    datos = cursor.fetchall()
+    conn.close()
+    return datos
+
+    
 
