@@ -5,7 +5,8 @@ from modules.inventario import (
     generar_codigo_material,
     crear_material_inventario,
     obtener_materiales_para_select,
-    registrar_movimiento_inventario
+    registrar_movimiento_inventario,
+    obtener_material_por_codigo
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -120,6 +121,18 @@ def pantalla_inventario():
         st.markdown("---")
         st.markdown(f"**{codigo}** · {material}")
         st.markdown(f"Stock: **{stock_actual} {unidad}**")
+
+        datos_material = obtener_material_por_codigo(codigo)
+
+        if datos_material:
+            try:
+                foto = datos_material[-1]
+
+                if foto:
+                    st.image(foto, width=220)
+
+            except Exception:
+                st.caption("Foto no disponible.")
 
         c1, c2 = st.columns(2)
 
