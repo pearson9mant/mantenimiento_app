@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 
 from modules.inventario import (
     generar_codigo_material,
@@ -6,6 +7,8 @@ from modules.inventario import (
     obtener_materiales_para_select,
     registrar_movimiento_inventario
 )
+
+from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 
 
 def pantalla_inventario():
@@ -15,19 +18,70 @@ def pantalla_inventario():
 
     if operario == "Abel Vasquez":
         with st.expander("➕ Crear material nuevo"):
+
             material = st.text_input("Nombre material")
+
             categoria = st.selectbox(
                 "Categoría",
-                ["Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"]
+                [
+                    "Electricidad",
+                    "Fontanería",
+                    "Climatización",
+                    "Ferretería",
+                    "Pintura",
+                    "Limpieza",
+                    "Otros"
+                ]
             )
+
             unidad = st.text_input("Unidad", value="uds")
             stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0)
             stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0)
-            centro = st.selectbox("Centro", ["Pearson 22", "Pearson 9"])
-            edificio = st.text_input("Edificio")
-            ubicacion = st.text_input("Ubicación")
+
+            centro = st.selectbox(
+                "Centro",
+                CENTROS,
+                key="inv_mat_centro"
+            )
+
+            edificios = obtener_edificios(centro)
+
+            edificio = st.selectbox(
+                "Edificio",
+                edificios,
+                key="inv_mat_edificio"
+            )
+
+            espacios = obtener_espacios(edificio)
+
+            ubicacion = st.selectbox(
+                "Aula / Espacio / Ubicación",
+                espacios,
+                key="inv_mat_ubicacion"
+            )
+
             proveedor = st.text_input("Proveedor")
             observaciones = st.text_area("Observaciones")
+
+            foto_subida = st.file_uploader(
+                "Foto del material",
+                type=["jpg", "jpeg", "png"],
+                key="foto_material_mantenimiento"
+            )
+
+            ruta_foto = ""
+
+            if foto_subida is not None:
+                carpeta = Path("data/fotos_inventario")
+                carpeta.mkdir(parents=True, exist_ok=True)
+
+                nombre_foto = f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}".replace(" ", "_")
+                ruta_foto = str(carpeta / nombre_foto)
+
+                with open(ruta_foto, "wb") as f:
+                    f.write(foto_subida.getbuffer())
+
+                st.image(ruta_foto, width=250)
 
             if st.button("Crear material", use_container_width=True):
                 if not material.strip():
@@ -46,7 +100,8 @@ def pantalla_inventario():
                         edificio=edificio,
                         ubicacion=ubicacion,
                         proveedor=proveedor,
-                        observaciones=observaciones
+                        observaciones=observaciones,
+                        foto=ruta_foto
                     )
 
                     st.success(f"Material creado correctamente: {codigo}")
