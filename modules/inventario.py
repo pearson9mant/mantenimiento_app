@@ -1,221 +1,127 @@
-from database.db import conectar
+import streamlit as st
 
-def generar_codigo_material(material, categoria):
-    texto_material = "".join(c for c in material.upper() if c.isalnum() or c == " ")
-    partes = [p for p in texto_material.split() if p]
-    base_material = "".join(p[:2] for p in partes[:2])[:4]
-    if len(base_material) < 4:
-        base_material = (base_material + "XXXX")[:4]
-
-    base_categoria = "".join(c for c in categoria.upper() if c.isalpha())[:3]
-    if len(base_categoria) < 3:
-        base_categoria = (base_categoria + "XXX")[:3]
-
-    prefijo = f"{base_categoria}-{base_material}"
-
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT codigo FROM inventario WHERE codigo LIKE ?", (f"{prefijo}-%",))
-    existentes = [fila[0] for fila in cursor.fetchall()]
-    conn.close()
-
-    numeros = []
-    for cod in existentes:
-        try:
-            numeros.append(int(cod.split("-")[-1]))
-        except Exception:
-            pass
-
-    siguiente = max(numeros) + 1 if numeros else 1
-    return f"{prefijo}-{siguiente:03d}"
+from modules.inventario import (
+    generar_codigo_material,
+    crear_material_inventario,
+    obtener_materiales_para_select,
+    registrar_movimiento_inventario
+)
 
 
-def crear_material_inventario(codigo, material, categoria, unidad, stock_actual, stock_minimo,
-                              centro, edificio, ubicacion, proveedor, observaciones):
-    conn = conectar()
-    cursor = conn.cursor()
+def pantalla_inventario():
+    st.subheader("📦 Inventario mantenimiento")
 
-    cursor.execute("""
-        INSERT INTO inventario
-        (codigo, material, categoria, unidad, stock_actual, stock_minimo, centro, edificio, ubicacion, proveedor, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        codigo,
-        material.strip(),
-        categoria,
-        unidad,
-        float(stock_actual),
-        float(stock_minimo),
-        centro,
-        edificio,
-        ubicacion.strip(),
-        proveedor.strip(),
-        observaciones.strip()
-    ))
+    operario = st.session_state.get("operario_activo", "")
 
-    conn.commit()
-    conn.close()
+    # -------------------------
+    # ➕ CREAR MATERIAL
+    # -------------------------
+    if operario == "Abel Vasquez":
+        with st.expander("➕ Crear material nuevo"):
+            material = st.text_input("Nombre material")
+            categoria = st.selectbox(
+                "Categoría",
+                ["Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"]
+            )
+            unidad = st.text_input("Unidad", value="uds")
+            stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0)
+            stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0)
 
+            centro = st.selectbox("Centro", ["Pearson 22", "Pearson 9"])
+            edificio = st.text_input("Edificio")
+            ubicacion = st.text_input("Ubicación")
+            proveedor = st.text_input("Proveedor")
+            observaciones = st.text_area("Observaciones")
 
-def obtener_materiales_inventario(filtro_texto="", filtro_categoria="Todas", filtro_centro="Todos", filtro_edificio="Todos"):
-    conn = conectar()
-    cursor = conn.cursor()
+            if st.button("Crear material", use_container_width=True):
+                if not material.strip():
+                    st.warning("Indica el nombre del material.")
+                else:
+                    codigo = generar_codigo_material(material, categoria)
 
-    sql = """
-        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
-        FROM inventario
-        WHERE 1=1
-    """
-    params = []
+                    crear_material_inventario(
+                        codigo=codigo,
+                        material=material,
+                        categoria=categoria,
+                        unidad=unidad,
+                        stock_actual=stock_actual,
+                        stock_minimo=stock_minimo,
+                        centro=centro,
+                        edificio=edificio,
+                        ubicacion=ubicacion,
+                        proveedor=proveedor,
+                        observaciones=observaciones
+                    )
 
-    if filtro_texto.strip():
-        sql += " AND (codigo LIKE ? OR material LIKE ? OR ubicacion LIKE ? OR proveedor LIKE ?)"
-        txt = f"%{filtro_texto.strip()}%"
-        params.extend([txt, txt, txt, txt])
+                    st.success(f"Material creado correctamente: {codigo}")
+                    st.rerun()
 
-    if filtro_categoria != "Todas":
-        sql += " AND categoria = ?"
-        params.append(filtro_categoria)
+    # -------------------------
+    # 📦 LISTADO
+    # -------------------------
+    materiales = obtener_materiales_para_select()
 
-    if filtro_centro != "Todos":
-        sql += " AND centro = ?"
-        params.append(filtro_centro)
+    if not materiales:
+        st.info("No hay materiales en inventario.")
+        return
 
-    if filtro_edificio != "Todos":
-        sql += " AND edificio = ?"
-        params.append(filtro_edificio)
+    st.markdown("### 📋 Stock actual")
 
-    sql += " ORDER BY material ASC"
+    for codigo, material, stock_actual, unidad in materiales:
 
-    cursor.execute(sql, params)
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
+        st.markdown("---")
+        st.markdown(f"**{codigo}** · {material}")
+        st.markdown(f"Stock: **{stock_actual} {unidad}**")
 
+        c1, c2 = st.columns(2)
 
-def obtener_codigos_materiales():
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT codigo, material FROM inventario ORDER BY material ASC")
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
+        with c1:
+            entrada = st.number_input(
+                f"Entrada {codigo}",
+                min_value=0.0,
+                step=1.0,
+                key=f"entrada_{codigo}"
+            )
 
+            if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
+                if entrada > 0:
+                    ok, mensaje = registrar_movimiento_inventario(
+                        codigo_material=codigo,
+                        tipo_movimiento="Entrada",
+                        cantidad=entrada,
+                        motivo="Entrada manual",
+                        numero_ot="",
+                        operario=operario
+                    )
 
-def registrar_movimiento_inventario(codigo_material, tipo_movimiento, cantidad, motivo, numero_ot, operario):
-    conn = conectar()
-    cursor = conn.cursor()
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
 
-    cursor.execute("""
-        SELECT material, stock_actual
-        FROM inventario
-        WHERE codigo = ?
-    """, (codigo_material,))
+        with c2:
+            salida = st.number_input(
+                f"Salida {codigo}",
+                min_value=0.0,
+                step=1.0,
+                key=f"salida_{codigo}"
+            )
 
-    fila = cursor.fetchone()
-    if not fila:
-        conn.close()
-        return False, "No existe el material."
+            if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
+                if salida > 0:
+                    ok, mensaje = registrar_movimiento_inventario(
+                        codigo_material=codigo,
+                        tipo_movimiento="Salida",
+                        cantidad=salida,
+                        motivo="Salida manual",
+                        numero_ot="",
+                        operario=operario
+                    )
 
-    material, stock_actual = fila
-    cantidad = float(cantidad)
-
-    nuevo_stock = stock_actual
-
-    if tipo_movimiento == "Entrada":
-        nuevo_stock = stock_actual + cantidad
-    elif tipo_movimiento == "Salida":
-        if stock_actual < cantidad:
-            conn.close()
-            return False, f"Stock insuficiente. Disponible: {stock_actual}"
-        nuevo_stock = stock_actual - cantidad
-    elif tipo_movimiento == "Ajuste":
-        nuevo_stock = cantidad
-
-    cursor.execute("""
-        UPDATE inventario
-        SET stock_actual = ?
-        WHERE codigo = ?
-    """, (nuevo_stock, codigo_material))
-
-    cursor.execute("""
-        INSERT INTO movimientos_inventario
-        (codigo_material, material, tipo_movimiento, cantidad, motivo, numero_ot, operario)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        codigo_material,
-        material,
-        tipo_movimiento,
-        cantidad,
-        motivo.strip(),
-        numero_ot.strip(),
-        operario.strip()
-    ))
-
-    conn.commit()
-    conn.close()
-    return True, "Movimiento registrado correctamente."
-
-
-def obtener_movimientos_inventario():
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, codigo_material, material, tipo_movimiento, cantidad, motivo, numero_ot, operario, fecha_movimiento
-        FROM movimientos_inventario
-        ORDER BY fecha_movimiento DESC, id DESC
-    """)
-
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
-
-
-def obtener_stock_bajo():
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
-        FROM inventario
-        WHERE stock_actual <= stock_minimo
-        ORDER BY stock_actual ASC, material ASC
-    """)
-
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
-
-def obtener_materiales_para_select():
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT codigo, material, stock_actual, unidad
-        FROM inventario
-        ORDER BY material ASC
-    """)
-
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
-
-
-def obtener_material_por_codigo(codigo):
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
-        FROM inventario
-        WHERE codigo = ?
-    """, (codigo,))
-
-    fila = cursor.fetchone()
-    conn.close()
-    return fila
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
 
