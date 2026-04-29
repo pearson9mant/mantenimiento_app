@@ -321,7 +321,7 @@ def obtener_material_por_codigo(codigo):
         WHERE codigo = {p}
     """, (codigo,))
 
-    def obtener_movimientos_por_material(codigo_material):
+  def obtener_movimientos_por_material(codigo_material):
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
@@ -341,7 +341,7 @@ def obtener_material_por_codigo(codigo):
 
     datos = cursor.fetchall()
     conn.close()
-    return datos
+    return datos  
 
     
 
