@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 
 from modules.ordenes import obtener_ordenes, obtener_historico
-from modules.outlook import importar_y_crear_ots_automaticamente
 from database.db import conectar
 
 
@@ -45,6 +44,54 @@ def pantalla_panel():
     c3.metric("📦 Pend. material", pendiente_material)
     c4.metric("✅ Finalizadas", finalizadas)
     c5.metric("💧 Legionella", ot_legionella)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # ÚLTIMAS OTs DE PROFESORES / APP
+    # -------------------------------
+    st.markdown("### 📩 Últimas OTs creadas desde profesores/app")
+
+    ultimas_profes = [
+        o for o in ordenes
+        if len(o) > 11 and (o[11] or "").strip().upper() in ["OUTLOOK", "APP"]
+    ]
+
+    ultimas_profes = ultimas_profes[:5]
+
+    if not ultimas_profes:
+        st.info("No hay OTs recientes de profesores/app.")
+    else:
+        for o in ultimas_profes:
+            try:
+                numero_ot = o[1]
+                descripcion = o[2]
+                estado = o[3]
+                fecha = o[4]
+                centro = o[5]
+                edificio = o[6]
+                espacio = o[7]
+                area = o[8]
+                prioridad = o[9]
+                operario = o[10]
+                origen = o[11] if len(o) > 11 else ""
+
+                icono_estado = {
+                    "Abierta": "🔴",
+                    "En curso": "🟡",
+                    "Pendiente material": "📦",
+                    "Finalizada": "✅"
+                }.get(estado, "⚪")
+
+                st.markdown(
+                    f"**{icono_estado} {numero_ot}** · {prioridad or '-'} · {estado}  \n"
+                    f"{descripcion}  \n"
+                    f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
+                    f"👷 {operario or '-'} · Origen: {origen or '-'} · {fecha or '-'}"
+                )
+                st.markdown("---")
+            except Exception:
+                pass
 
     st.markdown("---")
 
@@ -93,23 +140,8 @@ def pantalla_panel():
 
     st.markdown("---")
 
-    st.markdown("### 📩 Incidencias profesores / Outlook")
-
-    p1, p2 = st.columns(2)
-    p1.metric("OT profesores/app", ot_profesores)
-
-    with p2:
-        if st.button("🔄 Importar incidencias y crear OT", use_container_width=True):
-            try:
-                ok, mensaje = importar_y_crear_ots_automaticamente()
-
-                if ok:
-                    st.success(mensaje)
-                else:
-                    st.error(mensaje)
-
-            except Exception:
-                st.warning("Outlook no disponible en este entorno.")
+    st.markdown("### 📩 Incidencias profesores / app")
+    st.metric("OT profesores/app", ot_profesores)
 
     st.markdown("---")
 
