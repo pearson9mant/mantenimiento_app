@@ -8,7 +8,7 @@ def crear_tabla_inventario_aulas():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventario_aulas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             fecha_revision TEXT,
             centro TEXT,
             edificio TEXT,
@@ -44,12 +44,22 @@ def guardar_inventario_aula(
             cantidad, estado, ancho, alto, fondo, unidad,
             observaciones, foto, operario, fecha_creacion
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         datetime.now().strftime("%Y-%m-%d"),
-        centro, edificio, espacio, elemento,
-        cantidad, estado, ancho, alto, fondo, unidad,
-        observaciones, foto, operario,
+        centro,
+        edificio,
+        espacio,
+        elemento,
+        cantidad,
+        estado,
+        ancho,
+        alto,
+        fondo,
+        unidad,
+        observaciones,
+        foto,
+        operario,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ))
 
@@ -62,7 +72,23 @@ def obtener_inventario_aulas():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT *
+        SELECT
+            id,
+            fecha_revision,
+            centro,
+            edificio,
+            espacio,
+            elemento,
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario,
+            fecha_creacion
         FROM inventario_aulas
         ORDER BY fecha_creacion DESC
     """)
