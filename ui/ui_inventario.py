@@ -232,24 +232,25 @@ def pantalla_inventario():
         # -------------------------
         # HISTORIAL POR MATERIAL
         # -------------------------
-        with st.expander(f"📊 Historial {codigo}"):
+       with st.expander(f"📊 Historial {codigo}"):
 
-            movimientos = obtener_movimientos_por_material(codigo)
+    movimientos = obtener_movimientos_por_material(codigo)
 
-            if not movimientos:
-                st.info("Sin movimientos.")
-            else:
-                for mov in movimientos[:20]:
-                    tipo, cantidad, motivo, ot, operario_mov, fecha = mov
+    if not movimientos:
+        st.info("Sin movimientos.")
+    else:
+        for mov in movimientos[:20]:
+            tipo, cantidad, motivo, ot, operario_mov, fecha = mov
 
-                    icono = "➕" if tipo == "Entrada" else "➖"
+            icono = "➕" if tipo == "Entrada" else "➖"
 
-                    st.markdown(
-                        f"{icono} **{tipo}** · {cantidad}  \n"
-                        f"📅 {fecha} · 👷 {operario_mov or '-'}  \n"
-                        f"🛠 OT: {ot or '-'}  \n"
-                        f"📝 {motivo or '-'}"
-                    )
+            st.markdown(
+                f"{icono} **{tipo}** · {cantidad}  \n"
+                f"📅 {fecha} · 👷 {operario_mov or '-'}  \n"
+                f"🛠 OT: {ot or '-'}  \n"
+                f"📝 {motivo or '-'}"
+            )
+            st.markdown("---") 
                     st.markdown("---")
 
         # -------------------------
