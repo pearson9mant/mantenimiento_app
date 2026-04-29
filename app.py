@@ -85,7 +85,6 @@ def volver_portada():
 def mostrar_portada(perfil, operario_activo):
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Si tu logo está en otra ruta, cambia esta línea.
     try:
         st.image("logo cole.jpg", width=220)
     except Exception:
@@ -196,6 +195,22 @@ def mostrar_menu_operario():
         if st.button("🛠\nÓrdenes", key="btn_ot_operario", use_container_width=True):
             st.session_state["seccion_actual"] = "Órdenes"
             st.rerun()
+
+
+# -------------------------------
+# INICIO APP
+# -------------------------------
+inicializar_db()
+login()
+
+perfil = st.session_state.get("perfil", "")
+operario_activo = st.session_state.get("operario_activo", "")
+
+if "seccion_actual" not in st.session_state:
+    st.session_state["seccion_actual"] = None
+
+if "entrada_app" not in st.session_state:
+    st.session_state["entrada_app"] = False
 
 
 # -------------------------------
