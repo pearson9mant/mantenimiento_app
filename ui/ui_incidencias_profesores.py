@@ -148,8 +148,11 @@ def pantalla_incidencias_profesores():
         "Añadir foto (opcional)",
         type=["jpg", "jpeg", "png"]
     )
+    foto_bytes = None
+
     if foto is not None:
-        st.image(foto, caption="Foto adjunta", use_container_width=True)
+        foto_bytes = foto.getvalue()
+        st.image(foto_bytes, caption="Foto adjunta", use_container_width=True)
 
     prioridad = st.radio(
         "Prioridad",
