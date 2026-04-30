@@ -14,13 +14,19 @@ def asegurar_columnas_inventario():
         cursor.execute("ALTER TABLE inventario ADD COLUMN foto TEXT")
         conn.commit()
     except Exception:
-        pass
+        conn.rollback()
 
     try:
         cursor.execute("ALTER TABLE inventario ADD COLUMN activo INTEGER DEFAULT 1")
         conn.commit()
     except Exception:
-        pass
+        conn.rollback()
+
+    try:
+        cursor.execute("UPDATE inventario SET activo = 1 WHERE activo IS NULL")
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
     conn.close()
 
