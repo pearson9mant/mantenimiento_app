@@ -29,6 +29,10 @@ def limpiar_formulario_crear_material():
         "crear_material_unidad",
         "crear_material_stock_actual",
         "crear_material_stock_minimo",
+        "crear_material_precio_unitario",
+        "crear_material_fecha_compra",
+        "crear_material_referencia_factura",
+        "crear_material_observaciones_coste",
         "inv_mat_centro",
         "inv_mat_edificio",
         "inv_mat_ubicacion",
@@ -90,6 +94,36 @@ def pantalla_inventario():
                 min_value=0.0,
                 step=1.0,
                 key="crear_material_stock_minimo"
+            )
+
+            st.markdown("#### 💶 Coste del material")
+
+            precio_unitario = st.number_input(
+                "Precio unitario (€)",
+                min_value=0.0,
+                step=0.01,
+                format="%.2f",
+                key="crear_material_precio_unitario"
+            )
+
+            coste_total = float(stock_actual) * float(precio_unitario)
+
+            st.info(f"Coste total inicial: {coste_total:.2f} €")
+
+            fecha_compra = st.text_input(
+                "Fecha compra / entrada",
+                placeholder="Ejemplo: 30/04/2026",
+                key="crear_material_fecha_compra"
+            )
+
+            referencia_factura = st.text_input(
+                "Referencia factura / albarán",
+                key="crear_material_referencia_factura"
+            )
+
+            observaciones_coste = st.text_area(
+                "Observaciones coste",
+                key="crear_material_observaciones_coste"
             )
 
             centro = st.selectbox(
@@ -164,7 +198,12 @@ def pantalla_inventario():
                         ubicacion=ubicacion,
                         proveedor=proveedor,
                         observaciones=observaciones,
-                        foto=ruta_foto
+                        foto=ruta_foto,
+                        precio_unitario=precio_unitario,
+                        coste_total=coste_total,
+                        fecha_compra=fecha_compra,
+                        referencia_factura=referencia_factura,
+                        observaciones_coste=observaciones_coste
                     )
 
                     st.success(f"Material creado correctamente: {codigo}")
@@ -236,6 +275,12 @@ def pantalla_inventario():
     st.markdown(f"### 📋 Stock actual ({len(materiales)})")
 
     for m in materiales:
+        precio_unitario = 0
+        coste_total = 0
+        fecha_compra = ""
+        referencia_factura = ""
+        observaciones_coste = ""
+
         try:
             (
                 id_mat,
@@ -252,7 +297,12 @@ def pantalla_inventario():
                 observaciones,
                 fecha_alta,
                 foto,
-                activo
+                activo,
+                precio_unitario,
+                coste_total,
+                fecha_compra,
+                referencia_factura,
+                observaciones_coste
             ) = m
         except ValueError:
             try:
@@ -270,27 +320,56 @@ def pantalla_inventario():
                     proveedor,
                     observaciones,
                     fecha_alta,
-                    foto
+                    foto,
+                    activo
                 ) = m
-                activo = 1
             except ValueError:
-                (
-                    id_mat,
-                    codigo,
-                    material,
-                    categoria,
-                    unidad,
-                    stock_actual,
-                    stock_minimo,
-                    centro,
-                    edificio,
-                    ubicacion,
-                    proveedor,
-                    observaciones,
-                    fecha_alta
-                ) = m
-                foto = ""
-                activo = 1
+                try:
+                    (
+                        id_mat,
+                        codigo,
+                        material,
+                        categoria,
+                        unidad,
+                        stock_actual,
+                        stock_minimo,
+                        centro,
+                        edificio,
+                        ubicacion,
+                        proveedor,
+                        observaciones,
+                        fecha_alta,
+                        foto
+                    ) = m
+                    activo = 1
+                except ValueError:
+                    (
+                        id_mat,
+                        codigo,
+                        material,
+                        categoria,
+                        unidad,
+                        stock_actual,
+                        stock_minimo,
+                        centro,
+                        edificio,
+                        ubicacion,
+                        proveedor,
+                        observaciones,
+                        fecha_alta
+                    ) = m
+                    foto = ""
+                    activo = 1
+
+        try:
+            precio_unitario = float(precio_unitario or 0)
+        except Exception:
+            precio_unitario = 0
+
+        try:
+            coste_total = float(coste_total or 0)
+        except Exception:
+            coste_total = 0
 
         st.markdown("---")
 
@@ -302,13 +381,23 @@ def pantalla_inventario():
         st.markdown(f"### **{codigo}** · {material}")
         st.markdown(f"**Categoría:** {categoria or '-'}")
         st.markdown(f"**Stock:** {stock_actual} {unidad} · **Mínimo:** {stock_minimo} {unidad}")
+        st.markdown(f"**Precio unitario:** {precio_unitario:.2f} € · **Coste inicial:** {coste_total:.2f} €")
         st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {ubicacion or '-'}")
 
         if proveedor:
             st.caption(f"Proveedor: {proveedor}")
 
+        if fecha_compra:
+            st.caption(f"Fecha compra / entrada: {fecha_compra}")
+
+        if referencia_factura:
+            st.caption(f"Factura / albarán: {referencia_factura}")
+
         if observaciones:
             st.info(observaciones)
+
+        if observaciones_coste:
+            st.info(f"💶 {observaciones_coste}")
 
         if foto:
             try:
