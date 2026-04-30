@@ -162,7 +162,16 @@ def inicializar_db():
     _add_column(cursor, "historico_ordenes", "solicitante", "TEXT")
     _add_column(cursor, "historico_ordenes", "fecha_origen", "TEXT")
 
-        # -------------------------------
+    # -------------------------------
+    # MIGRACIONES INVENTARIO / COSTES
+    # -------------------------------
+    _add_column(cursor, "inventario", "precio_unitario", f"{real_sql} DEFAULT 0")
+    _add_column(cursor, "inventario", "coste_total", f"{real_sql} DEFAULT 0")
+    _add_column(cursor, "inventario", "fecha_compra", "TEXT")
+    _add_column(cursor, "inventario", "referencia_factura", "TEXT")
+    _add_column(cursor, "inventario", "observaciones_coste", "TEXT")
+
+    # -------------------------------
     # LEGIONELLA
     # -------------------------------
     cursor.execute(f"""
@@ -234,7 +243,8 @@ def inicializar_db():
             observaciones_cierre TEXT
         )
     """)
-        # -------------------------------
+
+    # -------------------------------
     # MIGRACIONES LEGIONELLA
     # -------------------------------
     _add_column(cursor, "legionella_registros", "centro", "TEXT")
@@ -263,7 +273,8 @@ def inicializar_db():
     _add_column(cursor, "legionella_incidencias", "operario", "TEXT")
     _add_column(cursor, "legionella_incidencias", "fecha_cierre", "TEXT")
     _add_column(cursor, "legionella_incidencias", "observaciones_cierre", "TEXT")
-        # -------------------------------
+
+    # -------------------------------
     # MIGRACIONES LEGIONELLA PUNTOS
     # -------------------------------
     _add_column(cursor, "legionella_puntos", "centro", "TEXT")
