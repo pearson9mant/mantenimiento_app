@@ -12,6 +12,7 @@ from ui.ui_resumen_operario import pantalla_resumen_operario
 from ui.ui_legionella import pantalla_legionella
 from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
+from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 
 
 st.set_page_config(page_title="Mantenimiento", layout="wide")
@@ -136,6 +137,10 @@ def mostrar_menu_admin():
 
         if st.button("⚙️\nOperarios", key="btn_ops", use_container_width=True):
             st.session_state["seccion_actual"] = "Operarios"
+            st.rerun()
+
+        if st.button("📩\nIncidencias", key="btn_incidencias", use_container_width=True):
+            st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
 
 
@@ -283,6 +288,9 @@ if perfil == "admin":
 
     elif seccion == "Operarios":
         pantalla_operarios_admin()
+
+    elif seccion == "Incidencias":
+        pantalla_incidencias_profesores()
 
 
 # -------------------------------
