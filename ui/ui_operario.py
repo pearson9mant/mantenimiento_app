@@ -119,8 +119,7 @@ def pantalla_operario():
                 key=f"usar_material_{id_orden}"
             )
 
-            codigo_sel = ""
-            cantidad_material = 0.0
+            materiales_ot = []
 
             if usar_material:
                 if materiales_select:
@@ -129,20 +128,39 @@ def pantalla_operario():
                         for codigo, material, stock_actual, unidad in materiales_select
                     ]
 
-                    material_ot = st.selectbox(
-                        "Selecciona material",
-                        opciones_material,
-                        key=f"material_ot_{id_orden}"
+                    num_materiales = st.number_input(
+                        "Número de materiales usados",
+                        min_value=1,
+                        max_value=10,
+                        value=1,
+                        step=1,
+                        key=f"num_materiales_ot_{id_orden}"
                     )
 
-                    codigo_sel = material_ot.split(" | ")[0]
+                    st.markdown("#### Materiales usados")
 
-                    cantidad_material = st.number_input(
-                        "Cantidad usada",
-                        min_value=0.0,
-                        step=1.0,
-                        key=f"cantidad_material_ot_{id_orden}"
-                    )
+                    for i in range(int(num_materiales)):
+                        st.markdown(f"**Material {i + 1}**")
+
+                        material_ot = st.selectbox(
+                            "Selecciona material",
+                            opciones_material,
+                            key=f"material_ot_{id_orden}_{i}"
+                        )
+
+                        codigo_sel = material_ot.split(" | ")[0]
+
+                        cantidad_material = st.number_input(
+                            "Cantidad usada",
+                            min_value=0.0,
+                            step=1.0,
+                            key=f"cantidad_material_ot_{id_orden}_{i}"
+                        )
+
+                        materiales_ot.append({
+                            "codigo": codigo_sel,
+                            "cantidad": cantidad_material
+                        })
                 else:
                     st.info("No hay materiales dados de alta en Inventario.")
 
@@ -163,25 +181,39 @@ def pantalla_operario():
                     if st.button("✔\nSí, finalizar", key=f"si_fin_completo_{id_orden}", use_container_width=True):
 
                         if usar_material and materiales_select:
-                            if cantidad_material <= 0:
-                                st.warning("Indica una cantidad de material mayor que 0.")
-                            else:
-                                ok, mensaje = registrar_movimiento_inventario(
-                                    codigo_material=codigo_sel,
-                                    tipo_movimiento="Salida",
-                                    cantidad=cantidad_material,
-                                    motivo=f"Consumo en OT {num_ot}",
-                                    numero_ot=num_ot,
-                                    operario=operario_sel
-                                )
 
-                                if not ok:
-                                    st.error(mensaje)
+                            materiales_validos = [
+                                m for m in materiales_ot
+                                if m["cantidad"] > 0
+                            ]
+
+                            if not materiales_validos:
+                                st.warning("Indica al menos un material con cantidad mayor que 0.")
+                            else:
+                                errores = []
+
+                                for m in materiales_validos:
+                                    ok, mensaje = registrar_movimiento_inventario(
+                                        codigo_material=m["codigo"],
+                                        tipo_movimiento="Salida",
+                                        cantidad=m["cantidad"],
+                                        motivo=f"Consumo en OT {num_ot}",
+                                        numero_ot=num_ot,
+                                        operario=operario_sel
+                                    )
+
+                                    if not ok:
+                                        errores.append(f"{m['codigo']}: {mensaje}")
+
+                                if errores:
+                                    for error in errores:
+                                        st.error(error)
                                 else:
                                     finalizar_orden(id_orden, observaciones_fin)
                                     st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
-                                    st.success(f"{num_ot} finalizada y material descontado correctamente.")
+                                    st.success(f"{num_ot} finalizada y materiales descontados correctamente.")
                                     st.rerun()
+
                         else:
                             finalizar_orden(id_orden, observaciones_fin)
                             st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
