@@ -291,5 +291,18 @@ def inicializar_db():
     _add_column(cursor, "legionella_puntos", "activo", "INTEGER DEFAULT 1")
     _add_column(cursor, "legionella_puntos", "observaciones", "TEXT")
 
+        # -------------------------------
+    # CONFIGURACIÓN UBICACIONES
+    # -------------------------------
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS ubicaciones_personalizadas (
+            id {id_sql},
+            centro TEXT,
+            edificio TEXT,
+            espacio TEXT,
+            activo INTEGER DEFAULT 1
+        )
+    """)
+
     conn.commit()
     conn.close()
