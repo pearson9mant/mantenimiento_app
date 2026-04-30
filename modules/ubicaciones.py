@@ -1,3 +1,6 @@
+from database.db import conectar, _sql
+
+
 CENTROS = ["Pearson 22", "Pearson 9"]
 
 EDIFICIOS_POR_CENTRO = {
@@ -78,5 +81,103 @@ def obtener_edificios(centro):
     return EDIFICIOS_POR_CENTRO.get(centro, [])
 
 
-def obtener_espacios(edificio):
+def obtener_espacios_base(edificio):
     return ESPACIOS_POR_EDIFICIO.get(edificio, ["Otro"])
+
+
+def obtener_espacios_personalizados(edificio):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT espacio
+            FROM ubicaciones_personalizadas
+            WHERE edificio = ? AND activo = 1
+            ORDER BY espacio
+        """), (edificio,))
+        datos = [fila[0] for fila in cursor.fetchall()]
+    except Exception:
+        datos = []
+
+    conn.close()
+    return datos
+
+
+def obtener_espacios(edificio):
+    base = obtener_espacios_base(edificio)
+    personalizados = obtener_espacios_personalizados(edificio)
+
+    combinados = []
+
+    for espacio in base + personalizados:
+        if espacio and espacio not in combinados:
+            combinados.append(espacio)
+
+    if "Otro" in combinados:
+        combinados.remove("Otro")
+        combinados.append("Otro")
+
+    return combinados or ["Otro"]
+
+
+def crear_espacio_personalizado(centro, edificio, espacio):
+    espacio = str(espacio or "").strip()
+
+    if not centro or not edificio or not espacio:
+        return False, "Faltan datos."
+
+    if espacio.lower() == "otro":
+        return False, "No hace falta crear 'Otro'. Ya existe."
+
+    existentes = [e.lower() for e in obtener_espacios(edificio)]
+    if espacio.lower() in existentes:
+        return False, "Ese espacio ya existe."
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        INSERT INTO ubicaciones_personalizadas
+        (centro, edificio, espacio, activo)
+        VALUES (?, ?, ?, 1)
+    """), (centro, edificio, espacio))
+
+    conn.commit()
+    conn.close()
+
+    return True, f"Espacio creado: {espacio}"
+
+
+def obtener_ubicaciones_personalizadas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT id, centro, edificio, espacio, activo
+            FROM ubicaciones_personalizadas
+            ORDER BY centro, edificio, espacio
+        """)
+        datos = cursor.fetchall()
+    except Exception:
+        datos = []
+
+    conn.close()
+    return datos
+
+
+def activar_desactivar_espacio(id_ubicacion, activo):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        UPDATE ubicaciones_personalizadas
+        SET activo = ?
+        WHERE id = ?
+    """), (activo, id_ubicacion))
+
+    conn.commit()
+    conn.close()
+
+    return True
