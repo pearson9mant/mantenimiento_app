@@ -243,29 +243,36 @@ def pantalla_ordenes():
 
                 origen_label = obtener_origen_ot(origen)
 
-                with st.container():
-                    c1, c2, c3, c4 = st.columns([5, 2, 2, 2])
+                icono_estado = "🔴"
+                if estado == "En curso":
+                    icono_estado = "🟡"
+                elif estado == "Pendiente material":
+                    icono_estado = "📦"
 
-                    with c1:
-                        st.markdown(
-                            f"**{numero_ot}** | {prioridad} | {area or '-'} | {origen_label}  \n"
-                            f"{descripcion}  \n"
-                            f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                            f"👷 {operario or '-'} | Estado: **{estado}**"
-                        )
+                titulo = f"{icono_estado} {numero_ot} | {prioridad} | {centro or '-'} · {espacio or '-'}"
 
-                        if solicitante:
-                            st.caption(f"Solicitante: {solicitante}")
+                with st.expander(titulo, expanded=False):
+                    st.markdown(
+                        f"**{numero_ot}** | {prioridad} | {area or '-'} | {origen_label}  \n"
+                        f"{descripcion}  \n"
+                        f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
+                        f"👷 {operario or '-'} | Estado: **{estado}**"
+                    )
 
-                        if fecha_origen:
-                            st.caption(f"Fecha origen: {fecha_origen}")
+                    if solicitante:
+                        st.caption(f"Solicitante: {solicitante}")
 
-                        if foto:
-                            try:
-                                with st.expander("📷 Ver foto"):
-                                    st.image(foto, use_container_width=True)
-                            except Exception:
-                                st.caption("📷 Foto no disponible")
+                    if fecha_origen:
+                        st.caption(f"Fecha origen: {fecha_origen}")
+
+                    if foto:
+                        try:
+                            with st.expander("📷 Ver foto"):
+                                st.image(foto, use_container_width=True)
+                        except Exception:
+                            st.caption("📷 Foto no disponible")
+
+                    c2, c3, c4 = st.columns([2, 2, 2])
 
                     with c2:
                         estados = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
@@ -304,8 +311,6 @@ def pantalla_ordenes():
                                 st.rerun()
                             else:
                                 st.error("Debes marcar la confirmación antes de borrar")
-
-                    st.markdown("---")
 
     # ----------------------
     # TAB 3 - HISTÓRICO
