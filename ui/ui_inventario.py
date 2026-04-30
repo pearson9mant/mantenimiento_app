@@ -6,7 +6,9 @@ from modules.inventario import (
     crear_material_inventario,
     obtener_materiales_inventario,
     registrar_movimiento_inventario,
-    obtener_movimientos_por_material
+    obtener_movimientos_por_material,
+    desactivar_material,
+    activar_material
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -158,11 +160,19 @@ def pantalla_inventario():
         key="filtro_categoria_inventario"
     )
 
+    ver_inactivos = False
+    if operario == "Abel Vasquez":
+        ver_inactivos = st.checkbox(
+            "Mostrar materiales desactivados",
+            key="ver_inactivos_inventario"
+        )
+
     materiales = obtener_materiales_inventario(
         filtro_texto=filtro_texto,
         filtro_categoria=filtro_categoria,
         filtro_centro=filtro_centro,
-        filtro_edificio=filtro_edificio
+        filtro_edificio=filtro_edificio,
+        incluir_inactivos=ver_inactivos
     )
 
     if not materiales:
@@ -187,29 +197,52 @@ def pantalla_inventario():
                 proveedor,
                 observaciones,
                 fecha_alta,
-                foto
+                foto,
+                activo
             ) = m
         except ValueError:
-            (
-                id_mat,
-                codigo,
-                material,
-                categoria,
-                unidad,
-                stock_actual,
-                stock_minimo,
-                centro,
-                edificio,
-                ubicacion,
-                proveedor,
-                observaciones,
-                fecha_alta
-            ) = m
-            foto = ""
+            try:
+                (
+                    id_mat,
+                    codigo,
+                    material,
+                    categoria,
+                    unidad,
+                    stock_actual,
+                    stock_minimo,
+                    centro,
+                    edificio,
+                    ubicacion,
+                    proveedor,
+                    observaciones,
+                    fecha_alta,
+                    foto
+                ) = m
+                activo = 1
+            except ValueError:
+                (
+                    id_mat,
+                    codigo,
+                    material,
+                    categoria,
+                    unidad,
+                    stock_actual,
+                    stock_minimo,
+                    centro,
+                    edificio,
+                    ubicacion,
+                    proveedor,
+                    observaciones,
+                    fecha_alta
+                ) = m
+                foto = ""
+                activo = 1
 
         st.markdown("---")
 
-        if stock_actual <= stock_minimo:
+        if activo == 0:
+            st.warning(f"⛔ Material desactivado: {material}")
+        elif stock_actual <= stock_minimo:
             st.warning(f"⚠️ Stock bajo: {material} ({stock_actual} {unidad})")
 
         st.markdown(f"### **{codigo}** · {material}")
@@ -228,6 +261,27 @@ def pantalla_inventario():
                 st.image(foto, width=220)
             except Exception:
                 st.caption("Foto no disponible.")
+
+        # -------------------------
+        # ACTIVAR / DESACTIVAR
+        # -------------------------
+        if operario == "Abel Vasquez":
+            if activo == 1:
+                if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
+                    ok, mensaje = desactivar_material(codigo)
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
+            else:
+                if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
+                    ok, mensaje = activar_material(codigo)
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
 
         # -------------------------
         # HISTORIAL POR MATERIAL
@@ -292,54 +346,57 @@ def pantalla_inventario():
         # -------------------------
         # ENTRADAS / SALIDAS
         # -------------------------
-        c1, c2 = st.columns(2)
+        if activo == 1:
+            c1, c2 = st.columns(2)
 
-        with c1:
-            entrada = st.number_input(
-                f"Entrada {codigo}",
-                min_value=0.0,
-                step=1.0,
-                key=f"entrada_{codigo}"
-            )
+            with c1:
+                entrada = st.number_input(
+                    f"Entrada {codigo}",
+                    min_value=0.0,
+                    step=1.0,
+                    key=f"entrada_{codigo}"
+                )
 
-            if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
-                if entrada > 0:
-                    ok, mensaje = registrar_movimiento_inventario(
-                        codigo_material=codigo,
-                        tipo_movimiento="Entrada",
-                        cantidad=entrada,
-                        motivo="Entrada manual",
-                        numero_ot="",
-                        operario=operario
-                    )
+                if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
+                    if entrada > 0:
+                        ok, mensaje = registrar_movimiento_inventario(
+                            codigo_material=codigo,
+                            tipo_movimiento="Entrada",
+                            cantidad=entrada,
+                            motivo="Entrada manual",
+                            numero_ot="",
+                            operario=operario
+                        )
 
-                    if ok:
-                        st.success(mensaje)
-                        st.rerun()
-                    else:
-                        st.error(mensaje)
+                        if ok:
+                            st.success(mensaje)
+                            st.rerun()
+                        else:
+                            st.error(mensaje)
 
-        with c2:
-            salida = st.number_input(
-                f"Salida {codigo}",
-                min_value=0.0,
-                step=1.0,
-                key=f"salida_{codigo}"
-            )
+            with c2:
+                salida = st.number_input(
+                    f"Salida {codigo}",
+                    min_value=0.0,
+                    step=1.0,
+                    key=f"salida_{codigo}"
+                )
 
-            if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
-                if salida > 0:
-                    ok, mensaje = registrar_movimiento_inventario(
-                        codigo_material=codigo,
-                        tipo_movimiento="Salida",
-                        cantidad=salida,
-                        motivo="Salida manual",
-                        numero_ot="",
-                        operario=operario
-                    )
+                if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
+                    if salida > 0:
+                        ok, mensaje = registrar_movimiento_inventario(
+                            codigo_material=codigo,
+                            tipo_movimiento="Salida",
+                            cantidad=salida,
+                            motivo="Salida manual",
+                            numero_ot="",
+                            operario=operario
+                        )
 
-                    if ok:
-                        st.success(mensaje)
-                        st.rerun()
-                    else:
-                        st.error(mensaje)
+                        if ok:
+                            st.success(mensaje)
+                            st.rerun()
+                        else:
+                            st.error(mensaje)
+        else:
+            st.info("Material desactivado: no permite entradas ni salidas.")
