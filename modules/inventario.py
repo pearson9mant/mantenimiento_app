@@ -6,24 +6,35 @@ def _ph(conn):
     return "?" if "sqlite" in modulo else "%s"
 
 
+def _add_columna_segura(cursor, tabla, columna, tipo):
+    try:
+        cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN IF NOT EXISTS {columna} {tipo}")
+    except Exception:
+        try:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+        except Exception:
+            pass
+
+
 def asegurar_columnas_inventario():
     conn = conectar()
     cursor = conn.cursor()
 
     try:
-        cursor.execute("ALTER TABLE inventario ADD COLUMN IF NOT EXISTS foto TEXT")
-        conn.commit()
-    except Exception:
-        conn.rollback()
+        _add_columna_segura(cursor, "inventario", "foto", "TEXT")
+        _add_columna_segura(cursor, "inventario", "activo", "INTEGER DEFAULT 1")
 
-    try:
-        cursor.execute("ALTER TABLE inventario ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1")
-        conn.commit()
-    except Exception:
-        conn.rollback()
+        # Costes inventario
+        _add_columna_segura(cursor, "inventario", "precio_unitario", "REAL DEFAULT 0")
+        _add_columna_segura(cursor, "inventario", "coste_total", "REAL DEFAULT 0")
+        _add_columna_segura(cursor, "inventario", "fecha_compra", "TEXT")
+        _add_columna_segura(cursor, "inventario", "referencia_factura", "TEXT")
+        _add_columna_segura(cursor, "inventario", "observaciones_coste", "TEXT")
 
-    try:
         cursor.execute("UPDATE inventario SET activo = 1 WHERE activo IS NULL")
+        cursor.execute("UPDATE inventario SET precio_unitario = 0 WHERE precio_unitario IS NULL")
+        cursor.execute("UPDATE inventario SET coste_total = 0 WHERE coste_total IS NULL")
+
         conn.commit()
     except Exception:
         conn.rollback()
@@ -82,7 +93,12 @@ def crear_material_inventario(
     ubicacion,
     proveedor,
     observaciones,
-    foto=""
+    foto="",
+    precio_unitario=0,
+    coste_total=0,
+    fecha_compra="",
+    referencia_factura="",
+    observaciones_coste=""
 ):
     asegurar_columnas_inventario()
 
@@ -105,9 +121,14 @@ def crear_material_inventario(
             proveedor,
             observaciones,
             foto,
-            activo
+            activo,
+            precio_unitario,
+            coste_total,
+            fecha_compra,
+            referencia_factura,
+            observaciones_coste
         )
-        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
     """, (
         codigo,
         material.strip(),
@@ -121,7 +142,12 @@ def crear_material_inventario(
         proveedor.strip(),
         observaciones.strip(),
         foto,
-        1
+        1,
+        float(precio_unitario or 0),
+        float(coste_total or 0),
+        str(fecha_compra or "").strip(),
+        str(referencia_factura or "").strip(),
+        str(observaciones_coste or "").strip()
     ))
 
     conn.commit()
@@ -143,7 +169,8 @@ def obtener_materiales_inventario(
 
     sql = """
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
+               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
         FROM inventario
         WHERE 1=1
     """
@@ -300,7 +327,8 @@ def obtener_stock_bajo():
 
     cursor.execute("""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
+               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
         FROM inventario
         WHERE stock_actual <= stock_minimo
           AND COALESCE(activo, 1) = 1
@@ -341,7 +369,8 @@ def obtener_material_por_codigo(codigo):
 
     cursor.execute(f"""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
+               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
         FROM inventario
         WHERE codigo = {p}
     """, (codigo,))
