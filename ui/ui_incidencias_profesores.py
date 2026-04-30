@@ -144,6 +144,13 @@ def pantalla_incidencias_profesores():
         height=120
     )
 
+    foto = st.file_uploader(
+        "Añadir foto (opcional)",
+        type=["jpg", "jpeg", "png"]
+    )
+    if foto is not None:
+        st.image(foto, caption="Foto adjunta", use_container_width=True)
+
     prioridad = st.radio(
         "Prioridad",
         ["🟢 Baja", "🟡 Normal", "🔴 Alta"],
