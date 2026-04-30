@@ -1,4 +1,7 @@
 import streamlit as st
+from datetime import datetime
+
+from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
 
 
 def pantalla_incidencias_profesores():
@@ -87,11 +90,32 @@ def pantalla_incidencias_profesores():
         else:
             operario = "J.A. Almeda"
 
-        st.success("✅ Prueba correcta. Todavía no se ha guardado en la base de datos.")
+        numero_ot = obtener_siguiente_numero_ot(centro, "INC")
+        fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        datos = (
+            numero_ot,
+            descripcion.strip(),
+            "Abierta",
+            centro,
+            edificio,
+            espacio.strip(),
+            "Otros",
+            prioridad,
+            operario,
+            f"Profesores - {tipo_solicitante}",
+            nombre_solicitante.strip(),
+            fecha_origen
+        )
+
+        crear_orden(datos)
+
+        st.success(f"✅ Incidencia guardada correctamente. Nº OT: {numero_ot}")
 
         st.info(f"""
         **Resumen de la incidencia:**
 
+        **Nº OT:** {numero_ot}  
         **Centro:** {centro}  
         **Edificio:** {edificio}  
         **Espacio:** {espacio}  
