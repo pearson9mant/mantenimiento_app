@@ -161,6 +161,11 @@ def inicializar_db():
     _add_column(cursor, "ordenes_trabajo", "fecha_origen", "TEXT")
     _add_column(cursor, "historico_ordenes", "solicitante", "TEXT")
     _add_column(cursor, "historico_ordenes", "fecha_origen", "TEXT")
+    # -------------------------------
+    # FOTO INCIDENCIAS
+    # -------------------------------
+    _add_column(cursor, "ordenes_trabajo", "foto", "TEXT")
+    _add_column(cursor, "historico_ordenes", "foto", "TEXT")
 
     # -------------------------------
     # MIGRACIONES INVENTARIO / COSTES
