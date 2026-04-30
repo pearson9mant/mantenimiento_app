@@ -232,26 +232,62 @@ def pantalla_inventario():
         # -------------------------
         # HISTORIAL POR MATERIAL
         # -------------------------
-       with st.expander(f"📊 Historial {codigo}"):
+        with st.expander(f"📊 Historial {codigo}"):
 
-    movimientos = obtener_movimientos_por_material(codigo)
+            movimientos = obtener_movimientos_por_material(codigo)
 
-    if not movimientos:
-        st.info("Sin movimientos.")
-    else:
-        for mov in movimientos[:20]:
-            tipo, cantidad, motivo, ot, operario_mov, fecha = mov
+            if not movimientos:
+                st.info("Sin movimientos.")
+            else:
+                total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
+                total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
+                total_con_ot = len([mov for mov in movimientos if mov[3]])
 
-            icono = "➕" if tipo == "Entrada" else "➖"
+                h1, h2, h3 = st.columns(3)
+                h1.metric("Entradas", total_entradas)
+                h2.metric("Salidas", total_salidas)
+                h3.metric("Con OT", total_con_ot)
 
-            st.markdown(
-                f"{icono} **{tipo}** · {cantidad}  \n"
-                f"📅 {fecha} · 👷 {operario_mov or '-'}  \n"
-                f"🛠 OT: {ot or '-'}  \n"
-                f"📝 {motivo or '-'}"
-            )
-            st.markdown("---") 
-                    st.markdown("---")
+                filtro_historial = st.selectbox(
+                    "Filtrar historial",
+                    ["Todos", "Entradas", "Salidas", "Con OT"],
+                    key=f"filtro_historial_{codigo}"
+                )
+
+                movimientos_filtrados = movimientos
+
+                if filtro_historial == "Entradas":
+                    movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
+
+                elif filtro_historial == "Salidas":
+                    movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
+
+                elif filtro_historial == "Con OT":
+                    movimientos_filtrados = [mov for mov in movimientos if mov[3]]
+
+                for mov in movimientos_filtrados[:30]:
+                    tipo, cantidad, motivo, ot, operario_mov, fecha = mov
+
+                    if tipo == "Entrada":
+                        st.success(
+                            f"➕ Entrada · {cantidad}\n\n"
+                            f"📅 {fecha} · 👷 {operario_mov or '-'}\n\n"
+                            f"📝 {motivo or '-'}"
+                        )
+                    else:
+                        if ot:
+                            st.warning(
+                                f"➖ Salida con OT · {cantidad}\n\n"
+                                f"🛠 {ot} · 📅 {fecha}\n\n"
+                                f"👷 {operario_mov or '-'}\n\n"
+                                f"📝 {motivo or '-'}"
+                            )
+                        else:
+                            st.error(
+                                f"➖ Salida manual · {cantidad}\n\n"
+                                f"📅 {fecha} · 👷 {operario_mov or '-'}\n\n"
+                                f"📝 {motivo or '-'}"
+                            )
 
         # -------------------------
         # ENTRADAS / SALIDAS
