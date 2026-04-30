@@ -59,13 +59,16 @@ def crear_orden(datos):
     cursor = conn.cursor()
 
     if len(datos) == 10:
-        datos = (*datos, "", "")
+        datos = (*datos, "", "", "")
+
+    elif len(datos) == 12:
+        datos = (*datos, "")
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
         (numero_ot, descripcion, estado, centro, edificio, espacio, area,
-         prioridad, operario, origen, solicitante, fecha_origen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         prioridad, operario, origen, solicitante, fecha_origen, foto)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), datos)
 
     conn.commit()
@@ -77,9 +80,10 @@ def obtener_ordenes():
     cursor = conn.cursor()
 
     cursor.execute("""
+    cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen
+               solicitante, fecha_origen, foto
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
