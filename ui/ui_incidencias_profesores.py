@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 
 from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
+from pathlib import Path
 
 
 ESPACIOS_POR_EDIFICIO = {
@@ -194,6 +195,19 @@ def pantalla_incidencias_profesores():
         numero_ot = obtener_siguiente_numero_ot(centro, "INC")
         fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        ruta_foto = ""
+
+        if foto_bytes is not None:
+            carpeta = Path("uploads/incidencias")
+            carpeta.mkdir(parents=True, exist_ok=True)
+
+            extension = foto.name.split(".")[-1].lower()
+            nombre_foto = f"{numero_ot}.{extension}"
+            ruta_foto = str(carpeta / nombre_foto)
+
+            with open(ruta_foto, "wb") as f:
+                f.write(foto_bytes)
+
         prioridad = prioridad.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "")
 
         datos = (
@@ -209,6 +223,7 @@ def pantalla_incidencias_profesores():
             f"Profesores - {tipo_solicitante}",
             nombre_solicitante.strip(),
             fecha_origen
+            ruta_foto
         )
 
         crear_orden(datos)
