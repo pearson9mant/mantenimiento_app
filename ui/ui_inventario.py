@@ -22,6 +22,26 @@ def limpiar_nombre_archivo(texto):
     return texto.replace(" ", "_")
 
 
+def limpiar_formulario_crear_material():
+    claves = [
+        "crear_material_nombre",
+        "crear_categoria_material",
+        "crear_material_unidad",
+        "crear_material_stock_actual",
+        "crear_material_stock_minimo",
+        "inv_mat_centro",
+        "inv_mat_edificio",
+        "inv_mat_ubicacion",
+        "crear_material_proveedor",
+        "crear_material_observaciones",
+        "foto_material_mantenimiento"
+    ]
+
+    for clave in claves:
+        if clave in st.session_state:
+            del st.session_state[clave]
+
+
 def pantalla_inventario():
     st.subheader("📦 Inventario mantenimiento")
 
@@ -33,7 +53,10 @@ def pantalla_inventario():
     if operario == "Abel Vasquez":
         with st.expander("➕ Crear material nuevo"):
 
-            material = st.text_input("Nombre material")
+            material = st.text_input(
+                "Nombre material",
+                key="crear_material_nombre"
+            )
 
             categoria = st.selectbox(
                 "Categoría",
@@ -49,18 +72,57 @@ def pantalla_inventario():
                 key="crear_categoria_material"
             )
 
-            unidad = st.text_input("Unidad", value="uds")
-            stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0)
-            stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0)
+            unidad = st.text_input(
+                "Unidad",
+                value="uds",
+                key="crear_material_unidad"
+            )
 
-            centro = st.selectbox("Centro", CENTROS, key="inv_mat_centro")
+            stock_actual = st.number_input(
+                "Stock inicial",
+                min_value=0.0,
+                step=1.0,
+                key="crear_material_stock_actual"
+            )
+
+            stock_minimo = st.number_input(
+                "Stock mínimo",
+                min_value=0.0,
+                step=1.0,
+                key="crear_material_stock_minimo"
+            )
+
+            centro = st.selectbox(
+                "Centro",
+                CENTROS,
+                key="inv_mat_centro"
+            )
+
             edificios = obtener_edificios(centro)
-            edificio = st.selectbox("Edificio", edificios, key="inv_mat_edificio")
-            espacios = obtener_espacios(edificio)
-            ubicacion = st.selectbox("Aula / Espacio / Ubicación", espacios, key="inv_mat_ubicacion")
 
-            proveedor = st.text_input("Proveedor")
-            observaciones = st.text_area("Observaciones")
+            edificio = st.selectbox(
+                "Edificio",
+                edificios,
+                key="inv_mat_edificio"
+            )
+
+            espacios = obtener_espacios(edificio)
+
+            ubicacion = st.selectbox(
+                "Aula / Espacio / Ubicación",
+                espacios,
+                key="inv_mat_ubicacion"
+            )
+
+            proveedor = st.text_input(
+                "Proveedor",
+                key="crear_material_proveedor"
+            )
+
+            observaciones = st.text_area(
+                "Observaciones",
+                key="crear_material_observaciones"
+            )
 
             foto_subida = st.file_uploader(
                 "Foto del material",
@@ -106,6 +168,7 @@ def pantalla_inventario():
                     )
 
                     st.success(f"Material creado correctamente: {codigo}")
+                    limpiar_formulario_crear_material()
                     st.rerun()
 
     # -------------------------
