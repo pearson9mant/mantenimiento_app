@@ -13,6 +13,7 @@ from ui.ui_legionella import pantalla_legionella
 from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
+from ui.ui_configuracion import pantalla_configuracion
 
 
 st.set_page_config(page_title="Mantenimiento", layout="wide")
@@ -124,6 +125,10 @@ def mostrar_menu_admin():
 
         if st.button("👷\nOperario", key="btn_op", use_container_width=True):
             st.session_state["seccion_actual"] = "Operario"
+            st.rerun()
+
+        if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
+            st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
 
     with col2:
@@ -252,10 +257,14 @@ if st.session_state["seccion_actual"] is None:
     elif perfil == "gerencia":
         mostrar_menu_gerencia()
 
+    elif seccion == "Configuración":
+        pantalla_configuracion()
+
     else:
         st.caption(f"{operario_activo}")
         mostrar_menu_operario()
 
+    
     st.stop()
 
 
