@@ -169,6 +169,7 @@ def pantalla_operario():
                 key=f"fin_completo_operario_{id_orden}",
                 use_container_width=True
             ):
+                st.session_state[f"materiales_confirmados_{id_orden}"] = materiales_ot.copy()
                 st.session_state[f"confirmar_fin_completo_{id_orden}"] = True
                 st.rerun()
 
@@ -182,8 +183,13 @@ def pantalla_operario():
 
                         if usar_material and materiales_select:
 
+                            materiales_confirmados = st.session_state.get(
+                                f"materiales_confirmados_{id_orden}",
+                                materiales_ot
+                            )
+
                             materiales_validos = [
-                                m for m in materiales_ot
+                                m for m in materiales_confirmados
                                 if m["cantidad"] > 0
                             ]
 
@@ -211,16 +217,19 @@ def pantalla_operario():
                                 else:
                                     finalizar_orden(id_orden, observaciones_fin)
                                     st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                                    st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
                                     st.success(f"{num_ot} finalizada y materiales descontados correctamente.")
                                     st.rerun()
 
                         else:
                             finalizar_orden(id_orden, observaciones_fin)
                             st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                            st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
                             st.success(f"{num_ot} finalizada correctamente.")
                             st.rerun()
 
                 with c2:
                     if st.button("❌\nCancelar", key=f"no_fin_completo_{id_orden}", use_container_width=True):
                         st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
+                        st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
                         st.rerun()
