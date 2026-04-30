@@ -124,7 +124,8 @@ def obtener_ordenes_operario(operario):
     if centro:
         cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
-                   centro, edificio, espacio, area, prioridad, operario, origen
+                   centro, edificio, espacio, area, prioridad, operario, origen,
+                   solicitante, fecha_origen, foto
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -132,7 +133,8 @@ def obtener_ordenes_operario(operario):
     else:
         cursor.execute("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
-                   centro, edificio, espacio, area, prioridad, operario, origen
+                   centro, edificio, espacio, area, prioridad, operario, origen,
+                   solicitante, fecha_origen, foto
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
