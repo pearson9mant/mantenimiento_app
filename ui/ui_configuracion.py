@@ -1,5 +1,7 @@
 import streamlit as st
 
+from database.db import conectar, _sql
+
 from modules.ubicaciones import (
     CENTROS,
     obtener_edificios,
@@ -9,11 +11,101 @@ from modules.ubicaciones import (
 )
 
 
+TIPOS_PUNTO_LEGIONELLA = [
+    "acumulador",
+    "acumulador_solar",
+    "retorno",
+    "grifo",
+    "ducha",
+    "deposito",
+    "otro"
+]
+
+
+INSTALACIONES_LEGIONELLA = [
+    "ACS",
+    "AFCH",
+    "Solar",
+    "Otro"
+]
+
+
+def obtener_puntos_legionella():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT id, centro, edificio, instalacion, tipo_punto,
+                   nombre_punto, ubicacion, activo, observaciones
+            FROM legionella_puntos
+            ORDER BY centro, edificio, instalacion, nombre_punto
+        """)
+        datos = cursor.fetchall()
+    except Exception:
+        datos = []
+
+    conn.close()
+    return datos
+
+
+def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, observaciones):
+    nombre_punto = str(nombre_punto or "").strip()
+
+    if not centro or not edificio or not instalacion or not tipo_punto or not nombre_punto:
+        return False, "Faltan datos obligatorios."
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        INSERT INTO legionella_puntos
+        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    """), (
+        centro,
+        edificio,
+        instalacion,
+        tipo_punto,
+        nombre_punto,
+        ubicacion,
+        observaciones
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return True, f"Punto creado: {nombre_punto}"
+
+
+def activar_desactivar_punto_legionella(id_punto, activo):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        UPDATE legionella_puntos
+        SET activo = ?
+        WHERE id = ?
+    """), (activo, id_punto))
+
+    conn.commit()
+    conn.close()
+
+    return True
+
+
 def pantalla_configuracion():
     st.subheader("⚙️ Configuración")
 
-    tab1, tab2 = st.tabs(["➕ Añadir espacio", "📋 Espacios creados"])
+    tab1, tab2, tab3 = st.tabs([
+        "➕ Añadir espacio",
+        "📋 Espacios creados",
+        "💧 Legionella"
+    ])
 
+    # -------------------------------
+    # AÑADIR ESPACIO
+    # -------------------------------
     with tab1:
         st.markdown("### Añadir nuevo espacio")
 
@@ -41,6 +133,9 @@ def pantalla_configuracion():
             else:
                 st.warning(mensaje)
 
+    # -------------------------------
+    # ESPACIOS CREADOS
+    # -------------------------------
     with tab2:
         st.markdown("### Espacios personalizados")
 
@@ -48,31 +143,142 @@ def pantalla_configuracion():
 
         if not ubicaciones:
             st.info("Todavía no hay espacios personalizados.")
-            return
+        else:
+            for id_ubicacion, centro, edificio, espacio, activo in ubicaciones:
+                icono = "✅" if activo else "⛔"
+                titulo = f"{icono} {centro} · {edificio} · {espacio}"
 
-        for id_ubicacion, centro, edificio, espacio, activo in ubicaciones:
-            icono = "✅" if activo else "⛔"
-            titulo = f"{icono} {centro} · {edificio} · {espacio}"
+                with st.expander(titulo, expanded=False):
+                    st.markdown(f"**Centro:** {centro}")
+                    st.markdown(f"**Edificio:** {edificio}")
+                    st.markdown(f"**Espacio:** {espacio}")
+                    st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
 
-            with st.expander(titulo, expanded=False):
-                st.markdown(f"**Centro:** {centro}")
-                st.markdown(f"**Edificio:** {edificio}")
-                st.markdown(f"**Espacio:** {espacio}")
-                st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
+                    if activo:
+                        if st.button(
+                            f"⛔ Desactivar {espacio}",
+                            key=f"desactivar_espacio_{id_ubicacion}",
+                            use_container_width=True
+                        ):
+                            activar_desactivar_espacio(id_ubicacion, 0)
+                            st.rerun()
+                    else:
+                        if st.button(
+                            f"✅ Activar {espacio}",
+                            key=f"activar_espacio_{id_ubicacion}",
+                            use_container_width=True
+                        ):
+                            activar_desactivar_espacio(id_ubicacion, 1)
+                            st.rerun()
 
-                if activo:
-                    if st.button(
-                        f"⛔ Desactivar {espacio}",
-                        key=f"desactivar_espacio_{id_ubicacion}",
-                        use_container_width=True
-                    ):
-                        activar_desactivar_espacio(id_ubicacion, 0)
-                        st.rerun()
+    # -------------------------------
+    # CONFIGURACIÓN LEGIONELLA
+    # -------------------------------
+    with tab3:
+        st.markdown("### 💧 Configuración Legionella")
+
+        sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
+
+        with sub1:
+            st.markdown("#### Añadir punto de control")
+
+            centro_leg = st.selectbox("Centro", CENTROS, key="cfg_leg_centro")
+            edificios_leg = obtener_edificios(centro_leg)
+
+            edificio_leg = st.selectbox("Edificio", edificios_leg, key="cfg_leg_edificio")
+
+            instalacion = st.selectbox(
+                "Instalación",
+                INSTALACIONES_LEGIONELLA,
+                key="cfg_leg_instalacion"
+            )
+
+            if instalacion == "Otro":
+                instalacion = st.text_input("Especificar instalación", key="cfg_leg_instalacion_otro")
+
+            tipo_punto = st.selectbox(
+                "Tipo de punto",
+                TIPOS_PUNTO_LEGIONELLA,
+                key="cfg_leg_tipo_punto"
+            )
+
+            nombre_punto = st.text_input(
+                "Nombre del punto",
+                placeholder="Ejemplo: Acumulador ACS 800L, Retorno ACS, Ducha vestuario..."
+            )
+
+            ubicacion = st.text_input(
+                "Ubicación",
+                placeholder="Ejemplo: Cuarto técnico, vestuario, sala calderas..."
+            )
+
+            observaciones = st.text_area("Observaciones")
+
+            if st.button("➕ Crear punto Legionella", use_container_width=True):
+                ok, mensaje = crear_punto_legionella(
+                    centro=centro_leg,
+                    edificio=edificio_leg,
+                    instalacion=instalacion,
+                    tipo_punto=tipo_punto,
+                    nombre_punto=nombre_punto,
+                    ubicacion=ubicacion,
+                    observaciones=observaciones
+                )
+
+                if ok:
+                    st.success(mensaje)
+                    st.rerun()
                 else:
-                    if st.button(
-                        f"✅ Activar {espacio}",
-                        key=f"activar_espacio_{id_ubicacion}",
-                        use_container_width=True
-                    ):
-                        activar_desactivar_espacio(id_ubicacion, 1)
-                        st.rerun()
+                    st.warning(mensaje)
+
+        with sub2:
+            st.markdown("#### Puntos de control existentes")
+
+            puntos = obtener_puntos_legionella()
+
+            if not puntos:
+                st.info("No hay puntos de Legionella creados.")
+            else:
+                for (
+                    id_punto,
+                    centro,
+                    edificio,
+                    instalacion,
+                    tipo_punto,
+                    nombre_punto,
+                    ubicacion,
+                    activo,
+                    observaciones
+                ) in puntos:
+
+                    icono = "✅" if activo else "⛔"
+                    titulo = f"{icono} {centro} · {edificio} · {nombre_punto}"
+
+                    with st.expander(titulo, expanded=False):
+                        st.markdown(f"**Centro:** {centro}")
+                        st.markdown(f"**Edificio:** {edificio}")
+                        st.markdown(f"**Instalación:** {instalacion}")
+                        st.markdown(f"**Tipo punto:** {tipo_punto}")
+                        st.markdown(f"**Nombre:** {nombre_punto}")
+                        st.markdown(f"**Ubicación:** {ubicacion or '-'}")
+                        st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
+
+                        if observaciones:
+                            st.info(observaciones)
+
+                        if activo:
+                            if st.button(
+                                f"⛔ Desactivar punto {id_punto}",
+                                key=f"desactivar_leg_{id_punto}",
+                                use_container_width=True
+                            ):
+                                activar_desactivar_punto_legionella(id_punto, 0)
+                                st.rerun()
+                        else:
+                            if st.button(
+                                f"✅ Activar punto {id_punto}",
+                                key=f"activar_leg_{id_punto}",
+                                use_container_width=True
+                            ):
+                                activar_desactivar_punto_legionella(id_punto, 1)
+                                st.rerun()
