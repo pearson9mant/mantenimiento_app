@@ -51,12 +51,30 @@ def obtener_puntos_legionella():
 
 def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, observaciones):
     nombre_punto = str(nombre_punto or "").strip()
+    instalacion = str(instalacion or "").strip()
 
-    if not centro or not edificio or not instalacion or not tipo_punto or not nombre_punto:
-        return False, "Faltan datos obligatorios."
+    # ❌ VALIDACIÓN FUERTE
+    if not centro or not edificio:
+        return False, "Centro o edificio inválido."
+
+    if not nombre_punto or nombre_punto.lower() in ["none", "null"]:
+        return False, "Debes indicar un nombre de punto válido."
+
+    if not instalacion or instalacion.lower() in ["none", "null"]:
+        return False, "Debes indicar una instalación válida."
 
     conn = conectar()
     cursor = conn.cursor()
+
+    # ❌ EVITAR DUPLICADOS
+    cursor.execute(_sql("""
+        SELECT COUNT(*) FROM legionella_puntos
+        WHERE centro = ? AND edificio = ? AND nombre_punto = ?
+    """), (centro, edificio, nombre_punto))
+
+    if cursor.fetchone()[0] > 0:
+        conn.close()
+        return False, "Ese punto ya existe."
 
     cursor.execute(_sql("""
         INSERT INTO legionella_puntos
@@ -76,6 +94,25 @@ def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_pun
     conn.close()
 
     return True, f"Punto creado: {nombre_punto}"
+
+def limpiar_puntos_legionella_invalidos():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE legionella_puntos
+        SET activo = 0
+        WHERE nombre_punto IS NULL
+           OR nombre_punto = ''
+           OR LOWER(nombre_punto) = 'none'
+    """)
+
+    afectados = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+
+    return afectados
 
 
 def activar_desactivar_punto_legionella(id_punto, activo):
