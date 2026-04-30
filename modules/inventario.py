@@ -11,13 +11,13 @@ def asegurar_columnas_inventario():
     cursor = conn.cursor()
 
     try:
-        cursor.execute("ALTER TABLE inventario ADD COLUMN foto TEXT")
+        cursor.execute("ALTER TABLE inventario ADD COLUMN IF NOT EXISTS foto TEXT")
         conn.commit()
     except Exception:
         conn.rollback()
 
     try:
-        cursor.execute("ALTER TABLE inventario ADD COLUMN activo INTEGER DEFAULT 1")
+        cursor.execute("ALTER TABLE inventario ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1")
         conn.commit()
     except Exception:
         conn.rollback()
