@@ -163,7 +163,7 @@ def pantalla_incidencias_profesores():
 
     tipo_solicitante = st.radio(
         "Quién envía",
-        ["Profesor", "Administración", "Dirección"],
+        ["Profesor", "Cap de estudios", "Dirección", "Operario"],
         horizontal=True
     )
 
