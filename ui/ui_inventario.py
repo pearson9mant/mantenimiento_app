@@ -14,6 +14,14 @@ from modules.inventario import (
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 
 
+def limpiar_nombre_archivo(texto):
+    texto = str(texto)
+    caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
+    for c in caracteres_malos:
+        texto = texto.replace(c, "_")
+    return texto.replace(" ", "_")
+
+
 def pantalla_inventario():
     st.subheader("📦 Inventario mantenimiento")
 
@@ -45,27 +53,11 @@ def pantalla_inventario():
             stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0)
             stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0)
 
-            centro = st.selectbox(
-                "Centro",
-                CENTROS,
-                key="inv_mat_centro"
-            )
-
+            centro = st.selectbox("Centro", CENTROS, key="inv_mat_centro")
             edificios = obtener_edificios(centro)
-
-            edificio = st.selectbox(
-                "Edificio",
-                edificios,
-                key="inv_mat_edificio"
-            )
-
+            edificio = st.selectbox("Edificio", edificios, key="inv_mat_edificio")
             espacios = obtener_espacios(edificio)
-
-            ubicacion = st.selectbox(
-                "Aula / Espacio / Ubicación",
-                espacios,
-                key="inv_mat_ubicacion"
-            )
+            ubicacion = st.selectbox("Aula / Espacio / Ubicación", espacios, key="inv_mat_ubicacion")
 
             proveedor = st.text_input("Proveedor")
             observaciones = st.text_area("Observaciones")
@@ -82,7 +74,9 @@ def pantalla_inventario():
                 carpeta = Path("data/fotos_inventario")
                 carpeta.mkdir(parents=True, exist_ok=True)
 
-                nombre_foto = f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}".replace(" ", "_")
+                nombre_foto = limpiar_nombre_archivo(
+                    f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}"
+                )
                 ruta_foto = str(carpeta / nombre_foto)
 
                 with open(ruta_foto, "wb") as f:
@@ -134,10 +128,7 @@ def pantalla_inventario():
         )
 
     with f2:
-        if filtro_centro != "Todos":
-            edificios_filtro = obtener_edificios(filtro_centro)
-        else:
-            edificios_filtro = []
+        edificios_filtro = obtener_edificios(filtro_centro) if filtro_centro != "Todos" else []
 
         filtro_edificio = st.selectbox(
             "Edificio",
@@ -312,10 +303,8 @@ def pantalla_inventario():
 
                 if filtro_historial == "Entradas":
                     movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
-
                 elif filtro_historial == "Salidas":
                     movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
-
                 elif filtro_historial == "Con OT":
                     movimientos_filtrados = [mov for mov in movimientos if mov[3]]
 
