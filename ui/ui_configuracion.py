@@ -214,7 +214,13 @@ def pantalla_configuracion():
     with tab3:
         st.markdown("### 💧 Configuración Legionella")
 
-        sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
+        # 🔽 👉 AQUÍ VA EL BOTÓN
+        if st.button("🧹 Limpiar puntos inválidos (None)", use_container_width=True):
+            afectados = limpiar_puntos_legionella_invalidos()
+            st.success(f"{afectados} puntos limpiados (desactivados)")
+            st.rerun()
+
+    sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
 
         with sub1:
             st.markdown("#### Añadir punto de control")
