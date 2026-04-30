@@ -57,44 +57,18 @@ def pantalla_inventario():
     if operario == "Abel Vasquez":
         with st.expander("➕ Crear material nuevo"):
 
-            material = st.text_input(
-                "Nombre material",
-                key="crear_material_nombre"
-            )
+            material = st.text_input("Nombre material", key="crear_material_nombre")
 
             categoria = st.selectbox(
                 "Categoría",
-                [
-                    "Electricidad",
-                    "Fontanería",
-                    "Climatización",
-                    "Ferretería",
-                    "Pintura",
-                    "Limpieza",
-                    "Otros"
-                ],
+                ["Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"],
                 key="crear_categoria_material"
             )
 
-            unidad = st.text_input(
-                "Unidad",
-                value="uds",
-                key="crear_material_unidad"
-            )
+            unidad = st.text_input("Unidad", value="uds", key="crear_material_unidad")
 
-            stock_actual = st.number_input(
-                "Stock inicial",
-                min_value=0.0,
-                step=1.0,
-                key="crear_material_stock_actual"
-            )
-
-            stock_minimo = st.number_input(
-                "Stock mínimo",
-                min_value=0.0,
-                step=1.0,
-                key="crear_material_stock_minimo"
-            )
+            stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0, key="crear_material_stock_actual")
+            stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0, key="crear_material_stock_minimo")
 
             st.markdown("#### 💶 Coste del material")
 
@@ -107,7 +81,6 @@ def pantalla_inventario():
             )
 
             coste_total = float(stock_actual) * float(precio_unitario)
-
             st.info(f"Coste total inicial: {coste_total:.2f} €")
 
             fecha_compra = st.text_input(
@@ -126,20 +99,10 @@ def pantalla_inventario():
                 key="crear_material_observaciones_coste"
             )
 
-            centro = st.selectbox(
-                "Centro",
-                CENTROS,
-                key="inv_mat_centro"
-            )
-
+            centro = st.selectbox("Centro", CENTROS, key="inv_mat_centro")
             edificios = obtener_edificios(centro)
 
-            edificio = st.selectbox(
-                "Edificio",
-                edificios,
-                key="inv_mat_edificio"
-            )
-
+            edificio = st.selectbox("Edificio", edificios, key="inv_mat_edificio")
             espacios = obtener_espacios(edificio)
 
             ubicacion = st.selectbox(
@@ -148,15 +111,8 @@ def pantalla_inventario():
                 key="inv_mat_ubicacion"
             )
 
-            proveedor = st.text_input(
-                "Proveedor",
-                key="crear_material_proveedor"
-            )
-
-            observaciones = st.text_area(
-                "Observaciones",
-                key="crear_material_observaciones"
-            )
+            proveedor = st.text_input("Proveedor", key="crear_material_proveedor")
+            observaciones = st.text_area("Observaciones", key="crear_material_observaciones")
 
             foto_subida = st.file_uploader(
                 "Foto del material",
@@ -240,16 +196,7 @@ def pantalla_inventario():
 
     filtro_categoria = st.selectbox(
         "Categoría",
-        [
-            "Todas",
-            "Electricidad",
-            "Fontanería",
-            "Climatización",
-            "Ferretería",
-            "Pintura",
-            "Limpieza",
-            "Otros"
-        ],
+        ["Todas", "Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"],
         key="filtro_categoria_inventario"
     )
 
@@ -283,80 +230,30 @@ def pantalla_inventario():
 
         try:
             (
-                id_mat,
-                codigo,
-                material,
-                categoria,
-                unidad,
-                stock_actual,
-                stock_minimo,
-                centro,
-                edificio,
-                ubicacion,
-                proveedor,
-                observaciones,
-                fecha_alta,
-                foto,
-                activo,
-                precio_unitario,
-                coste_total,
-                fecha_compra,
-                referencia_factura,
-                observaciones_coste
+                id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+                centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+                foto, activo, precio_unitario, coste_total, fecha_compra,
+                referencia_factura, observaciones_coste
             ) = m
         except ValueError:
             try:
                 (
-                    id_mat,
-                    codigo,
-                    material,
-                    categoria,
-                    unidad,
-                    stock_actual,
-                    stock_minimo,
-                    centro,
-                    edificio,
-                    ubicacion,
-                    proveedor,
-                    observaciones,
-                    fecha_alta,
-                    foto,
-                    activo
+                    id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+                    centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+                    foto, activo
                 ) = m
             except ValueError:
                 try:
                     (
-                        id_mat,
-                        codigo,
-                        material,
-                        categoria,
-                        unidad,
-                        stock_actual,
-                        stock_minimo,
-                        centro,
-                        edificio,
-                        ubicacion,
-                        proveedor,
-                        observaciones,
-                        fecha_alta,
+                        id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+                        centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
                         foto
                     ) = m
                     activo = 1
                 except ValueError:
                     (
-                        id_mat,
-                        codigo,
-                        material,
-                        categoria,
-                        unidad,
-                        stock_actual,
-                        stock_minimo,
-                        centro,
-                        edificio,
-                        ubicacion,
-                        proveedor,
-                        observaciones,
-                        fecha_alta
+                        id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+                        centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
                     ) = m
                     foto = ""
                     activo = 1
@@ -371,173 +268,182 @@ def pantalla_inventario():
         except Exception:
             coste_total = 0
 
-        st.markdown("---")
-
         if activo == 0:
-            st.warning(f"⛔ Material desactivado: {material}")
+            icono = "⛔"
         elif stock_actual <= stock_minimo:
-            st.warning(f"⚠️ Stock bajo: {material} ({stock_actual} {unidad})")
+            icono = "⚠️"
+        else:
+            icono = "✅"
 
-        st.markdown(f"### **{codigo}** · {material}")
-        st.markdown(f"**Categoría:** {categoria or '-'}")
-        st.markdown(f"**Stock:** {stock_actual} {unidad} · **Mínimo:** {stock_minimo} {unidad}")
-        st.markdown(f"**Precio unitario:** {precio_unitario:.2f} € · **Coste inicial:** {coste_total:.2f} €")
-        st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {ubicacion or '-'}")
+        titulo = f"{icono} {codigo} | {material} | Stock: {stock_actual} {unidad}"
 
-        if proveedor:
-            st.caption(f"Proveedor: {proveedor}")
+        with st.expander(titulo, expanded=False):
 
-        if fecha_compra:
-            st.caption(f"Fecha compra / entrada: {fecha_compra}")
+            if activo == 0:
+                st.warning(f"⛔ Material desactivado: {material}")
+            elif stock_actual <= stock_minimo:
+                st.warning(f"⚠️ Stock bajo: {material} ({stock_actual} {unidad})")
 
-        if referencia_factura:
-            st.caption(f"Factura / albarán: {referencia_factura}")
+            st.markdown(f"### **{codigo}** · {material}")
+            st.markdown(f"**Categoría:** {categoria or '-'}")
+            st.markdown(f"**Stock:** {stock_actual} {unidad} · **Mínimo:** {stock_minimo} {unidad}")
+            st.markdown(f"**Precio unitario:** {precio_unitario:.2f} € · **Coste inicial:** {coste_total:.2f} €")
+            st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {ubicacion or '-'}")
 
-        if observaciones:
-            st.info(observaciones)
+            if proveedor:
+                st.caption(f"Proveedor: {proveedor}")
 
-        if observaciones_coste:
-            st.info(f"💶 {observaciones_coste}")
+            if fecha_compra:
+                st.caption(f"Fecha compra / entrada: {fecha_compra}")
 
-        if foto:
-            try:
-                st.image(foto, width=220)
-            except Exception:
-                st.caption("Foto no disponible.")
+            if referencia_factura:
+                st.caption(f"Factura / albarán: {referencia_factura}")
 
-        # -------------------------
-        # ACTIVAR / DESACTIVAR
-        # -------------------------
-        if operario == "Abel Vasquez":
-            if activo == 1:
-                if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
-                    ok, mensaje = desactivar_material(codigo)
-                    if ok:
-                        st.success(mensaje)
-                        st.rerun()
-                    else:
-                        st.error(mensaje)
-            else:
-                if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
-                    ok, mensaje = activar_material(codigo)
-                    if ok:
-                        st.success(mensaje)
-                        st.rerun()
-                    else:
-                        st.error(mensaje)
+            if observaciones:
+                st.info(observaciones)
 
-        # -------------------------
-        # HISTORIAL POR MATERIAL
-        # -------------------------
-        with st.expander(f"📊 Historial {codigo}"):
+            if observaciones_coste:
+                st.info(f"💶 {observaciones_coste}")
 
-            movimientos = obtener_movimientos_por_material(codigo)
+            if foto:
+                try:
+                    st.image(foto, width=220)
+                except Exception:
+                    st.caption("Foto no disponible.")
 
-            if not movimientos:
-                st.info("Sin movimientos.")
-            else:
-                total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
-                total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
-                total_con_ot = len([mov for mov in movimientos if mov[3]])
-
-                h1, h2, h3 = st.columns(3)
-                h1.metric("Entradas", total_entradas)
-                h2.metric("Salidas", total_salidas)
-                h3.metric("Con OT", total_con_ot)
-
-                filtro_historial = st.selectbox(
-                    "Filtrar historial",
-                    ["Todos", "Entradas", "Salidas", "Con OT"],
-                    key=f"filtro_historial_{codigo}"
-                )
-
-                movimientos_filtrados = movimientos
-
-                if filtro_historial == "Entradas":
-                    movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
-                elif filtro_historial == "Salidas":
-                    movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
-                elif filtro_historial == "Con OT":
-                    movimientos_filtrados = [mov for mov in movimientos if mov[3]]
-
-                for mov in movimientos_filtrados[:30]:
-                    tipo, cantidad, motivo, ot, operario_mov, fecha = mov
-
-                    if tipo == "Entrada":
-                        st.success(
-                            f"➕ Entrada · {cantidad}\n\n"
-                            f"📅 {fecha} · 👷 {operario_mov or '-'}\n\n"
-                            f"📝 {motivo or '-'}"
-                        )
-                    else:
-                        if ot:
-                            st.warning(
-                                f"➖ Salida con OT · {cantidad}\n\n"
-                                f"🛠 {ot} · 📅 {fecha}\n\n"
-                                f"👷 {operario_mov or '-'}\n\n"
-                                f"📝 {motivo or '-'}"
-                            )
+            # -------------------------
+            # ACTIVAR / DESACTIVAR
+            # -------------------------
+            if operario == "Abel Vasquez":
+                if activo == 1:
+                    if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
+                        ok, mensaje = desactivar_material(codigo)
+                        if ok:
+                            st.success(mensaje)
+                            st.rerun()
                         else:
-                            st.error(
-                                f"➖ Salida manual · {cantidad}\n\n"
+                            st.error(mensaje)
+                else:
+                    if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
+                        ok, mensaje = activar_material(codigo)
+                        if ok:
+                            st.success(mensaje)
+                            st.rerun()
+                        else:
+                            st.error(mensaje)
+
+            # -------------------------
+            # HISTORIAL POR MATERIAL
+            # -------------------------
+            with st.expander(f"📊 Historial {codigo}"):
+
+                movimientos = obtener_movimientos_por_material(codigo)
+
+                if not movimientos:
+                    st.info("Sin movimientos.")
+                else:
+                    total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
+                    total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
+                    total_con_ot = len([mov for mov in movimientos if mov[3]])
+
+                    h1, h2, h3 = st.columns(3)
+                    h1.metric("Entradas", total_entradas)
+                    h2.metric("Salidas", total_salidas)
+                    h3.metric("Con OT", total_con_ot)
+
+                    filtro_historial = st.selectbox(
+                        "Filtrar historial",
+                        ["Todos", "Entradas", "Salidas", "Con OT"],
+                        key=f"filtro_historial_{codigo}"
+                    )
+
+                    movimientos_filtrados = movimientos
+
+                    if filtro_historial == "Entradas":
+                        movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
+                    elif filtro_historial == "Salidas":
+                        movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
+                    elif filtro_historial == "Con OT":
+                        movimientos_filtrados = [mov for mov in movimientos if mov[3]]
+
+                    for mov in movimientos_filtrados[:30]:
+                        tipo, cantidad, motivo, ot, operario_mov, fecha = mov
+
+                        if tipo == "Entrada":
+                            st.success(
+                                f"➕ Entrada · {cantidad}\n\n"
                                 f"📅 {fecha} · 👷 {operario_mov or '-'}\n\n"
                                 f"📝 {motivo or '-'}"
                             )
-
-        # -------------------------
-        # ENTRADAS / SALIDAS
-        # -------------------------
-        if activo == 1:
-            c1, c2 = st.columns(2)
-
-            with c1:
-                entrada = st.number_input(
-                    f"Entrada {codigo}",
-                    min_value=0.0,
-                    step=1.0,
-                    key=f"entrada_{codigo}"
-                )
-
-                if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
-                    if entrada > 0:
-                        ok, mensaje = registrar_movimiento_inventario(
-                            codigo_material=codigo,
-                            tipo_movimiento="Entrada",
-                            cantidad=entrada,
-                            motivo="Entrada manual",
-                            numero_ot="",
-                            operario=operario
-                        )
-
-                        if ok:
-                            st.success(mensaje)
-                            st.rerun()
                         else:
-                            st.error(mensaje)
+                            if ot:
+                                st.warning(
+                                    f"➖ Salida con OT · {cantidad}\n\n"
+                                    f"🛠 {ot} · 📅 {fecha}\n\n"
+                                    f"👷 {operario_mov or '-'}\n\n"
+                                    f"📝 {motivo or '-'}"
+                                )
+                            else:
+                                st.error(
+                                    f"➖ Salida manual · {cantidad}\n\n"
+                                    f"📅 {fecha} · 👷 {operario_mov or '-'}\n\n"
+                                    f"📝 {motivo or '-'}"
+                                )
 
-            with c2:
-                salida = st.number_input(
-                    f"Salida {codigo}",
-                    min_value=0.0,
-                    step=1.0,
-                    key=f"salida_{codigo}"
-                )
+            # -------------------------
+            # ENTRADAS / SALIDAS
+            # -------------------------
+            if activo == 1:
+                c1, c2 = st.columns(2)
 
-                if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
-                    if salida > 0:
-                        ok, mensaje = registrar_movimiento_inventario(
-                            codigo_material=codigo,
-                            tipo_movimiento="Salida",
-                            cantidad=salida,
-                            motivo="Salida manual",
-                            numero_ot="",
-                            operario=operario
-                        )
+                with c1:
+                    entrada = st.number_input(
+                        f"Entrada {codigo}",
+                        min_value=0.0,
+                        step=1.0,
+                        key=f"entrada_{codigo}"
+                    )
 
-                        if ok:
-                            st.success(mensaje)
-                            st.rerun()
-                        else:
-                            st.error(mensaje)
-        else:
-            st.info("Material desactivado: no permite entradas ni salidas.")
+                    if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
+                        if entrada > 0:
+                            ok, mensaje = registrar_movimiento_inventario(
+                                codigo_material=codigo,
+                                tipo_movimiento="Entrada",
+                                cantidad=entrada,
+                                motivo="Entrada manual",
+                                numero_ot="",
+                                operario=operario
+                            )
+
+                            if ok:
+                                st.success(mensaje)
+                                st.rerun()
+                            else:
+                                st.error(mensaje)
+
+                with c2:
+                    salida = st.number_input(
+                        f"Salida {codigo}",
+                        min_value=0.0,
+                        step=1.0,
+                        key=f"salida_{codigo}"
+                    )
+
+                    if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
+                        if salida > 0:
+                            ok, mensaje = registrar_movimiento_inventario(
+                                codigo_material=codigo,
+                                tipo_movimiento="Salida",
+                                cantidad=salida,
+                                motivo="Salida manual",
+                                numero_ot="",
+                                operario=operario
+                            )
+
+                            if ok:
+                                st.success(mensaje)
+                                st.rerun()
+                            else:
+                                st.error(mensaje)
+            else:
+                st.info("Material desactivado: no permite entradas ni salidas.")
