@@ -146,7 +146,7 @@ def pantalla_incidencias_profesores():
 
     prioridad = st.radio(
         "Prioridad",
-        ["Baja", "Media", "Alta"],
+        ["🟢 Baja", "🟡 Media", "🔴 Alta"],
         horizontal=True
     )
 
@@ -183,6 +183,8 @@ def pantalla_incidencias_profesores():
 
         numero_ot = obtener_siguiente_numero_ot(centro, "INC")
         fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        prioridad = prioridad.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "")
 
         datos = (
             numero_ot,
