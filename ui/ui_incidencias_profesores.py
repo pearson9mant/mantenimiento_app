@@ -222,7 +222,7 @@ def pantalla_incidencias_profesores():
             operario,
             f"Profesores - {tipo_solicitante}",
             nombre_solicitante.strip(),
-            fecha_origen
+            fecha_origen,
             ruta_foto
         )
 
