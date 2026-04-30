@@ -4,6 +4,83 @@ from datetime import datetime
 from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
 
 
+ESPACIOS_POR_EDIFICIO = {
+    "Infantil/Primaria": [
+        "I3A", "I3B", "I3C",
+        "I4A", "I4B", "I4C",
+        "I5A", "I5B", "I5C",
+        "1A", "1B", "1C",
+        "2A", "2B", "2C",
+        "3A", "3B", "3C",
+        "4A", "4B", "4C",
+        "5A", "5B", "5C",
+        "6A", "6B", "6C",
+        "Comedor niños",
+        "Comedor profesores",
+        "Patio cuadrado",
+        "Patio fútbol",
+        "Patio patines",
+        "Capilla",
+        "Secretaría",
+        "Sala profesores",
+        "Teatro",
+        "Pasillos",
+        "WC",
+        "General",
+        "Otro"
+    ],
+    "Llar": [
+        "I1A", "I1B", "I1C",
+        "I2A", "I2B", "I2C",
+        "Sala polivalente",
+        "Sala profesores",
+        "Pasillo",
+        "Almacén",
+        "Despacho gym",
+        "Vestuario femenino",
+        "Vestuario masculino",
+        "Patio",
+        "WC",
+        "Secretaría",
+        "General",
+        "Otro"
+    ],
+    "Edif. A": [
+        "ESO 1A", "ESO 1B", "ESO 1C",
+        "ESO 2A", "ESO 2B", "ESO 2C",
+        "ESO 3A", "ESO 3B", "ESO 3C",
+        "ESO 4A", "ESO 4B", "ESO 4C",
+        "Bach 1A", "Bach 1B", "Bach 1C",
+        "Bach 2A", "Bach 2B", "Bach 2C",
+        "Pasillo",
+        "WC",
+        "General",
+        "Otro"
+    ],
+    "Edif. B": [
+        "General",
+        "Laboratorio",
+        "Aula música",
+        "Aula informática",
+        "Pasillo",
+        "WC",
+        "Otro"
+    ],
+    "Edif. C": [
+        "ESO 1A", "ESO 1B", "ESO 1C",
+        "ESO 2A", "ESO 2B", "ESO 2C",
+        "ESO 3A", "ESO 3B", "ESO 3C",
+        "ESO 4A", "ESO 4B", "ESO 4C",
+        "Bach 1A", "Bach 1B", "Bach 1C",
+        "Bach 2A", "Bach 2B", "Bach 2C",
+        "Pasillo",
+        "WC",
+        "General",
+        "Otro"
+    ],
+}
+
+
 def pantalla_incidencias_profesores():
     st.markdown("""
     <style>
@@ -46,10 +123,20 @@ def pantalla_incidencias_profesores():
 
     edificio = st.selectbox("Edificio", edificios)
 
-    espacio = st.text_input(
+    espacios = ESPACIOS_POR_EDIFICIO.get(edificio, ["General", "Otro"])
+
+    espacio_seleccionado = st.selectbox(
         "Espacio / Aula",
-        placeholder="Ejemplo: 3A, comedor, patio..."
+        espacios
     )
+
+    if espacio_seleccionado == "Otro":
+        espacio = st.text_input(
+            "Escribe el espacio",
+            placeholder="Ejemplo: despacho, almacén, aula..."
+        )
+    else:
+        espacio = espacio_seleccionado
 
     descripcion = st.text_area(
         "¿Qué ocurre?",
@@ -85,6 +172,10 @@ def pantalla_incidencias_profesores():
             st.warning("Falta poner el nombre de quien envía.")
             return
 
+        if not str(espacio).strip():
+            st.warning("Falta indicar el espacio.")
+            return
+
         if centro == "Pearson 9":
             operario = "Luis Lozano"
         else:
@@ -99,7 +190,7 @@ def pantalla_incidencias_profesores():
             "Abierta",
             centro,
             edificio,
-            espacio.strip(),
+            str(espacio).strip(),
             "Otros",
             prioridad,
             operario,
