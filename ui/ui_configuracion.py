@@ -220,7 +220,7 @@ def pantalla_configuracion():
             st.success(f"{afectados} puntos limpiados (desactivados)")
             st.rerun()
 
-    sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
+        sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
 
         with sub1:
             st.markdown("#### Añadir punto de control")
