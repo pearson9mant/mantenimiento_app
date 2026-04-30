@@ -23,7 +23,10 @@ def obtener_origen_ot(origen):
         return "Preventivo"
     if origen_txt == "APP":
         return "App"
+    if origen_txt.startswith("PROFESORES"):
+        return "Profesor"
     return "General"
+
 
 def operario_por_centro(centro):
     if centro == "Pearson 9":
@@ -76,9 +79,9 @@ def pantalla_ordenes():
                 operario_auto = operario_por_centro(centro)
 
                 if operario_auto in OPERARIOS:
-                   indice_operario = OPERARIOS.index(operario_auto)
+                    indice_operario = OPERARIOS.index(operario_auto)
                 else:
-                   indice_operario = 0
+                    indice_operario = 0
 
                 operario_sel = st.selectbox(
                     "Operario",
@@ -139,15 +142,21 @@ def pantalla_ordenes():
             with f2:
                 filtro_origen = st.selectbox(
                     "Origen",
-                    ["Todos", "LEGIONELLA", "OUTLOOK", "APP", "PREVENTIVO"],
+                    ["Todos", "LEGIONELLA", "OUTLOOK", "APP", "PREVENTIVO", "PROFESORES"],
                     key="filtro_origen_admin_ot"
                 )
 
             if filtro_origen != "Todos":
-                ordenes = [
-                    o for o in ordenes
-                    if (o[11] or "").strip().upper() == filtro_origen
-                ]
+                if filtro_origen == "PROFESORES":
+                    ordenes = [
+                        o for o in ordenes
+                        if (o[11] or "").strip().upper().startswith("PROFESORES")
+                    ]
+                else:
+                    ordenes = [
+                        o for o in ordenes
+                        if (o[11] or "").strip().upper() == filtro_origen
+                    ]
 
             total_abiertas = len([o for o in ordenes if o[3] == "Abierta"])
             total_curso = len([o for o in ordenes if o[3] == "En curso"])
@@ -177,7 +186,25 @@ def pantalla_ordenes():
             st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                if len(o) == 14:
+                if len(o) == 15:
+                    (
+                        id_orden,
+                        numero_ot,
+                        descripcion,
+                        estado,
+                        fecha,
+                        centro,
+                        edificio,
+                        espacio,
+                        area,
+                        prioridad,
+                        operario,
+                        origen,
+                        solicitante,
+                        fecha_origen,
+                        foto,
+                    ) = o
+                elif len(o) == 14:
                     (
                         id_orden,
                         numero_ot,
@@ -194,6 +221,7 @@ def pantalla_ordenes():
                         solicitante,
                         fecha_origen,
                     ) = o
+                    foto = ""
                 else:
                     (
                         id_orden,
@@ -211,6 +239,7 @@ def pantalla_ordenes():
                     ) = o
                     solicitante = ""
                     fecha_origen = ""
+                    foto = ""
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -230,6 +259,13 @@ def pantalla_ordenes():
 
                         if fecha_origen:
                             st.caption(f"Fecha origen: {fecha_origen}")
+
+                        if foto:
+                            try:
+                                with st.expander("📷 Ver foto"):
+                                    st.image(foto, use_container_width=True)
+                            except Exception:
+                                st.caption("📷 Foto no disponible")
 
                     with c2:
                         estados = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
@@ -281,7 +317,27 @@ def pantalla_ordenes():
             st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-                if len(h) == 16:
+                if len(h) == 17:
+                    (
+                        id_orden,
+                        numero_ot,
+                        descripcion,
+                        estado,
+                        fecha,
+                        centro,
+                        edificio,
+                        espacio,
+                        area,
+                        prioridad,
+                        operario,
+                        origen,
+                        solicitante,
+                        fecha_origen,
+                        fecha_cierre,
+                        observaciones_cierre,
+                        foto,
+                    ) = h
+                elif len(h) == 16:
                     (
                         id_orden,
                         numero_ot,
@@ -300,6 +356,7 @@ def pantalla_ordenes():
                         fecha_cierre,
                         observaciones_cierre,
                     ) = h
+                    foto = ""
                 else:
                     (
                         id_orden,
@@ -319,6 +376,7 @@ def pantalla_ordenes():
                     ) = h
                     solicitante = ""
                     fecha_origen = ""
+                    foto = ""
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -341,6 +399,13 @@ def pantalla_ordenes():
 
                         if observaciones_cierre:
                             st.caption(f"📝 {observaciones_cierre}")
+
+                        if foto:
+                            try:
+                                with st.expander("📷 Ver foto"):
+                                    st.image(foto, use_container_width=True)
+                            except Exception:
+                                st.caption("📷 Foto no disponible")
 
                     with c2:
                         confirmar_hist = st.checkbox(
