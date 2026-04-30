@@ -197,6 +197,17 @@ def mostrar_menu_operario():
 # INICIO APP
 # -------------------------------
 inicializar_db()
+
+# -------------------------------
+# ACCESO DIRECTO QR INCIDENCIAS
+# -------------------------------
+params = st.query_params
+modo = params.get("modo")
+
+if modo == "incidencias":
+    pantalla_incidencias_profesores()
+    st.stop()
+
 login()
 
 perfil = st.session_state.get("perfil", "")
