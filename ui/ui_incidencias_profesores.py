@@ -146,7 +146,7 @@ def pantalla_incidencias_profesores():
 
     prioridad = st.radio(
         "Prioridad",
-        ["🟢 Baja", "🟡 Media", "🔴 Alta"],
+        ["🟢 Baja", "🟡 Normal", "🔴 Alta"],
         horizontal=True
     )
 
