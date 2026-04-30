@@ -312,6 +312,9 @@ if perfil == "admin":
     elif seccion == "Incidencias":
         pantalla_incidencias_profesores()
 
+    elif seccion == "Configuración":
+        pantalla_configuracion()
+
 
 # -------------------------------
 # GERENCIA
