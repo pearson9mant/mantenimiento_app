@@ -58,17 +58,21 @@ def crear_orden(datos):
     conn = conectar()
     cursor = conn.cursor()
 
+    # Compatibilidad con llamadas antiguas
     if len(datos) == 10:
-        datos = (*datos, "", "", "")
+        datos = (*datos, "", "", "", "Operarios")
 
     elif len(datos) == 12:
-        datos = (*datos, "")
+        datos = (*datos, "", "Operarios")
+
+    elif len(datos) == 13:
+        datos = (*datos, "Operarios")
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
         (numero_ot, descripcion, estado, centro, edificio, espacio, area,
-         prioridad, operario, origen, solicitante, fecha_origen, foto)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         prioridad, operario, origen, solicitante, fecha_origen, foto, tipo_solicitante)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), datos)
 
     conn.commit()
@@ -82,7 +86,7 @@ def obtener_ordenes():
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, foto
+               solicitante, fecha_origen, foto, tipo_solicitante
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
@@ -99,7 +103,8 @@ def obtener_historico():
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, fecha_cierre, observaciones_cierre, foto
+               solicitante, fecha_origen, fecha_cierre, observaciones_cierre, foto,
+               tipo_solicitante
         FROM historico_ordenes
         ORDER BY id DESC
     """)
@@ -125,7 +130,7 @@ def obtener_ordenes_operario(operario):
         cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                    centro, edificio, espacio, area, prioridad, operario, origen,
-                   solicitante, fecha_origen, foto
+                   solicitante, fecha_origen, foto, tipo_solicitante
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -134,7 +139,7 @@ def obtener_ordenes_operario(operario):
         cursor.execute("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                    centro, edificio, espacio, area, prioridad, operario, origen,
-                   solicitante, fecha_origen, foto
+                   solicitante, fecha_origen, foto, tipo_solicitante
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
@@ -168,7 +173,7 @@ def finalizar_orden(id_orden, observaciones=""):
     cursor.execute(_sql("""
         SELECT numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, foto
+               solicitante, fecha_origen, foto, tipo_solicitante
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -179,15 +184,15 @@ def finalizar_orden(id_orden, observaciones=""):
         (
             numero_ot, descripcion, estado, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
-            solicitante, fecha_origen, foto
+            solicitante, fecha_origen, foto, tipo_solicitante
         ) = orden
 
         cursor.execute(_sql("""
             INSERT INTO historico_ordenes
             (numero_ot, descripcion, estado, fecha_creacion, centro, edificio,
              espacio, area, prioridad, operario, origen, solicitante,
-             fecha_origen, observaciones_cierre, foto)
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             fecha_origen, observaciones_cierre, foto, tipo_solicitante)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -202,7 +207,8 @@ def finalizar_orden(id_orden, observaciones=""):
             solicitante,
             fecha_origen,
             observaciones,
-            foto
+            foto,
+            tipo_solicitante
         ))
 
         cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
