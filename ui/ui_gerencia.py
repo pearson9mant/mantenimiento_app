@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from modules.ordenes import obtener_ordenes, obtener_historico
-from modules.inventario import listar_inventario
+from modules.inventario import obtener_materiales_inventario
 
 from config_gerencia import (
     TIPOS_SOLICITANTE,
@@ -108,7 +108,15 @@ def pintar_metricas_generales(df):
 
 def pintar_inventario():
     try:
-       inventario = pd.DataFrame(listar_inventario())
+        columnas = [
+            "id", "codigo", "material", "categoria", "unidad",
+            "stock_actual", "stock_minimo", "centro", "edificio",
+            "ubicacion", "proveedor", "observaciones", "fecha_alta",
+            "foto", "activo", "precio_unitario", "coste_total",
+            "fecha_compra", "referencia_factura", "observaciones_coste"
+        ]
+
+        inventario = pd.DataFrame(obtener_materiales_inventario(), columns=columnas)
 
         if inventario.empty:
             st.info("No hay inventario registrado.")
@@ -116,30 +124,39 @@ def pintar_inventario():
 
         total_material = len(inventario)
 
-        columna_stock = None
+        inventario["stock_actual"] = pd.to_numeric(
+            inventario["stock_actual"], errors="coerce"
+        ).fillna(0)
 
-        if "stock" in inventario.columns:
-            columna_stock = "stock"
-        elif "cantidad" in inventario.columns:
-            columna_stock = "cantidad"
+        inventario["stock_minimo"] = pd.to_numeric(
+            inventario["stock_minimo"], errors="coerce"
+        ).fillna(0)
 
-        if columna_stock:
-            inventario[columna_stock] = pd.to_numeric(
-                inventario[columna_stock], errors="coerce"
-            ).fillna(0)
-
-            bajo_stock = len(inventario[inventario[columna_stock] <= STOCK_BAJO])
-            sin_stock = len(inventario[inventario[columna_stock] <= 0])
-        else:
-            bajo_stock = 0
-            sin_stock = 0
+        bajo_stock = len(inventario[inventario["stock_actual"] <= inventario["stock_minimo"]])
+        sin_stock = len(inventario[inventario["stock_actual"] <= 0])
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Total materiales", total_material)
         c2.metric("Bajo stock", bajo_stock)
         c3.metric("Sin stock", sin_stock)
 
-        st.dataframe(inventario, use_container_width=True, hide_index=True)
+        columnas_mostrar = [
+            "codigo",
+            "material",
+            "categoria",
+            "unidad",
+            "stock_actual",
+            "stock_minimo",
+            "centro",
+            "edificio",
+            "ubicacion",
+        ]
+
+        st.dataframe(
+            inventario[columnas_mostrar],
+            use_container_width=True,
+            hide_index=True
+        )
 
     except Exception as e:
         st.warning("No se pudo cargar el inventario.")
