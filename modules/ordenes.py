@@ -70,8 +70,22 @@ def crear_orden(datos):
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
-        (numero_ot, descripcion, estado, centro, edificio, espacio, area,
-         prioridad, operario, origen, solicitante, fecha_origen, foto, tipo_solicitante)
+        (
+            numero_ot,
+            descripcion,
+            estado,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen,
+            solicitante,
+            fecha_origen,
+            foto,
+            tipo_solicitante
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), datos)
 
