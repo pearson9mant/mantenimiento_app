@@ -257,14 +257,10 @@ if st.session_state["seccion_actual"] is None:
     elif perfil == "gerencia":
         mostrar_menu_gerencia()
 
-    elif seccion == "Configuración":
-        pantalla_configuracion()
-
     else:
         st.caption(f"{operario_activo}")
         mostrar_menu_operario()
 
-    
     st.stop()
 
 
