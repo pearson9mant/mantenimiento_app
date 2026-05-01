@@ -1,6 +1,19 @@
 import streamlit as st
 from modules.ordenes import obtener_ordenes, obtener_historico
 
+
+def obtener_tipo_solicitante_activa(o):
+    if len(o) >= 16:
+        return o[15] or "Operarios"
+    return "Operarios"
+
+
+def obtener_tipo_solicitante_historico(h):
+    if len(h) >= 18:
+        return h[17] or "Operarios"
+    return "Operarios"
+
+
 def pantalla_ordenes_lectura():
     st.subheader("📋 Órdenes")
 
@@ -13,13 +26,30 @@ def pantalla_ordenes_lectura():
             st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen, *resto = o
+                (
+                    _,
+                    numero_ot,
+                    descripcion,
+                    estado,
+                    fecha,
+                    centro,
+                    edificio,
+                    espacio,
+                    area,
+                    prioridad,
+                    operario,
+                    origen,
+                    *resto
+                ) = o
+
+                tipo_solicitante = obtener_tipo_solicitante_activa(o)
 
                 st.markdown(
                     f"**{numero_ot}** | {prioridad} | {area or '-'} | **{estado}**  \n"
                     f"{descripcion}  \n"
                     f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                    f"👷 {operario or '-'}"
+                    f"📌 Solicitante: **{tipo_solicitante}**  \n"
+                    f"👷 Asignado a: {operario or '-'}"
                 )
                 st.markdown("---")
 
@@ -30,14 +60,32 @@ def pantalla_ordenes_lectura():
             st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-               
-                _, numero_ot, descripcion, estado, fecha, centro, edificio, espacio, area, prioridad, operario, origen, fecha_cierre, observaciones_cierre, *resto = h
+                (
+                    _,
+                    numero_ot,
+                    descripcion,
+                    estado,
+                    fecha,
+                    centro,
+                    edificio,
+                    espacio,
+                    area,
+                    prioridad,
+                    operario,
+                    origen,
+                    *resto
+                ) = h
+
+                fecha_cierre = h[14] if len(h) > 14 else "-"
+                observaciones_cierre = h[15] if len(h) > 15 else ""
+                tipo_solicitante = obtener_tipo_solicitante_historico(h)
 
                 st.markdown(
-                    f"**{numero_ot}** | {prioridad} | {area or '-'}  \n"
+                    f"**{numero_ot}** | {prioridad} | {area or '-'} | **{estado}**  \n"
                     f"{descripcion}  \n"
                     f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                    f"👷 {operario or '-'} | Cierre: {fecha_cierre or '-'}"
+                    f"📌 Solicitante: **{tipo_solicitante}**  \n"
+                    f"👷 Asignado a: {operario or '-'} | Cierre: {fecha_cierre or '-'}"
                 )
 
                 if observaciones_cierre:
