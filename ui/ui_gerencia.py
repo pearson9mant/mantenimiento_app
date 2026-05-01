@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from modules.ordenes import obtener_ordenes, obtener_historico
-from modules.inventario import obtener_inventario
+from modules.inventario import listar_inventario
 
 from config_gerencia import (
     TIPOS_SOLICITANTE,
@@ -108,7 +108,7 @@ def pintar_metricas_generales(df):
 
 def pintar_inventario():
     try:
-        inventario = pd.DataFrame(obtener_inventario())
+       inventario = pd.DataFrame(listar_inventario())
 
         if inventario.empty:
             st.info("No hay inventario registrado.")
