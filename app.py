@@ -14,6 +14,7 @@ from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_configuracion import pantalla_configuracion
+from ui.ui_gerencia import pantalla_gerencia
 
 
 st.set_page_config(page_title="Mantenimiento", layout="wide")
@@ -131,6 +132,10 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
 
+        if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Gerencia"
+            st.rerun()
+
     with col2:
         if st.button("🛠\nÓrdenes", key="btn_ot", use_container_width=True):
             st.session_state["seccion_actual"] = "Órdenes"
@@ -153,8 +158,8 @@ def mostrar_menu_gerencia():
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("📊\nPanel", key="btn_panel_gerencia", use_container_width=True):
-            st.session_state["seccion_actual"] = "Panel"
+        if st.button("📊\nPanel gerencia", key="btn_panel_gerencia", use_container_width=True):
+            st.session_state["seccion_actual"] = "Gerencia"
             st.rerun()
 
         if st.button("📦\nInventario", key="btn_inv_gerencia", use_container_width=True):
@@ -287,6 +292,9 @@ if perfil == "admin":
     if seccion == "Panel":
         pantalla_panel()
 
+    elif seccion == "Gerencia":
+        pantalla_gerencia()
+
     elif seccion == "Órdenes":
         pantalla_ordenes()
 
@@ -317,8 +325,11 @@ if perfil == "admin":
 # -------------------------------
 elif perfil == "gerencia":
 
-    if seccion == "Panel":
-        pantalla_panel()
+    if seccion == "Gerencia":
+        pantalla_gerencia()
+
+    elif seccion == "Panel":
+        pantalla_gerencia()
 
     elif seccion == "Órdenes":
         pantalla_ordenes_lectura()
