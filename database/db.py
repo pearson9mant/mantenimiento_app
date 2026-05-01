@@ -72,6 +72,7 @@ def inicializar_db():
             operario TEXT,
             origen TEXT,
             solicitante TEXT,
+            tipo_solicitante TEXT DEFAULT 'Operarios',
             fecha_origen TEXT
         )
     """)
@@ -93,6 +94,7 @@ def inicializar_db():
             fecha_cierre {fecha_sql},
             origen TEXT,
             solicitante TEXT,
+            tipo_solicitante TEXT DEFAULT 'Operarios',
             fecha_origen TEXT
         )
     """)
@@ -158,9 +160,13 @@ def inicializar_db():
 
     # Por si las tablas ya existían antiguas
     _add_column(cursor, "ordenes_trabajo", "solicitante", "TEXT")
+    _add_column(cursor, "ordenes_trabajo", "tipo_solicitante", "TEXT DEFAULT 'Operarios'")
     _add_column(cursor, "ordenes_trabajo", "fecha_origen", "TEXT")
+
     _add_column(cursor, "historico_ordenes", "solicitante", "TEXT")
+    _add_column(cursor, "historico_ordenes", "tipo_solicitante", "TEXT DEFAULT 'Operarios'")
     _add_column(cursor, "historico_ordenes", "fecha_origen", "TEXT")
+
     # -------------------------------
     # FOTO INCIDENCIAS
     # -------------------------------
@@ -291,7 +297,7 @@ def inicializar_db():
     _add_column(cursor, "legionella_puntos", "activo", "INTEGER DEFAULT 1")
     _add_column(cursor, "legionella_puntos", "observaciones", "TEXT")
 
-        # -------------------------------
+    # -------------------------------
     # CONFIGURACIÓN UBICACIONES
     # -------------------------------
     cursor.execute(f"""
