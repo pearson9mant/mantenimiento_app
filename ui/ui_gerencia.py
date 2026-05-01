@@ -12,11 +12,26 @@ from config_gerencia import (
     MOSTRAR_MESES,
     MOSTRAR_CENTROS,
     MOSTRAR_INVENTARIO,
-    STOCK_BAJO,
 )
 
 
+COLUMNAS_ORDENES = [
+    "id", "numero_ot", "descripcion", "estado", "fecha_creacion",
+    "centro", "edificio", "espacio", "area", "prioridad", "operario",
+    "origen", "solicitante", "fecha_origen", "foto", "tipo_solicitante"
+]
+
+COLUMNAS_HISTORICO = [
+    "id", "numero_ot", "descripcion", "estado", "fecha_creacion",
+    "centro", "edificio", "espacio", "area", "prioridad", "operario",
+    "origen", "solicitante", "fecha_origen", "fecha_cierre",
+    "observaciones_cierre", "foto", "tipo_solicitante"
+]
+
+
 def normalizar_texto(valor):
+    if valor is None:
+        return ""
     return str(valor).strip()
 
 
@@ -36,8 +51,11 @@ def normalizar_estado(estado):
 
 
 def preparar_dataframe_ordenes():
-    ordenes = pd.DataFrame(obtener_ordenes())
-    historico = pd.DataFrame(obtener_historico())
+    datos_ordenes = obtener_ordenes()
+    datos_historico = obtener_historico()
+
+    ordenes = pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES) if datos_ordenes else pd.DataFrame(columns=COLUMNAS_ORDENES)
+    historico = pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO) if datos_historico else pd.DataFrame(columns=COLUMNAS_HISTORICO)
 
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
@@ -53,6 +71,10 @@ def preparar_dataframe_ordenes():
     if "centro" not in df.columns:
         df["centro"] = "Sin centro"
 
+    df["estado"] = df["estado"].fillna("Abierta")
+    df["tipo_solicitante"] = df["tipo_solicitante"].fillna("Sin clasificar")
+    df["centro"] = df["centro"].fillna("Sin centro")
+
     if "fecha_creacion" in df.columns:
         df["fecha_creacion"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
         df["mes"] = df["fecha_creacion"].dt.strftime("%Y-%m")
@@ -61,7 +83,6 @@ def preparar_dataframe_ordenes():
         df["mes"] = "Sin fecha"
 
     df["estado_resumen"] = df["estado"].apply(normalizar_estado)
-    df["tipo_solicitante"] = df["tipo_solicitante"].fillna("Sin clasificar")
 
     return df
 
