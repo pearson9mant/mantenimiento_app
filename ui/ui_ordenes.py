@@ -1,5 +1,7 @@
 import streamlit as st
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
+from config_gerencia import TIPOS_SOLICITANTE
+
 from modules.ordenes import (
     crear_orden,
     obtener_ordenes,
@@ -74,6 +76,14 @@ def pantalla_ordenes():
         with c2:
             with st.form("form_nueva_orden", clear_on_submit=True):
                 descripcion = st.text_area("Descripción", key="orden_descripcion")
+
+                tipo_solicitante = st.selectbox(
+                    "Tipo solicitante",
+                    TIPOS_SOLICITANTE,
+                    index=TIPOS_SOLICITANTE.index("Operarios") if "Operarios" in TIPOS_SOLICITANTE else 0,
+                    key="orden_tipo_solicitante"
+                )
+
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
                 operario_auto = operario_por_centro(centro)
@@ -117,7 +127,11 @@ def pantalla_ordenes():
                             area,
                             prioridad,
                             operario,
-                            "APP"
+                            "APP",
+                            "",
+                            "",
+                            "",
+                            tipo_solicitante
                         ))
 
                         st.success(f"Orden creada correctamente: {numero}")
@@ -186,7 +200,26 @@ def pantalla_ordenes():
             st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                if len(o) == 15:
+                if len(o) == 16:
+                    (
+                        id_orden,
+                        numero_ot,
+                        descripcion,
+                        estado,
+                        fecha,
+                        centro,
+                        edificio,
+                        espacio,
+                        area,
+                        prioridad,
+                        operario,
+                        origen,
+                        solicitante,
+                        fecha_origen,
+                        foto,
+                        tipo_solicitante,
+                    ) = o
+                elif len(o) == 15:
                     (
                         id_orden,
                         numero_ot,
@@ -204,6 +237,7 @@ def pantalla_ordenes():
                         fecha_origen,
                         foto,
                     ) = o
+                    tipo_solicitante = "Operarios"
                 elif len(o) == 14:
                     (
                         id_orden,
@@ -222,6 +256,7 @@ def pantalla_ordenes():
                         fecha_origen,
                     ) = o
                     foto = ""
+                    tipo_solicitante = "Operarios"
                 else:
                     (
                         id_orden,
@@ -240,6 +275,7 @@ def pantalla_ordenes():
                     solicitante = ""
                     fecha_origen = ""
                     foto = ""
+                    tipo_solicitante = "Operarios"
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -256,7 +292,8 @@ def pantalla_ordenes():
                         f"**{numero_ot}** | {prioridad} | {area or '-'} | {origen_label}  \n"
                         f"{descripcion}  \n"
                         f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                        f"👷 {operario or '-'} | Estado: **{estado}**"
+                        f"👷 {operario or '-'} | Estado: **{estado}**  \n"
+                        f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**"
                     )
 
                     if solicitante:
@@ -322,7 +359,28 @@ def pantalla_ordenes():
             st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-                if len(h) == 17:
+                if len(h) == 18:
+                    (
+                        id_orden,
+                        numero_ot,
+                        descripcion,
+                        estado,
+                        fecha,
+                        centro,
+                        edificio,
+                        espacio,
+                        area,
+                        prioridad,
+                        operario,
+                        origen,
+                        solicitante,
+                        fecha_origen,
+                        fecha_cierre,
+                        observaciones_cierre,
+                        foto,
+                        tipo_solicitante,
+                    ) = h
+                elif len(h) == 17:
                     (
                         id_orden,
                         numero_ot,
@@ -342,6 +400,7 @@ def pantalla_ordenes():
                         observaciones_cierre,
                         foto,
                     ) = h
+                    tipo_solicitante = "Operarios"
                 elif len(h) == 16:
                     (
                         id_orden,
@@ -362,6 +421,7 @@ def pantalla_ordenes():
                         observaciones_cierre,
                     ) = h
                     foto = ""
+                    tipo_solicitante = "Operarios"
                 else:
                     (
                         id_orden,
@@ -382,6 +442,7 @@ def pantalla_ordenes():
                     solicitante = ""
                     fecha_origen = ""
                     foto = ""
+                    tipo_solicitante = "Operarios"
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -393,7 +454,8 @@ def pantalla_ordenes():
                             f"**{numero_ot}** | {prioridad} | {area or '-'} | {origen_label}  \n"
                             f"{descripcion}  \n"
                             f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
-                            f"👷 {operario or '-'} | Cierre: {fecha_cierre or '-'}"
+                            f"👷 {operario or '-'} | Cierre: {fecha_cierre or '-'}  \n"
+                            f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**"
                         )
 
                         if solicitante:
