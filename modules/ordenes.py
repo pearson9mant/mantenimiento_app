@@ -281,3 +281,18 @@ def borrar_orden_historico(id_orden):
     conn.commit()
     conn.close()
     return True
+
+
+def actualizar_tipo_solicitante_por_numero(numero_ot, tipo_solicitante):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        UPDATE ordenes_trabajo
+        SET tipo_solicitante = ?
+        WHERE numero_ot = ?
+    """), (tipo_solicitante, numero_ot))
+
+    conn.commit()
+    conn.close()
+    return True
