@@ -62,17 +62,17 @@ def pantalla_ordenes():
                 espacio = espacio_sel
 
         with c2:
+            tipo_solicitante = st.selectbox(
+                "Tipo solicitante",
+                TIPOS_SOLICITANTE,
+                index=TIPOS_SOLICITANTE.index("Operarios") if "Operarios" in TIPOS_SOLICITANTE else 0,
+                key="orden_tipo_solicitante_fuera_form"
+            )
+
+            st.caption(f"Se guardará como: {tipo_solicitante}")
+
             with st.form("form_nueva_orden", clear_on_submit=True):
                 descripcion = st.text_area("Descripción", key="orden_descripcion")
-
-                tipo_solicitante = st.selectbox(
-                    "Tipo solicitante",
-                    TIPOS_SOLICITANTE,
-                    index=TIPOS_SOLICITANTE.index("Operarios") if "Operarios" in TIPOS_SOLICITANTE else 0,
-                    key="orden_tipo_solicitante"
-                )
-
-                st.caption(f"Se guardará como: {tipo_solicitante}")
 
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
@@ -98,7 +98,9 @@ def pantalla_ordenes():
                 boton_crear = st.form_submit_button("✅ Crear orden", use_container_width=True)
 
                 if boton_crear:
-                    tipo_solicitante_guardar = str(tipo_solicitante or "Operarios").strip()
+                    tipo_solicitante_guardar = str(
+                        st.session_state.get("orden_tipo_solicitante_fuera_form", "Operarios")
+                    ).strip()
 
                     if tipo_solicitante_guardar not in TIPOS_SOLICITANTE:
                         tipo_solicitante_guardar = "Operarios"
