@@ -210,21 +210,21 @@ def pantalla_incidencias_profesores():
 
         prioridad = prioridad.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "")
 
-        datos = (
-            numero_ot,
-            descripcion.strip(),
-            "Abierta",
-            centro,
-            edificio,
-            str(espacio).strip(),
-            "Otros",
-            prioridad,
-            operario,
-            f"Profesores - {tipo_solicitante}",
-            nombre_solicitante.strip(),
-            fecha_origen,
-            ruta_foto
-        )
+       datos = (
+           numero_ot,
+           descripcion.strip(),
+           "Abierta",
+           centro,
+           edificio,
+           str(espacio).strip(),
+           "Otros",
+           prioridad,
+           operario,
+           f"Profesores - {tipo_solicitante}",
+           nombre_solicitante.strip(),
+           fecha_origen,
+           ruta_foto
+       )
 
         crear_orden(datos)
 
