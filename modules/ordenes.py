@@ -58,15 +58,30 @@ def crear_orden(datos):
     conn = conectar()
     cursor = conn.cursor()
 
-    # Compatibilidad con llamadas antiguas
-    if len(datos) == 10:
-        datos = (*datos, "", "", "", "Operarios")
+    datos = tuple(datos)
 
-    elif len(datos) == 12:
-        datos = (*datos, "", "Operarios")
+    numero_ot = datos[0] if len(datos) > 0 else ""
+    descripcion = datos[1] if len(datos) > 1 else ""
+    estado = datos[2] if len(datos) > 2 else "Abierta"
+    centro = datos[3] if len(datos) > 3 else ""
+    edificio = datos[4] if len(datos) > 4 else ""
+    espacio = datos[5] if len(datos) > 5 else ""
+    area = datos[6] if len(datos) > 6 else ""
+    prioridad = datos[7] if len(datos) > 7 else ""
+    operario = datos[8] if len(datos) > 8 else ""
+    origen = datos[9] if len(datos) > 9 else "APP"
 
-    elif len(datos) == 13:
-        datos = (*datos, "Operarios")
+    solicitante = datos[10] if len(datos) > 10 else ""
+    fecha_origen = datos[11] if len(datos) > 11 else ""
+    foto = datos[12] if len(datos) > 12 else ""
+
+    if len(datos) > 13:
+        tipo_solicitante = datos[13]
+    else:
+        tipo_solicitante = "Operarios"
+
+    if not tipo_solicitante:
+        tipo_solicitante = "Operarios"
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
@@ -87,7 +102,22 @@ def crear_orden(datos):
             tipo_solicitante
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """), datos)
+    """), (
+        numero_ot,
+        descripcion,
+        estado,
+        centro,
+        edificio,
+        espacio,
+        area,
+        prioridad,
+        operario,
+        origen,
+        solicitante,
+        fecha_origen,
+        foto,
+        tipo_solicitante
+    ))
 
     conn.commit()
     conn.close()
