@@ -12,6 +12,87 @@ from modules.inventario import (
 )
 
 
+def descomponer_orden_operario(fila):
+    if len(fila) >= 16:
+        (
+            id_orden,
+            num_ot,
+            desc,
+            est,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen,
+            solicitante,
+            fecha_origen,
+            foto,
+            tipo_solicitante,
+        ) = fila[:16]
+
+    elif len(fila) == 15:
+        (
+            id_orden,
+            num_ot,
+            desc,
+            est,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen,
+            solicitante,
+            fecha_origen,
+            foto,
+        ) = fila
+        tipo_solicitante = "Operarios"
+
+    else:
+        (
+            id_orden,
+            num_ot,
+            desc,
+            est,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen
+        ) = fila[:12]
+        solicitante = ""
+        fecha_origen = ""
+        foto = ""
+        tipo_solicitante = "Operarios"
+
+    return (
+        id_orden,
+        num_ot,
+        desc,
+        est,
+        fecha,
+        centro,
+        edificio,
+        espacio,
+        area,
+        prioridad,
+        operario,
+        origen,
+        solicitante,
+        fecha_origen,
+        foto,
+        tipo_solicitante,
+    )
+
+
 def pantalla_operario():
     st.subheader("👷 Vista operario")
 
@@ -44,42 +125,24 @@ def pantalla_operario():
 
     for fila in ordenes_operario:
 
-        if len(fila) == 15:
-            (
-                id_orden,
-                num_ot,
-                desc,
-                est,
-                fecha,
-                centro,
-                edificio,
-                espacio,
-                area,
-                prioridad,
-                operario,
-                origen,
-                solicitante,
-                fecha_origen,
-                foto,
-            ) = fila
-        else:
-            (
-                id_orden,
-                num_ot,
-                desc,
-                est,
-                fecha,
-                centro,
-                edificio,
-                espacio,
-                area,
-                prioridad,
-                operario,
-                origen
-            ) = fila
-            solicitante = ""
-            fecha_origen = ""
-            foto = ""
+        (
+            id_orden,
+            num_ot,
+            desc,
+            est,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen,
+            solicitante,
+            fecha_origen,
+            foto,
+            tipo_solicitante,
+        ) = descomponer_orden_operario(fila)
 
         estado_icono = {
             "Abierta": "🔴",
@@ -96,9 +159,10 @@ def pantalla_operario():
             st.markdown(f"{desc}")
             st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}")
             st.caption(f"Estado actual: {est}")
+            st.caption(f"📌 Solicitante: {tipo_solicitante or 'Operarios'}")
 
             if solicitante:
-                st.caption(f"Solicitante: {solicitante}")
+                st.caption(f"Nombre solicitante: {solicitante}")
 
             if fecha_origen:
                 st.caption(f"Fecha origen: {fecha_origen}")
