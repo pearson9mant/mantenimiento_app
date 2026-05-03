@@ -43,30 +43,18 @@ def pantalla_ordenes():
 
     tab1, tab2, tab3 = st.tabs(["➕ Nueva orden", "📄 Activas", "🗂️ Histórico"])
 
-    # ----------------------
-    # TAB 1 - NUEVA ORDEN
-    # ----------------------
     with tab1:
         c1, c2 = st.columns(2)
 
         with c1:
             centro = st.selectbox("Centro", CENTROS, key="orden_centro")
-
             st.info("Número de OT: se asignará al crear la orden")
 
             edificios_disponibles = EDIFICIOS.get(centro, [])
-            edificio = st.selectbox(
-                "Edificio",
-                edificios_disponibles,
-                key=f"orden_edificio_{centro}"
-            )
+            edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_edificio_{centro}")
 
             espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
-            espacio_sel = st.selectbox(
-                "Espacio",
-                espacios_disponibles,
-                key=f"orden_espacio_{edificio}"
-            )
+            espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"orden_espacio_{edificio}")
 
             if espacio_sel == "Otro":
                 espacio = st.text_input("Especificar espacio nuevo", key="orden_espacio_otro")
@@ -83,6 +71,8 @@ def pantalla_ordenes():
                     index=TIPOS_SOLICITANTE.index("Operarios") if "Operarios" in TIPOS_SOLICITANTE else 0,
                     key="orden_tipo_solicitante"
                 )
+
+                st.caption(f"Se guardará como: {tipo_solicitante}")
 
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
@@ -108,6 +98,11 @@ def pantalla_ordenes():
                 boton_crear = st.form_submit_button("✅ Crear orden", use_container_width=True)
 
                 if boton_crear:
+                    tipo_solicitante_guardar = str(tipo_solicitante or "Operarios").strip()
+
+                    if tipo_solicitante_guardar not in TIPOS_SOLICITANTE:
+                        tipo_solicitante_guardar = "Operarios"
+
                     if not descripcion.strip():
                         st.warning("La descripción es obligatoria")
                     elif not operario.strip():
@@ -117,7 +112,7 @@ def pantalla_ordenes():
                     else:
                         numero = obtener_siguiente_numero_ot(centro, "INC")
 
-                        crear_orden((
+                        datos_orden = (
                             numero,
                             descripcion,
                             "Abierta",
@@ -131,15 +126,17 @@ def pantalla_ordenes():
                             "",
                             "",
                             "",
-                            tipo_solicitante
-                        ))
+                            tipo_solicitante_guardar
+                        )
 
-                        st.success(f"Orden creada correctamente: {numero}")
+                        crear_orden(datos_orden)
+
+                        st.success(
+                            f"Orden creada correctamente: {numero} | "
+                            f"Solicitante: {tipo_solicitante_guardar}"
+                        )
                         st.rerun()
 
-    # ----------------------
-    # TAB 2 - ACTIVAS
-    # ----------------------
     with tab2:
         ordenes = obtener_ordenes()
 
@@ -202,75 +199,29 @@ def pantalla_ordenes():
             for o in ordenes:
                 if len(o) == 16:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
-                        foto,
-                        tipo_solicitante,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, foto, tipo_solicitante
                     ) = o
                 elif len(o) == 15:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
-                        foto,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, foto
                     ) = o
                     tipo_solicitante = "Operarios"
                 elif len(o) == 14:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen
                     ) = o
                     foto = ""
                     tipo_solicitante = "Operarios"
                 else:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario, origen
                     ) = o
                     solicitante = ""
                     fecha_origen = ""
@@ -333,15 +284,9 @@ def pantalla_ordenes():
                             st.rerun()
 
                     with c4:
-                        confirmar_activa = st.checkbox(
-                            "Confirmar",
-                            key=f"conf_admin_activas_{id_orden}"
-                        )
+                        confirmar_activa = st.checkbox("Confirmar", key=f"conf_admin_activas_{id_orden}")
 
-                        if st.button(
-                            f"🗑️ Borrar {numero_ot}",
-                            key=f"del_admin_activas_{id_orden}"
-                        ):
+                        if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_activas_{id_orden}"):
                             if confirmar_activa:
                                 borrar_orden(id_orden)
                                 st.warning(f"{numero_ot} eliminada")
@@ -349,9 +294,6 @@ def pantalla_ordenes():
                             else:
                                 st.error("Debes marcar la confirmación antes de borrar")
 
-    # ----------------------
-    # TAB 3 - HISTÓRICO
-    # ----------------------
     with tab3:
         historico = obtener_historico()
 
@@ -361,83 +303,33 @@ def pantalla_ordenes():
             for h in historico:
                 if len(h) == 18:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
-                        fecha_cierre,
-                        observaciones_cierre,
-                        foto,
-                        tipo_solicitante,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, fecha_cierre,
+                        observaciones_cierre, foto, tipo_solicitante
                     ) = h
                 elif len(h) == 17:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
-                        fecha_cierre,
-                        observaciones_cierre,
-                        foto,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, fecha_cierre,
+                        observaciones_cierre, foto
                     ) = h
                     tipo_solicitante = "Operarios"
                 elif len(h) == 16:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        solicitante,
-                        fecha_origen,
-                        fecha_cierre,
-                        observaciones_cierre,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, fecha_cierre,
+                        observaciones_cierre
                     ) = h
                     foto = ""
                     tipo_solicitante = "Operarios"
                 else:
                     (
-                        id_orden,
-                        numero_ot,
-                        descripcion,
-                        estado,
-                        fecha,
-                        centro,
-                        edificio,
-                        espacio,
-                        area,
-                        prioridad,
-                        operario,
-                        origen,
-                        fecha_cierre,
-                        observaciones_cierre,
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, fecha_cierre, observaciones_cierre
                     ) = h
                     solicitante = ""
                     fecha_origen = ""
@@ -475,15 +367,9 @@ def pantalla_ordenes():
                                 st.caption("📷 Foto no disponible")
 
                     with c2:
-                        confirmar_hist = st.checkbox(
-                            "Confirmar",
-                            key=f"conf_admin_hist_{id_orden}"
-                        )
+                        confirmar_hist = st.checkbox("Confirmar", key=f"conf_admin_hist_{id_orden}")
 
-                        if st.button(
-                            f"🗑️ Borrar {numero_ot}",
-                            key=f"del_admin_hist_{id_orden}"
-                        ):
+                        if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_hist_{id_orden}"):
                             if confirmar_hist:
                                 borrar_orden_historico(id_orden)
                                 st.warning(f"{numero_ot} eliminada del histórico")
