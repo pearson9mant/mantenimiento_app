@@ -526,6 +526,41 @@ def pantalla_legionella():
         st.info(mensaje)
 
     st.subheader("💧 Legionella")
+        # 🧹 LIMPIEZA REGISTROS INVÁLIDOS (NO TOCA LOS BUENOS)
+    if st.button("🧹 Limpiar registros inválidos (None)", use_container_width=True):
+        conn = conectar()
+        cur = conn.cursor()
+
+        try:
+            # registros mal guardados
+            cur.execute("""
+                DELETE FROM legionella_registros
+                WHERE centro IS NULL
+                   OR edificio IS NULL
+                   OR punto IS NULL
+                   OR tarea IS NULL
+            """)
+
+            # incidencias mal generadas
+            cur.execute("""
+                DELETE FROM legionella_incidencias
+                WHERE centro IS NULL
+                   OR edificio IS NULL
+                   OR punto IS NULL
+                   OR tarea IS NULL
+            """)
+
+            conn.commit()
+            st.success("Registros inválidos eliminados correctamente")
+
+        except Exception as e:
+            conn.rollback()
+            st.error(f"Error al limpiar: {e}")
+
+        finally:
+            conn.close()
+
+        st.rerun()
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
