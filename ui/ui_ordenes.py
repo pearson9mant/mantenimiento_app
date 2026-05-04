@@ -27,15 +27,18 @@ def usuario_actual():
 
 
 def es_admin():
-    return rol_actual() == "admin"
+    rol = rol_actual()
+    return rol in ["admin", "administrador", "administracion", "administración"]
 
 
 def es_gerencia():
-    return rol_actual() == "gerencia"
+    rol = rol_actual()
+    return rol in ["gerencia", "gerente", "direccion", "dirección"]
 
 
 def es_operario():
-    return rol_actual() == "operario"
+    rol = rol_actual()
+    return rol in ["operario", "operarios"]
 
 
 def normalizar_txt(valor):
