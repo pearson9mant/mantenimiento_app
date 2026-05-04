@@ -155,21 +155,8 @@ def mostrar_menu_admin():
 
 
 def mostrar_menu_gerencia():
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("📊\nPanel gerencia", key="btn_panel_gerencia", use_container_width=True):
-            st.session_state["seccion_actual"] = "Gerencia"
-            st.rerun()
-
-        if st.button("📦\nInventario", key="btn_inv_gerencia", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario"
-            st.rerun()
-
-    with col2:
-        if st.button("🛠\nÓrdenes", key="btn_ot_gerencia", use_container_width=True):
-            st.session_state["seccion_actual"] = "Órdenes"
-            st.rerun()
+    st.session_state["seccion_actual"] = "Gerencia"
+    st.rerun()
 
 
 def mostrar_menu_operario():
@@ -203,14 +190,8 @@ def mostrar_menu_operario():
             st.rerun()
 
 
-# -------------------------------
-# INICIO APP
-# -------------------------------
 inicializar_db()
 
-# -------------------------------
-# ACCESO DIRECTO QR INCIDENCIAS
-# -------------------------------
 params = st.query_params
 modo = params.get("modo")
 
@@ -249,6 +230,17 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
     st.stop()
 
 
+if perfil == "gerencia":
+    st.markdown("---")
+
+    if st.button("🏠\nPortada", key="volver_portada_gerencia", use_container_width=True):
+        volver_portada()
+
+    st.markdown("---")
+    pantalla_gerencia()
+    st.stop()
+
+
 if st.session_state["seccion_actual"] is None:
 
     if st.button("⬅\nVolver a portada", key="volver_portada_desde_menu", use_container_width=True):
@@ -258,9 +250,6 @@ if st.session_state["seccion_actual"] is None:
 
     if perfil == "admin":
         mostrar_menu_admin()
-
-    elif perfil == "gerencia":
-        mostrar_menu_gerencia()
 
     else:
         st.caption(f"{operario_activo}")
@@ -284,9 +273,6 @@ st.markdown("---")
 seccion = st.session_state["seccion_actual"]
 
 
-# -------------------------------
-# ADMIN
-# -------------------------------
 if perfil == "admin":
 
     if seccion == "Panel":
@@ -320,27 +306,6 @@ if perfil == "admin":
         pantalla_configuracion()
 
 
-# -------------------------------
-# GERENCIA
-# -------------------------------
-elif perfil == "gerencia":
-
-    if seccion == "Gerencia":
-        pantalla_gerencia()
-
-    elif seccion == "Panel":
-        pantalla_gerencia()
-
-    elif seccion == "Órdenes":
-        pantalla_ordenes_lectura()
-
-    elif seccion == "Inventario":
-        pantalla_inventario_lectura()
-
-
-# -------------------------------
-# OPERARIO
-# -------------------------------
 else:
 
     st.caption(f"{operario_activo}")
