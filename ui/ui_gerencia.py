@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 from modules.ordenes import obtener_ordenes, obtener_historico
 
@@ -8,7 +7,6 @@ from ui.ui_inventario import pantalla_inventario
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 
 from config_gerencia import (
-    TIPOS_SOLICITANTE,
     ESTADOS_HECHAS,
     ESTADOS_EN_PROCESO,
     ESTADOS_FALTAN,
@@ -40,191 +38,85 @@ def normalizar_estado(estado):
     estado = normalizar_texto(estado)
 
     if estado in ESTADOS_HECHAS:
-        return "Hechas"
+        return "Terminadas"
 
     if estado in ESTADOS_EN_PROCESO:
-        return "En proceso"
+        return "Por hacer"
 
     if estado in ESTADOS_FALTAN:
-        return "Faltan"
+        return "Por hacer"
 
-    return "Faltan"
+    return "Por hacer"
 
 
 def preparar_dataframe_ordenes():
     datos_ordenes = obtener_ordenes()
     datos_historico = obtener_historico()
 
-    ordenes = pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES) if datos_ordenes else pd.DataFrame(columns=COLUMNAS_ORDENES)
-    historico = pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO) if datos_historico else pd.DataFrame(columns=COLUMNAS_HISTORICO)
+    ordenes = (
+        pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES)
+        if datos_ordenes
+        else pd.DataFrame(columns=COLUMNAS_ORDENES)
+    )
+
+    historico = (
+        pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO)
+        if datos_historico
+        else pd.DataFrame(columns=COLUMNAS_HISTORICO)
+    )
 
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
 
     df = pd.concat([ordenes, historico], ignore_index=True)
 
-    if "fecha_cierre" not in df.columns:
-        df["fecha_cierre"] = None
-
     df["estado"] = df["estado"].fillna("Abierta")
-    df["tipo_solicitante"] = df["tipo_solicitante"].fillna("Sin clasificar")
     df["centro"] = df["centro"].fillna("Sin centro")
-    df["area"] = df["area"].fillna("Sin área")
-    df["operario"] = df["operario"].fillna("Sin asignar")
 
     df["fecha_creacion"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
-    df["fecha_cierre"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
-
     df["mes"] = df["fecha_creacion"].dt.strftime("%Y-%m").fillna("Sin fecha")
     df["estado_resumen"] = df["estado"].apply(normalizar_estado)
-
-    hoy = pd.Timestamp(datetime.now())
-    df["dias_abierta"] = (hoy - df["fecha_creacion"]).dt.days
-    df["dias_resolucion"] = (df["fecha_cierre"] - df["fecha_creacion"]).dt.days
 
     return df
 
 
-def tabla_resumen(df, campo, orden=None):
-    if df.empty or campo not in df.columns:
-        return pd.DataFrame()
+def resumen_centro(df):
+    terminadas = len(df[df["estado_resumen"] == "Terminadas"])
+    por_hacer = len(df[df["estado_resumen"] == "Por hacer"])
 
-    tabla = df.groupby([campo, "estado_resumen"]).size().unstack(fill_value=0).reset_index()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total órdenes", len(df))
+    c2.metric("Terminadas", terminadas)
+    c3.metric("Por hacer", por_hacer)
 
-    for col in ["Hechas", "En proceso", "Faltan"]:
+
+def grafico_meses(df):
+    tabla = (
+        df.groupby(["mes", "estado_resumen"])
+        .size()
+        .unstack(fill_value=0)
+        .reset_index()
+    )
+
+    for col in ["Terminadas", "Por hacer"]:
         if col not in tabla.columns:
             tabla[col] = 0
 
-    tabla["Total"] = tabla["Hechas"] + tabla["En proceso"] + tabla["Faltan"]
-    tabla = tabla[[campo, "Total", "Hechas", "En proceso", "Faltan"]]
-
-    if orden:
-        tabla[campo] = pd.Categorical(tabla[campo], categories=orden, ordered=True)
-        tabla = tabla.sort_values(campo)
-        tabla[campo] = tabla[campo].astype(str)
-
-    return tabla
-
-
-def crear_dashboard_centro(df, centro_nombre):
-    total = len(df)
-    hechas = len(df[df["estado_resumen"] == "Hechas"])
-    en_proceso = len(df[df["estado_resumen"] == "En proceso"])
-    faltan = len(df[df["estado_resumen"] == "Faltan"])
-    pendientes_material = len(df[df["estado"] == "Pendiente material"])
-    antiguas = len(df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)])
-
-    finalizadas = df[df["estado_resumen"] == "Hechas"]
-    tiempo_medio = finalizadas["dias_resolucion"].dropna().mean()
-
-    datos = {
-        "Centro": centro_nombre,
-        "Total órdenes": total,
-        "Hechas": hechas,
-        "En proceso": en_proceso,
-        "Sin finalizar": faltan,
-        "Pendiente material": pendientes_material,
-        "+7 días": antiguas,
-        "Tiempo medio cierre": f"{tiempo_medio:.1f} días" if pd.notna(tiempo_medio) else "-",
-    }
-
-    for tipo in TIPOS_SOLICITANTE:
-        datos[tipo] = len(df[df["tipo_solicitante"] == tipo])
-
-    area_principal = "-"
-    if "area" in df.columns and not df.empty:
-        areas = df["area"].dropna()
-        if not areas.empty:
-            area_principal = areas.value_counts().idxmax()
-
-    operario_principal = "-"
-    if "operario" in df.columns and not df.empty:
-        operarios = df["operario"].dropna()
-        if not operarios.empty:
-            operario_principal = operarios.value_counts().idxmax()
-
-    datos["Área principal"] = area_principal
-    datos["Operario principal"] = operario_principal
-
-    return pd.DataFrame([datos])
-
-
-def pintar_grafico_barras(titulo, tabla, columna_indice):
-    st.markdown(f"#### {titulo}")
+    tabla = tabla[["mes", "Terminadas", "Por hacer"]]
 
     if tabla.empty:
-        st.info("Sin datos.")
+        st.info("Sin datos por meses.")
         return
 
-    tabla_chart = tabla.set_index(columna_indice)
-
-    columnas = ["Hechas", "En proceso", "Faltan"]
-    columnas = [c for c in columnas if c in tabla_chart.columns]
-
-    st.bar_chart(tabla_chart[columnas])
+    st.bar_chart(tabla.set_index("mes"))
 
 
-def pintar_bloque_centro(df, centro_nombre):
-    with st.expander(f"🏫 {centro_nombre}", expanded=False):
-        dashboard = crear_dashboard_centro(df, centro_nombre)
-        st.dataframe(dashboard, use_container_width=True, hide_index=True)
+def pintar_centro(df, centro):
+    with st.expander(f"🏫 {centro}", expanded=False):
+        resumen_centro(df)
 
-        st.markdown("---")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            pintar_grafico_barras(
-                "📌 Solicitantes",
-                tabla_resumen(df, "tipo_solicitante", TIPOS_SOLICITANTE),
-                "tipo_solicitante"
-            )
-
-        with col2:
-            pintar_grafico_barras(
-                "👷 Operarios",
-                tabla_resumen(df, "operario"),
-                "operario"
-            )
-
-        st.markdown("---")
-
-        col3, col4 = st.columns(2)
-
-        with col3:
-            pintar_grafico_barras(
-                "🔧 Áreas",
-                tabla_resumen(df, "area"),
-                "area"
-            )
-
-        with col4:
-            pintar_grafico_barras(
-                "📅 Meses",
-                tabla_resumen(df, "mes"),
-                "mes"
-            )
-
-        st.markdown("---")
-
-        st.markdown("### ⚠️ Órdenes abiertas +7 días")
-
-        antiguas = df[
-            (df["estado_resumen"] != "Hechas") &
-            (df["dias_abierta"] >= 7)
-        ]
-
-        if antiguas.empty:
-            st.success("Todo al día 👍")
-        else:
-            st.dataframe(
-                antiguas[[
-                    "numero_ot", "descripcion", "estado", "centro",
-                    "espacio", "area", "operario", "dias_abierta"
-                ]],
-                use_container_width=True,
-                hide_index=True
-            )
+        st.markdown("### 📅 Por meses")
+        grafico_meses(df)
 
 
 def pantalla_gerencia():
@@ -236,18 +128,11 @@ def pantalla_gerencia():
         st.warning("No hay órdenes registradas todavía.")
         return
 
-    centros = ["Todos"] + sorted([c for c in df["centro"].dropna().unique().tolist() if c])
-    centro_sel = st.selectbox("🏫 Selecciona centro", centros, key="gerencia_centro_dashboard")
+    centros = sorted([c for c in df["centro"].dropna().unique().tolist() if c])
 
-    if centro_sel != "Todos":
-        df_vista = df[df["centro"] == centro_sel]
-        pintar_bloque_centro(df_vista, centro_sel)
-    else:
-        pintar_bloque_centro(df, "Todos los centros")
-
-        for centro in sorted([c for c in df["centro"].dropna().unique().tolist() if c]):
-            df_centro = df[df["centro"] == centro]
-            pintar_bloque_centro(df_centro, centro)
+    for centro in centros:
+        df_centro = df[df["centro"] == centro]
+        pintar_centro(df_centro, centro)
 
     st.markdown("---")
 
