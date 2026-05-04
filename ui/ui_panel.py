@@ -15,11 +15,85 @@ def leer_df_seguro(sql):
         return pd.DataFrame()
 
 
+# =====================================================
+# KPIs SEGUROS - NO TOCAN LO QUE YA FUNCIONA
+# =====================================================
+
+def valor_ot(o, indice, clave="", defecto=""):
+    try:
+        if isinstance(o, dict):
+            return o.get(clave, defecto)
+        if len(o) > indice:
+            return o[indice]
+        return defecto
+    except Exception:
+        return defecto
+
+
+def normalizar_estado(estado):
+    estado = str(estado or "").strip().lower()
+
+    if estado in ["finalizada", "finalizado", "cerrada", "cerrado"]:
+        return "Hechas"
+
+    if estado in ["en curso", "en proceso"]:
+        return "En proceso"
+
+    if estado in ["abierta", "pendiente", "pendiente material", "esperando material"]:
+        return "Faltan"
+
+    return "Faltan"
+
+
+def calcular_kpis_panel(ordenes, historico):
+    total_activas = len(ordenes)
+    total_finalizadas = len(historico)
+    total = total_activas + total_finalizadas
+
+    hechas = total_finalizadas
+
+    en_proceso = len([
+        o for o in ordenes
+        if normalizar_estado(valor_ot(o, 3, "estado")) == "En proceso"
+    ])
+
+    faltan = len([
+        o for o in ordenes
+        if normalizar_estado(valor_ot(o, 3, "estado")) == "Faltan"
+    ])
+
+    rendimiento = round((hechas / total) * 100, 1) if total else 0
+
+    return {
+        "total": total,
+        "hechas": hechas,
+        "en_proceso": en_proceso,
+        "faltan": faltan,
+        "rendimiento": rendimiento,
+    }
+
+
 def pantalla_panel():
     st.subheader("📊 Panel general")
 
     ordenes = obtener_ordenes()
     historico = obtener_historico()
+
+    # -------------------------------
+    # KPIs GENERALES NUEVOS
+    # -------------------------------
+    kpis = calcular_kpis_panel(ordenes, historico)
+
+    st.markdown("### 📈 KPIs generales")
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Total OT", kpis["total"])
+    k2.metric("✅ Hechas", kpis["hechas"])
+    k3.metric("🔄 En proceso", kpis["en_proceso"])
+    k4.metric("⏳ Faltan", kpis["faltan"])
+    k5.metric("📈 Rendimiento", f'{kpis["rendimiento"]}%')
+
+    st.markdown("---")
 
     abiertas = len([o for o in ordenes if o[3] == "Abierta"])
     en_curso = len([o for o in ordenes if o[3] == "En curso"])
