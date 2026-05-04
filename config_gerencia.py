@@ -1,9 +1,34 @@
-TIPOS_SOLICITANTE = [
-    "Profesores",
-    "Operarios",
-    "Dirección",
-    "Cap de estudio",
-]
+# config_gerencia.py
+
+TIPOS_SOLICITANTE = {
+    "Operarios": [
+        "J.A. Almeda",
+        "Juan",
+        "Juan Antonio",
+        "Luis Lozano",
+        "Luis",
+        "Abel Vasquez",
+        "Abel",
+    ],
+
+    "Dirección": [
+        "Noemí",
+        "Noemi",
+        "Dirección",
+        "Direccion",
+        "Gerencia",
+    ],
+
+    "Cap de estudio": [
+        "Cap de estudio",
+        "Cap d'estudis",
+        "Jefe de estudios",
+        "Coordinación",
+        "Coordinacion",
+    ],
+
+    "Profesores": []
+}
 
 ESTADOS_HECHAS = [
     "Finalizada",
