@@ -8,17 +8,17 @@ USUARIOS = {
         "nombre": "Juan Antonio"
     },
     "luis": {
-        "password": "1234",
+        "password": "luis2026",
         "perfil": "operario",
         "nombre": "Luis Lozano"
     },
     "abel": {
-        "password": "1234",
-        "perfil": "operario",
+        "password": "abel2026",
+        "perfil": "inventario",
         "nombre": "Abel Vasquez"
     },
     "gerencia": {
-        "password": "1234",
+        "password": "gerencia2026",
         "perfil": "gerencia",
         "nombre": "Gerencia"
     }
@@ -29,13 +29,14 @@ def login():
     if st.session_state.get("login_ok", False):
         return
 
-    st.markdown("## Acceso mantenimiento")
+    st.markdown("## 🔐 Acceso mantenimiento")
 
     usuario = st.text_input("Usuario")
     password = st.text_input("Contraseña", type="password")
 
     if st.button("Entrar", use_container_width=True):
         usuario = usuario.strip().lower()
+        password = password.strip()
 
         if usuario in USUARIOS and password == USUARIOS[usuario]["password"]:
             datos = USUARIOS[usuario]
@@ -43,6 +44,7 @@ def login():
             st.session_state["login_ok"] = True
             st.session_state["usuario"] = usuario
             st.session_state["perfil"] = datos["perfil"]
+            st.session_state["rol"] = datos["perfil"]
             st.session_state["operario_activo"] = datos["nombre"]
             st.session_state["entrada_app"] = False
             st.session_state["seccion_actual"] = None
@@ -66,6 +68,7 @@ def barra_sesion():
             "login_ok",
             "usuario",
             "perfil",
+            "rol",
             "operario_activo",
             "entrada_app",
             "seccion_actual",
