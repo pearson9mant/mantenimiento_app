@@ -14,6 +14,78 @@ from modules.ordenes import (
 )
 
 
+# =====================================================
+# PERMISOS / FILTRO OBLIGATORIO POR OPERARIO
+# =====================================================
+
+def rol_actual():
+    return str(st.session_state.get("rol", "")).strip().lower()
+
+
+def usuario_actual():
+    return str(st.session_state.get("usuario", "")).strip()
+
+
+def es_admin():
+    return rol_actual() == "admin"
+
+
+def es_gerencia():
+    return rol_actual() == "gerencia"
+
+
+def es_operario():
+    return rol_actual() == "operario"
+
+
+def normalizar_txt(valor):
+    return str(valor or "").strip().lower()
+
+
+def obtener_operario_de_fila(fila):
+    try:
+        return fila[10]
+    except Exception:
+        return ""
+
+
+def filtrar_por_operario_obligatorio(filas):
+    """
+    Admin y gerencia ven todo.
+    Operario solo ve sus órdenes.
+    """
+    if not filas:
+        return []
+
+    if es_admin() or es_gerencia():
+        return filas
+
+    if es_operario():
+        usuario = normalizar_txt(usuario_actual())
+
+        return [
+            f for f in filas
+            if normalizar_txt(obtener_operario_de_fila(f)) == usuario
+        ]
+
+    return []
+
+
+def operario_forzado_si_toca(centro):
+    """
+    Si entra un operario, la orden se asigna obligatoriamente a él.
+    Si entra admin/gerencia, se usa el automático por centro.
+    """
+    if es_operario():
+        return usuario_actual()
+
+    return operario_por_centro(centro)
+
+
+# =====================================================
+# FUNCIONES EXISTENTES
+# =====================================================
+
 def obtener_origen_ot(origen):
     origen_txt = (origen or "").strip().upper()
 
@@ -42,6 +114,10 @@ def pantalla_ordenes():
     st.subheader("📋 Órdenes de trabajo")
 
     tab1, tab2, tab3 = st.tabs(["➕ Nueva orden", "📄 Activas", "🗂️ Histórico"])
+
+    # =====================================================
+    # NUEVA ORDEN
+    # =====================================================
 
     with tab1:
         c1, c2 = st.columns(2)
@@ -76,24 +152,29 @@ def pantalla_ordenes():
 
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
-                operario_auto = operario_por_centro(centro)
 
-                if operario_auto in OPERARIOS:
-                    indice_operario = OPERARIOS.index(operario_auto)
+                operario_auto = operario_forzado_si_toca(centro)
+
+                if es_operario():
+                    operario = operario_auto
+                    st.info(f"👷 Operario asignado automáticamente: {operario}")
                 else:
-                    indice_operario = 0
+                    if operario_auto in OPERARIOS:
+                        indice_operario = OPERARIOS.index(operario_auto)
+                    else:
+                        indice_operario = 0
 
-                operario_sel = st.selectbox(
-                    "Operario",
-                    OPERARIOS,
-                    index=indice_operario,
-                    key=f"orden_operario_{centro}"
-                )
+                    operario_sel = st.selectbox(
+                        "Operario",
+                        OPERARIOS,
+                        index=indice_operario,
+                        key=f"orden_operario_{centro}"
+                    )
 
-                if operario_sel == "Otro":
-                    operario = st.text_input("Nombre operario", key="orden_operario_otro")
-                else:
-                    operario = operario_sel
+                    if operario_sel == "Otro":
+                        operario = st.text_input("Nombre operario", key="orden_operario_otro")
+                    else:
+                        operario = operario_sel
 
                 boton_crear = st.form_submit_button("✅ Crear orden", use_container_width=True)
 
@@ -104,6 +185,10 @@ def pantalla_ordenes():
 
                     if tipo_solicitante_guardar not in TIPOS_SOLICITANTE:
                         tipo_solicitante_guardar = "Operarios"
+
+                    if es_operario():
+                        tipo_solicitante_guardar = "Operarios"
+                        operario = usuario_actual()
 
                     if not descripcion.strip():
                         st.warning("La descripción es obligatoria")
@@ -139,8 +224,13 @@ def pantalla_ordenes():
                         )
                         st.rerun()
 
+    # =====================================================
+    # ÓRDENES ACTIVAS
+    # =====================================================
+
     with tab2:
         ordenes = obtener_ordenes()
+        ordenes = filtrar_por_operario_obligatorio(ordenes)
 
         if ordenes:
             f1, f2 = st.columns(2)
@@ -196,7 +286,10 @@ def pantalla_ordenes():
             st.markdown("---")
 
         if not ordenes:
-            st.info("No hay órdenes activas")
+            if es_operario():
+                st.info("No tienes órdenes activas asignadas")
+            else:
+                st.info("No hay órdenes activas")
         else:
             for o in ordenes:
                 if len(o) == 16:
@@ -286,21 +379,30 @@ def pantalla_ordenes():
                             st.rerun()
 
                     with c4:
-                        confirmar_activa = st.checkbox("Confirmar", key=f"conf_admin_activas_{id_orden}")
+                        if es_admin() or es_gerencia():
+                            confirmar_activa = st.checkbox("Confirmar", key=f"conf_admin_activas_{id_orden}")
 
-                        if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_activas_{id_orden}"):
-                            if confirmar_activa:
-                                borrar_orden(id_orden)
-                                st.warning(f"{numero_ot} eliminada")
-                                st.rerun()
-                            else:
-                                st.error("Debes marcar la confirmación antes de borrar")
+                            if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_activas_{id_orden}"):
+                                if confirmar_activa:
+                                    borrar_orden(id_orden)
+                                    st.warning(f"{numero_ot} eliminada")
+                                    st.rerun()
+                                else:
+                                    st.error("Debes marcar la confirmación antes de borrar")
+
+    # =====================================================
+    # HISTÓRICO
+    # =====================================================
 
     with tab3:
         historico = obtener_historico()
+        historico = filtrar_por_operario_obligatorio(historico)
 
         if not historico:
-            st.info("No hay órdenes finalizadas")
+            if es_operario():
+                st.info("No tienes órdenes finalizadas")
+            else:
+                st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
                 if len(h) == 18:
@@ -369,14 +471,15 @@ def pantalla_ordenes():
                                 st.caption("📷 Foto no disponible")
 
                     with c2:
-                        confirmar_hist = st.checkbox("Confirmar", key=f"conf_admin_hist_{id_orden}")
+                        if es_admin() or es_gerencia():
+                            confirmar_hist = st.checkbox("Confirmar", key=f"conf_admin_hist_{id_orden}")
 
-                        if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_hist_{id_orden}"):
-                            if confirmar_hist:
-                                borrar_orden_historico(id_orden)
-                                st.warning(f"{numero_ot} eliminada del histórico")
-                                st.rerun()
-                            else:
-                                st.error("Debes marcar la confirmación antes de borrar")
+                            if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_hist_{id_orden}"):
+                                if confirmar_hist:
+                                    borrar_orden_historico(id_orden)
+                                    st.warning(f"{numero_ot} eliminada del histórico")
+                                    st.rerun()
+                                else:
+                                    st.error("Debes marcar la confirmación antes de borrar")
 
                     st.markdown("---")
