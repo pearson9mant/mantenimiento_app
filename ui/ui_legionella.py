@@ -14,6 +14,7 @@ from database.db import conectar
 
 OPERARIOS = ["J.A. Almeda", "Abel Vasquez", "Luis Lozano", "Otro"]
 
+
 CENTROS = {
     "Pearson 22": {
         "Edif. Infantil/Primaria": [
@@ -45,6 +46,7 @@ CENTROS = {
     },
 }
 
+
 def adaptar_sql(sql):
     if os.getenv("DATABASE_URL"):
         return sql.replace("?", "%s")
@@ -54,15 +56,22 @@ def adaptar_sql(sql):
 def ejecutar(sql, params=()):
     conn = conectar()
     cur = conn.cursor()
-    cur.execute(adaptar_sql(sql), params)
-    conn.commit()
-    conn.close()
+    try:
+        cur.execute(adaptar_sql(sql), params)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def leer_df(sql, params=()):
     conn = conectar()
-    df = pd.read_sql_query(adaptar_sql(sql), conn, params=params)
-    conn.close()
+    try:
+        df = pd.read_sql_query(adaptar_sql(sql), conn, params=params)
+    finally:
+        conn.close()
     return df
 
 
@@ -81,23 +90,33 @@ def sembrar_puntos_si_vacio():
     conn = conectar()
     cur = conn.cursor()
 
-    for centro, edificios in CENTROS.items():
-        for edificio, puntos in edificios.items():
-            for instalacion, nombre, tipo, ubicacion in puntos:
-                cur.execute(
-                    adaptar_sql("""
-                    INSERT INTO legionella_puntos
-                    (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
-                    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-                    """),
-                    (centro, edificio, instalacion, tipo, nombre, ubicacion, "Alta inicial automática"),
-                )
+    try:
+        for centro, edificios in CENTROS.items():
+            for edificio, puntos in edificios.items():
+                for instalacion, nombre, tipo, ubicacion in puntos:
+                    cur.execute(
+                        adaptar_sql("""
+                        INSERT INTO legionella_puntos
+                        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                        """),
+                        (centro, edificio, instalacion, tipo, nombre, ubicacion, "Alta inicial automática"),
+                    )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def evaluar_resultado(tipo_control, valor, valor_2=None):
+    try:
+        valor = float(valor)
+    except Exception:
+        return "INCIDENCIA", "Valor no válido o vacío"
+
     if tipo_control == "Temperatura acumulador":
         if valor >= 60:
             return "OK", "Correcto"
@@ -163,22 +182,24 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(
-        adaptar_sql("""
-        SELECT COUNT(*)
-        FROM ordenes_trabajo
-        WHERE centro = ?
-          AND edificio = ?
-          AND area = 'Legionella'
-          AND origen = 'Legionella'
-          AND descripcion = ?
-          AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
-        """),
-        (centro, edificio, descripcion),
-    )
+    try:
+        cur.execute(
+            adaptar_sql("""
+            SELECT COUNT(*)
+            FROM ordenes_trabajo
+            WHERE centro = ?
+              AND edificio = ?
+              AND area = 'Legionella'
+              AND origen = 'Legionella'
+              AND descripcion = ?
+              AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
+            """),
+            (centro, edificio, descripcion),
+        )
 
-    total = cur.fetchone()[0]
-    conn.close()
+        total = cur.fetchone()[0]
+    finally:
+        conn.close()
 
     return total > 0
 
@@ -319,7 +340,6 @@ def generar_ots_legionella_si_toca():
     no_toca = 0
 
     for _, fila in df_ultimos.iterrows():
-
         if fila["estado_control"] == "🔴 TOCA":
             creada = crear_ot_legionella(
                 fila["centro"],
@@ -334,7 +354,6 @@ def generar_ots_legionella_si_toca():
         else:
             no_toca += 1
 
-    # 🔽 MENSAJE INTELIGENTE
     if creadas > 0:
         mensaje = f"Se han creado {creadas} órdenes automáticamente"
     elif ya_existia > 0:
@@ -346,7 +365,6 @@ def generar_ots_legionella_si_toca():
 
 
 def generar_informe_legionella(fecha_inicio, fecha_fin):
-
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
@@ -499,7 +517,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
 def pantalla_legionella():
     sembrar_puntos_si_vacio()
-    ots_creadas = generar_ots_legionella_si_toca()
 
     ots_creadas, mensaje = generar_ots_legionella_si_toca()
 
@@ -545,7 +562,6 @@ def pantalla_legionella():
             return
 
         punto = df_filtrado.iloc[0].to_dict()
-
         tipo_punto = punto["tipo_punto"]
 
         tareas = ["Revisión visual", "Purga"]
