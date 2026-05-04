@@ -308,6 +308,111 @@ def mostrar_inventario():
         )
 
 
+# =====================================================
+# INVENTARIO DE AULAS PARA GERENCIA
+# =====================================================
+
+def mostrar_inventario_aulas():
+    aulas = leer_tabla("inventario_aulas")
+
+    if aulas.empty:
+        st.info("No hay inventario de aulas registrado.")
+        return
+
+    st.markdown("### 🏫 Inventario de aulas")
+
+    columnas_base = [
+        "centro",
+        "edificio",
+        "espacio",
+        "aula",
+        "elemento",
+        "categoria",
+        "estado",
+        "cantidad",
+        "observaciones",
+    ]
+
+    columnas = [c for c in columnas_base if c in aulas.columns]
+
+    total_registros = len(aulas)
+
+    elementos_revisar = 0
+
+    if "estado" in aulas.columns:
+        estados_malos = [
+            "mal",
+            "malo",
+            "averiado",
+            "averiada",
+            "revisar",
+            "pendiente",
+            "deteriorado",
+            "deteriorada",
+            "roto",
+            "rota",
+            "regular",
+        ]
+
+        elementos_revisar = len(
+            aulas[
+                aulas["estado"]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .isin(estados_malos)
+            ]
+        )
+
+    a1, a2 = st.columns(2)
+    a1.metric("Registros aulas", total_registros)
+    a2.metric("Elementos a revisar", elementos_revisar)
+
+    with st.expander("⚠️ Elementos de aula a revisar", expanded=False):
+        if "estado" not in aulas.columns:
+            st.info("No hay columna de estado en inventario de aulas.")
+        else:
+            estados_malos = [
+                "mal",
+                "malo",
+                "averiado",
+                "averiada",
+                "revisar",
+                "pendiente",
+                "deteriorado",
+                "deteriorada",
+                "roto",
+                "rota",
+                "regular",
+            ]
+
+            revisar = aulas[
+                aulas["estado"]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .isin(estados_malos)
+            ]
+
+            if revisar.empty:
+                st.success("No hay elementos de aula pendientes de revisar.")
+            else:
+                columnas_revisar = [c for c in columnas_base if c in revisar.columns]
+
+                st.dataframe(
+                    revisar[columnas_revisar] if columnas_revisar else revisar,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+    with st.expander("🏫 Inventario de aulas completo", expanded=False):
+        st.dataframe(
+            aulas[columnas] if columnas else aulas,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
 def pantalla_gerencia():
     st.subheader("📊 Gerencia Pro")
 
@@ -385,3 +490,6 @@ def pantalla_gerencia():
     if MOSTRAR_INVENTARIO:
         st.markdown("---")
         mostrar_inventario()
+
+        st.markdown("---")
+        mostrar_inventario_aulas()
