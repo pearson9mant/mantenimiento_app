@@ -99,6 +99,8 @@ def mostrar_portada(perfil, operario_activo):
         texto_boton = "🔐\nEntrar en administración"
     elif perfil == "gerencia":
         texto_boton = "📊\nEntrar a gerencia"
+    elif perfil == "inventario":
+        texto_boton = "📦\nEntrar a inventario"
     else:
         if operario_activo:
             st.caption(f"Operario: {operario_activo}")
@@ -153,15 +155,17 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
 
+
 def mostrar_menu_operario():
+    perfil = st.session_state.get("perfil", "")
     operario = st.session_state.get("operario_activo", "")
 
-    if operario == "Abel Vasquez":
-        if st.button("📦\nInventario mantenimiento", key="btn_inv_operario_abel", use_container_width=True):
+    if perfil == "inventario":
+        if st.button("📦\nInventario mantenimiento", key="btn_inv_inventario", use_container_width=True):
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
 
-        if st.button("🏫\nInventario aulas", key="btn_inv_aulas_abel", use_container_width=True):
+        if st.button("🏫\nInventario aulas", key="btn_inv_aulas_inventario", use_container_width=True):
             st.session_state["seccion_actual"] = "Inventario aulas"
             st.rerun()
 
@@ -304,8 +308,8 @@ else:
 
     st.caption(f"{operario_activo}")
 
-    if operario_activo == "Abel Vasquez" and seccion not in ["Inventario", "Inventario aulas"]:
-        st.warning("Abel solo tiene acceso a Inventario.")
+    if perfil == "inventario" and seccion not in ["Inventario", "Inventario aulas"]:
+        st.warning("Este usuario solo tiene acceso a Inventario.")
         st.stop()
 
     if seccion == "Resumen":
