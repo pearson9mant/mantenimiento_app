@@ -153,12 +153,6 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
 
-
-def mostrar_menu_gerencia():
-    st.session_state["seccion_actual"] = "Gerencia"
-    st.rerun()
-
-
 def mostrar_menu_operario():
     operario = st.session_state.get("operario_activo", "")
 
