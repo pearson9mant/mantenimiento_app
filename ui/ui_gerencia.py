@@ -13,6 +13,11 @@ from config_gerencia import (
     STOCK_BAJO,
 )
 
+try:
+    from modules.inventario_aulas import obtener_inventario_aulas
+except Exception:
+    obtener_inventario_aulas = None
+
 
 def leer_tabla(nombre_tabla):
     conn = conectar()
@@ -312,12 +317,44 @@ def mostrar_inventario():
 # INVENTARIO DE AULAS PARA GERENCIA
 # =====================================================
 
-def mostrar_inventario_aulas():
+def cargar_inventario_aulas_df():
+    columnas = [
+        "id",
+        "fecha_revision",
+        "centro",
+        "edificio",
+        "espacio",
+        "elemento",
+        "cantidad",
+        "estado",
+        "ancho",
+        "alto",
+        "fondo",
+        "unidad",
+        "observaciones",
+        "foto",
+        "operario",
+        "fecha_creacion",
+    ]
+
+    if obtener_inventario_aulas is not None:
+        try:
+            datos = obtener_inventario_aulas()
+            if datos:
+                return pd.DataFrame(datos, columns=columnas)
+        except Exception:
+            pass
+
     aulas = leer_tabla("inventario_aulas")
 
-    # Por si la tabla tuviera otro nombre en alguna versión
     if aulas.empty:
         aulas = leer_tabla("aulas_inventario")
+
+    return aulas
+
+
+def mostrar_inventario_aulas():
+    aulas = cargar_inventario_aulas_df()
 
     if aulas.empty:
         st.info("No hay inventario de aulas registrado.")
@@ -326,15 +363,20 @@ def mostrar_inventario_aulas():
     st.markdown("### 🏫 Inventario de aulas")
 
     columnas_base = [
+        "fecha_revision",
         "centro",
         "edificio",
         "espacio",
-        "aula",
         "elemento",
-        "categoria",
-        "estado",
         "cantidad",
+        "estado",
+        "ancho",
+        "alto",
+        "fondo",
+        "unidad",
         "observaciones",
+        "operario",
+        "fecha_creacion",
     ]
 
     columnas = [c for c in columnas_base if c in aulas.columns]
@@ -408,11 +450,6 @@ def pantalla_gerencia():
 
     df = preparar_ordenes()
 
-    # =====================================================
-    # IMPORTANTE:
-    # Si no hay órdenes, NO cortamos inventario.
-    # Así Gerencia puede ver inventario e inventario de aulas igualmente.
-    # =====================================================
     if df.empty:
         st.warning("No hay órdenes para analizar.")
 
