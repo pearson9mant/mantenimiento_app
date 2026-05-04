@@ -80,10 +80,16 @@ def preparar_ordenes():
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
 
+    if not historico.empty:
+        historico["estado"] = "Finalizada"
+
     df = pd.concat([ordenes, historico], ignore_index=True)
 
     if "fecha" not in df.columns:
         df["fecha"] = ""
+
+    if "fecha_cierre" not in df.columns:
+        df["fecha_cierre"] = ""
 
     if "estado" not in df.columns:
         df["estado"] = "Abierta"
@@ -104,8 +110,14 @@ def preparar_ordenes():
     df["tipo_solicitante"] = df.apply(clasificar_solicitante, axis=1)
 
     df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["fecha_cierre_dt"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
+
     df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m")
     df["mes"] = df["mes"].fillna("Sin fecha")
+
+    df["dias_resolucion"] = (
+        df["fecha_cierre_dt"] - df["fecha_dt"]
+    ).dt.days
 
     return df
 
@@ -116,12 +128,22 @@ def mostrar_metricas(df):
     proceso = len(df[df["grupo_estado"] == "En proceso"])
     faltan = len(df[df["grupo_estado"] == "Faltan"])
 
-    c1, c2, c3, c4 = st.columns(4)
+    rendimiento = round((hechas / total) * 100, 1) if total else 0
+
+    if "dias_resolucion" in df.columns:
+        tiempo = df["dias_resolucion"].dropna()
+        tiempo_medio = round(tiempo.mean(), 1) if not tiempo.empty else 0
+    else:
+        tiempo_medio = 0
+
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric("Total OTs", total)
     c2.metric("Hechas", hechas)
     c3.metric("En proceso", proceso)
     c4.metric("Faltan", faltan)
+    c5.metric("Rendimiento", f"{rendimiento}%")
+    c6.metric("Media cierre", f"{tiempo_medio} días")
 
 
 def mostrar_tabla_resumen(df, columnas):
@@ -153,6 +175,59 @@ def mostrar_tabla_resumen(df, columnas):
 
     st.dataframe(
         pivot,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+def mostrar_rendimiento_operarios(df):
+    if df.empty:
+        st.info("No hay datos para mostrar.")
+        return
+
+    if "operario" not in df.columns:
+        st.info("No hay columna de operario.")
+        return
+
+    tabla = (
+        df.groupby("operario")
+        .agg(
+            Total=("grupo_estado", "count"),
+            Hechas=("grupo_estado", lambda x: (x == "Hechas").sum()),
+            En_proceso=("grupo_estado", lambda x: (x == "En proceso").sum()),
+            Faltan=("grupo_estado", lambda x: (x == "Faltan").sum()),
+            Media_cierre_dias=("dias_resolucion", "mean"),
+        )
+        .reset_index()
+    )
+
+    tabla["Rendimiento %"] = tabla.apply(
+        lambda r: round((r["Hechas"] / r["Total"]) * 100, 1) if r["Total"] else 0,
+        axis=1
+    )
+
+    tabla["Media_cierre_dias"] = tabla["Media_cierre_dias"].fillna(0).round(1)
+
+    tabla = tabla.rename(columns={
+        "operario": "Operario",
+        "En_proceso": "En proceso",
+        "Media_cierre_dias": "Media cierre días",
+    })
+
+    tabla = tabla[
+        [
+            "Operario",
+            "Total",
+            "Hechas",
+            "En proceso",
+            "Faltan",
+            "Rendimiento %",
+            "Media cierre días",
+        ]
+    ]
+
+    st.dataframe(
+        tabla,
         use_container_width=True,
         hide_index=True
     )
@@ -270,6 +345,9 @@ def pantalla_gerencia():
     with st.expander("👷 Órdenes por operario", expanded=False):
         mostrar_tabla_resumen(df, ["operario"])
 
+    with st.expander("📈 Rendimiento real por operario", expanded=True):
+        mostrar_rendimiento_operarios(df)
+
     if MOSTRAR_CENTROS:
         with st.expander("🏫 Órdenes por centro", expanded=False):
             mostrar_tabla_resumen(df, ["centro"])
@@ -282,6 +360,7 @@ def pantalla_gerencia():
         columnas = [
             "numero_ot",
             "fecha",
+            "fecha_cierre",
             "centro",
             "edificio",
             "espacio",
@@ -292,6 +371,7 @@ def pantalla_gerencia():
             "solicitante",
             "tipo_solicitante",
             "origen",
+            "dias_resolucion",
         ]
 
         columnas = [c for c in columnas if c in df.columns]
