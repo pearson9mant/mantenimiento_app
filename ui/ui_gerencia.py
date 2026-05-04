@@ -54,17 +54,8 @@ def preparar_dataframe_ordenes():
     datos_ordenes = obtener_ordenes()
     datos_historico = obtener_historico()
 
-    ordenes = (
-        pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES)
-        if datos_ordenes
-        else pd.DataFrame(columns=COLUMNAS_ORDENES)
-    )
-
-    historico = (
-        pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO)
-        if datos_historico
-        else pd.DataFrame(columns=COLUMNAS_HISTORICO)
-    )
+    ordenes = pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES) if datos_ordenes else pd.DataFrame(columns=COLUMNAS_ORDENES)
+    historico = pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO) if datos_historico else pd.DataFrame(columns=COLUMNAS_HISTORICO)
 
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
@@ -76,6 +67,16 @@ def preparar_dataframe_ordenes():
 
     df["estado"] = df["estado"].fillna("Abierta")
     df["centro"] = df["centro"].fillna("Sin centro")
+    df["edificio"] = df["edificio"].fillna("")
+    df["espacio"] = df["espacio"].fillna("")
+    df["area"] = df["area"].fillna("")
+    df["prioridad"] = df["prioridad"].fillna("")
+    df["operario"] = df["operario"].fillna("")
+    df["descripcion"] = df["descripcion"].fillna("")
+    df["numero_ot"] = df["numero_ot"].fillna("")
+    df["solicitante"] = df["solicitante"].fillna("")
+    df["tipo_solicitante"] = df["tipo_solicitante"].fillna("")
+    df["foto"] = df["foto"].fillna("")
 
     df["fecha_creacion"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
     df["fecha_cierre"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
@@ -163,6 +164,80 @@ def pintar_alertas(df):
     c2.metric("Pendiente material", len(pendientes_material))
 
 
+def pintar_buscador_ordenes(df):
+    st.markdown("### 🔎 Buscar órdenes")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        texto = st.text_input(
+            "Buscar por OT, descripción, espacio o solicitante",
+            key="gerencia_buscar_orden"
+        )
+
+    with c2:
+        centros = ["Todos"] + sorted([c for c in df["centro"].dropna().unique().tolist() if c])
+        filtro_centro = st.selectbox("Centro", centros, key="gerencia_buscar_centro")
+
+    with c3:
+        estados = ["Todos"] + sorted([e for e in df["estado"].dropna().unique().tolist() if e])
+        filtro_estado = st.selectbox("Estado", estados, key="gerencia_buscar_estado")
+
+    resultado = df.copy()
+
+    if texto.strip():
+        t = texto.strip().lower()
+        resultado = resultado[
+            resultado["numero_ot"].str.lower().str.contains(t, na=False) |
+            resultado["descripcion"].str.lower().str.contains(t, na=False) |
+            resultado["espacio"].str.lower().str.contains(t, na=False) |
+            resultado["solicitante"].str.lower().str.contains(t, na=False)
+        ]
+
+    if filtro_centro != "Todos":
+        resultado = resultado[resultado["centro"] == filtro_centro]
+
+    if filtro_estado != "Todos":
+        resultado = resultado[resultado["estado"] == filtro_estado]
+
+    st.caption(f"Resultados: {len(resultado)}")
+
+    if resultado.empty:
+        st.info("No hay órdenes con esos filtros.")
+        return
+
+    for _, o in resultado.sort_values("fecha_creacion", ascending=False).head(50).iterrows():
+        titulo = (
+            f"{o['numero_ot']} | {o['estado']} | "
+            f"{o['centro'] or '-'} · {o['espacio'] or '-'}"
+        )
+
+        with st.expander(titulo, expanded=False):
+            st.markdown(
+                f"**{o['numero_ot']}** | {o['prioridad'] or '-'} | {o['area'] or '-'}  \n"
+                f"{o['descripcion']}  \n"
+                f"🏢 {o['centro'] or '-'} · {o['edificio'] or '-'} · {o['espacio'] or '-'}  \n"
+                f"👷 {o['operario'] or '-'} | Estado: **{o['estado']}**  \n"
+                f"📌 Tipo solicitante: **{o['tipo_solicitante'] or '-'}**"
+            )
+
+            if o["solicitante"]:
+                st.caption(f"Solicitante: {o['solicitante']}")
+
+            if pd.notna(o["fecha_creacion"]):
+                st.caption(f"Fecha creación: {o['fecha_creacion']}")
+
+            if pd.notna(o["fecha_cierre"]):
+                st.caption(f"Fecha cierre: {o['fecha_cierre']}")
+
+            if o["foto"]:
+                try:
+                    with st.expander("📷 Ver foto"):
+                        st.image(o["foto"], use_container_width=True)
+                except Exception:
+                    st.caption("📷 Foto no disponible")
+
+
 def pantalla_gerencia():
     st.title("📊 Panel Gerencia")
 
@@ -185,6 +260,10 @@ def pantalla_gerencia():
     st.markdown("---")
 
     pintar_alertas(df)
+
+    st.markdown("---")
+
+    pintar_buscador_ordenes(df)
 
     st.markdown("---")
 
