@@ -75,6 +75,50 @@ def leer_df(sql, params=()):
     return df
 
 
+def limpiar_registros_invalidos_legionella():
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            DELETE FROM legionella_registros
+            WHERE centro IS NULL
+               OR edificio IS NULL
+               OR punto IS NULL
+               OR tarea IS NULL
+               OR TRIM(COALESCE(centro, '')) = ''
+               OR TRIM(COALESCE(edificio, '')) = ''
+               OR TRIM(COALESCE(punto, '')) = ''
+               OR TRIM(COALESCE(tarea, '')) = ''
+        """)
+
+        registros_borrados = cur.rowcount
+
+        cur.execute("""
+            DELETE FROM legionella_incidencias
+            WHERE centro IS NULL
+               OR edificio IS NULL
+               OR punto IS NULL
+               OR tarea IS NULL
+               OR TRIM(COALESCE(centro, '')) = ''
+               OR TRIM(COALESCE(edificio, '')) = ''
+               OR TRIM(COALESCE(punto, '')) = ''
+               OR TRIM(COALESCE(tarea, '')) = ''
+        """)
+
+        incidencias_borradas = cur.rowcount
+
+        conn.commit()
+        return registros_borrados, incidencias_borradas
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
 def sembrar_puntos_si_vacio():
     df = leer_df("""
         SELECT COUNT(*) AS total
@@ -205,6 +249,9 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
 
 
 def crear_ot_legionella(centro, edificio, punto, tarea):
+    if not centro or not edificio or not punto or not tarea:
+        return False
+
     descripcion = f"Control Legionella - {tarea} - {punto}"
 
     if existe_ot_legionella_abierta(centro, edificio, descripcion):
@@ -233,6 +280,21 @@ def crear_ot_legionella(centro, edificio, punto, tarea):
 
 
 def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones):
+    centro = punto.get("centro")
+    edificio = punto.get("edificio")
+    instalacion = punto.get("instalacion") or ""
+    punto_id = punto.get("id")
+    punto_nombre = punto.get("nombre_punto")
+
+    if not centro or not edificio or not punto_nombre:
+        return "ERROR", "Punto incompleto. No se ha guardado el registro."
+
+    if not tarea or not tipo_control:
+        return "ERROR", "Tarea o tipo de control vacío. No se ha guardado el registro."
+
+    if valor is None:
+        return "ERROR", "Valor no válido. No se ha guardado el registro."
+
     estado, resultado = evaluar_resultado(tipo_control, valor, valor_2)
 
     ejecutar(
@@ -244,12 +306,12 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         """,
         (
             fecha_registro,
-            punto["centro"],
-            punto["edificio"],
-            punto["instalacion"],
-            punto["id"],
+            centro,
+            edificio,
+            instalacion,
+            punto_id,
             None,
-            punto["nombre_punto"],
+            punto_nombre,
             tarea,
             tipo_control,
             valor,
@@ -263,28 +325,29 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     )
 
     if estado in ["RIESGO", "INCIDENCIA"]:
-        ejecutar(
-            """
-            INSERT INTO legionella_incidencias
-            (centro, edificio, punto, tarea, descripcion, estado, prioridad, operario)
-            VALUES (?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
-            """,
-            (
-                punto["centro"],
-                punto["edificio"],
-                punto["nombre_punto"],
-                tarea,
-                resultado + (" | " + observaciones if observaciones else ""),
-                operario,
-            ),
-        )
+        if centro and edificio and punto_nombre and tarea:
+            ejecutar(
+                """
+                INSERT INTO legionella_incidencias
+                (centro, edificio, punto, tarea, descripcion, estado, prioridad, operario)
+                VALUES (?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+                """,
+                (
+                    centro,
+                    edificio,
+                    punto_nombre,
+                    tarea,
+                    resultado + (" | " + observaciones if observaciones else ""),
+                    operario,
+                ),
+            )
 
-        crear_ot_legionella(
-            punto["centro"],
-            punto["edificio"],
-            punto["nombre_punto"],
-            tarea,
-        )
+            crear_ot_legionella(
+                centro,
+                edificio,
+                punto_nombre,
+                tarea,
+            )
 
     return estado, resultado
 
@@ -315,6 +378,10 @@ def generar_ots_legionella_si_toca():
     df = leer_df("""
         SELECT fecha, centro, edificio, punto, tarea, resultado
         FROM legionella_registros
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
         ORDER BY fecha DESC, id DESC
     """)
 
@@ -373,6 +440,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
                unidad, estado, resultado, operario, observaciones
         FROM legionella_registros
         WHERE date(fecha) BETWEEN ? AND ?
+          AND centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
         ORDER BY fecha DESC
     """, (fecha_inicio_txt, fecha_fin_txt))
 
@@ -381,6 +452,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
                estado, prioridad, operario, fecha_cierre, observaciones_cierre
         FROM legionella_incidencias
         WHERE date(fecha_apertura) BETWEEN ? AND ?
+          AND centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
         ORDER BY fecha_apertura DESC
     """, (fecha_inicio_txt, fecha_fin_txt))
 
@@ -526,41 +601,21 @@ def pantalla_legionella():
         st.info(mensaje)
 
     st.subheader("💧 Legionella")
-        # 🧹 LIMPIEZA REGISTROS INVÁLIDOS (NO TOCA LOS BUENOS)
-    if st.button("🧹 Limpiar registros inválidos (None)", use_container_width=True):
-        conn = conectar()
-        cur = conn.cursor()
 
-        try:
-            # registros mal guardados
-            cur.execute("""
-                DELETE FROM legionella_registros
-                WHERE centro IS NULL
-                   OR edificio IS NULL
-                   OR punto IS NULL
-                   OR tarea IS NULL
-            """)
+    with st.expander("🛡️ Mantenimiento de datos Legionella", expanded=False):
+        st.caption("Limpia registros antiguos incompletos. No toca los registros correctos.")
 
-            # incidencias mal generadas
-            cur.execute("""
-                DELETE FROM legionella_incidencias
-                WHERE centro IS NULL
-                   OR edificio IS NULL
-                   OR punto IS NULL
-                   OR tarea IS NULL
-            """)
+        if st.button("🧹 Limpiar registros inválidos (None)", use_container_width=True):
+            try:
+                registros_borrados, incidencias_borradas = limpiar_registros_invalidos_legionella()
+                st.success(
+                    f"Limpieza finalizada. Registros eliminados: {registros_borrados}. "
+                    f"Incidencias eliminadas: {incidencias_borradas}."
+                )
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al limpiar registros inválidos: {e}")
 
-            conn.commit()
-            st.success("Registros inválidos eliminados correctamente")
-
-        except Exception as e:
-            conn.rollback()
-            st.error(f"Error al limpiar: {e}")
-
-        finally:
-            conn.close()
-
-        st.rerun()
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
@@ -688,6 +743,8 @@ def pantalla_legionella():
                 st.success(f"Control guardado correctamente: {resultado}")
             elif estado == "RIESGO":
                 st.error(f"Control guardado con RIESGO: {resultado}")
+            elif estado == "ERROR":
+                st.error(resultado)
             else:
                 st.warning(f"Control guardado con incidencia: {resultado}")
 
@@ -697,6 +754,10 @@ def pantalla_legionella():
         df = leer_df("""
             SELECT fecha, centro, edificio, instalacion, punto, tarea, estado, resultado, operario
             FROM legionella_registros
+            WHERE centro IS NOT NULL
+              AND edificio IS NOT NULL
+              AND punto IS NOT NULL
+              AND tarea IS NOT NULL
             ORDER BY fecha DESC, id DESC
         """)
 
@@ -758,6 +819,10 @@ def pantalla_legionella():
             SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
                    valor, valor_2, unidad, estado, resultado, operario, observaciones
             FROM legionella_registros
+            WHERE centro IS NOT NULL
+              AND edificio IS NOT NULL
+              AND punto IS NOT NULL
+              AND tarea IS NOT NULL
             ORDER BY fecha DESC, id DESC
         """)
 
@@ -792,6 +857,10 @@ def pantalla_legionella():
             SELECT id, fecha_apertura, centro, edificio, punto, tarea, descripcion,
                    estado, prioridad, operario, fecha_cierre, observaciones_cierre
             FROM legionella_incidencias
+            WHERE centro IS NOT NULL
+              AND edificio IS NOT NULL
+              AND punto IS NOT NULL
+              AND tarea IS NOT NULL
             ORDER BY fecha_apertura DESC, id DESC
         """)
 
