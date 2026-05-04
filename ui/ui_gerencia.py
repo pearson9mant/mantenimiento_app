@@ -27,7 +27,6 @@ def leer_tabla(nombre_tabla):
         df = pd.DataFrame()
     finally:
         conn.close()
-
     return df
 
 
@@ -57,19 +56,10 @@ def clasificar_solicitante(row):
             if nombre.lower() in texto:
                 return tipo
 
-    if "profesor" in texto:
+    if "profesor" in texto or "forms" in texto or "outlook" in texto:
         return "Profesores"
 
-    if "forms" in texto:
-        return "Profesores"
-
-    if "outlook" in texto:
-        return "Profesores"
-
-    if "incidencia profesor" in texto:
-        return "Profesores"
-
-    if "profesores" in texto:
+    if "incidencia profesor" in texto or "profesores" in texto:
         return "Profesores"
 
     if solicitante:
@@ -90,26 +80,23 @@ def preparar_ordenes():
 
     df = pd.concat([ordenes, historico], ignore_index=True)
 
-    if "fecha" not in df.columns:
-        df["fecha"] = ""
+    columnas_defecto = {
+        "fecha": "",
+        "fecha_cierre": "",
+        "estado": "Abierta",
+        "centro": "Sin centro",
+        "edificio": "",
+        "espacio": "",
+        "descripcion": "",
+        "operario": "Sin asignar",
+        "solicitante": "",
+        "origen": "",
+        "numero_ot": "",
+    }
 
-    if "fecha_cierre" not in df.columns:
-        df["fecha_cierre"] = ""
-
-    if "estado" not in df.columns:
-        df["estado"] = "Abierta"
-
-    if "centro" not in df.columns:
-        df["centro"] = "Sin centro"
-
-    if "operario" not in df.columns:
-        df["operario"] = "Sin asignar"
-
-    if "solicitante" not in df.columns:
-        df["solicitante"] = ""
-
-    if "origen" not in df.columns:
-        df["origen"] = ""
+    for col, valor in columnas_defecto.items():
+        if col not in df.columns:
+            df[col] = valor
 
     df["grupo_estado"] = df["estado"].apply(clasificar_estado)
     df["tipo_solicitante"] = df.apply(clasificar_solicitante, axis=1)
@@ -117,8 +104,7 @@ def preparar_ordenes():
     df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
     df["fecha_cierre_dt"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
 
-    df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m")
-    df["mes"] = df["mes"].fillna("Sin fecha")
+    df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m").fillna("Sin fecha")
 
     df["dias_resolucion"] = (
         df["fecha_cierre_dt"] - df["fecha_dt"]
@@ -127,19 +113,45 @@ def preparar_ordenes():
     return df
 
 
-def mostrar_metricas(df):
+def calcular_metricas(df):
     total = len(df)
     hechas = len(df[df["grupo_estado"] == "Hechas"])
     proceso = len(df[df["grupo_estado"] == "En proceso"])
     faltan = len(df[df["grupo_estado"] == "Faltan"])
-
     rendimiento = round((hechas / total) * 100, 1) if total else 0
 
-    if "dias_resolucion" in df.columns:
-        tiempo = df["dias_resolucion"].dropna()
-        tiempo_medio = round(tiempo.mean(), 1) if not tiempo.empty else 0
+    tiempo = df["dias_resolucion"].dropna() if "dias_resolucion" in df.columns else pd.Series(dtype=float)
+    tiempo_medio = round(tiempo.mean(), 1) if not tiempo.empty else 0
+
+    return total, hechas, proceso, faltan, rendimiento, tiempo_medio
+
+
+def mostrar_estado_general(df):
+    total, hechas, proceso, faltan, rendimiento, tiempo_medio = calcular_metricas(df)
+
+    st.markdown("### 🚦 Estado general")
+
+    if total == 0:
+        st.info("No hay datos suficientes para valorar el estado general.")
+        return
+
+    if faltan >= 15:
+        st.error(f"🔴 Atención: hay {faltan} órdenes pendientes. Conviene priorizar cierres.")
+    elif faltan >= 6:
+        st.warning(f"🟠 Hay {faltan} órdenes pendientes. Situación controlada, pero a vigilar.")
     else:
-        tiempo_medio = 0
+        st.success(f"🟢 Mantenimiento controlado. Pendientes actuales: {faltan}.")
+
+    if rendimiento < 50:
+        st.warning(f"Rendimiento bajo: {rendimiento}%.")
+    elif rendimiento >= 75:
+        st.success(f"Buen rendimiento: {rendimiento}%.")
+    else:
+        st.info(f"Rendimiento actual: {rendimiento}%.")
+
+
+def mostrar_metricas(df):
+    total, hechas, proceso, faltan, rendimiento, tiempo_medio = calcular_metricas(df)
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
 
@@ -149,6 +161,68 @@ def mostrar_metricas(df):
     c4.metric("Faltan", faltan)
     c5.metric("Rendimiento", f"{rendimiento}%")
     c6.metric("Media cierre", f"{tiempo_medio} días")
+
+
+def mostrar_legionella():
+    registros = leer_tabla("legionella_registros")
+    incidencias = leer_tabla("legionella_incidencias")
+
+    if registros.empty and incidencias.empty:
+        return
+
+    st.markdown("### 💧 Legionella")
+
+    total = len(registros)
+    ok = 0
+    riesgos = 0
+    incidencias_abiertas = 0
+
+    if not registros.empty and "estado" in registros.columns:
+        ok = len(registros[registros["estado"].astype(str).str.upper() == "OK"])
+        riesgos = len(registros[registros["estado"].astype(str).str.upper().isin(["RIESGO", "INCIDENCIA"])])
+
+    if not incidencias.empty and "estado" in incidencias.columns:
+        incidencias_abiertas = len(
+            incidencias[
+                incidencias["estado"].astype(str).str.lower().isin(["abierta", "pendiente"])
+            ]
+        )
+
+    cumplimiento = round((ok / total) * 100, 1) if total else 0
+
+    l1, l2, l3, l4 = st.columns(4)
+    l1.metric("Controles", total)
+    l2.metric("Correctos", ok)
+    l3.metric("Riesgos/incidencias", riesgos)
+    l4.metric("Cumplimiento", f"{cumplimiento}%")
+
+    if incidencias_abiertas > 0:
+        st.error(f"🔴 Hay {incidencias_abiertas} incidencias de Legionella abiertas.")
+    elif riesgos > 0:
+        st.warning("🟠 Hay registros de Legionella con riesgo/incidencia en el histórico.")
+    else:
+        st.success("🟢 Legionella sin incidencias abiertas.")
+
+    with st.expander("💧 Detalle Legionella", expanded=False):
+        if not registros.empty:
+            columnas = [
+                "fecha",
+                "centro",
+                "edificio",
+                "punto",
+                "tarea",
+                "valor",
+                "unidad",
+                "estado",
+                "resultado",
+                "operario",
+            ]
+            columnas = [c for c in columnas if c in registros.columns]
+            st.dataframe(registros[columnas], use_container_width=True, hide_index=True)
+
+        if not incidencias.empty:
+            st.markdown("#### Incidencias")
+            st.dataframe(incidencias, use_container_width=True, hide_index=True)
 
 
 def mostrar_tabla_resumen(df, columnas):
@@ -174,15 +248,15 @@ def mostrar_tabla_resumen(df, columnas):
             pivot[col] = 0
 
     pivot["Total"] = pivot["Hechas"] + pivot["En proceso"] + pivot["Faltan"]
+    pivot["Rendimiento %"] = pivot.apply(
+        lambda r: round((r["Hechas"] / r["Total"]) * 100, 1) if r["Total"] else 0,
+        axis=1
+    )
 
-    columnas_orden = columnas + ["Hechas", "En proceso", "Faltan", "Total"]
+    columnas_orden = columnas + ["Hechas", "En proceso", "Faltan", "Total", "Rendimiento %"]
     pivot = pivot[columnas_orden]
 
-    st.dataframe(
-        pivot,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(pivot, use_container_width=True, hide_index=True)
 
 
 def mostrar_rendimiento_operarios(df):
@@ -219,20 +293,20 @@ def mostrar_rendimiento_operarios(df):
         "Media_cierre_dias": "Media cierre días",
     })
 
-    tabla = tabla[
-        [
-            "Operario",
-            "Total",
-            "Hechas",
-            "En proceso",
-            "Faltan",
-            "Rendimiento %",
-            "Media cierre días",
-        ]
-    ]
+    tabla = tabla.sort_values(["Faltan", "Total"], ascending=[False, False])
 
     st.dataframe(
-        tabla,
+        tabla[
+            [
+                "Operario",
+                "Total",
+                "Hechas",
+                "En proceso",
+                "Faltan",
+                "Rendimiento %",
+                "Media cierre días",
+            ]
+        ],
         use_container_width=True,
         hide_index=True
     )
@@ -273,6 +347,11 @@ def mostrar_inventario():
     else:
         c3.metric("Valor inventario", "Sin datos")
 
+    if len(bajo_stock) > 0:
+        st.warning(f"⚠️ Hay {len(bajo_stock)} materiales con stock bajo.")
+    else:
+        st.success("🟢 Stock general correcto.")
+
     with st.expander("📉 Materiales con stock bajo", expanded=False):
         if bajo_stock.empty:
             st.success("No hay materiales con stock bajo.")
@@ -284,14 +363,8 @@ def mostrar_inventario():
                 "stock",
                 "ubicacion",
             ]
-
             columnas = [c for c in columnas if c in bajo_stock.columns]
-
-            st.dataframe(
-                bajo_stock[columnas],
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(bajo_stock[columnas], use_container_width=True, hide_index=True)
 
     with st.expander("📦 Inventario completo", expanded=False):
         columnas = [
@@ -303,19 +376,9 @@ def mostrar_inventario():
             "coste_total",
             "ubicacion",
         ]
-
         columnas = [c for c in columnas if c in inventario.columns]
+        st.dataframe(inventario[columnas], use_container_width=True, hide_index=True)
 
-        st.dataframe(
-            inventario[columnas],
-            use_container_width=True,
-            hide_index=True
-        )
-
-
-# =====================================================
-# INVENTARIO DE AULAS PARA GERENCIA
-# =====================================================
 
 def cargar_inventario_aulas_df():
     columnas = [
@@ -379,8 +442,6 @@ def mostrar_inventario_aulas():
         "fecha_creacion",
     ]
 
-    columnas = [c for c in columnas_base if c in aulas.columns]
-
     total_registros = len(aulas)
 
     estados_malos = [
@@ -414,6 +475,11 @@ def mostrar_inventario_aulas():
     a1.metric("Registros aulas", total_registros)
     a2.metric("Elementos a revisar", elementos_revisar)
 
+    if elementos_revisar > 0:
+        st.warning(f"⚠️ Hay {elementos_revisar} elementos de aula a revisar.")
+    else:
+        st.success("🟢 Inventario de aulas sin elementos críticos.")
+
     with st.expander("⚠️ Elementos de aula a revisar", expanded=False):
         if "estado" not in aulas.columns:
             st.info("No hay columna de estado en inventario de aulas.")
@@ -430,7 +496,6 @@ def mostrar_inventario_aulas():
                 st.success("No hay elementos de aula pendientes de revisar.")
             else:
                 columnas_revisar = [c for c in columnas_base if c in revisar.columns]
-
                 st.dataframe(
                     revisar[columnas_revisar] if columnas_revisar else revisar,
                     use_container_width=True,
@@ -438,6 +503,7 @@ def mostrar_inventario_aulas():
                 )
 
     with st.expander("🏫 Inventario de aulas completo", expanded=False):
+        columnas = [c for c in columnas_base if c in aulas.columns]
         st.dataframe(
             aulas[columnas] if columnas else aulas,
             use_container_width=True,
@@ -452,6 +518,8 @@ def pantalla_gerencia():
 
     if df.empty:
         st.warning("No hay órdenes para analizar.")
+
+        mostrar_legionella()
 
         if MOSTRAR_INVENTARIO:
             st.markdown("---")
@@ -484,13 +552,21 @@ def pantalla_gerencia():
 
     st.markdown("---")
 
-    with st.expander("📌 Órdenes por tipo de solicitante", expanded=True):
+    mostrar_estado_general(df)
+
+    st.markdown("---")
+
+    mostrar_legionella()
+
+    st.markdown("---")
+
+    with st.expander("📌 Órdenes por tipo de solicitante", expanded=False):
         mostrar_tabla_resumen(df, ["tipo_solicitante"])
 
     with st.expander("👷 Órdenes por operario", expanded=False):
         mostrar_tabla_resumen(df, ["operario"])
 
-    with st.expander("📈 Rendimiento real por operario", expanded=True):
+    with st.expander("📈 Rendimiento real por operario", expanded=False):
         mostrar_rendimiento_operarios(df)
 
     if MOSTRAR_CENTROS:
