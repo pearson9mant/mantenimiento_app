@@ -208,8 +208,8 @@ def pantalla_gerencia():
             st.dataframe(tabla_resumen(df, "centro"), use_container_width=True, hide_index=True)
 
     if MOSTRAR_INVENTARIO:
-    with st.expander("📦 Inventario mantenimiento completo", expanded=False):
-        pantalla_inventario()
+        with st.expander("📦 Inventario mantenimiento completo", expanded=False):
+            pantalla_inventario()
 
-    with st.expander("🏫 Inventario aulas completo", expanded=False):
-        pantalla_inventario_aulas()
+        with st.expander("🏫 Inventario aulas completo", expanded=False):
+            pantalla_inventario_aulas()
