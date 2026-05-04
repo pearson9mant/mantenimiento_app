@@ -12,6 +12,58 @@ from modules.inventario import (
 )
 
 
+def rol_actual():
+    return str(st.session_state.get("rol", "")).strip().lower()
+
+
+def usuario_actual():
+    return str(st.session_state.get("usuario", "")).strip()
+
+
+def es_admin():
+    return rol_actual() == "admin"
+
+
+def es_gerencia():
+    return rol_actual() == "gerencia"
+
+
+def es_operario():
+    return rol_actual() == "operario"
+
+
+def normalizar_txt(valor):
+    return str(valor or "").strip().lower()
+
+
+def obtener_operario_fila(fila):
+    try:
+        return fila[10]
+    except Exception:
+        return ""
+
+
+def filtrar_seguridad_operario(ordenes, operario_sel):
+    """
+    Si es operario real: solo puede ver sus propias órdenes.
+    Si es admin/gerencia en vista operario: respeta operario_activo.
+    """
+    if not ordenes:
+        return []
+
+    if es_operario():
+        usuario = normalizar_txt(usuario_actual())
+        return [
+            o for o in ordenes
+            if normalizar_txt(obtener_operario_fila(o)) == usuario
+        ]
+
+    return [
+        o for o in ordenes
+        if normalizar_txt(obtener_operario_fila(o)) == normalizar_txt(operario_sel)
+    ]
+
+
 def descomponer_orden_operario(fila):
     if len(fila) >= 16:
         (
@@ -103,6 +155,12 @@ def pantalla_operario():
 
     operario_sel = st.session_state.get("operario_activo", "")
 
+    # Seguridad PRO:
+    # Si entra un operario real, se fuerza siempre su usuario de sesión.
+    if es_operario():
+        operario_sel = usuario_actual()
+        st.session_state["operario_activo"] = operario_sel
+
     if not operario_sel:
         st.warning("No hay operario seleccionado.")
         return
@@ -110,6 +168,8 @@ def pantalla_operario():
     st.info(f"Operario: {operario_sel}")
 
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
+    ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
+
     materiales_select = obtener_materiales_para_select()
 
     ordenes_operario = [
@@ -144,6 +204,10 @@ def pantalla_operario():
             tipo_solicitante,
         ) = descomponer_orden_operario(fila)
 
+        # Segunda seguridad: si por cualquier motivo entra una fila incorrecta, no se muestra.
+        if es_operario() and normalizar_txt(operario) != normalizar_txt(usuario_actual()):
+            continue
+
         estado_icono = {
             "Abierta": "🔴",
             "En curso": "🟠",
@@ -159,6 +223,7 @@ def pantalla_operario():
             st.markdown(f"{desc}")
             st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}")
             st.caption(f"Estado actual: {est}")
+            st.caption(f"👷 Operario: {operario or '-'}")
             st.caption(f"📌 Solicitante: {tipo_solicitante or 'Operarios'}")
 
             if solicitante:
