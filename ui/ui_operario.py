@@ -43,6 +43,54 @@ def obtener_operario_fila(fila):
         return ""
 
 
+# =====================================================
+# KPIs OPERARIO - SEGURO, SIN TOCAR FLUJO ACTUAL
+# =====================================================
+
+def normalizar_estado_operario(estado):
+    estado = str(estado or "").strip().lower()
+
+    if estado in ["finalizada", "finalizado", "cerrada", "cerrado"]:
+        return "Hechas"
+
+    if estado in ["en curso", "en proceso"]:
+        return "En proceso"
+
+    if estado in ["abierta", "pendiente", "pendiente material", "esperando material"]:
+        return "Faltan"
+
+    return "Faltan"
+
+
+def calcular_kpis_operario(ordenes):
+    total = len(ordenes)
+
+    hechas = len([
+        o for o in ordenes
+        if normalizar_estado_operario(o[3]) == "Hechas"
+    ])
+
+    en_proceso = len([
+        o for o in ordenes
+        if normalizar_estado_operario(o[3]) == "En proceso"
+    ])
+
+    faltan = len([
+        o for o in ordenes
+        if normalizar_estado_operario(o[3]) == "Faltan"
+    ])
+
+    rendimiento = round((hechas / total) * 100, 1) if total else 0
+
+    return {
+        "total": total,
+        "hechas": hechas,
+        "en_proceso": en_proceso,
+        "faltan": faltan,
+        "rendimiento": rendimiento,
+    }
+
+
 def filtrar_seguridad_operario(ordenes, operario_sel):
     """
     Si es operario real: solo puede ver sus propias órdenes.
@@ -169,6 +217,22 @@ def pantalla_operario():
 
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
     ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
+
+    # -------------------------------
+    # KPIs DEL OPERARIO
+    # -------------------------------
+    kpis = calcular_kpis_operario(ordenes_operario)
+
+    st.markdown("### 📈 Mi resumen")
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Mis OT", kpis["total"])
+    k2.metric("✅ Hechas", kpis["hechas"])
+    k3.metric("🔄 En curso", kpis["en_proceso"])
+    k4.metric("⏳ Pendientes", kpis["faltan"])
+    k5.metric("📈 Rendimiento", f'{kpis["rendimiento"]}%')
+
+    st.markdown("---")
 
     materiales_select = obtener_materiales_para_select()
 
