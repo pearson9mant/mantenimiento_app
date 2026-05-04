@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-from modules.ordenes import obtener_ordenes, obtener_historico
-from modules.inventario import obtener_materiales_inventario
-from modules.inventario_aulas import crear_tabla_inventario_aulas, obtener_inventario_aulas
+from ui.ui_inventario import pantalla_inventario
+from ui.ui_inventario_aulas import pantalla_inventario_aulas
 
 from config_gerencia import (
     TIPOS_SOLICITANTE,
@@ -209,8 +208,8 @@ def pantalla_gerencia():
             st.dataframe(tabla_resumen(df, "centro"), use_container_width=True, hide_index=True)
 
     if MOSTRAR_INVENTARIO:
-        with st.expander("📦 Inventario mantenimiento", expanded=False):
-            pintar_inventario_mantenimiento()
+    with st.expander("📦 Inventario mantenimiento completo", expanded=False):
+        pantalla_inventario()
 
-        with st.expander("🏫 Inventario aulas", expanded=False):
-            pintar_inventario_aulas_gerencia()
+    with st.expander("🏫 Inventario aulas completo", expanded=False):
+        pantalla_inventario_aulas()
