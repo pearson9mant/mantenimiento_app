@@ -19,26 +19,58 @@ from modules.ordenes import (
 # =====================================================
 
 def rol_actual():
-    return str(st.session_state.get("rol", "")).strip().lower()
+    return str(
+        st.session_state.get("rol")
+        or st.session_state.get("tipo_usuario")
+        or st.session_state.get("perfil")
+        or st.session_state.get("modo")
+        or ""
+    ).strip().lower()
 
 
 def usuario_actual():
-    return str(st.session_state.get("usuario", "")).strip()
+    return str(
+        st.session_state.get("usuario")
+        or st.session_state.get("user")
+        or st.session_state.get("nombre")
+        or ""
+    ).strip()
 
 
 def es_admin():
     rol = rol_actual()
-    return rol in ["admin", "administrador", "administracion", "administración"]
+    return rol in [
+        "admin",
+        "administrador",
+        "administracion",
+        "administración",
+        "adminitracion",
+        "adminitración",
+        "responsable",
+    ]
 
 
 def es_gerencia():
     rol = rol_actual()
-    return rol in ["gerencia", "gerente", "direccion", "dirección"]
+    return rol in [
+        "gerencia",
+        "gerente",
+        "direccion",
+        "dirección",
+        "direccio",
+        "direcció",
+    ]
 
 
 def es_operario():
     rol = rol_actual()
-    return rol in ["operario", "operarios"]
+    return rol in [
+        "operario",
+        "operarios",
+        "mantenimiento",
+        "tecnico",
+        "técnico",
+    ]
 
 
 def normalizar_txt(valor):
@@ -62,6 +94,7 @@ def filtrar_por_operario_obligatorio(filas):
     """
     Admin y gerencia ven todo.
     Operario solo ve sus órdenes.
+    Si no se reconoce el rol, NO se filtra para no ocultar órdenes en administración.
     """
     if not filas:
         return []
@@ -71,20 +104,15 @@ def filtrar_por_operario_obligatorio(filas):
 
     if es_operario():
         usuario = normalizar_txt(usuario_actual())
-
         return [
             f for f in filas
             if normalizar_txt(obtener_operario_de_fila(f)) == usuario
         ]
 
-    return []
+    return filas
 
 
 def operario_forzado_si_toca(centro):
-    """
-    Si entra un operario, la orden se asigna obligatoriamente a él.
-    Si entra admin/gerencia, se usa el automático por centro.
-    """
     if es_operario():
         return usuario_actual()
 
