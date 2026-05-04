@@ -3,6 +3,34 @@ import streamlit as st
 from config import CATEGORIAS_INVENTARIO, CENTROS, EDIFICIOS
 from modules.inventario import obtener_materiales_inventario, obtener_stock_bajo
 
+
+def descomponer_material(fila):
+    valores = list(fila) + [""] * 20
+
+    return {
+        "id": valores[0],
+        "codigo": valores[1],
+        "material": valores[2],
+        "categoria": valores[3],
+        "unidad": valores[4],
+        "stock_actual": valores[5],
+        "stock_minimo": valores[6],
+        "centro": valores[7],
+        "edificio": valores[8],
+        "ubicacion": valores[9],
+        "proveedor": valores[10],
+        "observaciones": valores[11],
+        "fecha_alta": valores[12],
+        "foto": valores[13],
+        "activo": valores[14],
+        "precio_unitario": valores[15],
+        "coste_total": valores[16],
+        "fecha_compra": valores[17],
+        "referencia_factura": valores[18],
+        "observaciones_coste": valores[19],
+    }
+
+
 def pantalla_inventario_lectura():
     st.subheader("📦 Inventario")
 
@@ -41,8 +69,12 @@ def pantalla_inventario_lectura():
 
         if materiales:
             datos = []
+
             for fila in materiales:
-                _, codigo, material, categoria, unidad, stock_actual, stock_minimo, centro, edificio, ubicacion, proveedor, observaciones, fecha_alta = fila
+                m = descomponer_material(fila)
+
+                stock_actual = float(m["stock_actual"] or 0)
+                stock_minimo = float(m["stock_minimo"] or 0)
 
                 estado_stock = "OK"
                 if stock_actual <= 0:
@@ -51,17 +83,19 @@ def pantalla_inventario_lectura():
                     estado_stock = "BAJO"
 
                 datos.append({
-                    "CÓDIGO": codigo,
-                    "MATERIAL": material,
-                    "CATEGORÍA": categoria,
-                    "UNIDAD": unidad,
+                    "CÓDIGO": m["codigo"],
+                    "MATERIAL": m["material"],
+                    "CATEGORÍA": m["categoria"],
+                    "UNIDAD": m["unidad"],
                     "STOCK": stock_actual,
                     "MÍNIMO": stock_minimo,
                     "ESTADO": estado_stock,
-                    "CENTRO": centro,
-                    "EDIFICIO": edificio,
-                    "UBICACIÓN": ubicacion,
-                    "PROVEEDOR": proveedor
+                    "CENTRO": m["centro"],
+                    "EDIFICIO": m["edificio"],
+                    "UBICACIÓN": m["ubicacion"],
+                    "PROVEEDOR": m["proveedor"],
+                    "PRECIO UNIT.": m["precio_unitario"],
+                    "COSTE TOTAL": m["coste_total"],
                 })
 
             st.dataframe(pd.DataFrame(datos), use_container_width=True)
@@ -73,24 +107,29 @@ def pantalla_inventario_lectura():
 
         if stock_bajo:
             datos = []
+
             for fila in stock_bajo:
-                _, codigo, material, categoria, unidad, stock_actual, stock_minimo, centro, edificio, ubicacion, proveedor, observaciones, fecha_alta = fila
+                m = descomponer_material(fila)
+
+                stock_actual = float(m["stock_actual"] or 0)
+                stock_minimo = float(m["stock_minimo"] or 0)
 
                 estado = "BAJO"
                 if stock_actual <= 0:
                     estado = "AGOTADO"
 
                 datos.append({
-                    "CÓDIGO": codigo,
-                    "MATERIAL": material,
-                    "CATEGORÍA": categoria,
+                    "CÓDIGO": m["codigo"],
+                    "MATERIAL": m["material"],
+                    "CATEGORÍA": m["categoria"],
                     "STOCK": stock_actual,
                     "MÍNIMO": stock_minimo,
                     "ESTADO": estado,
-                    "CENTRO": centro,
-                    "EDIFICIO": edificio,
-                    "UBICACIÓN": ubicacion,
-                    "PROVEEDOR": proveedor
+                    "CENTRO": m["centro"],
+                    "EDIFICIO": m["edificio"],
+                    "UBICACIÓN": m["ubicacion"],
+                    "PROVEEDOR": m["proveedor"],
+                    "COSTE TOTAL": m["coste_total"],
                 })
 
             st.dataframe(pd.DataFrame(datos), use_container_width=True)
