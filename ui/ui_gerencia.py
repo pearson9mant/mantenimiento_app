@@ -1,275 +1,307 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-
-from modules.ordenes import obtener_ordenes, obtener_historico
-
-from ui.ui_inventario import pantalla_inventario
-from ui.ui_inventario_aulas import pantalla_inventario_aulas
+from database.db import conectar
 
 from config_gerencia import (
+    TIPOS_SOLICITANTE,
     ESTADOS_HECHAS,
     ESTADOS_EN_PROCESO,
     ESTADOS_FALTAN,
+    MOSTRAR_MESES,
+    MOSTRAR_CENTROS,
     MOSTRAR_INVENTARIO,
+    STOCK_BAJO,
 )
 
 
-COLUMNAS_ORDENES = [
-    "id", "numero_ot", "descripcion", "estado", "fecha_creacion",
-    "centro", "edificio", "espacio", "area", "prioridad", "operario",
-    "origen", "solicitante", "fecha_origen", "foto", "tipo_solicitante"
-]
+def leer_tabla(nombre_tabla):
+    conn = conectar()
+    try:
+        df = pd.read_sql_query(f"SELECT * FROM {nombre_tabla}", conn)
+    except Exception:
+        df = pd.DataFrame()
+    finally:
+        conn.close()
 
-COLUMNAS_HISTORICO = [
-    "id", "numero_ot", "descripcion", "estado", "fecha_creacion",
-    "centro", "edificio", "espacio", "area", "prioridad", "operario",
-    "origen", "solicitante", "fecha_origen", "fecha_cierre",
-    "observaciones_cierre", "foto", "tipo_solicitante"
-]
+    return df
 
 
-def normalizar_texto(valor):
-    if valor is None:
-        return ""
-    return str(valor).strip()
-
-
-def normalizar_estado(estado):
-    estado = normalizar_texto(estado)
+def clasificar_estado(estado):
+    estado = str(estado).strip()
 
     if estado in ESTADOS_HECHAS:
-        return "Terminadas"
+        return "Hechas"
 
     if estado in ESTADOS_EN_PROCESO:
-        return "Pendientes"
+        return "En proceso"
 
     if estado in ESTADOS_FALTAN:
-        return "Pendientes"
+        return "Faltan"
 
-    return "Pendientes"
+    return "Faltan"
 
 
-def preparar_dataframe_ordenes():
-    datos_ordenes = obtener_ordenes()
-    datos_historico = obtener_historico()
+def clasificar_solicitante(row):
+    solicitante = str(row.get("solicitante", "")).strip()
+    origen = str(row.get("origen", "")).strip()
 
-    ordenes = pd.DataFrame(datos_ordenes, columns=COLUMNAS_ORDENES) if datos_ordenes else pd.DataFrame(columns=COLUMNAS_ORDENES)
-    historico = pd.DataFrame(datos_historico, columns=COLUMNAS_HISTORICO) if datos_historico else pd.DataFrame(columns=COLUMNAS_HISTORICO)
+    texto = f"{solicitante} {origen}".lower()
+
+    for tipo, nombres in TIPOS_SOLICITANTE.items():
+        for nombre in nombres:
+            if nombre.lower() in texto:
+                return tipo
+
+    if "profesor" in texto:
+        return "Profesores"
+
+    if "forms" in texto:
+        return "Profesores"
+
+    if "outlook" in texto:
+        return "Profesores"
+
+    if "incidencia profesor" in texto:
+        return "Profesores"
+
+    if "profesores" in texto:
+        return "Profesores"
+
+    if solicitante:
+        return "Profesores"
+
+    return "Sin clasificar"
+
+
+def preparar_ordenes():
+    ordenes = leer_tabla("ordenes_trabajo")
+    historico = leer_tabla("historico_ordenes")
 
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
 
     df = pd.concat([ordenes, historico], ignore_index=True)
 
-    if "fecha_cierre" not in df.columns:
-        df["fecha_cierre"] = None
+    if "fecha" not in df.columns:
+        df["fecha"] = ""
 
-    df["estado"] = df["estado"].fillna("Abierta")
-    df["centro"] = df["centro"].fillna("Sin centro")
-    df["edificio"] = df["edificio"].fillna("")
-    df["espacio"] = df["espacio"].fillna("")
-    df["area"] = df["area"].fillna("")
-    df["prioridad"] = df["prioridad"].fillna("")
-    df["operario"] = df["operario"].fillna("")
-    df["descripcion"] = df["descripcion"].fillna("")
-    df["numero_ot"] = df["numero_ot"].fillna("")
-    df["solicitante"] = df["solicitante"].fillna("")
-    df["tipo_solicitante"] = df["tipo_solicitante"].fillna("")
-    df["foto"] = df["foto"].fillna("")
+    if "estado" not in df.columns:
+        df["estado"] = "Abierta"
 
-    df["fecha_creacion"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
-    df["fecha_cierre"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
+    if "centro" not in df.columns:
+        df["centro"] = "Sin centro"
 
-    df["mes"] = df["fecha_creacion"].dt.strftime("%Y-%m").fillna("Sin fecha")
-    df["estado_resumen"] = df["estado"].apply(normalizar_estado)
+    if "operario" not in df.columns:
+        df["operario"] = "Sin asignar"
 
-    hoy = pd.Timestamp(datetime.now())
-    df["dias_abierta"] = (hoy - df["fecha_creacion"]).dt.days
+    if "solicitante" not in df.columns:
+        df["solicitante"] = ""
+
+    if "origen" not in df.columns:
+        df["origen"] = ""
+
+    df["grupo_estado"] = df["estado"].apply(clasificar_estado)
+    df["tipo_solicitante"] = df.apply(clasificar_solicitante, axis=1)
+
+    df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m")
+    df["mes"] = df["mes"].fillna("Sin fecha")
 
     return df
 
 
-def calcular_resumen(df):
+def mostrar_metricas(df):
     total = len(df)
-    terminadas = len(df[df["estado_resumen"] == "Terminadas"])
-    pendientes = len(df[df["estado_resumen"] == "Pendientes"])
-
-    cumplimiento = 0
-    if total > 0:
-        cumplimiento = round((terminadas / total) * 100, 1)
-
-    return total, terminadas, pendientes, cumplimiento
-
-
-def pintar_resumen_general(df):
-    total, terminadas, pendientes, cumplimiento = calcular_resumen(df)
+    hechas = len(df[df["grupo_estado"] == "Hechas"])
+    proceso = len(df[df["grupo_estado"] == "En proceso"])
+    faltan = len(df[df["grupo_estado"] == "Faltan"])
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total órdenes", total)
-    c2.metric("Terminadas", terminadas)
-    c3.metric("Pendientes", pendientes)
-    c4.metric("% cumplimiento", f"{cumplimiento}%")
+
+    c1.metric("Total OTs", total)
+    c2.metric("Hechas", hechas)
+    c3.metric("En proceso", proceso)
+    c4.metric("Faltan", faltan)
 
 
-def pintar_tarjeta_centro(df, centro):
-    total, terminadas, pendientes, cumplimiento = calcular_resumen(df)
-
-    st.markdown(f"### 🏫 {centro}")
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total", total)
-    c2.metric("Terminadas", terminadas)
-    c3.metric("Pendientes", pendientes)
-    c4.metric("Cumplimiento", f"{cumplimiento}%")
-
-    st.markdown("---")
-
-
-def pintar_evolucion_mensual(df):
-    st.markdown("### 📅 Evolución mensual")
-
-    tabla = (
-        df.groupby(["mes", "estado_resumen"])
-        .size()
-        .unstack(fill_value=0)
-        .reset_index()
-    )
-
-    for col in ["Terminadas", "Pendientes"]:
-        if col not in tabla.columns:
-            tabla[col] = 0
-
-    tabla = tabla[["mes", "Terminadas", "Pendientes"]]
-
-    if tabla.empty:
-        st.info("Sin datos por meses.")
+def mostrar_tabla_resumen(df, columnas):
+    if df.empty:
+        st.info("No hay datos para mostrar.")
         return
 
-    st.bar_chart(tabla.set_index("mes"))
+    tabla = (
+        df.groupby(columnas + ["grupo_estado"])
+        .size()
+        .reset_index(name="cantidad")
+    )
+
+    pivot = tabla.pivot_table(
+        index=columnas,
+        columns="grupo_estado",
+        values="cantidad",
+        fill_value=0
+    ).reset_index()
+
+    for col in ["Hechas", "En proceso", "Faltan"]:
+        if col not in pivot.columns:
+            pivot[col] = 0
+
+    pivot["Total"] = pivot["Hechas"] + pivot["En proceso"] + pivot["Faltan"]
+
+    columnas_orden = columnas + ["Hechas", "En proceso", "Faltan", "Total"]
+    pivot = pivot[columnas_orden]
+
+    st.dataframe(
+        pivot,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
-def pintar_alertas(df):
-    st.markdown("### ⚠️ Alertas")
+def mostrar_inventario():
+    inventario = leer_tabla("inventario")
 
-    antiguas = df[
-        (df["estado_resumen"] != "Terminadas") &
-        (df["dias_abierta"] >= 7)
-    ]
+    if inventario.empty:
+        st.info("No hay inventario registrado.")
+        return
 
-    pendientes_material = df[df["estado"] == "Pendiente material"]
+    st.markdown("### 📦 Inventario")
 
-    c1, c2 = st.columns(2)
-    c1.metric("Órdenes +7 días", len(antiguas))
-    c2.metric("Pendiente material", len(pendientes_material))
+    if "activo" in inventario.columns:
+        inventario = inventario[inventario["activo"].fillna(1).astype(int) == 1]
 
+    if "stock" not in inventario.columns:
+        inventario["stock"] = 0
 
-def pintar_buscador_ordenes(df):
-    st.markdown("### 🔎 Buscar órdenes")
+    inventario["stock"] = pd.to_numeric(inventario["stock"], errors="coerce").fillna(0)
+
+    bajo_stock = inventario[inventario["stock"] <= STOCK_BAJO]
 
     c1, c2, c3 = st.columns(3)
 
-    with c1:
-        texto = st.text_input(
-            "Buscar por OT, descripción, espacio o solicitante",
-            key="gerencia_buscar_orden"
-        )
+    c1.metric("Materiales activos", len(inventario))
+    c2.metric("Stock bajo", len(bajo_stock))
 
-    with c2:
-        centros = ["Todos"] + sorted([c for c in df["centro"].dropna().unique().tolist() if c])
-        filtro_centro = st.selectbox("Centro", centros, key="gerencia_buscar_centro")
+    if "coste_total" in inventario.columns:
+        inventario["coste_total"] = pd.to_numeric(
+            inventario["coste_total"],
+            errors="coerce"
+        ).fillna(0)
 
-    with c3:
-        estados = ["Todos"] + sorted([e for e in df["estado"].dropna().unique().tolist() if e])
-        filtro_estado = st.selectbox("Estado", estados, key="gerencia_buscar_estado")
+        coste_total = inventario["coste_total"].sum()
+        c3.metric("Valor inventario", f"{coste_total:,.2f} €")
+    else:
+        c3.metric("Valor inventario", "Sin datos")
 
-    resultado = df.copy()
+    with st.expander("📉 Materiales con stock bajo", expanded=False):
+        if bajo_stock.empty:
+            st.success("No hay materiales con stock bajo.")
+        else:
+            columnas = [
+                "codigo",
+                "material",
+                "categoria",
+                "stock",
+                "ubicacion",
+            ]
 
-    if texto.strip():
-        t = texto.strip().lower()
-        resultado = resultado[
-            resultado["numero_ot"].str.lower().str.contains(t, na=False) |
-            resultado["descripcion"].str.lower().str.contains(t, na=False) |
-            resultado["espacio"].str.lower().str.contains(t, na=False) |
-            resultado["solicitante"].str.lower().str.contains(t, na=False)
-        ]
+            columnas = [c for c in columnas if c in bajo_stock.columns]
 
-    if filtro_centro != "Todos":
-        resultado = resultado[resultado["centro"] == filtro_centro]
-
-    if filtro_estado != "Todos":
-        resultado = resultado[resultado["estado"] == filtro_estado]
-
-    st.caption(f"Resultados: {len(resultado)}")
-
-    if resultado.empty:
-        st.info("No hay órdenes con esos filtros.")
-        return
-
-    for _, o in resultado.sort_values("fecha_creacion", ascending=False).head(50).iterrows():
-        titulo = (
-            f"{o['numero_ot']} | {o['estado']} | "
-            f"{o['centro'] or '-'} · {o['espacio'] or '-'}"
-        )
-
-        with st.expander(titulo, expanded=False):
-            st.markdown(
-                f"**{o['numero_ot']}** | {o['prioridad'] or '-'} | {o['area'] or '-'}  \n"
-                f"{o['descripcion']}  \n"
-                f"🏢 {o['centro'] or '-'} · {o['edificio'] or '-'} · {o['espacio'] or '-'}  \n"
-                f"👷 {o['operario'] or '-'} | Estado: **{o['estado']}**  \n"
-                f"📌 Tipo solicitante: **{o['tipo_solicitante'] or '-'}**"
+            st.dataframe(
+                bajo_stock[columnas],
+                use_container_width=True,
+                hide_index=True
             )
 
-            if o["solicitante"]:
-                st.caption(f"Solicitante: {o['solicitante']}")
+    with st.expander("📦 Inventario completo", expanded=False):
+        columnas = [
+            "codigo",
+            "material",
+            "categoria",
+            "stock",
+            "precio_unitario",
+            "coste_total",
+            "ubicacion",
+        ]
 
-            if pd.notna(o["fecha_creacion"]):
-                st.caption(f"Fecha creación: {o['fecha_creacion']}")
+        columnas = [c for c in columnas if c in inventario.columns]
 
-            if pd.notna(o["fecha_cierre"]):
-                st.caption(f"Fecha cierre: {o['fecha_cierre']}")
-
-            if o["foto"]:
-                try:
-                    with st.expander("📷 Ver foto"):
-                        st.image(o["foto"], use_container_width=True)
-                except Exception:
-                    st.caption("📷 Foto no disponible")
+        st.dataframe(
+            inventario[columnas],
+            use_container_width=True,
+            hide_index=True
+        )
 
 
 def pantalla_gerencia():
-    st.title("📊 Panel Gerencia")
+    st.subheader("📊 Gerencia Pro")
 
-    df = preparar_dataframe_ordenes()
+    df = preparar_ordenes()
 
     if df.empty:
-        st.warning("No hay órdenes registradas todavía.")
+        st.warning("No hay órdenes para analizar.")
         return
 
-    pintar_resumen_general(df)
+    st.markdown("### 🔎 Filtros")
+
+    col1, col2 = st.columns(2)
+
+    centros = ["Todos"] + sorted(df["centro"].dropna().astype(str).unique().tolist())
+    centro_sel = col1.selectbox("Centro", centros)
+
+    meses = ["Todos"] + sorted(df["mes"].dropna().astype(str).unique().tolist(), reverse=True)
+    mes_sel = col2.selectbox("Mes", meses)
+
+    if centro_sel != "Todos":
+        df = df[df["centro"] == centro_sel]
+
+    if mes_sel != "Todos":
+        df = df[df["mes"] == mes_sel]
 
     st.markdown("---")
 
-    for centro in ["Pearson 22", "Pearson 9"]:
-        df_centro = df[df["centro"] == centro]
-        pintar_tarjeta_centro(df_centro, centro)
-
-    pintar_evolucion_mensual(df)
+    mostrar_metricas(df)
 
     st.markdown("---")
 
-    pintar_alertas(df)
+    with st.expander("📌 Órdenes por tipo de solicitante", expanded=True):
+        mostrar_tabla_resumen(df, ["tipo_solicitante"])
 
-    st.markdown("---")
+    with st.expander("👷 Órdenes por operario", expanded=False):
+        mostrar_tabla_resumen(df, ["operario"])
 
-    pintar_buscador_ordenes(df)
+    if MOSTRAR_CENTROS:
+        with st.expander("🏫 Órdenes por centro", expanded=False):
+            mostrar_tabla_resumen(df, ["centro"])
 
-    st.markdown("---")
+    if MOSTRAR_MESES:
+        with st.expander("📅 Órdenes por mes", expanded=False):
+            mostrar_tabla_resumen(df, ["mes"])
+
+    with st.expander("📋 Detalle de órdenes", expanded=False):
+        columnas = [
+            "numero_ot",
+            "fecha",
+            "centro",
+            "edificio",
+            "espacio",
+            "descripcion",
+            "estado",
+            "grupo_estado",
+            "operario",
+            "solicitante",
+            "tipo_solicitante",
+            "origen",
+        ]
+
+        columnas = [c for c in columnas if c in df.columns]
+
+        st.dataframe(
+            df[columnas],
+            use_container_width=True,
+            hide_index=True
+        )
 
     if MOSTRAR_INVENTARIO:
-        with st.expander("📦 Inventario mantenimiento", expanded=False):
-            pantalla_inventario()
-
-        with st.expander("🏫 Inventario aulas", expanded=False):
-            pantalla_inventario_aulas()
+        st.markdown("---")
+        mostrar_inventario()
