@@ -12,8 +12,6 @@ from config_gerencia import (
     ESTADOS_HECHAS,
     ESTADOS_EN_PROCESO,
     ESTADOS_FALTAN,
-    MOSTRAR_MESES,
-    MOSTRAR_CENTROS,
     MOSTRAR_INVENTARIO,
 )
 
@@ -87,27 +85,6 @@ def preparar_dataframe_ordenes():
     return df
 
 
-def aplicar_filtros(df):
-    col1, col2 = st.columns(2)
-
-    centros = ["Todos"] + sorted(df["centro"].dropna().unique().tolist())
-    meses = ["Todos"] + sorted(df["mes"].dropna().unique().tolist())
-
-    with col1:
-        filtro_centro = st.selectbox("Centro", centros)
-
-    with col2:
-        filtro_mes = st.selectbox("Mes", meses)
-
-    if filtro_centro != "Todos":
-        df = df[df["centro"] == filtro_centro]
-
-    if filtro_mes != "Todos":
-        df = df[df["mes"] == filtro_mes]
-
-    return df
-
-
 def tabla_resumen(df, campo, orden=None):
     if df.empty or campo not in df.columns:
         return pd.DataFrame()
@@ -129,27 +106,100 @@ def tabla_resumen(df, campo, orden=None):
     return tabla
 
 
-def pintar_metricas_generales(df):
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("Total órdenes", len(df))
-    col2.metric("Hechas", len(df[df["estado_resumen"] == "Hechas"]))
-    col3.metric("En proceso", len(df[df["estado_resumen"] == "En proceso"]))
-    col4.metric("Faltan", len(df[df["estado_resumen"] == "Faltan"]))
-
-
-def pintar_alertas(df):
-    abiertas_antiguas = df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)]
-    pendientes_material = df[df["estado"] == "Pendiente material"]
+def crear_dashboard_centro(df, centro_nombre):
+    total = len(df)
+    hechas = len(df[df["estado_resumen"] == "Hechas"])
+    en_proceso = len(df[df["estado_resumen"] == "En proceso"])
+    faltan = len(df[df["estado_resumen"] == "Faltan"])
+    pendientes_material = len(df[df["estado"] == "Pendiente material"])
+    antiguas = len(df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)])
 
     finalizadas = df[df["estado_resumen"] == "Hechas"]
     tiempo_medio = finalizadas["dias_resolucion"].dropna().mean()
 
-    col1, col2, col3 = st.columns(3)
+    datos = {
+        "Centro": centro_nombre,
+        "Total órdenes": total,
+        "Hechas": hechas,
+        "En proceso": en_proceso,
+        "Sin finalizar": faltan,
+        "Pendiente material": pendientes_material,
+        "+7 días": antiguas,
+        "Tiempo medio cierre": f"{tiempo_medio:.1f} días" if pd.notna(tiempo_medio) else "-",
+    }
 
-    col1.metric("Órdenes +7 días", len(abiertas_antiguas))
-    col2.metric("Pendiente material", len(pendientes_material))
-    col3.metric("Tiempo medio", f"{tiempo_medio:.1f} días" if pd.notna(tiempo_medio) else "-")
+    for tipo in TIPOS_SOLICITANTE:
+        datos[tipo] = len(df[df["tipo_solicitante"] == tipo])
+
+    area_principal = "-"
+    if "area" in df.columns and not df.empty:
+        areas = df["area"].dropna()
+        if not areas.empty:
+            area_principal = areas.value_counts().idxmax()
+
+    operario_principal = "-"
+    if "operario" in df.columns and not df.empty:
+        operarios = df["operario"].dropna()
+        if not operarios.empty:
+            operario_principal = operarios.value_counts().idxmax()
+
+    datos["Área principal"] = area_principal
+    datos["Operario principal"] = operario_principal
+
+    return pd.DataFrame([datos])
+
+
+def pintar_bloque_centro(df, centro_nombre):
+    with st.expander(f"🏫 {centro_nombre}", expanded=False):
+        dashboard = crear_dashboard_centro(df, centro_nombre)
+        st.dataframe(dashboard, use_container_width=True, hide_index=True)
+
+        st.markdown("#### 📌 Solicitantes")
+        st.dataframe(
+            tabla_resumen(df, "tipo_solicitante", TIPOS_SOLICITANTE),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.markdown("#### 🔧 Áreas")
+            st.dataframe(
+                tabla_resumen(df, "area"),
+                use_container_width=True,
+                hide_index=True
+            )
+
+        with c2:
+            st.markdown("#### 👷 Operarios")
+            st.dataframe(
+                tabla_resumen(df, "operario"),
+                use_container_width=True,
+                hide_index=True
+            )
+
+        st.markdown("#### 📅 Meses")
+        st.dataframe(
+            tabla_resumen(df, "mes"),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.markdown("#### ⚠️ Órdenes abiertas +7 días")
+        antiguas = df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)]
+
+        if antiguas.empty:
+            st.success("Todo al día 👍")
+        else:
+            st.dataframe(
+                antiguas[[
+                    "numero_ot", "descripcion", "estado", "centro",
+                    "espacio", "area", "operario", "dias_abierta"
+                ]],
+                use_container_width=True,
+                hide_index=True
+            )
 
 
 def pantalla_gerencia():
@@ -161,81 +211,24 @@ def pantalla_gerencia():
         st.warning("No hay órdenes registradas todavía.")
         return
 
-    df = aplicar_filtros(df)
+    centros = ["Todos"] + sorted([c for c in df["centro"].dropna().unique().tolist() if c])
+    centro_sel = st.selectbox("🏫 Selecciona centro", centros, key="gerencia_centro_dashboard")
 
-    if df.empty:
-        st.warning("No hay datos con estos filtros.")
-        return
-
-    st.markdown("---")
-
-    pintar_metricas_generales(df)
-    st.markdown("---")
-
-    pintar_alertas(df)
-    st.markdown("---")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### 📌 Solicitante")
-        tabla = tabla_resumen(df, "tipo_solicitante", TIPOS_SOLICITANTE)
-        if not tabla.empty:
-            st.bar_chart(tabla.set_index("tipo_solicitante")[["Hechas", "En proceso", "Faltan"]])
-
-    with col2:
-        st.markdown("### 👷 Operarios")
-        tabla = tabla_resumen(df, "operario")
-        if not tabla.empty:
-            st.bar_chart(tabla.set_index("operario")[["Hechas", "En proceso", "Faltan"]])
-
-    st.markdown("---")
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.markdown("### 🔧 Áreas")
-        tabla = tabla_resumen(df, "area")
-        if not tabla.empty:
-            st.bar_chart(tabla.set_index("area")[["Hechas", "En proceso", "Faltan"]])
-
-    with col4:
-        if MOSTRAR_CENTROS:
-            st.markdown("### 🏫 Centros")
-            tabla = tabla_resumen(df, "centro")
-            if not tabla.empty:
-                st.bar_chart(tabla.set_index("centro")[["Hechas", "En proceso", "Faltan"]])
-
-    st.markdown("---")
-
-    if MOSTRAR_MESES:
-        st.markdown("### 📅 Evolución mensual")
-        tabla = tabla_resumen(df, "mes")
-        if not tabla.empty:
-            st.bar_chart(tabla.set_index("mes")[["Hechas", "En proceso", "Faltan"]])
-
-    st.markdown("---")
-
-    st.markdown("### ⚠️ Órdenes +7 días")
-
-    antiguas = df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)]
-
-    if antiguas.empty:
-        st.success("Todo al día 👍")
+    if centro_sel != "Todos":
+        df_vista = df[df["centro"] == centro_sel]
+        pintar_bloque_centro(df_vista, centro_sel)
     else:
-        st.dataframe(
-            antiguas[["numero_ot", "descripcion", "estado", "centro", "espacio", "operario", "dias_abierta"]],
-            use_container_width=True,
-            hide_index=True
-        )
+        pintar_bloque_centro(df, "Todos los centros")
+
+        for centro in sorted([c for c in df["centro"].dropna().unique().tolist() if c]):
+            df_centro = df[df["centro"] == centro]
+            pintar_bloque_centro(df_centro, centro)
 
     st.markdown("---")
 
     if MOSTRAR_INVENTARIO:
-        st.markdown("## 📦 Inventario mantenimiento")
-        pantalla_inventario()
+        with st.expander("📦 Inventario mantenimiento completo", expanded=False):
+            pantalla_inventario()
 
-        st.markdown("---")
-
-        st.markdown("## 🏫 Inventario aulas")
-        pantalla_inventario_aulas()
+        with st.expander("🏫 Inventario aulas completo", expanded=False):
+            pantalla_inventario_aulas()
