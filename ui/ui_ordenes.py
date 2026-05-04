@@ -49,6 +49,12 @@ def obtener_operario_de_fila(fila):
         return ""
 
 
+def obtener_tipos_solicitante_lista():
+    if isinstance(TIPOS_SOLICITANTE, dict):
+        return list(TIPOS_SOLICITANTE.keys())
+    return list(TIPOS_SOLICITANTE)
+
+
 def filtrar_por_operario_obligatorio(filas):
     """
     Admin y gerencia ven todo.
@@ -113,6 +119,8 @@ def operario_por_centro(centro):
 def pantalla_ordenes():
     st.subheader("📋 Órdenes de trabajo")
 
+    tipos_solicitante_lista = obtener_tipos_solicitante_lista()
+
     tab1, tab2, tab3 = st.tabs(["➕ Nueva orden", "📄 Activas", "🗂️ Histórico"])
 
     # =====================================================
@@ -140,8 +148,8 @@ def pantalla_ordenes():
         with c2:
             tipo_solicitante = st.selectbox(
                 "Tipo solicitante",
-                TIPOS_SOLICITANTE,
-                index=TIPOS_SOLICITANTE.index("Operarios") if "Operarios" in TIPOS_SOLICITANTE else 0,
+                tipos_solicitante_lista,
+                index=tipos_solicitante_lista.index("Operarios") if "Operarios" in tipos_solicitante_lista else 0,
                 key="orden_tipo_solicitante_fuera_form"
             )
 
@@ -183,7 +191,7 @@ def pantalla_ordenes():
                         st.session_state.get("orden_tipo_solicitante_fuera_form", "Operarios")
                     ).strip()
 
-                    if tipo_solicitante_guardar not in TIPOS_SOLICITANTE:
+                    if tipo_solicitante_guardar not in tipos_solicitante_lista:
                         tipo_solicitante_guardar = "Operarios"
 
                     if es_operario():
