@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 from modules.ordenes import obtener_ordenes, obtener_historico
 
@@ -41,12 +42,12 @@ def normalizar_estado(estado):
         return "Terminadas"
 
     if estado in ESTADOS_EN_PROCESO:
-        return "Por hacer"
+        return "Pendientes"
 
     if estado in ESTADOS_FALTAN:
-        return "Por hacer"
+        return "Pendientes"
 
-    return "Por hacer"
+    return "Pendientes"
 
 
 def preparar_dataframe_ordenes():
@@ -70,27 +71,63 @@ def preparar_dataframe_ordenes():
 
     df = pd.concat([ordenes, historico], ignore_index=True)
 
+    if "fecha_cierre" not in df.columns:
+        df["fecha_cierre"] = None
+
     df["estado"] = df["estado"].fillna("Abierta")
     df["centro"] = df["centro"].fillna("Sin centro")
 
     df["fecha_creacion"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
+    df["fecha_cierre"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
+
     df["mes"] = df["fecha_creacion"].dt.strftime("%Y-%m").fillna("Sin fecha")
     df["estado_resumen"] = df["estado"].apply(normalizar_estado)
+
+    hoy = pd.Timestamp(datetime.now())
+    df["dias_abierta"] = (hoy - df["fecha_creacion"]).dt.days
 
     return df
 
 
-def resumen_centro(df):
+def calcular_resumen(df):
+    total = len(df)
     terminadas = len(df[df["estado_resumen"] == "Terminadas"])
-    por_hacer = len(df[df["estado_resumen"] == "Por hacer"])
+    pendientes = len(df[df["estado_resumen"] == "Pendientes"])
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total órdenes", len(df))
+    cumplimiento = 0
+    if total > 0:
+        cumplimiento = round((terminadas / total) * 100, 1)
+
+    return total, terminadas, pendientes, cumplimiento
+
+
+def pintar_resumen_general(df):
+    total, terminadas, pendientes, cumplimiento = calcular_resumen(df)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total órdenes", total)
     c2.metric("Terminadas", terminadas)
-    c3.metric("Por hacer", por_hacer)
+    c3.metric("Pendientes", pendientes)
+    c4.metric("% cumplimiento", f"{cumplimiento}%")
 
 
-def grafico_meses(df):
+def pintar_tarjeta_centro(df, centro):
+    total, terminadas, pendientes, cumplimiento = calcular_resumen(df)
+
+    st.markdown(f"### 🏫 {centro}")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total", total)
+    c2.metric("Terminadas", terminadas)
+    c3.metric("Pendientes", pendientes)
+    c4.metric("Cumplimiento", f"{cumplimiento}%")
+
+    st.markdown("---")
+
+
+def pintar_evolucion_mensual(df):
+    st.markdown("### 📅 Evolución mensual")
+
     tabla = (
         df.groupby(["mes", "estado_resumen"])
         .size()
@@ -98,11 +135,11 @@ def grafico_meses(df):
         .reset_index()
     )
 
-    for col in ["Terminadas", "Por hacer"]:
+    for col in ["Terminadas", "Pendientes"]:
         if col not in tabla.columns:
             tabla[col] = 0
 
-    tabla = tabla[["mes", "Terminadas", "Por hacer"]]
+    tabla = tabla[["mes", "Terminadas", "Pendientes"]]
 
     if tabla.empty:
         st.info("Sin datos por meses.")
@@ -111,12 +148,19 @@ def grafico_meses(df):
     st.bar_chart(tabla.set_index("mes"))
 
 
-def pintar_centro(df, centro):
-    with st.expander(f"🏫 {centro}", expanded=False):
-        resumen_centro(df)
+def pintar_alertas(df):
+    st.markdown("### ⚠️ Alertas")
 
-        st.markdown("### 📅 Por meses")
-        grafico_meses(df)
+    antiguas = df[
+        (df["estado_resumen"] != "Terminadas") &
+        (df["dias_abierta"] >= 7)
+    ]
+
+    pendientes_material = df[df["estado"] == "Pendiente material"]
+
+    c1, c2 = st.columns(2)
+    c1.metric("Órdenes +7 días", len(antiguas))
+    c2.metric("Pendiente material", len(pendientes_material))
 
 
 def pantalla_gerencia():
@@ -128,17 +172,25 @@ def pantalla_gerencia():
         st.warning("No hay órdenes registradas todavía.")
         return
 
-    centros = sorted([c for c in df["centro"].dropna().unique().tolist() if c])
+    pintar_resumen_general(df)
 
-    for centro in centros:
+    st.markdown("---")
+
+    for centro in ["Pearson 22", "Pearson 9"]:
         df_centro = df[df["centro"] == centro]
-        pintar_centro(df_centro, centro)
+        pintar_tarjeta_centro(df_centro, centro)
+
+    pintar_evolucion_mensual(df)
+
+    st.markdown("---")
+
+    pintar_alertas(df)
 
     st.markdown("---")
 
     if MOSTRAR_INVENTARIO:
-        with st.expander("📦 Inventario mantenimiento completo", expanded=False):
+        with st.expander("📦 Inventario mantenimiento", expanded=False):
             pantalla_inventario()
 
-        with st.expander("🏫 Inventario aulas completo", expanded=False):
+        with st.expander("🏫 Inventario aulas", expanded=False):
             pantalla_inventario_aulas()
