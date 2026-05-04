@@ -149,45 +149,70 @@ def crear_dashboard_centro(df, centro_nombre):
     return pd.DataFrame([datos])
 
 
+def pintar_grafico_barras(titulo, tabla, columna_indice):
+    st.markdown(f"#### {titulo}")
+
+    if tabla.empty:
+        st.info("Sin datos.")
+        return
+
+    tabla_chart = tabla.set_index(columna_indice)
+
+    columnas = ["Hechas", "En proceso", "Faltan"]
+    columnas = [c for c in columnas if c in tabla_chart.columns]
+
+    st.bar_chart(tabla_chart[columnas])
+
+
 def pintar_bloque_centro(df, centro_nombre):
     with st.expander(f"🏫 {centro_nombre}", expanded=False):
         dashboard = crear_dashboard_centro(df, centro_nombre)
         st.dataframe(dashboard, use_container_width=True, hide_index=True)
 
-        st.markdown("#### 📌 Solicitantes")
-        st.dataframe(
-            tabla_resumen(df, "tipo_solicitante", TIPOS_SOLICITANTE),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.markdown("---")
 
-        c1, c2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
-        with c1:
-            st.markdown("#### 🔧 Áreas")
-            st.dataframe(
-                tabla_resumen(df, "area"),
-                use_container_width=True,
-                hide_index=True
+        with col1:
+            pintar_grafico_barras(
+                "📌 Solicitantes",
+                tabla_resumen(df, "tipo_solicitante", TIPOS_SOLICITANTE),
+                "tipo_solicitante"
             )
 
-        with c2:
-            st.markdown("#### 👷 Operarios")
-            st.dataframe(
+        with col2:
+            pintar_grafico_barras(
+                "👷 Operarios",
                 tabla_resumen(df, "operario"),
-                use_container_width=True,
-                hide_index=True
+                "operario"
             )
 
-        st.markdown("#### 📅 Meses")
-        st.dataframe(
-            tabla_resumen(df, "mes"),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.markdown("---")
 
-        st.markdown("#### ⚠️ Órdenes abiertas +7 días")
-        antiguas = df[(df["estado_resumen"] != "Hechas") & (df["dias_abierta"] >= 7)]
+        col3, col4 = st.columns(2)
+
+        with col3:
+            pintar_grafico_barras(
+                "🔧 Áreas",
+                tabla_resumen(df, "area"),
+                "area"
+            )
+
+        with col4:
+            pintar_grafico_barras(
+                "📅 Meses",
+                tabla_resumen(df, "mes"),
+                "mes"
+            )
+
+        st.markdown("---")
+
+        st.markdown("### ⚠️ Órdenes abiertas +7 días")
+
+        antiguas = df[
+            (df["estado_resumen"] != "Hechas") &
+            (df["dias_abierta"] >= 7)
+        ]
 
         if antiguas.empty:
             st.success("Todo al día 👍")
