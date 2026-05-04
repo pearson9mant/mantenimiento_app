@@ -315,6 +315,10 @@ def mostrar_inventario():
 def mostrar_inventario_aulas():
     aulas = leer_tabla("inventario_aulas")
 
+    # Por si la tabla tuviera otro nombre en alguna versión
+    if aulas.empty:
+        aulas = leer_tabla("aulas_inventario")
+
     if aulas.empty:
         st.info("No hay inventario de aulas registrado.")
         return
@@ -337,23 +341,23 @@ def mostrar_inventario_aulas():
 
     total_registros = len(aulas)
 
+    estados_malos = [
+        "mal",
+        "malo",
+        "averiado",
+        "averiada",
+        "revisar",
+        "pendiente",
+        "deteriorado",
+        "deteriorada",
+        "roto",
+        "rota",
+        "regular",
+    ]
+
     elementos_revisar = 0
 
     if "estado" in aulas.columns:
-        estados_malos = [
-            "mal",
-            "malo",
-            "averiado",
-            "averiada",
-            "revisar",
-            "pendiente",
-            "deteriorado",
-            "deteriorada",
-            "roto",
-            "rota",
-            "regular",
-        ]
-
         elementos_revisar = len(
             aulas[
                 aulas["estado"]
@@ -372,20 +376,6 @@ def mostrar_inventario_aulas():
         if "estado" not in aulas.columns:
             st.info("No hay columna de estado en inventario de aulas.")
         else:
-            estados_malos = [
-                "mal",
-                "malo",
-                "averiado",
-                "averiada",
-                "revisar",
-                "pendiente",
-                "deteriorado",
-                "deteriorada",
-                "roto",
-                "rota",
-                "regular",
-            ]
-
             revisar = aulas[
                 aulas["estado"]
                 .astype(str)
@@ -418,8 +408,21 @@ def pantalla_gerencia():
 
     df = preparar_ordenes()
 
+    # =====================================================
+    # IMPORTANTE:
+    # Si no hay órdenes, NO cortamos inventario.
+    # Así Gerencia puede ver inventario e inventario de aulas igualmente.
+    # =====================================================
     if df.empty:
         st.warning("No hay órdenes para analizar.")
+
+        if MOSTRAR_INVENTARIO:
+            st.markdown("---")
+            mostrar_inventario()
+
+            st.markdown("---")
+            mostrar_inventario_aulas()
+
         return
 
     st.markdown("### 🔎 Filtros")
