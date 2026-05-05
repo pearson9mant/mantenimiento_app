@@ -10,6 +10,7 @@ from ui.ui_inventario_lectura import pantalla_inventario_lectura
 from ui.ui_operario import pantalla_operario
 from ui.ui_resumen_operario import pantalla_resumen_operario
 from ui.ui_legionella import pantalla_legionella
+from ui.ui_preventivo import pantalla_preventivo
 from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
@@ -145,6 +146,10 @@ def mostrar_menu_admin():
 
         if st.button("💧\nLegionella", key="btn_leg", use_container_width=True):
             st.session_state["seccion_actual"] = "Legionella"
+            st.rerun()
+
+        if st.button("🔧\nPreventivo", key="btn_preventivo", use_container_width=True):
+            st.session_state["seccion_actual"] = "Preventivo"
             st.rerun()
 
         if st.button("⚙️\nOperarios", key="btn_ops", use_container_width=True):
@@ -290,6 +295,9 @@ if perfil == "admin":
 
     elif seccion == "Legionella":
         pantalla_legionella()
+
+    elif seccion == "Preventivo":
+        pantalla_preventivo()
 
     elif seccion == "Operario":
         pantalla_operario()
