@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 
 from modules.ordenes import obtener_ordenes, obtener_historico
+from modules.preventivo import generar_ots_preventivo_si_toca
 from database.db import conectar
+
 
 
 def leer_df_seguro(sql):
@@ -75,6 +77,17 @@ def calcular_kpis_panel(ordenes, historico):
 
 def pantalla_panel():
     st.subheader("📊 Panel general")
+    st.markdown("### 🔧 Preventivos")
+
+    if st.button("🔄 Generar preventivos que tocan", use_container_width=True):
+        n = generar_ots_preventivo_si_toca()
+        if n > 0:
+            st.success(f"Se han generado {n} órdenes preventivas.")
+        else:
+            st.info("No hay preventivos pendientes para generar.")
+        st.rerun()
+
+    st.markdown("---")
 
     ordenes = obtener_ordenes()
     historico = obtener_historico()
