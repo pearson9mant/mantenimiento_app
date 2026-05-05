@@ -95,6 +95,7 @@ def filtrar_por_operario_obligatorio(filas):
     Admin y gerencia ven todo.
     Operario solo ve sus órdenes.
     Si no se reconoce el rol, NO se filtra para no ocultar órdenes en administración.
+    Las tareas externas no tienen operario, por tanto solo las ven admin/gerencia.
     """
     if not filas:
         return []
@@ -134,6 +135,8 @@ def obtener_origen_ot(origen):
         return "Preventivo"
     if origen_txt == "APP":
         return "App"
+    if origen_txt == "EXTERNA":
+        return "Externa"
     if origen_txt.startswith("PROFESORES"):
         return "Profesor"
     return "General"
@@ -192,28 +195,65 @@ def pantalla_ordenes():
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
 
-                operario_auto = operario_forzado_si_toca(centro)
+                # -------------------------------
+                # NUEVO: TIPO DE ORDEN
+                # -------------------------------
+                tipo_orden = st.radio(
+                    "Tipo de orden",
+                    ["Interna", "Externa"],
+                    horizontal=True,
+                    key="orden_tipo_orden"
+                )
 
-                if es_operario():
-                    operario = operario_auto
-                    st.info(f"👷 Operario asignado automáticamente: {operario}")
-                else:
-                    if operario_auto in OPERARIOS:
-                        indice_operario = OPERARIOS.index(operario_auto)
-                    else:
-                        indice_operario = 0
+                empresa_externa = ""
+                contacto_empresa = ""
+                telefono_empresa = ""
+                email_empresa = ""
+                fecha_programada = ""
+                fecha_realizacion = ""
+                coste_estimado = 0
+                coste_final = 0
 
-                    operario_sel = st.selectbox(
-                        "Operario",
-                        OPERARIOS,
-                        index=indice_operario,
-                        key=f"orden_operario_{centro}"
+                if tipo_orden == "Externa":
+                    st.info("🏢 Esta orden será gestionada por una empresa externa.")
+
+                    empresa_externa = st.text_input("Empresa externa", key="orden_empresa_externa")
+                    contacto_empresa = st.text_input("Persona de contacto", key="orden_contacto_empresa")
+                    telefono_empresa = st.text_input("Teléfono empresa", key="orden_telefono_empresa")
+                    email_empresa = st.text_input("Email empresa", key="orden_email_empresa")
+                    fecha_programada = st.date_input("Fecha programada", key="orden_fecha_programada")
+                    coste_estimado = st.number_input(
+                        "Coste estimado €",
+                        min_value=0.0,
+                        step=10.0,
+                        key="orden_coste_estimado"
                     )
 
-                    if operario_sel == "Otro":
-                        operario = st.text_input("Nombre operario", key="orden_operario_otro")
+                    operario = ""
+                    st.caption("Las tareas externas no se asignan a un operario interno.")
+                else:
+                    operario_auto = operario_forzado_si_toca(centro)
+
+                    if es_operario():
+                        operario = operario_auto
+                        st.info(f"👷 Operario asignado automáticamente: {operario}")
                     else:
-                        operario = operario_sel
+                        if operario_auto in OPERARIOS:
+                            indice_operario = OPERARIOS.index(operario_auto)
+                        else:
+                            indice_operario = 0
+
+                        operario_sel = st.selectbox(
+                            "Operario",
+                            OPERARIOS,
+                            index=indice_operario,
+                            key=f"orden_operario_{centro}"
+                        )
+
+                        if operario_sel == "Otro":
+                            operario = st.text_input("Nombre operario", key="orden_operario_otro")
+                        else:
+                            operario = operario_sel
 
                 boton_crear = st.form_submit_button("✅ Crear orden", use_container_width=True)
 
@@ -227,38 +267,60 @@ def pantalla_ordenes():
 
                     if es_operario():
                         tipo_solicitante_guardar = "Operarios"
-                        operario = usuario_actual()
+                        if tipo_orden != "Externa":
+                            operario = usuario_actual()
 
                     if not descripcion.strip():
                         st.warning("La descripción es obligatoria")
-                    elif not operario.strip():
+                    elif tipo_orden == "Interna" and not operario.strip():
                         st.warning("Indica un operario")
+                    elif tipo_orden == "Externa" and not empresa_externa.strip():
+                        st.warning("Indica la empresa externa")
                     elif not str(espacio).strip():
                         st.warning("Indica un espacio")
                     else:
-                        numero = obtener_siguiente_numero_ot(centro, "INC")
+                        if tipo_orden == "Externa":
+                            numero = obtener_siguiente_numero_ot(centro, "EXT")
+                            estado_inicial = "Pendiente proveedor"
+                            origen_guardar = "EXTERNA"
+                            operario_guardar = ""
+                        else:
+                            numero = obtener_siguiente_numero_ot(centro, "INC")
+                            estado_inicial = "Abierta"
+                            origen_guardar = "APP"
+                            operario_guardar = operario
 
                         datos_orden = (
                             numero,
                             descripcion,
-                            "Abierta",
+                            estado_inicial,
                             centro,
                             edificio,
                             espacio,
                             area,
                             prioridad,
-                            operario,
-                            "APP",
+                            operario_guardar,
+                            origen_guardar,
                             "",
                             "",
                             "",
-                            tipo_solicitante_guardar
+                            tipo_solicitante_guardar,
+                            tipo_orden,
+                            empresa_externa,
+                            contacto_empresa,
+                            telefono_empresa,
+                            email_empresa,
+                            str(fecha_programada) if fecha_programada else "",
+                            str(fecha_realizacion) if fecha_realizacion else "",
+                            coste_estimado,
+                            coste_final,
                         )
 
                         crear_orden(datos_orden)
 
                         st.success(
                             f"Orden creada correctamente: {numero} | "
+                            f"Tipo: {tipo_orden} | "
                             f"Solicitante: {tipo_solicitante_guardar}"
                         )
                         st.rerun()
@@ -272,20 +334,36 @@ def pantalla_ordenes():
         ordenes = filtrar_por_operario_obligatorio(ordenes)
 
         if ordenes:
-            f1, f2 = st.columns(2)
+            f1, f2, f3 = st.columns(3)
 
             with f1:
                 filtro_estado = st.selectbox(
                     "Estado",
-                    ["Todas", "Abierta", "En curso", "Pendiente material", "Incidencias"],
+                    [
+                        "Todas",
+                        "Abierta",
+                        "En curso",
+                        "Pendiente material",
+                        "Pendiente proveedor",
+                        "Avisado",
+                        "En ejecución",
+                        "Incidencias"
+                    ],
                     key="filtro_estado_admin_ot"
                 )
 
             with f2:
                 filtro_origen = st.selectbox(
                     "Origen",
-                    ["Todos", "LEGIONELLA", "OUTLOOK", "APP", "PREVENTIVO", "PROFESORES"],
+                    ["Todos", "LEGIONELLA", "OUTLOOK", "APP", "EXTERNA", "PREVENTIVO", "PROFESORES"],
                     key="filtro_origen_admin_ot"
+                )
+
+            with f3:
+                filtro_tipo_orden = st.selectbox(
+                    "Tipo orden",
+                    ["Todas", "Interna", "Externa"],
+                    key="filtro_tipo_orden_admin_ot"
                 )
 
             if filtro_origen != "Todos":
@@ -300,9 +378,19 @@ def pantalla_ordenes():
                         if (o[11] or "").strip().upper() == filtro_origen
                     ]
 
+            if filtro_tipo_orden != "Todas":
+                ordenes = [
+                    o for o in ordenes
+                    if len(o) > 16 and (o[16] or "Interna") == filtro_tipo_orden
+                ]
+
             total_abiertas = len([o for o in ordenes if o[3] == "Abierta"])
             total_curso = len([o for o in ordenes if o[3] == "En curso"])
             total_material = len([o for o in ordenes if o[3] == "Pendiente material"])
+            total_externas = len([
+                o for o in ordenes
+                if len(o) > 16 and (o[16] or "Interna") == "Externa"
+            ])
             total_incidencias = len([
                 o for o in ordenes
                 if (o[11] or "").strip().upper() == "LEGIONELLA"
@@ -316,11 +404,12 @@ def pantalla_ordenes():
             elif filtro_estado != "Todas":
                 ordenes = [o for o in ordenes if o[3] == filtro_estado]
 
-            k1, k2, k3, k4 = st.columns(4)
+            k1, k2, k3, k4, k5 = st.columns(5)
             k1.metric("Abiertas", total_abiertas)
             k2.metric("En curso", total_curso)
             k3.metric("Material", total_material)
-            k4.metric("Incidencias", total_incidencias)
+            k4.metric("Externas", total_externas)
+            k5.metric("Incidencias", total_incidencias)
 
             st.markdown("---")
 
@@ -331,12 +420,30 @@ def pantalla_ordenes():
                 st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                if len(o) == 16:
+                if len(o) >= 25:
+                    (
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, foto, tipo_solicitante,
+                        tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                        email_empresa, fecha_programada, fecha_realizacion,
+                        coste_estimado, coste_final
+                    ) = o
+                elif len(o) == 16:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
                         centro, edificio, espacio, area, prioridad, operario,
                         origen, solicitante, fecha_origen, foto, tipo_solicitante
                     ) = o
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 elif len(o) == 15:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -344,6 +451,15 @@ def pantalla_ordenes():
                         origen, solicitante, fecha_origen, foto
                     ) = o
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 elif len(o) == 14:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -352,6 +468,15 @@ def pantalla_ordenes():
                     ) = o
                     foto = ""
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 else:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -361,6 +486,15 @@ def pantalla_ordenes():
                     fecha_origen = ""
                     foto = ""
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -369,8 +503,13 @@ def pantalla_ordenes():
                     icono_estado = "🟡"
                 elif estado == "Pendiente material":
                     icono_estado = "📦"
+                elif estado in ["Pendiente proveedor", "Avisado", "En ejecución"]:
+                    icono_estado = "🏢"
 
-                titulo = f"{icono_estado} {numero_ot} | {prioridad} | {centro or '-'} · {espacio or '-'}"
+                if tipo_orden == "Externa":
+                    titulo = f"{icono_estado} {numero_ot} | EXTERNA | {empresa_externa or '-'} | {centro or '-'} · {espacio or '-'}"
+                else:
+                    titulo = f"{icono_estado} {numero_ot} | {prioridad} | {centro or '-'} · {espacio or '-'}"
 
                 with st.expander(titulo, expanded=False):
                     st.markdown(
@@ -378,8 +517,19 @@ def pantalla_ordenes():
                         f"{descripcion}  \n"
                         f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
                         f"👷 {operario or '-'} | Estado: **{estado}**  \n"
-                        f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**"
+                        f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**  \n"
+                        f"🔧 Tipo orden: **{tipo_orden or 'Interna'}**"
                     )
+
+                    if tipo_orden == "Externa":
+                        st.info(
+                            f"🏢 Empresa: **{empresa_externa or '-'}**  \n"
+                            f"👤 Contacto: {contacto_empresa or '-'}  \n"
+                            f"☎️ Teléfono: {telefono_empresa or '-'}  \n"
+                            f"✉️ Email: {email_empresa or '-'}  \n"
+                            f"📅 Fecha programada: {fecha_programada or '-'}  \n"
+                            f"💰 Coste estimado: {coste_estimado or 0} €"
+                        )
 
                     if solicitante:
                         st.caption(f"Solicitante: {solicitante}")
@@ -397,7 +547,15 @@ def pantalla_ordenes():
                     c2, c3, c4 = st.columns([2, 2, 2])
 
                     with c2:
-                        estados = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
+                        if tipo_orden == "Externa":
+                            estados = [
+                                "Pendiente proveedor",
+                                "Avisado",
+                                "En ejecución",
+                                "Finalizada"
+                            ]
+                        else:
+                            estados = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
 
                         nuevo_estado = st.selectbox(
                             f"Estado {numero_ot}",
@@ -444,13 +602,32 @@ def pantalla_ordenes():
                 st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-                if len(h) == 18:
+                if len(h) >= 27:
+                    (
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, fecha_cierre,
+                        observaciones_cierre, foto, tipo_solicitante,
+                        tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                        email_empresa, fecha_programada, fecha_realizacion,
+                        coste_estimado, coste_final
+                    ) = h
+                elif len(h) == 18:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
                         centro, edificio, espacio, area, prioridad, operario,
                         origen, solicitante, fecha_origen, fecha_cierre,
                         observaciones_cierre, foto, tipo_solicitante
                     ) = h
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 elif len(h) == 17:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -459,6 +636,15 @@ def pantalla_ordenes():
                         observaciones_cierre, foto
                     ) = h
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 elif len(h) == 16:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -468,6 +654,15 @@ def pantalla_ordenes():
                     ) = h
                     foto = ""
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
                 else:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
@@ -478,6 +673,15 @@ def pantalla_ordenes():
                     fecha_origen = ""
                     foto = ""
                     tipo_solicitante = "Operarios"
+                    tipo_orden = "Interna"
+                    empresa_externa = ""
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
+                    fecha_programada = ""
+                    fecha_realizacion = ""
+                    coste_estimado = 0
+                    coste_final = 0
 
                 origen_label = obtener_origen_ot(origen)
 
@@ -490,8 +694,21 @@ def pantalla_ordenes():
                             f"{descripcion}  \n"
                             f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}  \n"
                             f"👷 {operario or '-'} | Cierre: {fecha_cierre or '-'}  \n"
-                            f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**"
+                            f"📌 Tipo solicitante: **{tipo_solicitante or '-'}**  \n"
+                            f"🔧 Tipo orden: **{tipo_orden or 'Interna'}**"
                         )
+
+                        if tipo_orden == "Externa":
+                            st.info(
+                                f"🏢 Empresa: **{empresa_externa or '-'}**  \n"
+                                f"👤 Contacto: {contacto_empresa or '-'}  \n"
+                                f"☎️ Teléfono: {telefono_empresa or '-'}  \n"
+                                f"✉️ Email: {email_empresa or '-'}  \n"
+                                f"📅 Fecha programada: {fecha_programada or '-'}  \n"
+                                f"📅 Fecha realización: {fecha_realizacion or '-'}  \n"
+                                f"💰 Coste estimado: {coste_estimado or 0} €  \n"
+                                f"💶 Coste final: {coste_final or 0} €"
+                            )
 
                         if solicitante:
                             st.caption(f"Solicitante: {solicitante}")
