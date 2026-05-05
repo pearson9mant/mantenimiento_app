@@ -41,8 +41,66 @@ def operario_por_centro_preventivo(centro, operario=""):
     return ""
 
 
+def normalizar_tarea(texto):
+    texto = str(texto or "").strip().lower()
+    cambios = {
+        "á": "a",
+        "é": "e",
+        "í": "i",
+        "ó": "o",
+        "ú": "u",
+        "ñ": "n",
+    }
+
+    for a, b in cambios.items():
+        texto = texto.replace(a, b)
+
+    return texto
+
+
+def obtener_items_checklist_configurado(tarea):
+    """
+    Primero intenta usar los modelos configurados en Configuración.
+    Si no encuentra coincidencia, devuelve lista vacía y se usará el checklist por defecto.
+    """
+    tarea_txt = normalizar_tarea(tarea)
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT tarea_clave, item
+            FROM preventivo_checklist_modelos
+            WHERE activo = 1
+            ORDER BY categoria, tarea_clave, id
+        """)
+        modelos = cursor.fetchall()
+    except Exception:
+        modelos = []
+
+    conn.close()
+
+    items = []
+
+    for tarea_clave, item in modelos:
+        clave = normalizar_tarea(tarea_clave)
+
+        if clave and clave in tarea_txt:
+            items.append(item)
+
+    return items
+
+
 def obtener_items_checklist_por_tarea(tarea):
-    tarea_txt = str(tarea or "").strip().lower()
+    # 1) Primero mira si hay modelos configurados desde Configuración
+    items_configurados = obtener_items_checklist_configurado(tarea)
+
+    if items_configurados:
+        return items_configurados
+
+    # 2) Si no hay modelo configurado, usa checklist automático por defecto
+    tarea_txt = normalizar_tarea(tarea)
 
     if "cuadro" in tarea_txt and "electric" in tarea_txt:
         return [
@@ -53,6 +111,20 @@ def obtener_items_checklist_por_tarea(tarea):
             "Apriete visual de bornes si procede",
             "Limpieza interior de polvo si procede",
             "Comprobación de tapas y señalización",
+        ]
+
+    if "split" in tarea_txt or "aire acondicionado" in tarea_txt or "climatizacion" in tarea_txt:
+        return [
+            "Revisión visual de unidad interior",
+            "Limpieza de filtros",
+            "Comprobación de desagüe de condensados",
+            "Comprobación de mando y encendido",
+            "Comprobación de frío/calor",
+            "Revisión de ruidos o vibraciones",
+            "Revisión visual de unidad exterior",
+            "Comprobación de soportes y fijaciones",
+            "Comprobación de suciedad en batería exterior",
+            "Anotar incidencias detectadas",
         ]
 
     if "enchufe" in tarea_txt or "toma" in tarea_txt:
@@ -72,7 +144,7 @@ def obtener_items_checklist_por_tarea(tarea):
             "Comprobar luces de emergencia si aplica",
         ]
 
-    if "baño" in tarea_txt or "grifo" in tarea_txt or "cisterna" in tarea_txt or "fontaner" in tarea_txt:
+    if "bano" in tarea_txt or "grifo" in tarea_txt or "cisterna" in tarea_txt or "fontaner" in tarea_txt:
         return [
             "Comprobar fugas visibles",
             "Revisar grifos y pulsadores",
