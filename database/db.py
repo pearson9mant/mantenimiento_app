@@ -414,5 +414,29 @@ def inicializar_db():
     _add_column(cursor, "preventivo_tareas", "activo", "INTEGER DEFAULT 1")
     _add_column(cursor, "preventivo_tareas", "observaciones", "TEXT")
 
+    # -------------------------------
+    # CHECKLIST PREVENTIVO
+    # -------------------------------
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_checklist (
+            id {id_sql},
+            numero_ot TEXT,
+            tarea_id INTEGER,
+            item TEXT,
+            hecho INTEGER DEFAULT 0,
+            fecha_hecho TEXT,
+            operario TEXT,
+            observaciones TEXT
+        )
+    """)
+
+    _add_column(cursor, "preventivo_checklist", "numero_ot", "TEXT")
+    _add_column(cursor, "preventivo_checklist", "tarea_id", "INTEGER")
+    _add_column(cursor, "preventivo_checklist", "item", "TEXT")
+    _add_column(cursor, "preventivo_checklist", "hecho", "INTEGER DEFAULT 0")
+    _add_column(cursor, "preventivo_checklist", "fecha_hecho", "TEXT")
+    _add_column(cursor, "preventivo_checklist", "operario", "TEXT")
+    _add_column(cursor, "preventivo_checklist", "observaciones", "TEXT")
+
     conn.commit()
     conn.close()
