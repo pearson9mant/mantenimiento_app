@@ -1,6 +1,6 @@
 import streamlit as st
 
-from database.db import conectar, _sql
+from database.db import conectar, _sql, _es_postgres
 
 from modules.ubicaciones import (
     CENTROS,
@@ -27,6 +27,15 @@ INSTALACIONES_LEGIONELLA = [
     "AFCH",
     "Solar",
     "Otro"
+]
+
+
+CATEGORIAS_CHECKLIST_PREVENTIVO = [
+    "Electricidad",
+    "Iluminación",
+    "Fontanería",
+    "Climatización / Split",
+    "Otros"
 ]
 
 
@@ -132,6 +141,280 @@ def activar_desactivar_punto_legionella(id_punto, activo):
     conn.close()
 
     return True
+
+
+# =====================================================
+# CHECKLIST PREVENTIVO CONFIGURABLE
+# =====================================================
+
+def asegurar_tabla_checklist_modelos():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if _es_postgres():
+        id_sql = "SERIAL PRIMARY KEY"
+    else:
+        id_sql = "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_checklist_modelos (
+            id {id_sql},
+            categoria TEXT,
+            tarea_clave TEXT,
+            item TEXT,
+            activo INTEGER DEFAULT 1
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def crear_modelo_checklist(categoria, tarea_clave, item):
+    categoria = str(categoria or "").strip()
+    tarea_clave = str(tarea_clave or "").strip().lower()
+    item = str(item or "").strip()
+
+    if not categoria:
+        return False, "Indica una categoría."
+
+    if not tarea_clave:
+        return False, "Indica una tarea clave."
+
+    if not item:
+        return False, "Indica el punto del checklist."
+
+    asegurar_tabla_checklist_modelos()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT COUNT(*)
+        FROM preventivo_checklist_modelos
+        WHERE LOWER(categoria) = LOWER(?)
+          AND LOWER(tarea_clave) = LOWER(?)
+          AND LOWER(item) = LOWER(?)
+    """), (categoria, tarea_clave, item))
+
+    if cursor.fetchone()[0] > 0:
+        conn.close()
+        return False, "Ese punto ya existe para esa tarea."
+
+    cursor.execute(_sql("""
+        INSERT INTO preventivo_checklist_modelos
+        (categoria, tarea_clave, item, activo)
+        VALUES (?, ?, ?, 1)
+    """), (categoria, tarea_clave, item))
+
+    conn.commit()
+    conn.close()
+
+    return True, "Punto de checklist creado correctamente."
+
+
+def obtener_modelos_checklist():
+    asegurar_tabla_checklist_modelos()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, categoria, tarea_clave, item, activo
+        FROM preventivo_checklist_modelos
+        ORDER BY categoria, tarea_clave, id
+    """)
+
+    datos = cursor.fetchall()
+    conn.close()
+    return datos
+
+
+def activar_desactivar_modelo_checklist(id_modelo, activo):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        UPDATE preventivo_checklist_modelos
+        SET activo = ?
+        WHERE id = ?
+    """), (activo, id_modelo))
+
+    conn.commit()
+    conn.close()
+
+
+def borrar_modelo_checklist(id_modelo):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        DELETE FROM preventivo_checklist_modelos
+        WHERE id = ?
+    """), (id_modelo,))
+
+    conn.commit()
+    conn.close()
+
+
+def sembrar_modelos_checklist_por_defecto():
+    modelos = [
+        ("Electricidad", "cuadro", "Revisión visual del cuadro eléctrico"),
+        ("Electricidad", "cuadro", "Comprobación de magnetotérmicos"),
+        ("Electricidad", "cuadro", "Comprobación de diferenciales con botón TEST"),
+        ("Electricidad", "cuadro", "Revisión de calentamientos, olores o ruidos"),
+        ("Electricidad", "cuadro", "Apriete visual de bornes si procede"),
+        ("Electricidad", "cuadro", "Limpieza interior de polvo si procede"),
+        ("Electricidad", "cuadro", "Comprobación de tapas y señalización"),
+
+        ("Electricidad", "enchufe", "Revisar enchufes sueltos"),
+        ("Electricidad", "enchufe", "Comprobar tapas y mecanismos"),
+        ("Electricidad", "enchufe", "Revisar calentamientos o marcas"),
+        ("Electricidad", "enchufe", "Comprobar fijación a pared"),
+
+        ("Iluminación", "iluminacion", "Comprobar encendido correcto"),
+        ("Iluminación", "iluminacion", "Revisar lámparas o tubos fundidos"),
+        ("Iluminación", "iluminacion", "Revisar pantallas o difusores"),
+        ("Iluminación", "iluminacion", "Comprobar interruptores o pulsadores"),
+
+        ("Iluminación", "emergencia", "Comprobar encendido de emergencia"),
+        ("Iluminación", "emergencia", "Revisar pilotos de carga"),
+        ("Iluminación", "emergencia", "Comprobar señalización de evacuación"),
+        ("Iluminación", "emergencia", "Anotar luminarias defectuosas"),
+
+        ("Fontanería", "baño", "Comprobar fugas visibles"),
+        ("Fontanería", "baño", "Revisar grifos y pulsadores"),
+        ("Fontanería", "baño", "Revisar cisternas o fluxores"),
+        ("Fontanería", "baño", "Comprobar desagües"),
+        ("Fontanería", "baño", "Comprobar malos olores"),
+
+        ("Fontanería", "grifo", "Comprobar fugas"),
+        ("Fontanería", "grifo", "Comprobar cierre correcto"),
+        ("Fontanería", "grifo", "Comprobar presión de agua"),
+        ("Fontanería", "grifo", "Revisar fijación y estado general"),
+
+        ("Climatización / Split", "split", "Revisión visual de unidad interior"),
+        ("Climatización / Split", "split", "Limpieza de filtros"),
+        ("Climatización / Split", "split", "Comprobación de desagüe de condensados"),
+        ("Climatización / Split", "split", "Comprobación de mando y encendido"),
+        ("Climatización / Split", "split", "Comprobación de frío/calor"),
+        ("Climatización / Split", "split", "Revisión de ruidos o vibraciones"),
+        ("Climatización / Split", "split", "Revisión visual de unidad exterior"),
+        ("Climatización / Split", "split", "Comprobación de soportes y fijaciones"),
+        ("Climatización / Split", "split", "Comprobación de suciedad en batería exterior"),
+        ("Climatización / Split", "split", "Anotar incidencias detectadas"),
+    ]
+
+    creados = 0
+
+    for categoria, tarea_clave, item in modelos:
+        ok, _ = crear_modelo_checklist(categoria, tarea_clave, item)
+        if ok:
+            creados += 1
+
+    return creados
+
+
+def pantalla_checklist_preventivo_config():
+    st.markdown("### ✅ Checklist preventivo configurable")
+
+    st.info(
+        "Aquí puedes crear modelos de checklist. "
+        "Cuando una tarea preventiva contenga la palabra clave, se cargarán estos puntos automáticamente."
+    )
+
+    if st.button("🌱 Cargar modelos por defecto", use_container_width=True):
+        creados = sembrar_modelos_checklist_por_defecto()
+        st.success(f"Modelos creados: {creados}")
+        st.rerun()
+
+    st.markdown("---")
+
+    st.markdown("#### ➕ Añadir punto de checklist")
+
+    categoria = st.selectbox(
+        "Categoría",
+        CATEGORIAS_CHECKLIST_PREVENTIVO,
+        key="cfg_check_categoria"
+    )
+
+    tarea_clave = st.text_input(
+        "Palabra clave de la tarea",
+        placeholder="Ejemplo: cuadro, enchufe, emergencia, baño, split...",
+        key="cfg_check_tarea_clave"
+    )
+
+    item = st.text_input(
+        "Punto del checklist",
+        placeholder="Ejemplo: Comprobación de diferenciales con botón TEST",
+        key="cfg_check_item"
+    )
+
+    if st.button("➕ Crear punto de checklist", use_container_width=True):
+        ok, mensaje = crear_modelo_checklist(categoria, tarea_clave, item)
+
+        if ok:
+            st.success(mensaje)
+            st.rerun()
+        else:
+            st.warning(mensaje)
+
+    st.markdown("---")
+
+    st.markdown("#### 📋 Modelos existentes")
+
+    modelos = obtener_modelos_checklist()
+
+    if not modelos:
+        st.info("Todavía no hay modelos de checklist.")
+    else:
+        for id_modelo, categoria, tarea_clave, item, activo in modelos:
+            icono = "✅" if activo else "⛔"
+            titulo = f"{icono} {categoria} · {tarea_clave} · {item}"
+
+            with st.expander(titulo, expanded=False):
+                st.markdown(f"**Categoría:** {categoria}")
+                st.markdown(f"**Palabra clave:** {tarea_clave}")
+                st.markdown(f"**Punto:** {item}")
+                st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
+
+                c1, c2 = st.columns(2)
+
+                with c1:
+                    if activo:
+                        if st.button(
+                            f"⛔ Desactivar {id_modelo}",
+                            key=f"desactivar_check_modelo_{id_modelo}",
+                            use_container_width=True
+                        ):
+                            activar_desactivar_modelo_checklist(id_modelo, 0)
+                            st.rerun()
+                    else:
+                        if st.button(
+                            f"✅ Activar {id_modelo}",
+                            key=f"activar_check_modelo_{id_modelo}",
+                            use_container_width=True
+                        ):
+                            activar_desactivar_modelo_checklist(id_modelo, 1)
+                            st.rerun()
+
+                with c2:
+                    confirmar = st.checkbox(
+                        "Confirmar borrado",
+                        key=f"confirmar_borrar_check_modelo_{id_modelo}"
+                    )
+
+                    if st.button(
+                        f"🗑️ Borrar {id_modelo}",
+                        key=f"borrar_check_modelo_{id_modelo}",
+                        use_container_width=True
+                    ):
+                        if confirmar:
+                            borrar_modelo_checklist(id_modelo)
+                            st.warning("Modelo eliminado.")
+                            st.rerun()
+                        else:
+                            st.error("Marca la confirmación antes de borrar.")
 
 
 # =====================================================
@@ -315,10 +598,11 @@ def pantalla_borrados_inicio():
 def pantalla_configuracion():
     st.subheader("⚙️ Configuración")
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "➕ Añadir espacio",
         "📋 Espacios creados",
         "💧 Legionella",
+        "✅ Checklist preventivo",
         "🧹 Borrados"
     ])
 
@@ -496,4 +780,7 @@ def pantalla_configuracion():
                                 st.rerun()
 
     with tab4:
+        pantalla_checklist_preventivo_config()
+
+    with tab5:
         pantalla_borrados_inicio()
