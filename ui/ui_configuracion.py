@@ -145,10 +145,10 @@ def borrar_historico_ordenes():
     try:
         cursor.execute("DELETE FROM historico_ordenes")
         conn.commit()
-        return True, "Histórico eliminado correctamente."
+        return True, "Histórico de órdenes eliminado correctamente."
     except Exception as e:
         conn.rollback()
-        return False, f"Error al borrar histórico: {e}"
+        return False, f"Error al borrar histórico de órdenes: {e}"
     finally:
         conn.close()
 
@@ -164,6 +164,22 @@ def borrar_ordenes_activas():
     except Exception as e:
         conn.rollback()
         return False, f"Error al borrar órdenes activas: {e}"
+    finally:
+        conn.close()
+
+
+def borrar_historico_legionella():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM legionella_registros")
+        cursor.execute("DELETE FROM legionella_incidencias")
+        conn.commit()
+        return True, "Histórico de Legionella eliminado correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al borrar histórico de Legionella: {e}"
     finally:
         conn.close()
 
@@ -190,18 +206,15 @@ def pantalla_borrados_inicio():
 
     st.markdown("---")
 
-    # -------------------------------
-    # 1. BORRAR SOLO HISTÓRICO
-    # -------------------------------
-    st.markdown("#### 1️⃣ Borrar solo histórico")
+    st.markdown("#### 1️⃣ Borrar solo histórico de órdenes")
     st.caption("Elimina solo las órdenes finalizadas guardadas en histórico. No toca órdenes activas ni contador.")
 
     confirmar_historico = st.checkbox(
-        "Confirmo que quiero borrar SOLO el histórico",
+        "Confirmo que quiero borrar SOLO el histórico de órdenes",
         key="confirmar_borrar_solo_historico"
     )
 
-    if st.button("🧹 Borrar solo histórico", use_container_width=True):
+    if st.button("🧹 Borrar histórico de órdenes", use_container_width=True):
         if not confirmar_historico:
             st.error("Marca la confirmación antes de borrar.")
         else:
@@ -215,9 +228,6 @@ def pantalla_borrados_inicio():
 
     st.markdown("---")
 
-    # -------------------------------
-    # 2. BORRAR ÓRDENES + CONTADOR
-    # -------------------------------
     st.markdown("#### 2️⃣ Borrar órdenes activas + contador")
     st.caption("Elimina órdenes pendientes/abiertas/en curso y reinicia numeración OT. No toca histórico.")
 
@@ -242,11 +252,30 @@ def pantalla_borrados_inicio():
 
     st.markdown("---")
 
-    # -------------------------------
-    # 3. REINICIO TOTAL SEPTIEMBRE
-    # -------------------------------
-    st.markdown("#### 3️⃣ Reinicio total septiembre")
-    st.error("Esto borra órdenes activas, histórico y contador OT. Es para empezar curso limpio.")
+    st.markdown("#### 3️⃣ Borrar histórico de Legionella")
+    st.caption("Elimina registros e incidencias de Legionella. No toca los puntos de control creados.")
+
+    confirmar_legionella = st.checkbox(
+        "Confirmo que quiero borrar el histórico de Legionella",
+        key="confirmar_borrar_historico_legionella"
+    )
+
+    if st.button("💧 Borrar histórico Legionella", use_container_width=True):
+        if not confirmar_legionella:
+            st.error("Marca la confirmación antes de borrar.")
+        else:
+            ok, mensaje = borrar_historico_legionella()
+
+            if ok:
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.error(mensaje)
+
+    st.markdown("---")
+
+    st.markdown("#### 4️⃣ Reinicio total septiembre")
+    st.error("Esto borra órdenes activas, histórico de órdenes, histórico de Legionella y contador OT. No borra puntos de Legionella.")
 
     confirmar_total = st.checkbox(
         "Confirmo REINICIO TOTAL para septiembre",
@@ -267,14 +296,16 @@ def pantalla_borrados_inicio():
             ok1, msg1 = borrar_ordenes_activas()
             ok2, msg2 = borrar_historico_ordenes()
             ok3, msg3 = resetear_contador_ot()
+            ok4, msg4 = borrar_historico_legionella()
 
-            if ok1 and ok2 and ok3:
+            if ok1 and ok2 and ok3 and ok4:
                 st.success("Reinicio total de septiembre realizado correctamente.")
                 st.rerun()
             else:
                 st.error(msg1)
                 st.error(msg2)
                 st.error(msg3)
+                st.error(msg4)
 
 
 # =====================================================
@@ -291,16 +322,11 @@ def pantalla_configuracion():
         "🧹 Borrados"
     ])
 
-    # -------------------------------
-    # AÑADIR ESPACIO
-    # -------------------------------
     with tab1:
         st.markdown("### Añadir nuevo espacio")
 
         centro = st.selectbox("Centro", CENTROS, key="cfg_centro")
-
         edificios = obtener_edificios(centro)
-
         edificio = st.selectbox("Edificio", edificios, key="cfg_edificio")
 
         espacio = st.text_input(
@@ -321,9 +347,6 @@ def pantalla_configuracion():
             else:
                 st.warning(mensaje)
 
-    # -------------------------------
-    # ESPACIOS CREADOS
-    # -------------------------------
     with tab2:
         st.markdown("### Espacios personalizados")
 
@@ -359,9 +382,6 @@ def pantalla_configuracion():
                             activar_desactivar_espacio(id_ubicacion, 1)
                             st.rerun()
 
-    # -------------------------------
-    # CONFIGURACIÓN LEGIONELLA
-    # -------------------------------
     with tab3:
         st.markdown("### 💧 Configuración Legionella")
 
@@ -377,7 +397,6 @@ def pantalla_configuracion():
 
             centro_leg = st.selectbox("Centro", CENTROS, key="cfg_leg_centro")
             edificios_leg = obtener_edificios(centro_leg)
-
             edificio_leg = st.selectbox("Edificio", edificios_leg, key="cfg_leg_edificio")
 
             instalacion = st.selectbox(
@@ -476,8 +495,5 @@ def pantalla_configuracion():
                                 activar_desactivar_punto_legionella(id_punto, 1)
                                 st.rerun()
 
-    # -------------------------------
-    # BORRADOS
-    # -------------------------------
     with tab4:
         pantalla_borrados_inicio()
