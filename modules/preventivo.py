@@ -26,10 +26,6 @@ def sumar_frecuencia(fecha, frecuencia):
 
 
 def operario_por_centro_preventivo(centro, operario=""):
-    """
-    Si la tarea ya tiene operario, respeta ese operario.
-    Si viene vacío, asigna automáticamente por centro.
-    """
     operario = str(operario or "").strip()
     centro = str(centro or "").strip()
 
@@ -43,6 +39,54 @@ def operario_por_centro_preventivo(centro, operario=""):
         return "J.A. Almeda"
 
     return ""
+
+
+def obtener_items_checklist_por_tarea(tarea):
+    tarea_txt = str(tarea or "").strip().lower()
+
+    if "cuadro" in tarea_txt and "electric" in tarea_txt:
+        return [
+            "Revisión visual del cuadro eléctrico",
+            "Comprobación de magnetotérmicos",
+            "Comprobación de diferenciales con botón TEST",
+            "Revisión de calentamientos, olores o ruidos",
+            "Apriete visual de bornes si procede",
+            "Limpieza interior de polvo si procede",
+            "Comprobación de tapas y señalización",
+        ]
+
+    if "enchufe" in tarea_txt or "toma" in tarea_txt:
+        return [
+            "Revisar enchufes sueltos",
+            "Comprobar tapas y mecanismos",
+            "Revisar calentamientos o marcas",
+            "Comprobar fijación a pared",
+        ]
+
+    if "luz" in tarea_txt or "ilumin" in tarea_txt or "emergencia" in tarea_txt:
+        return [
+            "Comprobar encendido correcto",
+            "Revisar lámparas o tubos fundidos",
+            "Revisar pantallas o difusores",
+            "Comprobar interruptores o pulsadores",
+            "Comprobar luces de emergencia si aplica",
+        ]
+
+    if "baño" in tarea_txt or "grifo" in tarea_txt or "cisterna" in tarea_txt or "fontaner" in tarea_txt:
+        return [
+            "Comprobar fugas visibles",
+            "Revisar grifos y pulsadores",
+            "Revisar cisternas o fluxores",
+            "Comprobar desagües",
+            "Comprobar malos olores",
+        ]
+
+    return [
+        "Revisión visual general",
+        "Comprobación de funcionamiento",
+        "Anotar incidencias detectadas",
+        "Dejar zona en condiciones correctas",
+    ]
 
 
 def existe_ot_preventiva_abierta(tarea_id, tarea):
@@ -62,6 +106,90 @@ def existe_ot_preventiva_abierta(tarea_id, tarea):
 
     conn.close()
     return total > 0
+
+
+def crear_checklist_preventivo(numero_ot, tarea_id, tarea, operario):
+    items = obtener_items_checklist_por_tarea(tarea)
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    for item in items:
+        cursor.execute(_sql("""
+            INSERT INTO preventivo_checklist
+            (
+                numero_ot,
+                tarea_id,
+                item,
+                hecho,
+                fecha_hecho,
+                operario,
+                observaciones
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """), (
+            numero_ot,
+            tarea_id,
+            item,
+            0,
+            "",
+            operario,
+            ""
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def obtener_checklist_preventivo(numero_ot):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT id, numero_ot, tarea_id, item, hecho, fecha_hecho, operario, observaciones
+        FROM preventivo_checklist
+        WHERE numero_ot = ?
+        ORDER BY id ASC
+    """), (numero_ot,))
+
+    datos = cursor.fetchall()
+
+    conn.close()
+    return datos
+
+
+def actualizar_checklist_preventivo(id_check, hecho, operario=""):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    fecha_hecho = hoy_str() if hecho else ""
+
+    cursor.execute(_sql("""
+        UPDATE preventivo_checklist
+        SET hecho = ?, fecha_hecho = ?, operario = ?
+        WHERE id = ?
+    """), (
+        1 if hecho else 0,
+        fecha_hecho,
+        operario,
+        id_check
+    ))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def checklist_preventivo_completo(numero_ot):
+    checks = obtener_checklist_preventivo(numero_ot)
+
+    if not checks:
+        return False
+
+    total = len(checks)
+    hechos = len([c for c in checks if int(c[4] or 0) == 1])
+
+    return total == hechos
 
 
 def generar_ots_preventivo_si_toca():
@@ -117,6 +245,8 @@ def generar_ots_preventivo_si_toca():
             )
 
             crear_orden(datos_orden)
+
+            crear_checklist_preventivo(numero, tarea_id, tarea, operario)
 
             cursor.execute(_sql("""
                 INSERT INTO preventivo_registros
