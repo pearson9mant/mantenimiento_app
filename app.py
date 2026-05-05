@@ -16,6 +16,7 @@ from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_configuracion import pantalla_configuracion
 from ui.ui_gerencia import pantalla_gerencia
+from modules.preventivo import generar_ots_preventivo_si_toca
 
 
 st.set_page_config(page_title="Mantenimiento", layout="wide")
@@ -194,6 +195,13 @@ def mostrar_menu_operario():
 
 
 inicializar_db()
+# Generar preventivos automáticamente al entrar en la app
+try:
+    if "preventivos_auto_revisados" not in st.session_state:
+        generar_ots_preventivo_si_toca()
+        st.session_state["preventivos_auto_revisados"] = True
+except Exception:
+    pass
 
 params = st.query_params
 modo = params.get("modo")
