@@ -365,5 +365,54 @@ def inicializar_db():
         )
     """)
 
+    # -------------------------------
+    # MANTENIMIENTO PREVENTIVO
+    # -------------------------------
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_tareas (
+            id {id_sql},
+            centro TEXT,
+            edificio TEXT,
+            espacio TEXT,
+            area TEXT,
+            tarea TEXT,
+            frecuencia TEXT,
+            ultima_fecha TEXT,
+            proxima_fecha TEXT,
+            operario TEXT,
+            activo INTEGER DEFAULT 1,
+            observaciones TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_registros (
+            id {id_sql},
+            tarea_id INTEGER,
+            numero_ot TEXT,
+            fecha_generacion {fecha_sql},
+            centro TEXT,
+            edificio TEXT,
+            espacio TEXT,
+            area TEXT,
+            tarea TEXT,
+            frecuencia TEXT,
+            operario TEXT,
+            estado TEXT DEFAULT 'Generada'
+        )
+    """)
+
+    _add_column(cursor, "preventivo_tareas", "centro", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "edificio", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "espacio", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "area", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "tarea", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "frecuencia", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "ultima_fecha", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "proxima_fecha", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "operario", "TEXT")
+    _add_column(cursor, "preventivo_tareas", "activo", "INTEGER DEFAULT 1")
+    _add_column(cursor, "preventivo_tareas", "observaciones", "TEXT")
+
     conn.commit()
     conn.close()
