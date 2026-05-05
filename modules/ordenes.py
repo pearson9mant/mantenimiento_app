@@ -87,10 +87,6 @@ def crear_orden(datos):
 
     tipo_solicitante = datos[13] if len(datos) > 13 else "Operarios"
 
-    # -------------------------------
-    # TAREAS EXTERNAS
-    # Campos nuevos al final para no romper llamadas antiguas
-    # -------------------------------
     tipo_orden = datos[14] if len(datos) > 14 else "Interna"
     empresa_externa = datos[15] if len(datos) > 15 else ""
     contacto_empresa = datos[16] if len(datos) > 16 else ""
@@ -108,12 +104,12 @@ def crear_orden(datos):
         tipo_orden = "Interna"
 
     if tipo_orden == "Externa":
-        operario = ""
+        operario = "Proveedor externo"
 
         if not estado or estado == "Abierta":
             estado = "Pendiente proveedor"
 
-        if not origen:
+        if not origen or origen == "APP":
             origen = "EXTERNA"
 
     cursor.execute(_sql("""
@@ -300,8 +296,15 @@ def finalizar_orden(id_orden, observaciones=""):
             coste_estimado, coste_final
         ) = orden
 
-        if tipo_orden == "Externa" and not fecha_realizacion:
-            fecha_realizacion = ""
+        if tipo_orden == "Externa":
+            if not operario:
+                operario = "Proveedor externo"
+
+            if not origen:
+                origen = "EXTERNA"
+
+            if not fecha_realizacion:
+                fecha_realizacion = ""
 
         cursor.execute(_sql("""
             INSERT INTO historico_ordenes
