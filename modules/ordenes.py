@@ -1,6 +1,14 @@
 from database.db import conectar, _sql
 
-ESTADOS_VALIDOS = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
+ESTADOS_VALIDOS = [
+    "Abierta",
+    "En curso",
+    "Pendiente material",
+    "Finalizada",
+    "Pendiente proveedor",
+    "Avisado",
+    "En ejecución"
+]
 
 
 def obtener_codigo_centro(centro):
@@ -18,6 +26,8 @@ def obtener_codigo_tipo(tipo_ot):
         return "LEG"
     if tipo_ot in ["PREV", "PREVENTIVO"]:
         return "PREV"
+    if tipo_ot in ["EXT", "EXTERNA", "EXTERNO"]:
+        return "EXT"
     return "INC"
 
 
@@ -75,13 +85,36 @@ def crear_orden(datos):
     fecha_origen = datos[11] if len(datos) > 11 else ""
     foto = datos[12] if len(datos) > 12 else ""
 
-    if len(datos) > 13:
-        tipo_solicitante = datos[13]
-    else:
-        tipo_solicitante = "Operarios"
+    tipo_solicitante = datos[13] if len(datos) > 13 else "Operarios"
+
+    # -------------------------------
+    # TAREAS EXTERNAS
+    # Campos nuevos al final para no romper llamadas antiguas
+    # -------------------------------
+    tipo_orden = datos[14] if len(datos) > 14 else "Interna"
+    empresa_externa = datos[15] if len(datos) > 15 else ""
+    contacto_empresa = datos[16] if len(datos) > 16 else ""
+    telefono_empresa = datos[17] if len(datos) > 17 else ""
+    email_empresa = datos[18] if len(datos) > 18 else ""
+    fecha_programada = datos[19] if len(datos) > 19 else ""
+    fecha_realizacion = datos[20] if len(datos) > 20 else ""
+    coste_estimado = datos[21] if len(datos) > 21 else 0
+    coste_final = datos[22] if len(datos) > 22 else 0
 
     if not tipo_solicitante:
         tipo_solicitante = "Operarios"
+
+    if not tipo_orden:
+        tipo_orden = "Interna"
+
+    if tipo_orden == "Externa":
+        operario = ""
+
+        if not estado or estado == "Abierta":
+            estado = "Pendiente proveedor"
+
+        if not origen:
+            origen = "EXTERNA"
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
@@ -99,9 +132,18 @@ def crear_orden(datos):
             solicitante,
             fecha_origen,
             foto,
-            tipo_solicitante
+            tipo_solicitante,
+            tipo_orden,
+            empresa_externa,
+            contacto_empresa,
+            telefono_empresa,
+            email_empresa,
+            fecha_programada,
+            fecha_realizacion,
+            coste_estimado,
+            coste_final
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         numero_ot,
         descripcion,
@@ -116,7 +158,16 @@ def crear_orden(datos):
         solicitante,
         fecha_origen,
         foto,
-        tipo_solicitante
+        tipo_solicitante,
+        tipo_orden,
+        empresa_externa,
+        contacto_empresa,
+        telefono_empresa,
+        email_empresa,
+        fecha_programada,
+        fecha_realizacion,
+        coste_estimado,
+        coste_final
     ))
 
     conn.commit()
@@ -130,7 +181,10 @@ def obtener_ordenes():
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, foto, tipo_solicitante
+               solicitante, fecha_origen, foto, tipo_solicitante,
+               tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+               email_empresa, fecha_programada, fecha_realizacion,
+               coste_estimado, coste_final
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
@@ -148,7 +202,10 @@ def obtener_historico():
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
                solicitante, fecha_origen, fecha_cierre, observaciones_cierre, foto,
-               tipo_solicitante
+               tipo_solicitante,
+               tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+               email_empresa, fecha_programada, fecha_realizacion,
+               coste_estimado, coste_final
         FROM historico_ordenes
         ORDER BY id DESC
     """)
@@ -174,7 +231,10 @@ def obtener_ordenes_operario(operario):
         cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                    centro, edificio, espacio, area, prioridad, operario, origen,
-                   solicitante, fecha_origen, foto, tipo_solicitante
+                   solicitante, fecha_origen, foto, tipo_solicitante,
+                   tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                   email_empresa, fecha_programada, fecha_realizacion,
+                   coste_estimado, coste_final
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -183,7 +243,10 @@ def obtener_ordenes_operario(operario):
         cursor.execute("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                    centro, edificio, espacio, area, prioridad, operario, origen,
-                   solicitante, fecha_origen, foto, tipo_solicitante
+                   solicitante, fecha_origen, foto, tipo_solicitante,
+                   tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                   email_empresa, fecha_programada, fecha_realizacion,
+                   coste_estimado, coste_final
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
@@ -217,7 +280,10 @@ def finalizar_orden(id_orden, observaciones=""):
     cursor.execute(_sql("""
         SELECT numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, foto, tipo_solicitante
+               solicitante, fecha_origen, foto, tipo_solicitante,
+               tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+               email_empresa, fecha_programada, fecha_realizacion,
+               coste_estimado, coste_final
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -228,15 +294,45 @@ def finalizar_orden(id_orden, observaciones=""):
         (
             numero_ot, descripcion, estado, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
-            solicitante, fecha_origen, foto, tipo_solicitante
+            solicitante, fecha_origen, foto, tipo_solicitante,
+            tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+            email_empresa, fecha_programada, fecha_realizacion,
+            coste_estimado, coste_final
         ) = orden
+
+        if tipo_orden == "Externa" and not fecha_realizacion:
+            fecha_realizacion = ""
 
         cursor.execute(_sql("""
             INSERT INTO historico_ordenes
-            (numero_ot, descripcion, estado, fecha_creacion, centro, edificio,
-             espacio, area, prioridad, operario, origen, solicitante,
-             fecha_origen, observaciones_cierre, foto, tipo_solicitante)
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (
+                numero_ot,
+                descripcion,
+                estado,
+                fecha_creacion,
+                centro,
+                edificio,
+                espacio,
+                area,
+                prioridad,
+                operario,
+                origen,
+                solicitante,
+                fecha_origen,
+                observaciones_cierre,
+                foto,
+                tipo_solicitante,
+                tipo_orden,
+                empresa_externa,
+                contacto_empresa,
+                telefono_empresa,
+                email_empresa,
+                fecha_programada,
+                fecha_realizacion,
+                coste_estimado,
+                coste_final
+            )
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -252,7 +348,16 @@ def finalizar_orden(id_orden, observaciones=""):
             fecha_origen,
             observaciones,
             foto,
-            tipo_solicitante
+            tipo_solicitante,
+            tipo_orden,
+            empresa_externa,
+            contacto_empresa,
+            telefono_empresa,
+            email_empresa,
+            fecha_programada,
+            fecha_realizacion,
+            coste_estimado,
+            coste_final
         ))
 
         cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
