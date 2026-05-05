@@ -25,6 +25,25 @@ def sumar_frecuencia(fecha, frecuencia):
     return (fecha_dt + timedelta(days=30)).strftime("%Y-%m-%d")
 
 
+def existe_ot_preventiva_abierta(tarea_id, tarea):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    texto_buscar = f"[PREVENTIVO] {tarea}"
+
+    cursor.execute(_sql("""
+        SELECT COUNT(*)
+        FROM ordenes_trabajo
+        WHERE origen = ?
+          AND descripcion = ?
+    """), ("PREVENTIVO", texto_buscar))
+
+    total = cursor.fetchone()[0]
+
+    conn.close()
+    return total > 0
+
+
 def generar_ots_preventivo_si_toca():
     conn = conectar()
     cursor = conn.cursor()
@@ -51,6 +70,9 @@ def generar_ots_preventivo_si_toca():
             proxima_fecha = hoy
 
         if str(proxima_fecha) <= hoy:
+            if existe_ot_preventiva_abierta(tarea_id, tarea):
+                continue
+
             numero = obtener_siguiente_numero_ot(centro, "PREV")
 
             descripcion = f"[PREVENTIVO] {tarea}"
