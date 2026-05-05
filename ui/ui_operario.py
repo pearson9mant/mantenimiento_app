@@ -11,6 +11,13 @@ from modules.inventario import (
     registrar_movimiento_inventario
 )
 
+from modules.preventivo import (
+    obtener_checklist_preventivo,
+    actualizar_checklist_preventivo,
+    checklist_preventivo_completo,
+    crear_checklist_preventivo,
+)
+
 
 def rol_actual():
     return str(st.session_state.get("rol", "")).strip().lower()
@@ -41,6 +48,79 @@ def obtener_operario_fila(fila):
         return fila[10]
     except Exception:
         return ""
+
+
+def es_ot_preventiva(origen, descripcion):
+    origen_txt = str(origen or "").strip().upper()
+    desc_txt = str(descripcion or "").strip().upper()
+    return origen_txt == "PREVENTIVO" or desc_txt.startswith("[PREVENTIVO]")
+
+
+def limpiar_tarea_preventiva(descripcion):
+    texto = str(descripcion or "").strip()
+    return texto.replace("[PREVENTIVO]", "").strip()
+
+
+def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
+    st.markdown("### ✅ Checklist preventivo")
+
+    checks = obtener_checklist_preventivo(num_ot)
+
+    if not checks:
+        crear_checklist_preventivo(
+            num_ot,
+            0,
+            limpiar_tarea_preventiva(desc),
+            operario
+        )
+        checks = obtener_checklist_preventivo(num_ot)
+
+    if not checks:
+        st.warning("No se ha podido crear el checklist preventivo.")
+        return False
+
+    hechos = 0
+
+    for check in checks:
+        (
+            id_check,
+            check_numero_ot,
+            tarea_id,
+            item,
+            hecho,
+            fecha_hecho,
+            operario_check,
+            observaciones_check
+        ) = check
+
+        valor_actual = bool(hecho)
+
+        nuevo_valor = st.checkbox(
+            item,
+            value=valor_actual,
+            key=f"check_operario_prev_{num_ot}_{id_check}"
+        )
+
+        if nuevo_valor != valor_actual:
+            actualizar_checklist_preventivo(
+                id_check,
+                nuevo_valor,
+                usuario_actual() or operario
+            )
+            st.rerun()
+
+        if nuevo_valor:
+            hechos += 1
+
+    total = len(checks)
+    st.caption(f"Checklist: {hechos}/{total} completado")
+
+    if hechos == total:
+        st.success("Checklist completado. Ya puedes finalizar la OT.")
+        return True
+
+    st.warning("Faltan puntos del checklist por marcar.")
+    return False
 
 
 # =====================================================
@@ -92,10 +172,6 @@ def calcular_kpis_operario(ordenes):
 
 
 def filtrar_seguridad_operario(ordenes, operario_sel):
-    """
-    Si es operario real: solo puede ver sus propias órdenes.
-    Si es admin/gerencia en vista operario: respeta operario_activo.
-    """
     if not ordenes:
         return []
 
@@ -193,6 +269,12 @@ def descomponer_orden_operario(fila):
     )
 
 
+def puede_finalizar_preventivo(num_ot, origen, desc):
+    if es_ot_preventiva(origen, desc):
+        return checklist_preventivo_completo(num_ot)
+    return True
+
+
 def pantalla_operario():
     st.subheader("👷 Vista operario")
 
@@ -203,8 +285,6 @@ def pantalla_operario():
 
     operario_sel = st.session_state.get("operario_activo", "")
 
-    # Seguridad PRO:
-    # Si entra un operario real, se fuerza siempre su usuario de sesión.
     if es_operario():
         operario_sel = usuario_actual()
         st.session_state["operario_activo"] = operario_sel
@@ -218,9 +298,6 @@ def pantalla_operario():
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
     ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
 
-    # -------------------------------
-    # KPIs DEL OPERARIO
-    # -------------------------------
     kpis = calcular_kpis_operario(ordenes_operario)
 
     st.markdown("### 📈 Mi resumen")
@@ -268,7 +345,6 @@ def pantalla_operario():
             tipo_solicitante,
         ) = descomponer_orden_operario(fila)
 
-        # Segunda seguridad: si por cualquier motivo entra una fila incorrecta, no se muestra.
         if es_operario() and normalizar_txt(operario) != normalizar_txt(usuario_actual()):
             continue
 
@@ -302,6 +378,9 @@ def pantalla_operario():
                 except Exception:
                     st.caption("📷 Foto no disponible")
 
+            if es_ot_preventiva(origen, desc):
+                mostrar_checklist_preventivo_operario(num_ot, desc, operario)
+
             b1, b2, b3 = st.columns(3)
 
             with b1:
@@ -326,10 +405,13 @@ def pantalla_operario():
 
                 with c1:
                     if st.button("✔\nSí, finalizar", key=f"si_fin_rapido_{id_orden}", use_container_width=True):
-                        finalizar_orden(id_orden, "")
-                        st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
-                        st.success(f"{num_ot} finalizada correctamente.")
-                        st.rerun()
+                        if not puede_finalizar_preventivo(num_ot, origen, desc):
+                            st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                        else:
+                            finalizar_orden(id_orden, "")
+                            st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
+                            st.success(f"{num_ot} finalizada correctamente.")
+                            st.rerun()
 
                 with c2:
                     if st.button("❌\nCancelar", key=f"no_fin_rapido_{id_orden}", use_container_width=True):
@@ -410,7 +492,10 @@ def pantalla_operario():
                     with c1:
                         if st.button("✔\nSí, finalizar", key=f"si_fin_completo_{id_orden}", use_container_width=True):
 
-                            if usar_material and materiales_select:
+                            if not puede_finalizar_preventivo(num_ot, origen, desc):
+                                st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+
+                            elif usar_material and materiales_select:
 
                                 materiales_confirmados = st.session_state.get(
                                     f"materiales_confirmados_{id_orden}",
