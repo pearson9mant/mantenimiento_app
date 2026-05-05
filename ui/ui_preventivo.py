@@ -40,14 +40,12 @@ def calcular_proxima_fecha(fecha_base, frecuencia):
     return fecha_base + timedelta(days=30)
 
 
-def obtener_reset_form():
-    if "prev_reset_form" not in st.session_state:
-        st.session_state["prev_reset_form"] = 0
-    return st.session_state["prev_reset_form"]
-
-
-def resetear_formulario_preventivo():
-    st.session_state["prev_reset_form"] = st.session_state.get("prev_reset_form", 0) + 1
+def operario_por_centro(centro):
+    if centro == "Pearson 9":
+        return "Luis Lozano"
+    if centro == "Pearson 22":
+        return "J.A. Almeda"
+    return OPERARIOS[0] if OPERARIOS else ""
 
 
 def pantalla_preventivo():
@@ -56,100 +54,79 @@ def pantalla_preventivo():
     tab1, tab2 = st.tabs(["➕ Crear tarea", "📋 Tareas"])
 
     with tab1:
-        reset = obtener_reset_form()
+        centro = st.selectbox("Centro", CENTROS, key="prev_centro")
 
-        with st.form(f"form_preventivo_{reset}", clear_on_submit=True):
+        edificios_disponibles = EDIFICIOS.get(centro, [])
+        edificio = st.selectbox("Edificio", edificios_disponibles, key=f"prev_edificio_{centro}")
 
-            centro_sel = st.selectbox(
-                "Centro",
-                ["Selecciona..."] + CENTROS,
-                key=f"prev_centro_{reset}"
-            )
-            centro = "" if centro_sel == "Selecciona..." else centro_sel
+        espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
+        espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"prev_espacio_{centro}_{edificio}")
 
-            edificios_disponibles = EDIFICIOS.get(centro, []) if centro else []
-            edificio_sel = st.selectbox(
-                "Edificio",
-                ["Selecciona..."] + edificios_disponibles,
-                key=f"prev_edificio_{reset}"
-            )
-            edificio = "" if edificio_sel == "Selecciona..." else edificio_sel
+        if espacio_sel == "Otro":
+            espacio = st.text_input("Especificar espacio", key="prev_espacio_otro")
+        else:
+            espacio = espacio_sel
 
-            espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"]) if edificio else []
-            espacio_sel = st.selectbox(
-                "Espacio",
-                ["Selecciona..."] + espacios_disponibles,
-                key=f"prev_espacio_{reset}"
-            )
-
-            if espacio_sel == "Selecciona...":
-                espacio = ""
-            elif espacio_sel == "Otro":
-                espacio = st.text_input("Especificar espacio", key=f"prev_espacio_otro_{reset}")
-            else:
-                espacio = espacio_sel
-
-            area_sel = st.selectbox(
-                "Área",
-                ["Selecciona..."] + AREAS,
-                key=f"prev_area_{reset}"
-            )
-            area = "" if area_sel == "Selecciona..." else area_sel
+        with st.form("form_preventivo", clear_on_submit=True):
+            area = st.selectbox("Área", AREAS, key="prev_area")
 
             tarea_sel = st.selectbox(
                 "Tarea preventiva",
-                ["Selecciona..."] + TAREAS_PREVENTIVAS,
-                key=f"prev_tarea_select_{reset}"
+                TAREAS_PREVENTIVAS,
+                key="prev_tarea_select"
             )
 
-            if tarea_sel == "Selecciona...":
-                tarea = ""
-            elif tarea_sel == "Otra":
-                tarea = st.text_input("Especificar tarea preventiva", key=f"prev_tarea_otra_{reset}")
+            if tarea_sel == "Otra":
+                tarea = st.text_input("Especificar tarea preventiva", key="prev_tarea_otra")
             else:
                 tarea = tarea_sel
 
-            frecuencia_sel = st.selectbox(
+            frecuencia = st.selectbox(
                 "Frecuencia",
-                ["Selecciona...", "Semanal", "Mensual", "Trimestral", "Semestral", "Anual"],
-                key=f"prev_frecuencia_{reset}"
+                ["Semanal", "Mensual", "Trimestral", "Semestral", "Anual"],
+                key="prev_frecuencia"
             )
-            frecuencia = "" if frecuencia_sel == "Selecciona..." else frecuencia_sel
 
             ultima_fecha = st.date_input(
                 "Última revisión / fecha base",
                 value=date.today(),
-                key=f"prev_ultima_fecha_{reset}"
+                key="prev_ultima_fecha"
             )
 
             proxima_fecha = calcular_proxima_fecha(ultima_fecha, frecuencia)
 
-            st.info(f"📅 Próxima fecha: {proxima_fecha}")
+            st.info(f"📅 Próxima fecha calculada automáticamente: {proxima_fecha}")
+
+            operario_auto = operario_por_centro(centro)
+
+            if operario_auto in OPERARIOS:
+                indice_operario = OPERARIOS.index(operario_auto)
+            else:
+                indice_operario = 0
 
             operario_sel = st.selectbox(
                 "Operario",
-                ["Selecciona..."] + OPERARIOS,
-                key=f"prev_operario_{reset}"
+                OPERARIOS,
+                index=indice_operario,
+                key=f"prev_operario_{centro}"
             )
-            operario = "" if operario_sel == "Selecciona..." else operario_sel
 
-            observaciones = st.text_area("Observaciones", key=f"prev_observaciones_{reset}")
+            if operario_sel == "Otro":
+                operario = st.text_input("Nombre operario", key="prev_operario_otro")
+            else:
+                operario = operario_sel
+
+            observaciones = st.text_area("Observaciones", key="prev_observaciones")
 
             crear = st.form_submit_button("✅ Crear tarea preventiva", use_container_width=True)
 
             if crear:
-                if not centro:
-                    st.warning("Selecciona centro")
-                elif not edificio:
-                    st.warning("Selecciona edificio")
-                elif not espacio:
-                    st.warning("Selecciona espacio")
-                elif not area:
-                    st.warning("Selecciona área")
-                elif not tarea:
-                    st.warning("Selecciona tarea")
-                elif not frecuencia:
-                    st.warning("Selecciona frecuencia")
+                if not str(tarea).strip():
+                    st.warning("La tarea es obligatoria")
+                elif not str(espacio).strip():
+                    st.warning("Indica un espacio")
+                elif not str(operario).strip():
+                    st.warning("Indica un operario")
                 else:
                     conn = conectar()
                     cursor = conn.cursor()
@@ -180,7 +157,6 @@ def pantalla_preventivo():
                     conn.commit()
                     conn.close()
 
-                    resetear_formulario_preventivo()
                     st.success("Tarea preventiva creada correctamente")
                     st.rerun()
 
