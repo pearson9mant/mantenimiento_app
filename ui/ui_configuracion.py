@@ -30,6 +30,10 @@ INSTALACIONES_LEGIONELLA = [
 ]
 
 
+# =====================================================
+# LEGIONELLA
+# =====================================================
+
 def obtener_puntos_legionella():
     conn = conectar()
     cursor = conn.cursor()
@@ -53,7 +57,6 @@ def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_pun
     nombre_punto = str(nombre_punto or "").strip()
     instalacion = str(instalacion or "").strip()
 
-    # ❌ VALIDACIÓN FUERTE
     if not centro or not edificio:
         return False, "Centro o edificio inválido."
 
@@ -66,7 +69,6 @@ def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_pun
     conn = conectar()
     cursor = conn.cursor()
 
-    # ❌ EVITAR DUPLICADOS
     cursor.execute(_sql("""
         SELECT COUNT(*) FROM legionella_puntos
         WHERE centro = ? AND edificio = ? AND nombre_punto = ?
@@ -94,6 +96,7 @@ def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_pun
     conn.close()
 
     return True, f"Punto creado: {nombre_punto}"
+
 
 def limpiar_puntos_legionella_invalidos():
     conn = conectar()
@@ -131,13 +134,161 @@ def activar_desactivar_punto_legionella(id_punto, activo):
     return True
 
 
+# =====================================================
+# BORRADOS CONTROLADOS
+# =====================================================
+
+def borrar_historico_ordenes():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM historico_ordenes")
+        conn.commit()
+        return True, "Histórico eliminado correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al borrar histórico: {e}"
+    finally:
+        conn.close()
+
+
+def borrar_ordenes_activas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM ordenes_trabajo")
+        conn.commit()
+        return True, "Órdenes activas eliminadas correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al borrar órdenes activas: {e}"
+    finally:
+        conn.close()
+
+
+def resetear_contador_ot():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM contador_ot")
+        conn.commit()
+        return True, "Contador OT reiniciado correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al reiniciar contador OT: {e}"
+    finally:
+        conn.close()
+
+
+def pantalla_borrados_inicio():
+    st.markdown("### 🧹 Borrados para empezar")
+
+    st.warning("Zona delicada. Estos botones borran datos reales. Usa siempre la confirmación antes de ejecutar.")
+
+    st.markdown("---")
+
+    # -------------------------------
+    # 1. BORRAR SOLO HISTÓRICO
+    # -------------------------------
+    st.markdown("#### 1️⃣ Borrar solo histórico")
+    st.caption("Elimina solo las órdenes finalizadas guardadas en histórico. No toca órdenes activas ni contador.")
+
+    confirmar_historico = st.checkbox(
+        "Confirmo que quiero borrar SOLO el histórico",
+        key="confirmar_borrar_solo_historico"
+    )
+
+    if st.button("🧹 Borrar solo histórico", use_container_width=True):
+        if not confirmar_historico:
+            st.error("Marca la confirmación antes de borrar.")
+        else:
+            ok, mensaje = borrar_historico_ordenes()
+
+            if ok:
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.error(mensaje)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # 2. BORRAR ÓRDENES + CONTADOR
+    # -------------------------------
+    st.markdown("#### 2️⃣ Borrar órdenes activas + contador")
+    st.caption("Elimina órdenes pendientes/abiertas/en curso y reinicia numeración OT. No toca histórico.")
+
+    confirmar_ordenes = st.checkbox(
+        "Confirmo que quiero borrar órdenes activas y reiniciar contador",
+        key="confirmar_borrar_ordenes_contador"
+    )
+
+    if st.button("🧯 Borrar órdenes activas + reset contador", use_container_width=True):
+        if not confirmar_ordenes:
+            st.error("Marca la confirmación antes de borrar.")
+        else:
+            ok1, msg1 = borrar_ordenes_activas()
+            ok2, msg2 = resetear_contador_ot()
+
+            if ok1 and ok2:
+                st.success("Órdenes activas eliminadas y contador OT reiniciado correctamente.")
+                st.rerun()
+            else:
+                st.error(msg1)
+                st.error(msg2)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # 3. REINICIO TOTAL SEPTIEMBRE
+    # -------------------------------
+    st.markdown("#### 3️⃣ Reinicio total septiembre")
+    st.error("Esto borra órdenes activas, histórico y contador OT. Es para empezar curso limpio.")
+
+    confirmar_total = st.checkbox(
+        "Confirmo REINICIO TOTAL para septiembre",
+        key="confirmar_reinicio_total_septiembre"
+    )
+
+    texto_seguridad = st.text_input(
+        "Para confirmar escribe: SEPTIEMBRE",
+        key="texto_confirmacion_septiembre"
+    )
+
+    if st.button("🔥 Reinicio TOTAL septiembre + contador", use_container_width=True):
+        if not confirmar_total:
+            st.error("Marca la confirmación antes de hacer el reinicio total.")
+        elif texto_seguridad.strip().upper() != "SEPTIEMBRE":
+            st.error("Debes escribir SEPTIEMBRE para confirmar.")
+        else:
+            ok1, msg1 = borrar_ordenes_activas()
+            ok2, msg2 = borrar_historico_ordenes()
+            ok3, msg3 = resetear_contador_ot()
+
+            if ok1 and ok2 and ok3:
+                st.success("Reinicio total de septiembre realizado correctamente.")
+                st.rerun()
+            else:
+                st.error(msg1)
+                st.error(msg2)
+                st.error(msg3)
+
+
+# =====================================================
+# PANTALLA CONFIGURACIÓN
+# =====================================================
+
 def pantalla_configuracion():
     st.subheader("⚙️ Configuración")
 
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "➕ Añadir espacio",
         "📋 Espacios creados",
-        "💧 Legionella"
+        "💧 Legionella",
+        "🧹 Borrados"
     ])
 
     # -------------------------------
@@ -214,10 +365,9 @@ def pantalla_configuracion():
     with tab3:
         st.markdown("### 💧 Configuración Legionella")
 
-        # 🔽 👉 AQUÍ VA EL BOTÓN
         if st.button("🧹 Limpiar puntos inválidos (None)", use_container_width=True):
             afectados = limpiar_puntos_legionella_invalidos()
-            st.success(f"{afectados} puntos limpiados (desactivados)")
+            st.success(f"{afectados} puntos limpiados/desactivados.")
             st.rerun()
 
         sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
@@ -325,3 +475,9 @@ def pantalla_configuracion():
                             ):
                                 activar_desactivar_punto_legionella(id_punto, 1)
                                 st.rerun()
+
+    # -------------------------------
+    # BORRADOS
+    # -------------------------------
+    with tab4:
+        pantalla_borrados_inicio()
