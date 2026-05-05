@@ -89,7 +89,7 @@ def obtener_items_checklist_por_tarea(tarea):
     ]
 
 
-def existe_ot_preventiva_abierta(tarea_id, tarea):
+def existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
     conn = conectar()
     cursor = conn.cursor()
 
@@ -100,7 +100,16 @@ def existe_ot_preventiva_abierta(tarea_id, tarea):
         FROM ordenes_trabajo
         WHERE origen = ?
           AND descripcion = ?
-    """), ("PREVENTIVO", texto_buscar))
+          AND centro = ?
+          AND edificio = ?
+          AND espacio = ?
+    """), (
+        "PREVENTIVO",
+        texto_buscar,
+        centro,
+        edificio,
+        espacio
+    ))
 
     total = cursor.fetchone()[0]
 
@@ -220,7 +229,7 @@ def generar_ots_preventivo_si_toca():
             proxima_fecha = hoy
 
         if str(proxima_fecha) <= hoy:
-            if existe_ot_preventiva_abierta(tarea_id, tarea):
+            if existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
                 continue
 
             numero = obtener_siguiente_numero_ot(centro, "PREV")
