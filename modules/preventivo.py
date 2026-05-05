@@ -1,8 +1,8 @@
 import streamlit as st
-from datetime import date, timedelta
 
+from datetime import datetime, timedelta
 from database.db import conectar, _sql
-from modules.preventivo import generar_ots_preventivo_si_toca
+from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
 
 
 def calcular_proxima_fecha(fecha_base, frecuencia):
