@@ -25,6 +25,26 @@ def sumar_frecuencia(fecha, frecuencia):
     return (fecha_dt + timedelta(days=30)).strftime("%Y-%m-%d")
 
 
+def operario_por_centro_preventivo(centro, operario=""):
+    """
+    Si la tarea ya tiene operario, respeta ese operario.
+    Si viene vacío, asigna automáticamente por centro.
+    """
+    operario = str(operario or "").strip()
+    centro = str(centro or "").strip()
+
+    if operario:
+        return operario
+
+    if centro == "Pearson 9":
+        return "Luis Lozano"
+
+    if centro == "Pearson 22":
+        return "J.A. Almeda"
+
+    return ""
+
+
 def existe_ot_preventiva_abierta(tarea_id, tarea):
     conn = conectar()
     cursor = conn.cursor()
@@ -65,6 +85,8 @@ def generar_ots_preventivo_si_toca():
             tarea_id, centro, edificio, espacio, area, tarea,
             frecuencia, ultima_fecha, proxima_fecha, operario
         ) = t
+
+        operario = operario_por_centro_preventivo(centro, operario)
 
         if not proxima_fecha:
             proxima_fecha = hoy
