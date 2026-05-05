@@ -13,6 +13,12 @@ from modules.ordenes import (
     borrar_orden_historico,
 )
 
+from modules.preventivo import (
+    obtener_checklist_preventivo,
+    actualizar_checklist_preventivo,
+    checklist_preventivo_completo,
+)
+
 
 # =====================================================
 # PERMISOS / FILTRO OBLIGATORIO POR OPERARIO
@@ -142,6 +148,59 @@ def operario_por_centro(centro):
     if centro == "Pearson 22":
         return "J.A. Almeda"
     return OPERARIOS[0] if OPERARIOS else ""
+
+
+def mostrar_checklist_preventivo(numero_ot, operario):
+    st.markdown("### ✅ Checklist preventivo")
+
+    checks = obtener_checklist_preventivo(numero_ot)
+
+    if not checks:
+        st.info("Esta OT preventiva no tiene checklist asociado.")
+        return False
+
+    hechos = 0
+
+    for check in checks:
+        (
+            id_check,
+            check_numero_ot,
+            tarea_id,
+            item,
+            hecho,
+            fecha_hecho,
+            operario_check,
+            observaciones_check
+        ) = check
+
+        valor_actual = bool(hecho)
+
+        nuevo_valor = st.checkbox(
+            item,
+            value=valor_actual,
+            key=f"check_prev_{numero_ot}_{id_check}"
+        )
+
+        if nuevo_valor != valor_actual:
+            actualizar_checklist_preventivo(
+                id_check,
+                nuevo_valor,
+                usuario_actual() or operario
+            )
+            st.rerun()
+
+        if nuevo_valor:
+            hechos += 1
+
+    total_checks = len(checks)
+    st.caption(f"Checklist: {hechos}/{total_checks} completado")
+
+    if hechos == total_checks:
+        st.success("Checklist preventivo completado.")
+        return True
+    else:
+        st.warning("Faltan puntos del checklist por marcar.")
+        return False
 
 
 def pantalla_ordenes():
@@ -522,6 +581,9 @@ def pantalla_ordenes():
                             f"💰 Coste estimado: {coste_estimado or 0} €"
                         )
 
+                    if (origen or "").strip().upper() == "PREVENTIVO":
+                        mostrar_checklist_preventivo(numero_ot, operario)
+
                     if solicitante:
                         st.caption(f"Solicitante: {solicitante}")
 
@@ -562,9 +624,18 @@ def pantalla_ordenes():
 
                     with c3:
                         if st.button(f"Finalizar {numero_ot}", key=f"fin_admin_{id_orden}"):
-                            finalizar_orden(id_orden)
-                            st.success(f"{numero_ot} finalizada")
-                            st.rerun()
+
+                            if (origen or "").strip().upper() == "PREVENTIVO":
+                                if not checklist_preventivo_completo(numero_ot):
+                                    st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                                else:
+                                    finalizar_orden(id_orden)
+                                    st.success(f"{numero_ot} finalizada")
+                                    st.rerun()
+                            else:
+                                finalizar_orden(id_orden)
+                                st.success(f"{numero_ot} finalizada")
+                                st.rerun()
 
                     with c4:
                         if es_admin() or es_gerencia():
