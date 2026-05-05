@@ -91,12 +91,6 @@ def obtener_tipos_solicitante_lista():
 
 
 def filtrar_por_operario_obligatorio(filas):
-    """
-    Admin y gerencia ven todo.
-    Operario solo ve sus órdenes.
-    Si no se reconoce el rol, NO se filtra para no ocultar órdenes en administración.
-    Las tareas externas no tienen operario, por tanto solo las ven admin/gerencia.
-    """
     if not filas:
         return []
 
@@ -195,9 +189,6 @@ def pantalla_ordenes():
                 area = st.selectbox("Área", AREAS, key="orden_area")
                 prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
 
-                # -------------------------------
-                # NUEVO: TIPO DE ORDEN
-                # -------------------------------
                 tipo_orden = st.radio(
                     "Tipo de orden",
                     ["Interna", "Externa"],
@@ -229,8 +220,8 @@ def pantalla_ordenes():
                         key="orden_coste_estimado"
                     )
 
-                    operario = ""
-                    st.caption("Las tareas externas no se asignan a un operario interno.")
+                    operario = "Proveedor externo"
+                    st.caption("Las tareas externas se guardan como Proveedor externo.")
                 else:
                     operario_auto = operario_forzado_si_toca(centro)
 
@@ -283,7 +274,7 @@ def pantalla_ordenes():
                             numero = obtener_siguiente_numero_ot(centro, "EXT")
                             estado_inicial = "Pendiente proveedor"
                             origen_guardar = "EXTERNA"
-                            operario_guardar = ""
+                            operario_guardar = "Proveedor externo"
                         else:
                             numero = obtener_siguiente_numero_ot(centro, "INC")
                             estado_inicial = "Abierta"
@@ -347,7 +338,7 @@ def pantalla_ordenes():
                         "Pendiente proveedor",
                         "Avisado",
                         "En ejecución",
-                        "Incidencias"
+                        "Incidencias",
                     ],
                     key="filtro_estado_admin_ot"
                 )
@@ -393,13 +384,13 @@ def pantalla_ordenes():
             ])
             total_incidencias = len([
                 o for o in ordenes
-                if (o[11] or "").strip().upper() == "LEGIONELLA"
+                if (o[11] or "").strip().upper() in ["LEGIONELLA", "EXTERNA"]
             ])
 
             if filtro_estado == "Incidencias":
                 ordenes = [
                     o for o in ordenes
-                    if (o[11] or "").strip().upper() == "LEGIONELLA"
+                    if (o[11] or "").strip().upper() in ["LEGIONELLA", "EXTERNA"]
                 ]
             elif filtro_estado != "Todas":
                 ordenes = [o for o in ordenes if o[3] == filtro_estado]
@@ -552,7 +543,7 @@ def pantalla_ordenes():
                                 "Pendiente proveedor",
                                 "Avisado",
                                 "En ejecución",
-                                "Finalizada"
+                                "Finalizada",
                             ]
                         else:
                             estados = ["Abierta", "En curso", "Pendiente material", "Finalizada"]
