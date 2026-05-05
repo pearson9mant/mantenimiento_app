@@ -45,6 +45,9 @@ def limpiar_formulario_crear_material():
         if clave in st.session_state:
             del st.session_state[clave]
 
+    st.session_state["inventario_material_creado_ok"] = True
+    st.session_state["inventario_abrir_crear_material"] = True
+
 
 def pantalla_inventario():
     st.subheader("📦 Inventario mantenimiento")
@@ -55,7 +58,12 @@ def pantalla_inventario():
     # CREAR MATERIAL NUEVO
     # -------------------------
     if operario == "Abel Vasquez":
-        with st.expander("➕ Crear material nuevo"):
+        abrir_crear_material = st.session_state.pop("inventario_abrir_crear_material", False)
+
+        with st.expander("➕ Crear material nuevo", expanded=abrir_crear_material):
+
+            if st.session_state.pop("inventario_material_creado_ok", False):
+                st.success("Material creado correctamente. Formulario limpio para crear otro.")
 
             material = st.text_input("Nombre material", key="crear_material_nombre")
 
