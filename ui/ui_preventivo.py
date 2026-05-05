@@ -6,6 +6,20 @@ from database.db import conectar, _sql
 from modules.preventivo import generar_ots_preventivo_si_toca
 
 
+TAREAS_PREVENTIVAS = [
+    "Revisar cuadro eléctrico",
+    "Revisar enchufes",
+    "Revisar iluminación",
+    "Revisar luces de emergencia",
+    "Revisar baños",
+    "Revisar grifos",
+    "Revisar cisternas",
+    "Revisar desagües",
+    "Revisar split aire acondicionado",
+    "Otra",
+]
+
+
 def calcular_proxima_fecha(fecha_base, frecuencia):
     if not fecha_base:
         fecha_base = date.today()
@@ -14,16 +28,12 @@ def calcular_proxima_fecha(fecha_base, frecuencia):
 
     if "semanal" in frecuencia:
         return fecha_base + timedelta(days=7)
-
     if "mensual" in frecuencia:
         return fecha_base + timedelta(days=30)
-
     if "trimestral" in frecuencia:
         return fecha_base + timedelta(days=90)
-
     if "semestral" in frecuencia:
         return fecha_base + timedelta(days=180)
-
     if "anual" in frecuencia:
         return fecha_base + timedelta(days=365)
 
@@ -57,10 +67,19 @@ def pantalla_preventivo():
         else:
             espacio = espacio_sel
 
-        with st.form("form_preventivo"):
+        with st.form("form_preventivo", clear_on_submit=True):
             area = st.selectbox("Área", AREAS, key="prev_area")
 
-            tarea = st.text_input("Tarea preventiva", key="prev_tarea")
+            tarea_sel = st.selectbox(
+                "Tarea preventiva",
+                TAREAS_PREVENTIVAS,
+                key="prev_tarea_select"
+            )
+
+            if tarea_sel == "Otra":
+                tarea = st.text_input("Especificar tarea preventiva", key="prev_tarea_otra")
+            else:
+                tarea = tarea_sel
 
             frecuencia = st.selectbox(
                 "Frecuencia",
@@ -102,7 +121,7 @@ def pantalla_preventivo():
             crear = st.form_submit_button("✅ Crear tarea preventiva", use_container_width=True)
 
             if crear:
-                if not tarea.strip():
+                if not str(tarea).strip():
                     st.warning("La tarea es obligatoria")
                 elif not str(espacio).strip():
                     st.warning("Indica un espacio")
