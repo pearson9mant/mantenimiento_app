@@ -73,7 +73,16 @@ def inicializar_db():
             origen TEXT,
             solicitante TEXT,
             tipo_solicitante TEXT DEFAULT 'Operarios',
-            fecha_origen TEXT
+            fecha_origen TEXT,
+            tipo_orden TEXT DEFAULT 'Interna',
+            empresa_externa TEXT,
+            contacto_empresa TEXT,
+            telefono_empresa TEXT,
+            email_empresa TEXT,
+            fecha_programada TEXT,
+            fecha_realizacion TEXT,
+            coste_estimado {real_sql} DEFAULT 0,
+            coste_final {real_sql} DEFAULT 0
         )
     """)
 
@@ -95,7 +104,16 @@ def inicializar_db():
             origen TEXT,
             solicitante TEXT,
             tipo_solicitante TEXT DEFAULT 'Operarios',
-            fecha_origen TEXT
+            fecha_origen TEXT,
+            tipo_orden TEXT DEFAULT 'Interna',
+            empresa_externa TEXT,
+            contacto_empresa TEXT,
+            telefono_empresa TEXT,
+            email_empresa TEXT,
+            fecha_programada TEXT,
+            fecha_realizacion TEXT,
+            coste_estimado {real_sql} DEFAULT 0,
+            coste_final {real_sql} DEFAULT 0
         )
     """)
 
@@ -166,6 +184,43 @@ def inicializar_db():
     _add_column(cursor, "historico_ordenes", "solicitante", "TEXT")
     _add_column(cursor, "historico_ordenes", "tipo_solicitante", "TEXT DEFAULT 'Operarios'")
     _add_column(cursor, "historico_ordenes", "fecha_origen", "TEXT")
+
+    # -------------------------------
+    # TAREAS EXTERNAS / PROVEEDORES
+    # -------------------------------
+    columnas_externas = [
+        ("tipo_orden", "TEXT DEFAULT 'Interna'"),
+        ("empresa_externa", "TEXT"),
+        ("contacto_empresa", "TEXT"),
+        ("telefono_empresa", "TEXT"),
+        ("email_empresa", "TEXT"),
+        ("fecha_programada", "TEXT"),
+        ("fecha_realizacion", "TEXT"),
+        ("coste_estimado", f"{real_sql} DEFAULT 0"),
+        ("coste_final", f"{real_sql} DEFAULT 0"),
+    ]
+
+    for columna, tipo in columnas_externas:
+        _add_column(cursor, "ordenes_trabajo", columna, tipo)
+        _add_column(cursor, "historico_ordenes", columna, tipo)
+
+    try:
+        cursor.execute("""
+            UPDATE ordenes_trabajo
+            SET tipo_orden = 'Interna'
+            WHERE tipo_orden IS NULL OR tipo_orden = ''
+        """)
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("""
+            UPDATE historico_ordenes
+            SET tipo_orden = 'Interna'
+            WHERE tipo_orden IS NULL OR tipo_orden = ''
+        """)
+    except Exception:
+        pass
 
     # -------------------------------
     # FOTO INCIDENCIAS
