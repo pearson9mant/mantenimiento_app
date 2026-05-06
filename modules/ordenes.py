@@ -1,3 +1,4 @@
+from datetime import date
 from database.db import conectar, _sql
 
 ESTADOS_VALIDOS = [
@@ -11,23 +12,48 @@ ESTADOS_VALIDOS = [
 ]
 
 
+def obtener_curso_escolar(fecha=None):
+    if fecha is None:
+        fecha = date.today()
+
+    año = fecha.year
+
+    if fecha.month >= 9:
+        return f"{año}-{año + 1}"
+
+    return f"{año - 1}-{año}"
+
+
+def obtener_codigo_curso_escolar(fecha=None):
+    curso = obtener_curso_escolar(fecha)
+    inicio, fin = curso.split("-")
+    return f"{inicio[-2:]}{fin[-2:]}"
+
+
 def obtener_codigo_centro(centro):
     centro = str(centro or "").strip().lower()
+
     if centro in ["pearson 22", "p22", "pearson22"]:
         return "P22"
+
     if centro in ["pearson 9", "p9", "pearson9"]:
         return "P9"
+
     return "GEN"
 
 
 def obtener_codigo_tipo(tipo_ot):
     tipo_ot = str(tipo_ot or "").strip().upper()
+
     if tipo_ot in ["LEG", "LEGIONELLA"]:
         return "LEG"
+
     if tipo_ot in ["PREV", "PREVENTIVO"]:
         return "PREV"
+
     if tipo_ot in ["EXT", "EXTERNA", "EXTERNO"]:
         return "EXT"
+
     return "INC"
 
 
@@ -48,6 +74,18 @@ def asegurar_tabla_contador_ot():
                 UNIQUE(centro_codigo, tipo_codigo)
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contador_ot_curso (
+                id SERIAL PRIMARY KEY,
+                centro_codigo TEXT NOT NULL,
+                tipo_codigo TEXT NOT NULL,
+                curso_escolar TEXT NOT NULL,
+                curso_codigo TEXT NOT NULL,
+                ultimo_numero INTEGER DEFAULT 0,
+                UNIQUE(centro_codigo, tipo_codigo, curso_escolar)
+            )
+        """)
     else:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS contador_ot (
@@ -56,6 +94,18 @@ def asegurar_tabla_contador_ot():
                 tipo_codigo TEXT NOT NULL,
                 ultimo_numero INTEGER DEFAULT 0,
                 UNIQUE(centro_codigo, tipo_codigo)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contador_ot_curso (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                centro_codigo TEXT NOT NULL,
+                tipo_codigo TEXT NOT NULL,
+                curso_escolar TEXT NOT NULL,
+                curso_codigo TEXT NOT NULL,
+                ultimo_numero INTEGER DEFAULT 0,
+                UNIQUE(centro_codigo, tipo_codigo, curso_escolar)
             )
         """)
 
@@ -72,30 +122,64 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
     centro_codigo = obtener_codigo_centro(centro)
     tipo_codigo = obtener_codigo_tipo(tipo_ot)
 
+    curso_escolar = obtener_curso_escolar()
+    curso_codigo = obtener_codigo_curso_escolar()
+
     cursor.execute(_sql("""
-        SELECT ultimo_numero FROM contador_ot
-        WHERE centro_codigo = ? AND tipo_codigo = ?
-    """), (centro_codigo, tipo_codigo))
+        SELECT ultimo_numero
+        FROM contador_ot_curso
+        WHERE centro_codigo = ?
+          AND tipo_codigo = ?
+          AND curso_escolar = ?
+    """), (
+        centro_codigo,
+        tipo_codigo,
+        curso_escolar
+    ))
 
     fila = cursor.fetchone()
 
     if fila:
         siguiente = int(fila[0]) + 1
+
         cursor.execute(_sql("""
-            UPDATE contador_ot SET ultimo_numero = ?
-            WHERE centro_codigo = ? AND tipo_codigo = ?
-        """), (siguiente, centro_codigo, tipo_codigo))
+            UPDATE contador_ot_curso
+            SET ultimo_numero = ?
+            WHERE centro_codigo = ?
+              AND tipo_codigo = ?
+              AND curso_escolar = ?
+        """), (
+            siguiente,
+            centro_codigo,
+            tipo_codigo,
+            curso_escolar
+        ))
+
     else:
         siguiente = 1
+
         cursor.execute(_sql("""
-            INSERT INTO contador_ot (centro_codigo, tipo_codigo, ultimo_numero)
-            VALUES (?, ?, ?)
-        """), (centro_codigo, tipo_codigo, siguiente))
+            INSERT INTO contador_ot_curso
+            (
+                centro_codigo,
+                tipo_codigo,
+                curso_escolar,
+                curso_codigo,
+                ultimo_numero
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """), (
+            centro_codigo,
+            tipo_codigo,
+            curso_escolar,
+            curso_codigo,
+            siguiente
+        ))
 
     conn.commit()
     conn.close()
 
-    return f"{centro_codigo}-{tipo_codigo}-{siguiente:05d}"
+    return f"{tipo_codigo}-{centro_codigo}-{curso_codigo}-{siguiente:04d}"
 
 
 def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
