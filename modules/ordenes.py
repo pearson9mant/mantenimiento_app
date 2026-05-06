@@ -35,15 +35,29 @@ def asegurar_tabla_contador_ot():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute(_sql("""
-        CREATE TABLE IF NOT EXISTS contador_ot (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            centro_codigo TEXT NOT NULL,
-            tipo_codigo TEXT NOT NULL,
-            ultimo_numero INTEGER DEFAULT 0,
-            UNIQUE(centro_codigo, tipo_codigo)
-        )
-    """))
+    modulo = conn.__class__.__module__.lower()
+    es_postgres = "psycopg2" in modulo or "postgres" in modulo
+
+    if es_postgres:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contador_ot (
+                id SERIAL PRIMARY KEY,
+                centro_codigo TEXT NOT NULL,
+                tipo_codigo TEXT NOT NULL,
+                ultimo_numero INTEGER DEFAULT 0,
+                UNIQUE(centro_codigo, tipo_codigo)
+            )
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contador_ot (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                centro_codigo TEXT NOT NULL,
+                tipo_codigo TEXT NOT NULL,
+                ultimo_numero INTEGER DEFAULT 0,
+                UNIQUE(centro_codigo, tipo_codigo)
+            )
+        """)
 
     conn.commit()
     conn.close()
