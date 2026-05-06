@@ -75,6 +75,17 @@ def leer_df(sql, params=()):
     return df
 def asegurar_columnas_planificacion_legionella():
     columnas = [
+        ("punto_id", "INTEGER"),
+        ("tarea", "TEXT"),
+        ("tipo_control", "TEXT"),
+        ("frecuencia", "TEXT"),
+        ("valor_minimo", "REAL"),
+        ("valor_maximo", "REAL"),
+        ("unidad", "TEXT"),
+        ("ultima_fecha", "TEXT"),
+        ("proxima_fecha", "TEXT"),
+        ("activo", "INTEGER DEFAULT 1"),
+        ("observaciones", "TEXT"),
         ("centro", "TEXT"),
         ("edificio", "TEXT"),
         ("instalacion", "TEXT"),
