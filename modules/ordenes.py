@@ -401,6 +401,59 @@ def actualizar_tipo_solicitante_por_numero(numero_ot, tipo_solicitante):
         WHERE numero_ot = ?
     """), (tipo_solicitante, numero_ot))
 
+def crear_correctiva_desde_ot(
+    centro,
+    edificio,
+    espacio,
+    area,
+    prioridad,
+    operario,
+    descripcion_defecto,
+    numero_ot_origen="",
+    origen="Preventivo",
+    solicitante="Operarios",
+):
+    descripcion_defecto = str(descripcion_defecto or "").strip()
+
+    if not descripcion_defecto:
+        return False, "No hay defecto indicado."
+
+    numero_ot = obtener_siguiente_numero_ot(centro, "INC")
+
+    descripcion = (
+        f"[CORRECTIVA DESDE {origen.upper()}]\n"
+        f"OT origen: {numero_ot_origen}\n\n"
+        f"{descripcion_defecto}"
+    )
+
+    crear_orden((
+        numero_ot,
+        descripcion,
+        "Abierta",
+        centro,
+        edificio,
+        espacio,
+        area or "Otros",
+        prioridad or "Media",
+        operario,
+        origen,
+        solicitante,
+        "",
+        "",
+        "Operarios",
+        "Interna",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        0
+    ))
+
+    return True, f"Correctiva creada correctamente: {numero_ot}"
+
     conn.commit()
     conn.close()
     return True
