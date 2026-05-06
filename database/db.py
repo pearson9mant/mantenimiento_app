@@ -341,6 +341,18 @@ def inicializar_db():
     _add_column(cursor, "legionella_incidencias", "observaciones_cierre", "TEXT")
 
     # -------------------------------
+    # MIGRACIONES LEGIONELLA TAREAS / PLANIFICACIÓN
+    # -------------------------------
+    _add_column(cursor, "legionella_tareas", "centro", "TEXT")
+    _add_column(cursor, "legionella_tareas", "edificio", "TEXT")
+    _add_column(cursor, "legionella_tareas", "instalacion", "TEXT")
+    _add_column(cursor, "legionella_tareas", "punto", "TEXT")
+    _add_column(cursor, "legionella_tareas", "operario", "TEXT")
+    _add_column(cursor, "legionella_tareas", "frecuencia_dias", "INTEGER DEFAULT 30")
+    _add_column(cursor, "legionella_tareas", "fecha_inicio", "TEXT")
+    _add_column(cursor, "legionella_tareas", "generar_ot", "INTEGER DEFAULT 1")
+
+    # -------------------------------
     # MIGRACIONES LEGIONELLA PUNTOS
     # -------------------------------
     _add_column(cursor, "legionella_puntos", "centro", "TEXT")
