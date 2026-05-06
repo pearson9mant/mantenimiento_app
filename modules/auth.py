@@ -7,6 +7,11 @@ USUARIOS = {
         "perfil": "admin",
         "nombre": "Juan Antonio"
     },
+    "almeda": {
+        "password": "1234",
+        "perfil": "operario",
+        "nombre": "JA Almeda"
+    },
     "luis": {
         "password": "luis2026",
         "perfil": "operario",
