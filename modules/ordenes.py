@@ -31,7 +31,27 @@ def obtener_codigo_tipo(tipo_ot):
     return "INC"
 
 
+def asegurar_tabla_contador_ot():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        CREATE TABLE IF NOT EXISTS contador_ot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            centro_codigo TEXT NOT NULL,
+            tipo_codigo TEXT NOT NULL,
+            ultimo_numero INTEGER DEFAULT 0,
+            UNIQUE(centro_codigo, tipo_codigo)
+        )
+    """))
+
+    conn.commit()
+    conn.close()
+
+
 def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
+    asegurar_tabla_contador_ot()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -62,6 +82,22 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
     conn.close()
 
     return f"{centro_codigo}-{tipo_codigo}-{siguiente:05d}"
+
+
+def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
+    origen_txt = str(origen or "").strip().upper()
+    tipo_orden_txt = str(tipo_orden or "").strip().lower()
+
+    if origen_txt in ["LEGIONELLA", "LEG"]:
+        return "LEG"
+
+    if origen_txt in ["PREVENTIVO", "PREV"]:
+        return "PREV"
+
+    if tipo_orden_txt == "externa" or origen_txt in ["EXTERNA", "EXT", "EMPRESA"]:
+        return "EXT"
+
+    return "INC"
 
 
 def crear_orden(datos):
@@ -111,6 +147,10 @@ def crear_orden(datos):
 
         if not origen or origen == "APP":
             origen = "EXTERNA"
+
+    if not numero_ot:
+        tipo_para_numero = detectar_tipo_ot_para_numero(origen, tipo_orden)
+        numero_ot = obtener_siguiente_numero_ot(centro, tipo_para_numero)
 
     cursor.execute(_sql("""
         INSERT INTO ordenes_trabajo
@@ -401,6 +441,11 @@ def actualizar_tipo_solicitante_por_numero(numero_ot, tipo_solicitante):
         WHERE numero_ot = ?
     """), (tipo_solicitante, numero_ot))
 
+    conn.commit()
+    conn.close()
+    return True
+
+
 def crear_correctiva_desde_ot(
     centro,
     edificio,
@@ -453,7 +498,3 @@ def crear_correctiva_desde_ot(
     ))
 
     return True, f"Correctiva creada correctamente: {numero_ot}"
-
-    conn.commit()
-    conn.close()
-    return True
