@@ -27,6 +27,14 @@ def usuario_actual():
     return str(st.session_state.get("usuario", "")).strip()
 
 
+def nombre_operario_actual():
+    return str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("nombre")
+        or usuario_actual()
+    ).strip()
+
+
 def es_admin():
     return rol_actual() == "admin"
 
@@ -44,16 +52,16 @@ def normalizar_txt(valor):
 
 
 def puede_ver_legionella_operario(operario):
-    operario_txt = normalizar_txt(operario).replace(".", "").replace(" ", "")
+    operario_txt = normalizar_txt(operario)
+    operario_txt = operario_txt.replace(".", "")
+    operario_txt = operario_txt.replace(" ", "")
+    operario_txt = operario_txt.replace("-", "")
+    operario_txt = operario_txt.replace("_", "")
 
-    permitidos = [
-        "jaalmeda",
-        "jalmeda",
-        "juanantonio",
-        "juanantonioalmeda",
-    ]
-
-    return operario_txt in permitidos
+    return (
+        "almeda" in operario_txt
+        or operario_txt in ["ja", "jalmeda", "jaalmeda", "juanantonio"]
+    )
 
 
 def obtener_operario_fila(fila):
@@ -118,7 +126,7 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             actualizar_checklist_preventivo(
                 id_check,
                 nuevo_valor,
-                usuario_actual() or operario
+                nombre_operario_actual() or operario
             )
             st.rerun()
 
@@ -135,10 +143,6 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
     st.warning("Faltan puntos del checklist por marcar.")
     return False
 
-
-# =====================================================
-# KPIs OPERARIO - SEGURO, SIN TOCAR FLUJO ACTUAL
-# =====================================================
 
 def normalizar_estado_operario(estado):
     estado = str(estado or "").strip().lower()
@@ -189,7 +193,8 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
         return []
 
     if es_operario():
-        usuario = normalizar_txt(usuario_actual())
+        usuario = normalizar_txt(nombre_operario_actual())
+
         return [
             o for o in ordenes
             if normalizar_txt(obtener_operario_fila(o)) == usuario
@@ -299,7 +304,7 @@ def pantalla_operario():
     operario_sel = st.session_state.get("operario_activo", "")
 
     if es_operario():
-        operario_sel = usuario_actual()
+        operario_sel = nombre_operario_actual()
         st.session_state["operario_activo"] = operario_sel
 
     if not operario_sel:
@@ -307,11 +312,6 @@ def pantalla_operario():
         return
 
     st.info(f"Operario: {operario_sel}")
-
-    # =====================================================
-    # ACCESO EXTRA A LEGIONELLA PARA OPERARIO AUTORIZADO
-    # SIN TOCAR EL FLUJO ACTUAL DE ÓRDENES
-    # =====================================================
 
     if puede_ver_legionella_operario(operario_sel):
         zona_operario = st.radio(
@@ -380,7 +380,7 @@ def pantalla_operario():
             tipo_solicitante,
         ) = descomponer_orden_operario(fila)
 
-        if es_operario() and normalizar_txt(operario) != normalizar_txt(usuario_actual()):
+        if es_operario() and normalizar_txt(operario) != normalizar_txt(nombre_operario_actual()):
             continue
 
         estado_icono = {
