@@ -77,9 +77,229 @@ def es_ot_preventiva(origen, descripcion):
     return origen_txt == "PREVENTIVO" or desc_txt.startswith("[PREVENTIVO]")
 
 
+def es_ot_legionella(area, origen, descripcion):
+    area_txt = normalizar_txt(area)
+    origen_txt = normalizar_txt(origen)
+    desc_txt = normalizar_txt(descripcion)
+
+    return (
+        area_txt == "legionella"
+        or origen_txt == "legionella"
+        or desc_txt.startswith("control legionella")
+    )
+
+
 def limpiar_tarea_preventiva(descripcion):
     texto = str(descripcion or "").strip()
     return texto.replace("[PREVENTIVO]", "").strip()
+
+
+def extraer_datos_ot_legionella(descripcion, espacio):
+    """
+    Espera descripciones tipo:
+    Control Legionella - Purga - Acumulador ACS
+    Control Legionella - Temperatura retorno - Retorno ACS
+    """
+    texto = str(descripcion or "").strip()
+    partes = [p.strip() for p in texto.split(" - ")]
+
+    tarea = ""
+    punto = str(espacio or "").strip()
+
+    if len(partes) >= 3:
+        tarea = partes[1].strip()
+        punto = partes[2].strip()
+    elif len(partes) == 2:
+        tarea = partes[1].strip()
+
+    return tarea, punto
+
+
+def mostrar_ejecucion_legionella_operario(
+    id_orden,
+    num_ot,
+    desc,
+    centro,
+    edificio,
+    espacio,
+    operario
+):
+    st.markdown("### 💧 Ejecutar control Legionella")
+
+    try:
+        from ui.ui_legionella import registrar_control, leer_df
+    except Exception as e:
+        st.error("No se ha podido cargar el módulo de Legionella.")
+        st.exception(e)
+        return False
+
+    tarea, punto_nombre = extraer_datos_ot_legionella(desc, espacio)
+
+    if not tarea:
+        st.warning("No se ha podido identificar la tarea de Legionella desde la OT.")
+        return False
+
+    puntos_df = leer_df(
+        """
+        SELECT *
+        FROM legionella_puntos
+        WHERE centro = ?
+          AND edificio = ?
+          AND nombre_punto = ?
+          AND activo = 1
+        ORDER BY id DESC
+        """,
+        (centro, edificio, punto_nombre),
+    )
+
+    if puntos_df.empty:
+        st.warning(
+            "No se ha encontrado el punto de Legionella asociado a esta OT. "
+            "Puedes revisar el punto en el módulo Legionella."
+        )
+        return False
+
+    punto = puntos_df.iloc[0].to_dict()
+
+    st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
+    st.caption(f"🧪 Tarea: {tarea}")
+
+    valor = None
+    valor_2 = None
+    unidad = ""
+
+    if tarea == "Temperatura acumulador":
+        tipo_control = "Temperatura acumulador"
+        unidad = "ºC"
+        valor = st.number_input(
+            "Temperatura acumulador ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=60.0,
+            step=0.1,
+            key=f"leg_valor_{id_orden}"
+        )
+
+    elif tarea == "Temperatura retorno":
+        tipo_control = "Temperatura retorno"
+        unidad = "ºC"
+        valor = st.number_input(
+            "Temperatura retorno ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=50.0,
+            step=0.1,
+            key=f"leg_valor_{id_orden}"
+        )
+
+    elif tarea == "Temperatura punto terminal":
+        tipo_control = "Temperatura punto terminal"
+        unidad = "ºC"
+        valor = st.number_input(
+            "Temperatura punto terminal ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=45.0,
+            step=0.1,
+            key=f"leg_valor_{id_orden}"
+        )
+
+    elif tarea == "Cloro residual":
+        tipo_control = "Cloro residual"
+        unidad = "mg/L"
+        valor = st.number_input(
+            "Cloro residual libre mg/L",
+            min_value=0.0,
+            max_value=5.0,
+            value=0.5,
+            step=0.01,
+            key=f"leg_valor_{id_orden}"
+        )
+
+    elif tarea == "Revisión visual":
+        tipo_control = "Revisión visual"
+        unidad = "OK/KO"
+        correcto = st.radio(
+            "Resultado revisión visual",
+            ["Correcto", "Deficiente"],
+            horizontal=True,
+            key=f"leg_revision_{id_orden}"
+        )
+        valor = 1 if correcto == "Correcto" else 0
+
+    elif tarea == "Purga":
+        tipo_control = "Purga"
+        unidad = "Sí/No"
+        purga = st.radio(
+            "Purga realizada",
+            ["Sí", "No"],
+            horizontal=True,
+            key=f"leg_purga_{id_orden}"
+        )
+        valor = 1 if purga == "Sí" else 0
+
+    else:
+        tipo_control = tarea
+        unidad = ""
+        valor = st.number_input(
+            "Valor del control",
+            min_value=0.0,
+            max_value=999.0,
+            value=0.0,
+            step=0.1,
+            key=f"leg_valor_{id_orden}"
+        )
+
+    fecha_control = st.date_input(
+        "Fecha del control",
+        key=f"leg_fecha_{id_orden}"
+    )
+
+    observaciones_leg = st.text_area(
+        "Observaciones Legionella",
+        key=f"leg_obs_{id_orden}"
+    )
+
+    ya_guardado = st.session_state.get(f"legionella_guardada_{id_orden}", False)
+
+    if ya_guardado:
+        st.success("Control de Legionella guardado para esta OT.")
+        return True
+
+    if st.button(
+        f"💾 Guardar control Legionella {num_ot}",
+        key=f"guardar_legionella_ot_{id_orden}",
+        use_container_width=True
+    ):
+        estado, resultado = registrar_control(
+            fecha_control.strftime("%Y-%m-%d"),
+            punto,
+            tarea,
+            tipo_control,
+            valor,
+            valor_2,
+            unidad,
+            operario,
+            observaciones_leg,
+        )
+
+        if estado == "ERROR":
+            st.error(resultado)
+            return False
+
+        st.session_state[f"legionella_guardada_{id_orden}"] = True
+
+        if estado == "OK":
+            st.success(f"Control guardado correctamente: {resultado}")
+        elif estado == "RIESGO":
+            st.error(f"Control guardado con RIESGO: {resultado}")
+        else:
+            st.warning(f"Control guardado con incidencia: {resultado}")
+
+        st.rerun()
+
+    st.info("Guarda el control de Legionella antes de finalizar esta OT.")
+    return False
 
 
 def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
@@ -293,6 +513,12 @@ def puede_finalizar_preventivo(num_ot, origen, desc):
     return True
 
 
+def puede_finalizar_legionella(id_orden, area, origen, desc):
+    if es_ot_legionella(area, origen, desc):
+        return st.session_state.get(f"legionella_guardada_{id_orden}", False)
+    return True
+
+
 def pantalla_operario():
     st.subheader("👷 Vista operario")
 
@@ -416,6 +642,17 @@ def pantalla_operario():
             if es_ot_preventiva(origen, desc):
                 mostrar_checklist_preventivo_operario(num_ot, desc, operario)
 
+            if es_ot_legionella(area, origen, desc):
+                mostrar_ejecucion_legionella_operario(
+                    id_orden,
+                    num_ot,
+                    desc,
+                    centro,
+                    edificio,
+                    espacio,
+                    operario
+                )
+
             b1, b2, b3 = st.columns(3)
 
             with b1:
@@ -442,9 +679,12 @@ def pantalla_operario():
                     if st.button("✔\nSí, finalizar", key=f"si_fin_rapido_{id_orden}", use_container_width=True):
                         if not puede_finalizar_preventivo(num_ot, origen, desc):
                             st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                        elif not puede_finalizar_legionella(id_orden, area, origen, desc):
+                            st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
                         else:
                             finalizar_orden(id_orden, "")
                             st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
+                            st.session_state.pop(f"legionella_guardada_{id_orden}", None)
                             st.success(f"{num_ot} finalizada correctamente.")
                             st.rerun()
 
@@ -530,6 +770,9 @@ def pantalla_operario():
                             if not puede_finalizar_preventivo(num_ot, origen, desc):
                                 st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
 
+                            elif not puede_finalizar_legionella(id_orden, area, origen, desc):
+                                st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
+
                             elif usar_material and materiales_select:
 
                                 materiales_confirmados = st.session_state.get(
@@ -567,6 +810,7 @@ def pantalla_operario():
                                         finalizar_orden(id_orden, observaciones_fin)
                                         st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
                                         st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
+                                        st.session_state.pop(f"legionella_guardada_{id_orden}", None)
                                         st.success(f"{num_ot} finalizada y materiales descontados correctamente.")
                                         st.rerun()
 
@@ -574,6 +818,7 @@ def pantalla_operario():
                                 finalizar_orden(id_orden, observaciones_fin)
                                 st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
                                 st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
+                                st.session_state.pop(f"legionella_guardada_{id_orden}", None)
                                 st.success(f"{num_ot} finalizada correctamente.")
                                 st.rerun()
 
