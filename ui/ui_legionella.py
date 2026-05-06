@@ -73,6 +73,23 @@ def leer_df(sql, params=()):
     finally:
         conn.close()
     return df
+def asegurar_columnas_planificacion_legionella():
+    columnas = [
+        ("centro", "TEXT"),
+        ("edificio", "TEXT"),
+        ("instalacion", "TEXT"),
+        ("punto", "TEXT"),
+        ("operario", "TEXT"),
+        ("frecuencia_dias", "INTEGER DEFAULT 30"),
+        ("fecha_inicio", "TEXT"),
+        ("generar_ot", "INTEGER DEFAULT 1"),
+    ]
+
+    for columna, tipo in columnas:
+        try:
+            ejecutar(f"ALTER TABLE legionella_tareas ADD COLUMN {columna} {tipo}")
+        except Exception:
+            pass
 
 
 def limpiar_registros_invalidos_legionella():
@@ -847,6 +864,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
 
 def pantalla_legionella():
+    asegurar_columnas_planificacion_legionella()
+
     puntos_creados = sembrar_puntos_si_vacio()
 
     if puntos_creados:
