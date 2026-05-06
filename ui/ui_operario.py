@@ -711,17 +711,17 @@ def pantalla_operario():
                     espacio,
                     operario
                 )
-             if es_ot_preventiva(origen, desc):
-                 mostrar_crear_correctiva_desde_revision(
-                     id_orden=id_orden,
-                     num_ot=num_ot,
-                     centro=centro,
-                     edificio=edificio,
-                     espacio=espacio,
-                     area=area,
-                     prioridad="Media",
-                     operario=operario,
-                     origen_base="Preventivo"
+            if es_ot_preventiva(origen, desc):
+                mostrar_crear_correctiva_desde_revision(
+                    id_orden=id_orden,
+                    num_ot=num_ot,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    area=area,
+                    prioridad="Media",
+                    operario=operario,
+                    origen_base="Preventivo"
                )
 
             if es_ot_legionella(area, origen, desc):
