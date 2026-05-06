@@ -11,10 +11,12 @@ from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 
 ASIGNACION_OPERARIO_POR_CENTRO = getattr(
     config,
+    ASIGNACION_OPERARIO_POR_CENTRO = getattr(
+    config,
     "ASIGNACION_OPERARIO_POR_CENTRO",
     {
-        "Pearson 9": "Luis",
-        "Pearson 22": "Juan Antonio"
+        "Pearson 9": "Luis Lozano",
+        "Pearson 22": "J.A. Almeda"
     }
 )
 
