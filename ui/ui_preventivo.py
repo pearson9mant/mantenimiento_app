@@ -48,6 +48,35 @@ def operario_por_centro(centro):
     return OPERARIOS[0] if OPERARIOS else ""
 
 
+def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuencia):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT COUNT(*)
+        FROM preventivo_tareas
+        WHERE centro = ?
+          AND edificio = ?
+          AND espacio = ?
+          AND area = ?
+          AND tarea = ?
+          AND frecuencia = ?
+          AND activo = 1
+    """), (
+        centro,
+        edificio,
+        espacio,
+        area,
+        tarea,
+        frecuencia
+    ))
+
+    total = cursor.fetchone()[0]
+
+    conn.close()
+    return total > 0
+
+
 def pantalla_preventivo():
     st.subheader("🔧 Mantenimiento preventivo")
 
@@ -118,6 +147,11 @@ def pantalla_preventivo():
 
             observaciones = st.text_area("Observaciones", key="prev_observaciones")
 
+            crear_de_todas_formas = st.checkbox(
+                "Crear de todas formas si ya existe una preventiva igual",
+                key="prev_crear_de_todas_formas"
+            )
+
             crear = st.form_submit_button("✅ Crear tarea preventiva", use_container_width=True)
 
             if crear:
@@ -128,37 +162,52 @@ def pantalla_preventivo():
                 elif not str(operario).strip():
                     st.warning("Indica un operario")
                 else:
-                    conn = conectar()
-                    cursor = conn.cursor()
-
-                    cursor.execute(_sql("""
-                        INSERT INTO preventivo_tareas
-                        (
-                            centro, edificio, espacio, area,
-                            tarea, frecuencia,
-                            ultima_fecha, proxima_fecha,
-                            operario, activo, observaciones
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """), (
+                    duplicado = existe_preventivo_duplicado(
                         centro,
                         edificio,
                         espacio,
                         area,
                         tarea,
-                        frecuencia,
-                        str(ultima_fecha),
-                        str(proxima_fecha),
-                        operario,
-                        1,
-                        observaciones
-                    ))
+                        frecuencia
+                    )
 
-                    conn.commit()
-                    conn.close()
+                    if duplicado and not crear_de_todas_formas:
+                        st.warning(
+                            "⚠️ Ya existe una tarea preventiva igual activa en este mismo espacio. "
+                            "Si realmente quieres duplicarla, marca la casilla de confirmación."
+                        )
+                    else:
+                        conn = conectar()
+                        cursor = conn.cursor()
 
-                    st.success("Tarea preventiva creada correctamente")
-                    st.rerun()
+                        cursor.execute(_sql("""
+                            INSERT INTO preventivo_tareas
+                            (
+                                centro, edificio, espacio, area,
+                                tarea, frecuencia,
+                                ultima_fecha, proxima_fecha,
+                                operario, activo, observaciones
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """), (
+                            centro,
+                            edificio,
+                            espacio,
+                            area,
+                            tarea,
+                            frecuencia,
+                            str(ultima_fecha),
+                            str(proxima_fecha),
+                            operario,
+                            1,
+                            observaciones
+                        ))
+
+                        conn.commit()
+                        conn.close()
+
+                        st.success("Tarea preventiva creada correctamente")
+                        st.rerun()
 
     with tab2:
         conn = conectar()
