@@ -80,7 +80,7 @@ def limpiar_registros_invalidos_legionella():
     cur = conn.cursor()
 
     try:
-        cur.execute("""
+        cur.execute(adaptar_sql("""
             DELETE FROM legionella_registros
             WHERE centro IS NULL
                OR edificio IS NULL
@@ -90,11 +90,11 @@ def limpiar_registros_invalidos_legionella():
                OR TRIM(COALESCE(edificio, '')) = ''
                OR TRIM(COALESCE(punto, '')) = ''
                OR TRIM(COALESCE(tarea, '')) = ''
-        """)
+        """))
 
         registros_borrados = cur.rowcount
 
-        cur.execute("""
+        cur.execute(adaptar_sql("""
             DELETE FROM legionella_incidencias
             WHERE centro IS NULL
                OR edificio IS NULL
@@ -104,7 +104,7 @@ def limpiar_registros_invalidos_legionella():
                OR TRIM(COALESCE(edificio, '')) = ''
                OR TRIM(COALESCE(punto, '')) = ''
                OR TRIM(COALESCE(tarea, '')) = ''
-        """)
+        """))
 
         incidencias_borradas = cur.rowcount
 
@@ -120,19 +120,9 @@ def limpiar_registros_invalidos_legionella():
 
 
 def sembrar_puntos_si_vacio():
-    df = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_puntos
-        WHERE centro IS NOT NULL
-          AND edificio IS NOT NULL
-          AND nombre_punto IS NOT NULL
-    """)
-
-    if int(df.loc[0, "total"]) > 0:
-        return
-
     conn = conectar()
     cur = conn.cursor()
+    creados = 0
 
     try:
         for centro, edificios in CENTROS.items():
@@ -140,17 +130,44 @@ def sembrar_puntos_si_vacio():
                 for instalacion, nombre, tipo, ubicacion in puntos:
                     cur.execute(
                         adaptar_sql("""
-                        INSERT INTO legionella_puntos
-                        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
-                        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                        SELECT COUNT(*)
+                        FROM legionella_puntos
+                        WHERE centro = ?
+                          AND edificio = ?
+                          AND instalacion = ?
+                          AND nombre_punto = ?
                         """),
-                        (centro, edificio, instalacion, tipo, nombre, ubicacion, "Alta inicial automática"),
+                        (centro, edificio, instalacion, nombre),
                     )
 
+                    existe = cur.fetchone()[0]
+
+                    if existe == 0:
+                        cur.execute(
+                            adaptar_sql("""
+                            INSERT INTO legionella_puntos
+                            (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
+                            VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                            """),
+                            (
+                                centro,
+                                edificio,
+                                instalacion,
+                                tipo,
+                                nombre,
+                                ubicacion,
+                                "Alta inicial automática",
+                            ),
+                        )
+                        creados += 1
+
         conn.commit()
+        return creados
+
     except Exception:
         conn.rollback()
         raise
+
     finally:
         conn.close()
 
@@ -248,7 +265,7 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
     return total > 0
 
 
-def crear_ot_legionella(centro, edificio, punto, tarea):
+def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
     if not centro or not edificio or not punto or not tarea:
         return False
 
@@ -258,13 +275,13 @@ def crear_ot_legionella(centro, edificio, punto, tarea):
         return False
 
     numero_ot = obtener_siguiente_numero_ot()
-    operario = operario_por_centro(centro)
+    operario_final = operario or operario_por_centro(centro)
 
     ejecutar(
         """
         INSERT INTO ordenes_trabajo
-        (numero_ot, descripcion, estado, centro, edificio, espacio, area, prioridad, operario, origen)
-        VALUES (?, ?, 'Abierta', ?, ?, ?, 'Legionella', 'Alta', ?, 'Legionella')
+        (numero_ot, descripcion, estado, centro, edificio, espacio, area, prioridad, operario, origen, tipo_solicitante)
+        VALUES (?, ?, 'Abierta', ?, ?, ?, 'Legionella', 'Alta', ?, 'Legionella', 'Operarios')
         """,
         (
             numero_ot,
@@ -272,84 +289,11 @@ def crear_ot_legionella(centro, edificio, punto, tarea):
             centro,
             edificio,
             punto,
-            operario,
+            operario_final,
         ),
     )
 
     return True
-
-
-def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones):
-    centro = punto.get("centro")
-    edificio = punto.get("edificio")
-    instalacion = punto.get("instalacion") or ""
-    punto_id = punto.get("id")
-    punto_nombre = punto.get("nombre_punto")
-
-    if not centro or not edificio or not punto_nombre:
-        return "ERROR", "Punto incompleto. No se ha guardado el registro."
-
-    if not tarea or not tipo_control:
-        return "ERROR", "Tarea o tipo de control vacío. No se ha guardado el registro."
-
-    if valor is None:
-        return "ERROR", "Valor no válido. No se ha guardado el registro."
-
-    estado, resultado = evaluar_resultado(tipo_control, valor, valor_2)
-
-    ejecutar(
-        """
-        INSERT INTO legionella_registros
-        (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
-         valor, valor_2, unidad, estado, resultado, operario, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            fecha_registro,
-            centro,
-            edificio,
-            instalacion,
-            punto_id,
-            None,
-            punto_nombre,
-            tarea,
-            tipo_control,
-            valor,
-            valor_2,
-            unidad,
-            estado,
-            resultado,
-            operario,
-            observaciones,
-        ),
-    )
-
-    if estado in ["RIESGO", "INCIDENCIA"]:
-        if centro and edificio and punto_nombre and tarea:
-            ejecutar(
-                """
-                INSERT INTO legionella_incidencias
-                (centro, edificio, punto, tarea, descripcion, estado, prioridad, operario)
-                VALUES (?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
-                """,
-                (
-                    centro,
-                    edificio,
-                    punto_nombre,
-                    tarea,
-                    resultado + (" | " + observaciones if observaciones else ""),
-                    operario,
-                ),
-            )
-
-            crear_ot_legionella(
-                centro,
-                edificio,
-                punto_nombre,
-                tarea,
-            )
-
-    return estado, resultado
 
 
 def dias_frecuencia(tarea):
@@ -360,6 +304,144 @@ def dias_frecuencia(tarea):
         return 30
 
     return 30
+
+
+def tareas_por_tipo_punto(tipo_punto):
+    tareas = ["Revisión visual", "Purga"]
+
+    if tipo_punto in ["acumulador", "acumulador_solar"]:
+        tareas.insert(0, "Temperatura acumulador")
+
+    if tipo_punto == "retorno":
+        tareas.insert(0, "Temperatura retorno")
+
+    if tipo_punto in ["grifo", "ducha"]:
+        tareas.insert(0, "Cloro residual")
+        tareas.insert(1, "Temperatura punto terminal")
+
+    return tareas
+
+
+def unidad_por_tarea(tarea):
+    if tarea in ["Temperatura acumulador", "Temperatura retorno", "Temperatura punto terminal"]:
+        return "ºC"
+
+    if tarea == "Cloro residual":
+        return "mg/L"
+
+    if tarea == "Revisión visual":
+        return "OK/KO"
+
+    if tarea == "Purga":
+        return "Sí/No"
+
+    return ""
+
+
+def existe_plan_legionella(punto_id, tarea):
+    df = leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_tareas
+        WHERE punto_id = ?
+          AND tarea = ?
+          AND activo = 1
+    """, (punto_id, tarea))
+
+    return int(df.loc[0, "total"]) > 0
+
+
+def sembrar_planificacion_legionella(fecha_inicio):
+    puntos_df = leer_df("""
+        SELECT *
+        FROM legionella_puntos
+        WHERE activo = 1
+          AND centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND nombre_punto IS NOT NULL
+        ORDER BY centro, edificio, instalacion, nombre_punto
+    """)
+
+    if puntos_df.empty:
+        return 0
+
+    creadas = 0
+
+    for _, punto in puntos_df.iterrows():
+        punto_id = int(punto["id"])
+        centro = punto["centro"]
+        edificio = punto["edificio"]
+        instalacion = punto["instalacion"]
+        nombre_punto = punto["nombre_punto"]
+        tipo_punto = punto["tipo_punto"]
+        operario = operario_por_centro(centro)
+
+        for tarea in tareas_por_tipo_punto(tipo_punto):
+            if existe_plan_legionella(punto_id, tarea):
+                continue
+
+            frecuencia = dias_frecuencia(tarea)
+            unidad = unidad_por_tarea(tarea)
+
+            ejecutar("""
+                INSERT INTO legionella_tareas
+                (punto_id, centro, edificio, instalacion, punto, tarea, tipo_control,
+                 frecuencia, frecuencia_dias, unidad, fecha_inicio, ultima_fecha,
+                 proxima_fecha, operario, activo, generar_ot, observaciones)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, 1, ?)
+            """, (
+                punto_id,
+                centro,
+                edificio,
+                instalacion,
+                nombre_punto,
+                tarea,
+                tarea,
+                f"{frecuencia} días",
+                frecuencia,
+                unidad,
+                fecha_inicio,
+                fecha_inicio,
+                operario,
+                "Planificación inicial automática"
+            ))
+
+            creadas += 1
+
+    return creadas
+
+
+def obtener_planificacion_legionella():
+    return leer_df("""
+        SELECT id, centro, edificio, instalacion, punto, tarea, tipo_control,
+               frecuencia_dias, proxima_fecha, operario, activo, generar_ot
+        FROM legionella_tareas
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
+        ORDER BY centro, edificio, punto, tarea
+    """)
+
+
+def actualizar_plan_legionella(tarea_id, frecuencia_dias, proxima_fecha, operario, generar_ot, activo):
+    ejecutar("""
+        UPDATE legionella_tareas
+        SET frecuencia_dias = ?,
+            frecuencia = ?,
+            proxima_fecha = ?,
+            operario = ?,
+            generar_ot = ?,
+            activo = ?
+        WHERE id = ?
+    """, (
+        int(frecuencia_dias),
+        f"{int(frecuencia_dias)} días",
+        proxima_fecha,
+        operario,
+        1 if generar_ot else 0,
+        1 if activo else 0,
+        int(tarea_id)
+    ))
 
 
 def calcular_estado_control(proxima_fecha):
@@ -374,7 +456,77 @@ def calcular_estado_control(proxima_fecha):
     return "🟢 OK"
 
 
+def generar_ots_legionella_planificadas():
+    df = leer_df("""
+        SELECT id, centro, edificio, punto, tarea, frecuencia_dias, proxima_fecha, operario
+        FROM legionella_tareas
+        WHERE activo = 1
+          AND generar_ot = 1
+          AND proxima_fecha IS NOT NULL
+          AND date(proxima_fecha) <= date('now')
+    """)
+
+    if df.empty:
+        return 0, "No hay controles planificados que toquen hoy."
+
+    creadas = 0
+    ya_existia = 0
+
+    for _, fila in df.iterrows():
+        creada = crear_ot_legionella(
+            fila["centro"],
+            fila["edificio"],
+            fila["punto"],
+            fila["tarea"],
+            fila["operario"],
+        )
+
+        if creada:
+            creadas += 1
+
+            proxima = pd.to_datetime(fila["proxima_fecha"]) + pd.Timedelta(
+                days=int(fila["frecuencia_dias"] or 30)
+            )
+
+            ejecutar("""
+                UPDATE legionella_tareas
+                SET proxima_fecha = ?
+                WHERE id = ?
+            """, (
+                proxima.strftime("%Y-%m-%d"),
+                int(fila["id"])
+            ))
+        else:
+            ya_existia += 1
+
+    if creadas > 0:
+        return creadas, f"Se han creado {creadas} OT de Legionella planificadas."
+
+    if ya_existia > 0:
+        return 0, "Ya existen OT abiertas para esos controles."
+
+    return 0, "No se ha creado ninguna OT."
+
+
 def generar_ots_legionella_si_toca():
+    df_plan = leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_tareas
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
+          AND activo = 1
+    """)
+
+    try:
+        total_plan = int(df_plan.loc[0, "total"])
+    except Exception:
+        total_plan = 0
+
+    if total_plan > 0:
+        return generar_ots_legionella_planificadas()
+
     df = leer_df("""
         SELECT fecha, centro, edificio, punto, tarea, resultado
         FROM legionella_registros
@@ -429,6 +581,110 @@ def generar_ots_legionella_si_toca():
         mensaje = "No toca todavía (controles en fecha o próximos)"
 
     return creadas, mensaje
+
+
+def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones):
+    centro = punto.get("centro")
+    edificio = punto.get("edificio")
+    instalacion = punto.get("instalacion") or ""
+    punto_id = punto.get("id")
+    punto_nombre = punto.get("nombre_punto")
+
+    if not centro or not edificio or not punto_nombre:
+        return "ERROR", "Punto incompleto. No se ha guardado el registro."
+
+    if not tarea or not tipo_control:
+        return "ERROR", "Tarea o tipo de control vacío. No se ha guardado el registro."
+
+    if valor is None:
+        return "ERROR", "Valor no válido. No se ha guardado el registro."
+
+    estado, resultado = evaluar_resultado(tipo_control, valor, valor_2)
+
+    ejecutar(
+        """
+        INSERT INTO legionella_registros
+        (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
+         valor, valor_2, unidad, estado, resultado, operario, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            fecha_registro,
+            centro,
+            edificio,
+            instalacion,
+            punto_id,
+            None,
+            punto_nombre,
+            tarea,
+            tipo_control,
+            valor,
+            valor_2,
+            unidad,
+            estado,
+            resultado,
+            operario,
+            observaciones,
+        ),
+    )
+
+    try:
+        df_plan = leer_df("""
+            SELECT id, frecuencia_dias
+            FROM legionella_tareas
+            WHERE centro = ?
+              AND edificio = ?
+              AND punto = ?
+              AND tarea = ?
+              AND activo = 1
+            ORDER BY id DESC
+            LIMIT 1
+        """, (centro, edificio, punto_nombre, tarea))
+
+        if not df_plan.empty:
+            frecuencia = int(df_plan.iloc[0]["frecuencia_dias"] or dias_frecuencia(tarea))
+            proxima = pd.to_datetime(fecha_registro) + pd.Timedelta(days=frecuencia)
+
+            ejecutar("""
+                UPDATE legionella_tareas
+                SET ultima_fecha = ?,
+                    proxima_fecha = ?
+                WHERE id = ?
+            """, (
+                fecha_registro,
+                proxima.strftime("%Y-%m-%d"),
+                int(df_plan.iloc[0]["id"])
+            ))
+    except Exception:
+        pass
+
+    if estado in ["RIESGO", "INCIDENCIA"]:
+        if centro and edificio and punto_nombre and tarea:
+            ejecutar(
+                """
+                INSERT INTO legionella_incidencias
+                (centro, edificio, punto, tarea, descripcion, estado, prioridad, operario)
+                VALUES (?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+                """,
+                (
+                    centro,
+                    edificio,
+                    punto_nombre,
+                    tarea,
+                    resultado + (" | " + observaciones if observaciones else ""),
+                    operario,
+                ),
+            )
+
+            crear_ot_legionella(
+                centro,
+                edificio,
+                punto_nombre,
+                tarea,
+                operario,
+            )
+
+    return estado, resultado
 
 
 def generar_informe_legionella(fecha_inicio, fecha_fin):
@@ -591,7 +847,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
 
 def pantalla_legionella():
-    sembrar_puntos_si_vacio()
+    puntos_creados = sembrar_puntos_si_vacio()
+
+    if puntos_creados:
+        st.success(f"Se han creado {puntos_creados} puntos automáticos de Legionella que faltaban.")
 
     ots_creadas, mensaje = generar_ots_legionella_si_toca()
 
@@ -618,8 +877,15 @@ def pantalla_legionella():
 
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["📋 Registrar control", "📅 Próximos / estado", "📚 Histórico", "🚨 Incidencias", "📄 Informe"]
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        [
+            "📋 Registrar control",
+            "🗓️ Planificación",
+            "📅 Próximos / estado",
+            "📚 Histórico",
+            "🚨 Incidencias",
+            "📄 Informe",
+        ]
     )
 
     with tab1:
@@ -654,17 +920,7 @@ def pantalla_legionella():
         punto = df_filtrado.iloc[0].to_dict()
         tipo_punto = punto["tipo_punto"]
 
-        tareas = ["Revisión visual", "Purga"]
-
-        if tipo_punto in ["acumulador", "acumulador_solar"]:
-            tareas.insert(0, "Temperatura acumulador")
-
-        if tipo_punto == "retorno":
-            tareas.insert(0, "Temperatura retorno")
-
-        if tipo_punto in ["grifo", "ducha"]:
-            tareas.insert(0, "Cloro residual")
-            tareas.insert(1, "Temperatura punto terminal")
+        tareas = tareas_por_tipo_punto(tipo_punto)
 
         tarea = st.selectbox("Tarea", tareas)
 
@@ -749,39 +1005,187 @@ def pantalla_legionella():
                 st.warning(f"Control guardado con incidencia: {resultado}")
 
     with tab2:
+        st.markdown("### 🗓️ Planificación Legionella")
+
+        st.info(
+            "Desde aquí puedes preparar los controles para septiembre, cambiar frecuencias "
+            "y generar órdenes automáticamente cuando toque."
+        )
+
+        fecha_inicio_plan = st.date_input(
+            "Fecha inicial de planificación",
+            value=date(2026, 9, 1),
+            key="legionella_fecha_inicio_plan"
+        )
+
+        col_plan1, col_plan2 = st.columns(2)
+
+        with col_plan1:
+            if st.button("🧱 Crear planificación automática desde puntos", use_container_width=True):
+                creadas = sembrar_planificacion_legionella(fecha_inicio_plan.strftime("%Y-%m-%d"))
+
+                if creadas > 0:
+                    st.success(f"Se han creado {creadas} controles planificados.")
+                else:
+                    st.info("No se han creado controles nuevos. Ya existían o faltan puntos.")
+
+                st.rerun()
+
+        with col_plan2:
+            if st.button("⚙️ Generar OT que tocan hoy", use_container_width=True):
+                creadas, mensaje = generar_ots_legionella_planificadas()
+
+                if creadas > 0:
+                    st.success(mensaje)
+                else:
+                    st.info(mensaje)
+
+                st.rerun()
+
+        df_plan = obtener_planificacion_legionella()
+
+        if df_plan.empty:
+            st.warning("Todavía no hay planificación de Legionella.")
+        else:
+            df_plan["proxima_fecha_dt"] = pd.to_datetime(df_plan["proxima_fecha"], errors="coerce")
+            df_plan["estado_control"] = df_plan["proxima_fecha_dt"].apply(
+                lambda x: calcular_estado_control(x) if pd.notna(x) else "Sin fecha"
+            )
+
+            total = len(df_plan)
+            toca = len(df_plan[df_plan["estado_control"] == "🔴 TOCA"])
+            proximo = len(df_plan[df_plan["estado_control"] == "🟠 PRÓXIMO"])
+            ok = len(df_plan[df_plan["estado_control"] == "🟢 OK"])
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Planificados", total)
+            c2.metric("🔴 Toca", toca)
+            c3.metric("🟠 Próximo", proximo)
+            c4.metric("🟢 OK", ok)
+
+            centro_f = st.selectbox(
+                "Filtrar centro planificación",
+                ["Todos"] + sorted(df_plan["centro"].dropna().unique().tolist()),
+                key="filtro_plan_centro_leg"
+            )
+
+            df_filtrado = df_plan.copy()
+
+            if centro_f != "Todos":
+                df_filtrado = df_filtrado[df_filtrado["centro"] == centro_f]
+
+            st.markdown("### Controles planificados")
+
+            for _, row in df_filtrado.iterrows():
+                estado = "Activo" if int(row["activo"] or 0) == 1 else "Inactivo"
+                titulo = (
+                    f"{row['estado_control']} · {row['centro']} · {row['edificio']} · "
+                    f"{row['punto']} · {row['tarea']} · {row['proxima_fecha']} · {estado}"
+                )
+
+                with st.expander(titulo, expanded=False):
+                    c1, c2 = st.columns(2)
+
+                    with c1:
+                        frecuencia = st.number_input(
+                            "Frecuencia en días",
+                            min_value=1,
+                            max_value=365,
+                            value=int(row["frecuencia_dias"] or 30),
+                            step=1,
+                            key=f"freq_leg_{row['id']}"
+                        )
+
+                        fecha_base = date.today()
+                        if row["proxima_fecha"]:
+                            try:
+                                fecha_base = pd.to_datetime(row["proxima_fecha"]).date()
+                            except Exception:
+                                fecha_base = date.today()
+
+                        proxima_fecha = st.date_input(
+                            "Próxima fecha",
+                            value=fecha_base,
+                            key=f"prox_leg_{row['id']}"
+                        )
+
+                    with c2:
+                        operario = st.selectbox(
+                            "Operario",
+                            OPERARIOS,
+                            index=OPERARIOS.index(row["operario"]) if row["operario"] in OPERARIOS else 0,
+                            key=f"operario_plan_leg_{row['id']}"
+                        )
+
+                        if operario == "Otro":
+                            operario = st.text_input(
+                                "Nombre operario",
+                                value=str(row["operario"] or ""),
+                                key=f"operario_otro_plan_leg_{row['id']}"
+                            )
+
+                        generar_ot = st.checkbox(
+                            "Generar OT cuando toque",
+                            value=bool(row["generar_ot"]),
+                            key=f"generar_ot_leg_{row['id']}"
+                        )
+
+                        activo = st.checkbox(
+                            "Activo",
+                            value=bool(row["activo"]),
+                            key=f"activo_leg_{row['id']}"
+                        )
+
+                    if st.button("💾 Guardar cambios", key=f"guardar_plan_leg_{row['id']}", use_container_width=True):
+                        actualizar_plan_legionella(
+                            row["id"],
+                            frecuencia,
+                            proxima_fecha.strftime("%Y-%m-%d"),
+                            operario,
+                            generar_ot,
+                            activo
+                        )
+
+                        st.success("Planificación actualizada.")
+                        st.rerun()
+
+            st.markdown("### Vista rápida")
+
+            df_mostrar = df_filtrado.copy()
+            st.dataframe(
+                df_mostrar[
+                    [
+                        "estado_control",
+                        "centro",
+                        "edificio",
+                        "punto",
+                        "tarea",
+                        "frecuencia_dias",
+                        "proxima_fecha",
+                        "operario",
+                        "activo",
+                        "generar_ot",
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+
+    with tab3:
         st.markdown("### Próximos controles / estado")
 
-        df = leer_df("""
-            SELECT fecha, centro, edificio, instalacion, punto, tarea, estado, resultado, operario
-            FROM legionella_registros
-            WHERE centro IS NOT NULL
-              AND edificio IS NOT NULL
-              AND punto IS NOT NULL
-              AND tarea IS NOT NULL
-            ORDER BY fecha DESC, id DESC
-        """)
+        df_plan = obtener_planificacion_legionella()
 
-        if df.empty:
-            st.info("Todavía no hay controles registrados.")
-        else:
-            df["fecha"] = pd.to_datetime(df["fecha"])
-
-            df_ultimos = (
-                df.sort_values("fecha", ascending=False)
-                .drop_duplicates(subset=["centro", "edificio", "punto", "tarea"])
-                .copy()
+        if not df_plan.empty:
+            df_plan["proxima_fecha_dt"] = pd.to_datetime(df_plan["proxima_fecha"], errors="coerce")
+            df_plan["estado_control"] = df_plan["proxima_fecha_dt"].apply(
+                lambda x: calcular_estado_control(x) if pd.notna(x) else "Sin fecha"
             )
 
-            df_ultimos["frecuencia_dias"] = df_ultimos["tarea"].apply(dias_frecuencia)
-            df_ultimos["proxima_fecha"] = (
-                df_ultimos["fecha"] + pd.to_timedelta(df_ultimos["frecuencia_dias"], unit="D")
-            )
-            df_ultimos["estado_control"] = df_ultimos["proxima_fecha"].apply(calcular_estado_control)
-
-            total = len(df_ultimos)
-            toca = len(df_ultimos[df_ultimos["estado_control"] == "🔴 TOCA"])
-            proximo = len(df_ultimos[df_ultimos["estado_control"] == "🟠 PRÓXIMO"])
-            ok = len(df_ultimos[df_ultimos["estado_control"] == "🟢 OK"])
+            total = len(df_plan)
+            toca = len(df_plan[df_plan["estado_control"] == "🔴 TOCA"])
+            proximo = len(df_plan[df_plan["estado_control"] == "🟠 PRÓXIMO"])
+            ok = len(df_plan[df_plan["estado_control"] == "🟢 OK"])
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Controles", total)
@@ -789,22 +1193,16 @@ def pantalla_legionella():
             c3.metric("🟠 Próximo", proximo)
             c4.metric("🟢 OK", ok)
 
-            st.markdown("### Detalle")
-
-            df_ultimos["fecha"] = df_ultimos["fecha"].dt.strftime("%Y-%m-%d")
-            df_ultimos["proxima_fecha"] = df_ultimos["proxima_fecha"].dt.strftime("%Y-%m-%d")
-
             st.dataframe(
-                df_ultimos[
+                df_plan[
                     [
                         "estado_control",
                         "centro",
                         "edificio",
                         "punto",
                         "tarea",
-                        "fecha",
+                        "frecuencia_dias",
                         "proxima_fecha",
-                        "resultado",
                         "operario",
                     ]
                 ],
@@ -812,7 +1210,69 @@ def pantalla_legionella():
                 hide_index=True,
             )
 
-    with tab3:
+        else:
+            df = leer_df("""
+                SELECT fecha, centro, edificio, instalacion, punto, tarea, estado, resultado, operario
+                FROM legionella_registros
+                WHERE centro IS NOT NULL
+                  AND edificio IS NOT NULL
+                  AND punto IS NOT NULL
+                  AND tarea IS NOT NULL
+                ORDER BY fecha DESC, id DESC
+            """)
+
+            if df.empty:
+                st.info("Todavía no hay controles registrados ni planificación creada.")
+            else:
+                df["fecha"] = pd.to_datetime(df["fecha"])
+
+                df_ultimos = (
+                    df.sort_values("fecha", ascending=False)
+                    .drop_duplicates(subset=["centro", "edificio", "punto", "tarea"])
+                    .copy()
+                )
+
+                df_ultimos["frecuencia_dias"] = df_ultimos["tarea"].apply(dias_frecuencia)
+                df_ultimos["proxima_fecha"] = (
+                    df_ultimos["fecha"] + pd.to_timedelta(df_ultimos["frecuencia_dias"], unit="D")
+                )
+                df_ultimos["estado_control"] = df_ultimos["proxima_fecha"].apply(calcular_estado_control)
+
+                total = len(df_ultimos)
+                toca = len(df_ultimos[df_ultimos["estado_control"] == "🔴 TOCA"])
+                proximo = len(df_ultimos[df_ultimos["estado_control"] == "🟠 PRÓXIMO"])
+                ok = len(df_ultimos[df_ultimos["estado_control"] == "🟢 OK"])
+
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Controles", total)
+                c2.metric("🔴 Toca", toca)
+                c3.metric("🟠 Próximo", proximo)
+                c4.metric("🟢 OK", ok)
+
+                st.markdown("### Detalle")
+
+                df_ultimos["fecha"] = df_ultimos["fecha"].dt.strftime("%Y-%m-%d")
+                df_ultimos["proxima_fecha"] = df_ultimos["proxima_fecha"].dt.strftime("%Y-%m-%d")
+
+                st.dataframe(
+                    df_ultimos[
+                        [
+                            "estado_control",
+                            "centro",
+                            "edificio",
+                            "punto",
+                            "tarea",
+                            "fecha",
+                            "proxima_fecha",
+                            "resultado",
+                            "operario",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+    with tab4:
         st.markdown("### Histórico de controles")
 
         df = leer_df("""
@@ -850,7 +1310,7 @@ def pantalla_legionella():
                 mime="text/csv",
             )
 
-    with tab4:
+    with tab5:
         st.markdown("### Incidencias Legionella")
 
         df = leer_df("""
@@ -899,7 +1359,7 @@ def pantalla_legionella():
                     st.success("Incidencia cerrada.")
                     st.rerun()
 
-    with tab5:
+    with tab6:
         st.markdown("### Informe inspección Legionella")
 
         col1, col2 = st.columns(2)
