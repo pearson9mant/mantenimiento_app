@@ -3,7 +3,8 @@ import streamlit as st
 from modules.ordenes import (
     obtener_ordenes_operario,
     actualizar_estado,
-    finalizar_orden
+    finalizar_orden,
+    crear_correctiva_desde_ot
 )
 
 from modules.inventario import (
@@ -519,6 +520,64 @@ def puede_finalizar_legionella(id_orden, area, origen, desc):
     return True
 
 
+def mostrar_crear_correctiva_desde_revision(
+    id_orden,
+    num_ot,
+    centro,
+    edificio,
+    espacio,
+    area,
+    prioridad,
+    operario,
+    origen_base
+):
+    st.markdown("### 🛠️ Crear correctiva si hay defecto")
+
+    defecto = st.text_area(
+        "Defecto encontrado",
+        placeholder="Ejemplo: Luz de emergencia sin batería en pasillo 2º ESO",
+        key=f"defecto_correctiva_{id_orden}"
+    )
+
+    crear_correctiva = st.checkbox(
+        "Crear OT correctiva automática",
+        key=f"crear_correctiva_auto_{id_orden}"
+    )
+
+    if st.button(
+        "➕ Crear correctiva",
+        key=f"btn_crear_correctiva_{id_orden}",
+        use_container_width=True
+    ):
+        if not crear_correctiva:
+            st.warning("Marca la casilla para crear la OT correctiva.")
+            return False
+
+        ok, mensaje = crear_correctiva_desde_ot(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+            area=area,
+            prioridad=prioridad,
+            operario=operario,
+            descripcion_defecto=defecto,
+            numero_ot_origen=num_ot,
+            origen=origen_base,
+            solicitante="Operarios",
+        )
+
+        if ok:
+            st.success(mensaje)
+            st.session_state[f"correctiva_creada_{id_orden}"] = True
+            st.rerun()
+        else:
+            st.warning(mensaje)
+
+    if st.session_state.get(f"correctiva_creada_{id_orden}", False):
+        st.success("Correctiva creada desde esta revisión.")
+
+    return st.session_state.get(f"correctiva_creada_{id_orden}", False)
+
 def pantalla_operario():
     st.subheader("👷 Vista operario")
 
@@ -652,7 +711,31 @@ def pantalla_operario():
                     espacio,
                     operario
                 )
+             if es_ot_preventiva(origen, desc):
+                 mostrar_crear_correctiva_desde_revision(
+                     id_orden=id_orden,
+                     num_ot=num_ot,
+                     centro=centro,
+                     edificio=edificio,
+                     espacio=espacio,
+                     area=area,
+                     prioridad="Media",
+                     operario=operario,
+                     origen_base="Preventivo"
+               )
 
+            if es_ot_legionella(area, origen, desc):
+                mostrar_crear_correctiva_desde_revision(
+                    id_orden=id_orden,
+                    num_ot=num_ot,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    area="Legionella",
+                    prioridad="Alta",
+                    operario=operario,
+                    origen_base="Legionella"
+               )
             b1, b2, b3 = st.columns(3)
 
             with b1:
