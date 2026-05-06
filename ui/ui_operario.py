@@ -43,6 +43,19 @@ def normalizar_txt(valor):
     return str(valor or "").strip().lower()
 
 
+def puede_ver_legionella_operario(operario):
+    operario_txt = normalizar_txt(operario).replace(".", "").replace(" ", "")
+
+    permitidos = [
+        "jaalmeda",
+        "jalmeda",
+        "juanantonio",
+        "juanantonioalmeda",
+    ]
+
+    return operario_txt in permitidos
+
+
 def obtener_operario_fila(fila):
     try:
         return fila[10]
@@ -294,6 +307,28 @@ def pantalla_operario():
         return
 
     st.info(f"Operario: {operario_sel}")
+
+    # =====================================================
+    # ACCESO EXTRA A LEGIONELLA PARA OPERARIO AUTORIZADO
+    # SIN TOCAR EL FLUJO ACTUAL DE ÓRDENES
+    # =====================================================
+
+    if puede_ver_legionella_operario(operario_sel):
+        zona_operario = st.radio(
+            "Zona de trabajo",
+            ["📋 Mis órdenes", "💧 Control Legionella"],
+            horizontal=True,
+            key="zona_operario_legionella"
+        )
+
+        if zona_operario == "💧 Control Legionella":
+            try:
+                from ui.ui_legionella import pantalla_legionella
+                pantalla_legionella()
+            except Exception as e:
+                st.error("No se ha podido abrir el módulo de Legionella.")
+                st.exception(e)
+            return
 
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
     ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
