@@ -470,7 +470,6 @@ def volver_portada():
 
 def mostrar_portada(perfil, operario_activo):
 
-    st.markdown("<div class='portada-box'>", unsafe_allow_html=True)
 
     try:
         col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
@@ -552,7 +551,6 @@ def mostrar_portada(perfil, operario_activo):
         unsafe_allow_html=True
     )
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
     pintar_footer()
 
