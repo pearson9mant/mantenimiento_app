@@ -81,7 +81,7 @@ def preparar_ordenes():
     df = pd.concat([ordenes, historico], ignore_index=True)
 
     columnas_defecto = {
-        "fecha": "",
+        "fecha_creacion": "",
         "fecha_cierre": "",
         "estado": "Abierta",
         "centro": "Sin centro",
@@ -101,7 +101,7 @@ def preparar_ordenes():
     df["grupo_estado"] = df["estado"].apply(clasificar_estado)
     df["tipo_solicitante"] = df.apply(clasificar_solicitante, axis=1)
 
-    df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["fecha_dt"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
     df["fecha_cierre_dt"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
 
     df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m").fillna("Sin fecha")
