@@ -1104,7 +1104,39 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         file_name=f"libro_mantenimiento_legionella_{centro_filtro.replace(' ', '_')}_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
         mime="application/pdf"
     )
-
+def crear_tarea_legionella_manual(
+    centro,
+    edificio,
+    instalacion,
+    punto,
+    tarea,
+    frecuencia_dias,
+    unidad,
+    operario,
+    generar_ot
+):
+    ejecutar("""
+        INSERT INTO legionella_tareas
+        (centro, edificio, instalacion, punto, tarea, tipo_control,
+         frecuencia, frecuencia_dias, unidad, fecha_inicio, ultima_fecha,
+         proxima_fecha, operario, activo, generar_ot, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?)
+    """, (
+        centro,
+        edificio,
+        instalacion,
+        punto,
+        tarea,
+        tarea,
+        f"{int(frecuencia_dias)} días",
+        int(frecuencia_dias),
+        unidad,
+        date.today().strftime("%Y-%m-%d"),
+        date.today().strftime("%Y-%m-%d"),
+        operario,
+        1 if generar_ot else 0,
+        "Tarea creada manualmente"
+    ))
 
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
