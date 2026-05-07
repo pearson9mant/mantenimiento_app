@@ -473,6 +473,12 @@ def actualizar_plan_legionella(tarea_id, frecuencia_dias, proxima_fecha, operari
         int(tarea_id)
     ))
 
+def borrar_plan_legionella(tarea_id):
+    ejecutar("""
+        DELETE FROM legionella_tareas
+        WHERE id = ?
+    """, (int(tarea_id),))
+
 
 def calcular_estado_control(proxima_fecha):
     hoy = pd.Timestamp(date.today())
@@ -1363,6 +1369,21 @@ def pantalla_legionella():
 
                         st.success("Planificación actualizada.")
                         st.rerun()
+                    st.markdown("---")
+
+                    if st.button(
+                        "🗑️ Borrar planificación",
+                        key=f"borrar_plan_leg_{row['id']}",
+                        use_container_width=True
+                    ):
+                        borrar_plan_legionella(row["id"])
+
+                        st.warning(
+                            f"Planificación eliminada: "
+                            f"{row['punto']} - {row['tarea']}"
+                        )
+
+                        st.rerun()            
 
             st.markdown("### Vista rápida")
 
