@@ -485,6 +485,41 @@ def borrar_plan_legionella(tarea_id):
         WHERE id = ?
     """, (int(tarea_id),))
 
+def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, observaciones):
+    ejecutar("""
+        INSERT INTO legionella_puntos
+        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    """, (
+        centro,
+        edificio,
+        instalacion,
+        tipo_punto,
+        nombre_punto,
+        ubicacion,
+        observaciones
+    ))
+
+
+def actualizar_estado_punto_legionella(punto_id, activo):
+    ejecutar("""
+        UPDATE legionella_puntos
+        SET activo = ?
+        WHERE id = ?
+    """, (
+        1 if activo else 0,
+        int(punto_id)
+    ))
+
+
+def obtener_puntos_legionella_admin():
+    return leer_df("""
+        SELECT id, centro, edificio, instalacion, tipo_punto,
+               nombre_punto, ubicacion, activo, observaciones
+        FROM legionella_puntos
+        ORDER BY centro, edificio, instalacion, nombre_punto
+    """)
+
 
 def calcular_estado_control(proxima_fecha):
     hoy = pd.Timestamp(date.today())
@@ -1104,16 +1139,17 @@ def pantalla_legionella():
 
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        [
-            "📋 Registrar control",
-            "🗓️ Planificación",
-            "📅 Próximos / estado",
-            "📚 Histórico",
-            "🚨 Incidencias",
-            "📄 Informe",
-        ]
-    )
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    [
+        "📋 Registrar control",
+        "🗓️ Planificación",
+        "⚙️ Puntos",
+        "📅 Próximos / estado",
+        "📚 Histórico",
+        "🚨 Incidencias",
+        "📄 Informe",
+    ]
+)
 
     with tab1:
         st.markdown("### Nuevo control")
@@ -1427,6 +1463,160 @@ def pantalla_legionella():
             )
 
     with tab3:
+        st.markdown("### ⚙️ Gestión de puntos Legionella")
+
+        st.info(
+            "Desde aquí puedes crear nuevos puntos de control, activar o desactivar puntos existentes "
+            "y después crear su planificación automática."
+        )
+
+        with st.expander("➕ Crear nuevo punto", expanded=True):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                centro_nuevo = st.selectbox(
+                    "Centro",
+                    list(CENTROS.keys()),
+                    key="nuevo_punto_centro"
+                )
+
+                edificios_disponibles = list(CENTROS.get(centro_nuevo, {}).keys())
+
+                edificio_nuevo = st.selectbox(
+                    "Edificio / zona",
+                    edificios_disponibles + ["Otro"],
+                    key="nuevo_punto_edificio"
+                )
+
+                if edificio_nuevo == "Otro":
+                    edificio_nuevo = st.text_input(
+                        "Nombre edificio / zona",
+                        key="nuevo_punto_edificio_otro"
+                    )
+
+                instalacion_nueva = st.selectbox(
+                    "Instalación",
+                    ["ACS", "AFCH", "Solar", "Otro"],
+                    key="nuevo_punto_instalacion"
+                )
+
+                if instalacion_nueva == "Otro":
+                    instalacion_nueva = st.text_input(
+                        "Nombre instalación",
+                        key="nuevo_punto_instalacion_otro"
+                    )
+
+            with col2:
+                tipo_punto_nuevo = st.selectbox(
+                    "Tipo de punto",
+                    [
+                        "acumulador",
+                        "acumulador_solar",
+                        "retorno",
+                        "grifo",
+                        "ducha",
+                        "deposito",
+                        "otro",
+                    ],
+                    key="nuevo_punto_tipo"
+                )
+
+                nombre_punto_nuevo = st.text_input(
+                    "Nombre del punto",
+                    placeholder="Ejemplo: Acumulador ACS Principal",
+                    key="nuevo_punto_nombre"
+                )
+
+                ubicacion_nueva = st.text_input(
+                    "Ubicación",
+                    placeholder="Ejemplo: Cuarto calderas",
+                    key="nuevo_punto_ubicacion"
+                )
+
+            observaciones_nueva = st.text_area(
+                "Observaciones",
+                key="nuevo_punto_observaciones"
+            )
+
+            if st.button("💾 Crear punto Legionella", use_container_width=True):
+                if not centro_nuevo or not edificio_nuevo or not instalacion_nueva or not tipo_punto_nuevo or not nombre_punto_nuevo:
+                    st.error("Faltan datos obligatorios.")
+                else:
+                    crear_punto_legionella(
+                        centro_nuevo,
+                        edificio_nuevo,
+                        instalacion_nueva,
+                        tipo_punto_nuevo,
+                        nombre_punto_nuevo,
+                        ubicacion_nueva,
+                        observaciones_nueva
+                    )
+
+                    st.success("Punto creado correctamente.")
+                    st.info("Ahora puedes ir a Planificación y pulsar 'Crear planificación automática desde puntos'.")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("### Puntos existentes")
+
+        puntos_admin = obtener_puntos_legionella_admin()
+
+        if puntos_admin.empty:
+            st.info("No hay puntos registrados.")
+        else:
+            centro_filtro_puntos = st.selectbox(
+                "Filtrar centro",
+                ["Todos"] + sorted(puntos_admin["centro"].dropna().astype(str).unique().tolist()),
+                key="filtro_admin_puntos_leg"
+            )
+
+            df_puntos_admin = puntos_admin.copy()
+
+            if centro_filtro_puntos != "Todos":
+                df_puntos_admin = df_puntos_admin[df_puntos_admin["centro"] == centro_filtro_puntos]
+
+            for _, row in df_puntos_admin.iterrows():
+                estado_txt = "Activo" if int(row["activo"] or 0) == 1 else "Inactivo"
+
+                titulo = (
+                    f"{estado_txt} · {row['centro']} · {row['edificio']} · "
+                    f"{row['instalacion']} · {row['nombre_punto']}"
+                )
+
+                with st.expander(titulo, expanded=False):
+                    st.write(f"**Tipo:** {row['tipo_punto']}")
+                    st.write(f"**Ubicación:** {row['ubicacion']}")
+                    st.write(f"**Observaciones:** {row['observaciones']}")
+
+                    activo_actual = bool(row["activo"])
+
+                    nuevo_estado = st.checkbox(
+                        "Punto activo",
+                        value=activo_actual,
+                        key=f"activo_punto_leg_{row['id']}"
+                    )
+
+                    if st.button(
+                        "💾 Guardar estado del punto",
+                        key=f"guardar_estado_punto_leg_{row['id']}",
+                        use_container_width=True
+                    ):
+                        actualizar_estado_punto_legionella(
+                            row["id"],
+                            nuevo_estado
+                        )
+
+                        st.success("Estado del punto actualizado.")
+                        st.rerun()
+
+            with st.expander("📋 Vista rápida de puntos", expanded=False):
+                st.dataframe(
+                    df_puntos_admin,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+    with tab4:
         st.markdown("### Próximos controles / estado")
 
         df_plan = obtener_planificacion_legionella()
@@ -1527,7 +1717,7 @@ def pantalla_legionella():
                     hide_index=True,
                 )
 
-    with tab4:
+    with tab5:
         st.markdown("### Histórico de controles")
 
         st.warning("Zona de pruebas: puedes borrar el histórico de controles de Legionella.")
@@ -1585,7 +1775,7 @@ def pantalla_legionella():
                 mime="text/csv",
             )
 
-    with tab5:
+    with tab6: 
         st.markdown("### Incidencias Legionella")
 
         df = leer_df("""
@@ -1634,7 +1824,7 @@ def pantalla_legionella():
                     st.success("Incidencia cerrada.")
                     st.rerun()
 
-    with tab6:
+    with tab7:
         st.markdown("### Informe inspección Legionella")
 
         col1, col2 = st.columns(2)
