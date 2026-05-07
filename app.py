@@ -50,18 +50,27 @@ body {
 /* =========================================
    QUITAR CABECERA BLANCA STREAMLIT
 ========================================= */
+[data-testid="stDecoration"] {
+    display: none !important;
+}
 
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    height: 0px !important;
+[data-testid="stStatusWidget"] {
+    display: none !important;
 }
 
 div[data-testid="stToolbar"] {
-    right: 10px;
-    top: 10px;
+    display: none !important;
+}
+
+header[data-testid="stHeader"] {
+    display: none !important;
 }
 
 section.main > div {
+    padding-top: 0rem !important;
+}
+
+.block-container {
     padding-top: 0rem !important;
 }
 
