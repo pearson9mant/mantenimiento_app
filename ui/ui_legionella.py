@@ -31,20 +31,23 @@ CENTROS = {
         ],
     },
     "Pearson 9": {
+        "Sala calderas": [
+            ("ACS", "Acumulador ACS Principal", "acumulador", "Cuarto calderas"),
+            ("ACS", "Retorno ACS Principal", "retorno", "Cuarto calderas"),
+        ],
+
         "Edif. A": [
-            ("ACS", "Acumulador ACS", "acumulador", "Cuarto técnico"),
-            ("ACS", "Retorno ACS", "retorno", "Cuarto técnico"),
             ("AFCH", "Grifo representativo", "grifo", "Edif. A"),
         ],
+
         "Edif. B": [
             ("AFCH", "Grifo representativo", "grifo", "Edif. B"),
         ],
+
         "Edif. C": [
-            ("ACS", "Acumulador ACS", "acumulador", "Cuarto técnico"),
             ("AFCH", "Grifo representativo", "grifo", "Edif. C"),
         ],
     },
-}
 
 
 def adaptar_sql(sql):
