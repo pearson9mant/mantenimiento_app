@@ -423,30 +423,36 @@ def pintar_cabecera():
 
     with col1:
 
-        st.markdown(f"""
-        <div class="pro-header">
-            <div class="pro-header-title">
-                {APP_NAME}
-            </div>
+        st.markdown(
+            f"""
+            <div class="pro-header">
+                <div class="pro-header-title">
+                    {APP_NAME}
+                </div>
 
-            <div class="pro-header-subtitle">
-                {COLEGIO}
+                <div class="pro-header-subtitle">
+                    {COLEGIO}
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
 
     with col2:
 
-        st.markdown(f"""
-        <div class="pro-header">
-            <div class="pro-header-meta">
-                <b>{APP_VERSION}</b><br>
-                {fecha}<br>
-                {usuario}<br>
-                {etiqueta_perfil(perfil)}
+        st.markdown(
+            f"""
+            <div class="pro-header">
+                <div class="pro-header-meta">
+                    <b>{APP_VERSION}</b><br>
+                    {fecha}<br>
+                    {usuario}<br>
+                    {etiqueta_perfil(perfil)}
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
 
 
 def pintar_footer():
