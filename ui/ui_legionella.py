@@ -1305,6 +1305,26 @@ def pantalla_legionella():
     with tab4:
         st.markdown("### Histórico de controles")
 
+        st.warning("Zona de pruebas: puedes borrar el histórico de controles de Legionella.")
+
+        confirmar_borrado = st.checkbox(
+            "Confirmo que quiero borrar el histórico de controles Legionella",
+            key="confirmar_borrar_historico_legionella"
+        )
+
+        if st.button("🗑️ Borrar histórico de controles", use_container_width=True):
+            if not confirmar_borrado:
+                st.error("Marca primero la casilla de confirmación.")
+            else:
+                try:
+                    ejecutar("DELETE FROM legionella_registros")
+                    st.success("Histórico de controles eliminado correctamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al borrar histórico: {e}")
+
+        st.markdown("---")
+
         df = leer_df("""
             SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
                    valor, valor_2, unidad, estado, resultado, operario, observaciones
