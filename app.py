@@ -422,6 +422,7 @@ def pintar_cabecera():
     col1, col2 = st.columns([3, 1])
 
     with col1:
+
         st.markdown(f"""
         <div class="pro-header">
             <div class="pro-header-title">
@@ -435,16 +436,15 @@ def pintar_cabecera():
         """, unsafe_allow_html=True)
 
     with col2:
+
         st.markdown(f"""
         <div class="pro-header">
-
             <div class="pro-header-meta">
                 <b>{APP_VERSION}</b><br>
                 {fecha}<br>
                 {usuario}<br>
                 {etiqueta_perfil(perfil)}
             </div>
-
         </div>
         """, unsafe_allow_html=True)
 
