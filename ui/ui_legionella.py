@@ -327,7 +327,12 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
 
 
 def dias_frecuencia(tarea):
-    if tarea in ["Temperatura acumulador", "Temperatura retorno", "Cloro residual"]:
+    if tarea in [
+        "Temperatura acumulador",
+        "Temperatura impulsión ACS",
+        "Temperatura retorno",
+        "Cloro residual"
+    ]:
         return 7
 
     if tarea in ["Purga", "Revisión visual", "Temperatura punto terminal"]:
@@ -341,6 +346,7 @@ def tareas_por_tipo_punto(tipo_punto):
 
     if tipo_punto in ["acumulador", "acumulador_solar"]:
         tareas.insert(0, "Temperatura acumulador")
+        tareas.insert(1, "Temperatura impulsión ACS")
 
     if tipo_punto == "retorno":
         tareas.insert(0, "Temperatura retorno")
@@ -1150,6 +1156,19 @@ def pantalla_legionella():
             unidad = "ºC"
             valor = st.number_input("Temperatura acumulador ºC", min_value=0.0, max_value=100.0, value=60.0, step=0.1)
             valor_2 = None
+        elif tarea == "Temperatura impulsión ACS":
+            tipo_control = "Temperatura impulsión ACS"
+            unidad = "ºC"
+
+            valor = st.number_input(
+                "Temperatura impulsión ACS ºC",
+                min_value=0.0,
+                max_value=100.0,
+                value=55.0,
+                step=0.1
+            )
+
+            valor_2 = None    
 
         elif tarea == "Temperatura retorno":
             tipo_control = "Temperatura retorno"
