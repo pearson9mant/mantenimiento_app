@@ -715,7 +715,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     return estado, resultado
 
 
-def generar_informe_legionella(fecha_inicio, fecha_fin):
+def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
@@ -731,44 +731,48 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
                unidad, estado, resultado, operario, observaciones
         FROM legionella_registros
         WHERE date(fecha) BETWEEN ? AND ?
+          AND centro = ?
           AND centro IS NOT NULL
           AND edificio IS NOT NULL
           AND punto IS NOT NULL
           AND tarea IS NOT NULL
         ORDER BY fecha DESC
-    """, (fecha_inicio_txt, fecha_fin_txt))
+    """, (fecha_inicio_txt, fecha_fin_txt, centro_filtro))
 
     df_inc = leer_df("""
         SELECT fecha_apertura, centro, edificio, punto, tarea, descripcion,
                estado, prioridad, operario, fecha_cierre, observaciones_cierre
         FROM legionella_incidencias
         WHERE date(fecha_apertura) BETWEEN ? AND ?
+          AND centro = ?
           AND centro IS NOT NULL
           AND edificio IS NOT NULL
           AND punto IS NOT NULL
           AND tarea IS NOT NULL
         ORDER BY fecha_apertura DESC
-    """, (fecha_inicio_txt, fecha_fin_txt))
+    """, (fecha_inicio_txt, fecha_fin_txt, centro_filtro))
 
     df_puntos = leer_df("""
         SELECT centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo
         FROM legionella_puntos
-        WHERE centro IS NOT NULL
+        WHERE centro = ?
+          AND centro IS NOT NULL
           AND edificio IS NOT NULL
           AND nombre_punto IS NOT NULL
         ORDER BY centro, edificio, instalacion, nombre_punto
-    """)
+    """, (centro_filtro,))
 
     df_plan = leer_df("""
         SELECT centro, edificio, instalacion, punto, tarea, frecuencia, frecuencia_dias,
                proxima_fecha, operario, activo
         FROM legionella_tareas
-        WHERE centro IS NOT NULL
+        WHERE centro = ?
+          AND centro IS NOT NULL
           AND edificio IS NOT NULL
           AND punto IS NOT NULL
           AND tarea IS NOT NULL
         ORDER BY centro, edificio, punto, tarea
-    """)
+    """, (centro_filtro,))
 
     buffer = BytesIO()
 
@@ -791,14 +795,11 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
     fecha_informe = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    # =====================================================
-    # PORTADA
-    # =====================================================
-
     contenido.append(Paragraph("LIBRO DE MANTENIMIENTO Y CONTROL DE LEGIONELLA", styles["Title"]))
     contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("<b>Centro:</b> Loreto Abat Oliba", styles["Normal"]))
+    contenido.append(Paragraph(f"<b>Centro:</b> {centro_filtro}", styles["Normal"]))
+    contenido.append(Paragraph("<b>Centro titular:</b> Loreto Abat Oliba", styles["Normal"]))
     contenido.append(Paragraph("<b>Instalaciones:</b> ACS / AFCH / puntos terminales / acumuladores / retornos", styles["Normal"]))
     contenido.append(Paragraph(f"<b>Periodo revisado:</b> {fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}", styles["Normal"]))
     contenido.append(Paragraph(f"<b>Fecha de emisión:</b> {fecha_informe}", styles["Normal"]))
@@ -813,10 +814,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     ))
 
     contenido.append(Spacer(1, 22))
-
-    # =====================================================
-    # ÍNDICE
-    # =====================================================
 
     contenido.append(Paragraph("Índice del libro", styles["Heading2"]))
     indice = [
@@ -839,17 +836,17 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     contenido.append(tabla_indice)
     contenido.append(Spacer(1, 20))
 
-    # =====================================================
-    # DATOS GENERALES
-    # =====================================================
-
     contenido.append(Paragraph("1. Datos generales de la instalación", styles["Heading2"]))
 
-    centros_detectados = " / ".join(sorted(df_puntos["centro"].dropna().astype(str).unique().tolist())) if not df_puntos.empty else "Pearson 9 / Pearson 22"
-    edificios_detectados = " / ".join(sorted(df_puntos["edificio"].dropna().astype(str).unique().tolist())) if not df_puntos.empty else "No especificado"
+    edificios_detectados = (
+        " / ".join(sorted(df_puntos["edificio"].dropna().astype(str).unique().tolist()))
+        if not df_puntos.empty
+        else "No especificado"
+    )
 
     datos_generales = [
-        ["Centro/s", centros_detectados],
+        ["Centro", centro_filtro],
+        ["Centro titular", "Loreto Abat Oliba"],
         ["Edificios", edificios_detectados],
         ["Tipo de instalación", "ACS / AFCH / Solar / puntos terminales"],
         ["Tipo de documento", "Libro de mantenimiento y control de Legionella"],
@@ -869,10 +866,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     ]))
     contenido.append(tabla_datos)
     contenido.append(Spacer(1, 18))
-
-    # =====================================================
-    # PROGRAMA MANTENIMIENTO
-    # =====================================================
 
     contenido.append(Paragraph("2. Programa de mantenimiento y controles", styles["Heading2"]))
 
@@ -896,10 +889,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     ]))
     contenido.append(tabla_programa)
     contenido.append(Spacer(1, 18))
-
-    # =====================================================
-    # PUNTOS DE CONTROL
-    # =====================================================
 
     contenido.append(Paragraph("3. Puntos de control registrados", styles["Heading2"]))
 
@@ -930,10 +919,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
     contenido.append(Spacer(1, 18))
 
-    # =====================================================
-    # RESUMEN
-    # =====================================================
-
     contenido.append(Paragraph("4. Resumen del periodo", styles["Heading2"]))
 
     resumen = [
@@ -953,10 +938,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
     contenido.append(tabla_resumen)
     contenido.append(Spacer(1, 18))
-
-    # =====================================================
-    # PLANIFICACIÓN
-    # =====================================================
 
     contenido.append(Paragraph("Planificación activa", styles["Heading3"]))
 
@@ -987,10 +968,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
         contenido.append(tabla_pl)
 
     contenido.append(Spacer(1, 18))
-
-    # =====================================================
-    # CONTROLES REALIZADOS
-    # =====================================================
 
     contenido.append(Paragraph("5. Registro de controles realizados", styles["Heading2"]))
 
@@ -1026,10 +1003,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
     contenido.append(Spacer(1, 18))
 
-    # =====================================================
-    # INCIDENCIAS
-    # =====================================================
-
     contenido.append(Paragraph("6. Incidencias y acciones correctoras", styles["Heading2"]))
 
     if df_inc.empty:
@@ -1060,10 +1033,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
 
     contenido.append(Spacer(1, 20))
 
-    # =====================================================
-    # OBSERVACIONES
-    # =====================================================
-
     contenido.append(Paragraph("7. Observaciones y trazabilidad", styles["Heading2"]))
     contenido.append(Paragraph(
         "Libro generado automáticamente desde el sistema de mantenimiento. "
@@ -1081,9 +1050,9 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     doc.build(contenido)
 
     st.download_button(
-        "📘 Descargar libro mantenimiento Legionella",
+        f"📘 Descargar libro mantenimiento {centro_filtro}",
         data=buffer.getvalue(),
-        file_name=f"libro_mantenimiento_legionella_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
+        file_name=f"libro_mantenimiento_legionella_{centro_filtro.replace(' ', '_')}_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
         mime="application/pdf"
     )
 
