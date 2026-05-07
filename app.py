@@ -1,4 +1,6 @@
 import streamlit as st
+from datetime import datetime
+
 from modules.auth import login, barra_sesion
 from database.db import inicializar_db
 
@@ -19,59 +21,270 @@ from ui.ui_gerencia import pantalla_gerencia
 from modules.preventivo import generar_ots_preventivo_si_toca
 
 
-st.set_page_config(page_title="Mantenimiento", layout="wide")
+APP_VERSION = "v1.0 PRO"
+APP_NAME = "Sistema Integral de Mantenimiento"
+COLEGIO = "Loreto Abat Oliba"
+
+
+st.set_page_config(
+    page_title="Mantenimiento PRO",
+    page_icon="🛠️",
+    layout="wide"
+)
 
 
 st.markdown("""
 <meta name="google" content="notranslate">
 
 <style>
-html, body {
+html, body, [class*="css"] {
     font-size: 14px !important;
+}
+
+body {
+    background-color: #f4f6f9;
 }
 
 .block-container {
     padding-top: 1rem !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 1.2rem !important;
+    padding-right: 1.2rem !important;
+    max-width: 1400px;
 }
 
 .stButton > button {
     width: 100%;
-    height: 80px !important;
+    height: 82px !important;
     font-size: 16px !important;
-    font-weight: 700 !important;
-    border-radius: 16px !important;
+    font-weight: 800 !important;
+    border-radius: 18px !important;
     white-space: pre-line !important;
+    border: 1px solid #d8dee9 !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+    color: #1f2937 !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14) !important;
 }
 
 [data-testid="stMetricValue"] {
     font-size: 34px !important;
 }
 
-.logo-portada {
+.pro-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    margin-bottom: 18px;
+}
+
+.pro-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+    color: white;
+    border-radius: 24px;
+    padding: 26px 28px;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.20);
+}
+
+.pro-header-title {
+    font-size: 30px;
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+
+.pro-header-subtitle {
+    font-size: 17px;
+    font-weight: 600;
+    opacity: 0.92;
+}
+
+.pro-header-meta {
+    text-align: right;
+    font-size: 13px;
+    line-height: 1.7;
+    opacity: 0.95;
+}
+
+.portada-box {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 28px;
+    padding: 34px;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+    margin-top: 10px;
     text-align: center;
-    margin-top: 20px;
-    margin-bottom: 10px;
 }
 
 .titulo-portada {
     text-align: center;
-    font-size: 26px;
-    font-weight: 800;
-    margin-bottom: 0;
+    font-size: 34px;
+    font-weight: 900;
+    color: #0f172a;
+    margin-top: 12px;
+    margin-bottom: 4px;
 }
 
 .subtitulo-portada {
     text-align: center;
-    font-size: 18px;
-    font-weight: 600;
-    color: #555;
-    margin-top: 0;
-    margin-bottom: 25px;
+    font-size: 21px;
+    font-weight: 700;
+    color: #1d4ed8;
+    margin-bottom: 8px;
+}
+
+.version-portada {
+    display: inline-block;
+    background: #e0ecff;
+    color: #1d4ed8;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-weight: 800;
+    font-size: 13px;
+    margin-top: 8px;
+    margin-bottom: 20px;
+}
+
+.info-user {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 14px;
+    margin-top: 12px;
+    margin-bottom: 20px;
+    color: #334155;
+    font-weight: 700;
+}
+
+.section-title {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 12px;
+}
+
+.footer-pro {
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+    margin-top: 35px;
+    padding-top: 18px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.status-pill {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .pro-header {
+        padding: 22px 18px;
+        border-radius: 20px;
+    }
+
+    .pro-header-title {
+        font-size: 23px;
+    }
+
+    .pro-header-subtitle {
+        font-size: 15px;
+    }
+
+    .pro-header-meta {
+        text-align: left;
+        margin-top: 15px;
+    }
+
+    .titulo-portada {
+        font-size: 27px;
+    }
+
+    .subtitulo-portada {
+        font-size: 18px;
+    }
+
+    .portada-box {
+        padding: 24px 16px;
+    }
+
+    .stButton > button {
+        height: 78px !important;
+        font-size: 15px !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+def etiqueta_perfil(perfil):
+    perfil = str(perfil or "").strip().lower()
+
+    if perfil == "admin":
+        return "Administración"
+    if perfil == "gerencia":
+        return "Gerencia"
+    if perfil == "inventario":
+        return "Inventario"
+    return "Operario"
+
+
+def usuario_visible():
+    usuario = st.session_state.get("usuario", "")
+    operario = st.session_state.get("operario_activo", "")
+
+    if operario:
+        return operario
+    if usuario:
+        return usuario
+    return "Usuario"
+
+
+def pintar_cabecera():
+    perfil = st.session_state.get("perfil", "")
+    usuario = usuario_visible()
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.markdown(f"""
+        <div class="pro-header">
+            <div class="pro-header-title">{APP_NAME}</div>
+            <div class="pro-header-subtitle">{COLEGIO}</div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="pro-header">
+            <div class="pro-header-meta">
+                <b>{APP_VERSION}</b><br>
+                {fecha}<br>
+                {usuario}<br>
+                {etiqueta_perfil(perfil)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def pintar_footer():
+    st.markdown(f"""
+    <div class="footer-pro">
+        {APP_NAME} · {COLEGIO} · {APP_VERSION} · © 2026
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def volver_menu():
@@ -86,41 +299,56 @@ def volver_portada():
 
 
 def mostrar_portada(perfil, operario_activo):
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<div class='portada-box'>", unsafe_allow_html=True)
 
     try:
-        st.image("logo cole.jpg", width=220)
+        col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
+        with col_logo2:
+            st.image("logo cole.jpg", width=230)
     except Exception:
-        st.markdown("<div class='logo-portada'>🏫</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:64px;'>🏫</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='titulo-portada'>Mantenimiento</div>", unsafe_allow_html=True)
-    st.markdown("<div class='subtitulo-portada'>Loreto Abat Oliba</div>", unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown(f"<div class='titulo-portada'>{APP_NAME}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='subtitulo-portada'>{COLEGIO}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='version-portada'>{APP_VERSION}</div>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
     if perfil == "admin":
         texto_boton = "🔐\nEntrar en administración"
+        descripcion = "Acceso completo al sistema"
     elif perfil == "gerencia":
         texto_boton = "📊\nEntrar a gerencia"
+        descripcion = "Panel de control y seguimiento"
     elif perfil == "inventario":
         texto_boton = "📦\nEntrar a inventario"
+        descripcion = "Gestión de materiales e inventario"
     else:
-        if operario_activo:
-            st.caption(f"Operario: {operario_activo}")
         texto_boton = "👷\nEntrar a mi zona"
+        descripcion = f"Operario: {operario_activo}" if operario_activo else "Zona de operario"
 
-    if st.button(texto_boton, key="btn_entrada_app", use_container_width=True):
-        st.session_state["entrada_app"] = True
-        st.session_state["seccion_actual"] = None
-        st.rerun()
+    st.markdown(f"<div class='info-user'>{descripcion}</div>", unsafe_allow_html=True)
 
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        if st.button(texto_boton, key="btn_entrada_app", use_container_width=True):
+            st.session_state["entrada_app"] = True
+            st.session_state["seccion_actual"] = None
+            st.rerun()
+
+    st.markdown("<br><span class='status-pill'>● Sistema operativo</span>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    pintar_footer()
     st.stop()
 
 
 def mostrar_menu_admin():
-    col1, col2 = st.columns(2)
+    st.markdown("<div class='section-title'>Menú principal</div>", unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("📊\nPanel", key="btn_panel", use_container_width=True):
+        if st.button("📊\nPanel general", key="btn_panel", use_container_width=True):
             st.session_state["seccion_actual"] = "Panel"
             st.rerun()
 
@@ -128,20 +356,12 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
 
-        if st.button("👷\nOperario", key="btn_op", use_container_width=True):
+        if st.button("👷\nVista operario", key="btn_op", use_container_width=True):
             st.session_state["seccion_actual"] = "Operario"
             st.rerun()
 
-        if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
-            st.session_state["seccion_actual"] = "Configuración"
-            st.rerun()
-
-        if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Gerencia"
-            st.rerun()
-
     with col2:
-        if st.button("🛠\nÓrdenes", key="btn_ot", use_container_width=True):
+        if st.button("🛠\nÓrdenes de trabajo", key="btn_ot", use_container_width=True):
             st.session_state["seccion_actual"] = "Órdenes"
             st.rerun()
 
@@ -153,6 +373,11 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Preventivo"
             st.rerun()
 
+    with col3:
+        if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Gerencia"
+            st.rerun()
+
         if st.button("⚙️\nOperarios", key="btn_ops", use_container_width=True):
             st.session_state["seccion_actual"] = "Operarios"
             st.rerun()
@@ -161,41 +386,58 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col4, col5, col6 = st.columns(3)
+    with col5:
+        if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
+            st.session_state["seccion_actual"] = "Configuración"
+            st.rerun()
+
 
 def mostrar_menu_operario():
     perfil = st.session_state.get("perfil", "")
     operario = st.session_state.get("operario_activo", "")
 
-    if perfil == "inventario":
-        if st.button("📦\nInventario mantenimiento", key="btn_inv_inventario", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario"
-            st.rerun()
+    st.markdown("<div class='section-title'>Menú de trabajo</div>", unsafe_allow_html=True)
 
-        if st.button("🏫\nInventario aulas", key="btn_inv_aulas_inventario", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario aulas"
-            st.rerun()
+    if perfil == "inventario":
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("📦\nInventario mantenimiento", key="btn_inv_inventario", use_container_width=True):
+                st.session_state["seccion_actual"] = "Inventario"
+                st.rerun()
+
+        with col2:
+            if st.button("🏫\nInventario aulas", key="btn_inv_aulas_inventario", use_container_width=True):
+                st.session_state["seccion_actual"] = "Inventario aulas"
+                st.rerun()
 
         return
 
-    col1, col2 = st.columns(2)
+    st.markdown(f"<div class='info-user'>Operario: {operario}</div>", unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("📋\nResumen", key="btn_resumen_operario", use_container_width=True):
             st.session_state["seccion_actual"] = "Resumen"
             st.rerun()
 
+    with col2:
+        if st.button("🛠\nMis órdenes", key="btn_ot_operario", use_container_width=True):
+            st.session_state["seccion_actual"] = "Órdenes"
+            st.rerun()
+
+    with col3:
         if st.button("📦\nInventario", key="btn_inv_operario", use_container_width=True):
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
 
-    with col2:
-        if st.button("🛠\nÓrdenes", key="btn_ot_operario", use_container_width=True):
-            st.session_state["seccion_actual"] = "Órdenes"
-            st.rerun()
-
 
 inicializar_db()
-# Generar preventivos automáticamente al entrar en la app
+
 try:
     if "preventivos_auto_revisados" not in st.session_state:
         generar_ots_preventivo_si_toca()
@@ -203,12 +445,14 @@ try:
 except Exception:
     pass
 
+
 params = st.query_params
 modo = params.get("modo")
 
 if modo == "incidencias":
     pantalla_incidencias_profesores()
     st.stop()
+
 
 login()
 
@@ -226,7 +470,7 @@ if not st.session_state["entrada_app"]:
     mostrar_portada(perfil, operario_activo)
 
 
-st.markdown("### Mantenimiento")
+pintar_cabecera()
 barra_sesion()
 
 
@@ -249,6 +493,7 @@ if perfil == "gerencia":
 
     st.markdown("---")
     pantalla_gerencia()
+    pintar_footer()
     st.stop()
 
 
@@ -263,9 +508,9 @@ if st.session_state["seccion_actual"] is None:
         mostrar_menu_admin()
 
     else:
-        st.caption(f"{operario_activo}")
         mostrar_menu_operario()
 
+    pintar_footer()
     st.stop()
 
 
@@ -339,3 +584,6 @@ else:
 
     elif seccion == "Inventario aulas":
         pantalla_inventario_aulas()
+
+
+pintar_footer()
