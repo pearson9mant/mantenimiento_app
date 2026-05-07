@@ -719,6 +719,13 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
+    def limpiar_pdf(texto, max_len=None):
+        texto = "" if pd.isna(texto) else str(texto)
+        texto = texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if max_len:
+            texto = texto[:max_len]
+        return texto
+
     df = leer_df("""
         SELECT fecha, centro, edificio, instalacion, punto, tarea, valor, valor_2,
                unidad, estado, resultado, operario, observaciones
@@ -743,9 +750,25 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
         ORDER BY fecha_apertura DESC
     """, (fecha_inicio_txt, fecha_fin_txt))
 
-    if df.empty:
-        st.warning("No hay datos para generar el informe en esas fechas.")
-        return
+    df_puntos = leer_df("""
+        SELECT centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo
+        FROM legionella_puntos
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND nombre_punto IS NOT NULL
+        ORDER BY centro, edificio, instalacion, nombre_punto
+    """)
+
+    df_plan = leer_df("""
+        SELECT centro, edificio, instalacion, punto, tarea, frecuencia, frecuencia_dias,
+               proxima_fecha, operario, activo
+        FROM legionella_tareas
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
+        ORDER BY centro, edificio, punto, tarea
+    """)
 
     buffer = BytesIO()
 
@@ -762,22 +785,156 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     contenido = []
 
     total = len(df)
-    ok = len(df[df["estado"] == "OK"])
+    ok = len(df[df["estado"] == "OK"]) if not df.empty and "estado" in df.columns else 0
     no_ok = total - ok
     cumplimiento = round((ok / total) * 100, 2) if total else 0
 
     fecha_informe = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    contenido.append(Paragraph("INFORME DE CONTROL DE LEGIONELLA", styles["Title"]))
-    contenido.append(Spacer(1, 12))
+    # =====================================================
+    # PORTADA
+    # =====================================================
 
-    contenido.append(Paragraph(f"<b>Fecha de emisión:</b> {fecha_informe}", styles["Normal"]))
-    contenido.append(Paragraph(f"<b>Periodo revisado:</b> {fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}", styles["Normal"]))
-    contenido.append(Paragraph("<b>Centro:</b> Pearson 9 / Pearson 22", styles["Normal"]))
-    contenido.append(Paragraph("<b>Tipo de control:</b> ACS / AFCH / puntos terminales", styles["Normal"]))
+    contenido.append(Paragraph("LIBRO DE MANTENIMIENTO Y CONTROL DE LEGIONELLA", styles["Title"]))
     contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("1. Resumen general", styles["Heading2"]))
+    contenido.append(Paragraph("<b>Centro:</b> Loreto Abat Oliba", styles["Normal"]))
+    contenido.append(Paragraph("<b>Instalaciones:</b> ACS / AFCH / puntos terminales / acumuladores / retornos", styles["Normal"]))
+    contenido.append(Paragraph(f"<b>Periodo revisado:</b> {fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}", styles["Normal"]))
+    contenido.append(Paragraph(f"<b>Fecha de emisión:</b> {fecha_informe}", styles["Normal"]))
+    contenido.append(Paragraph("<b>Responsable mantenimiento:</b> Departamento de Mantenimiento", styles["Normal"]))
+    contenido.append(Spacer(1, 24))
+
+    contenido.append(Paragraph(
+        "Este documento recoge el registro de mantenimiento, planificación, controles realizados, "
+        "resultados, incidencias y trazabilidad de las actuaciones de control de Legionella registradas "
+        "en el sistema de mantenimiento.",
+        styles["Normal"]
+    ))
+
+    contenido.append(Spacer(1, 22))
+
+    # =====================================================
+    # ÍNDICE
+    # =====================================================
+
+    contenido.append(Paragraph("Índice del libro", styles["Heading2"]))
+    indice = [
+        ["1", "Datos generales de la instalación"],
+        ["2", "Programa de mantenimiento y controles"],
+        ["3", "Puntos de control registrados"],
+        ["4", "Resumen del periodo"],
+        ["5", "Registro de controles realizados"],
+        ["6", "Incidencias y acciones correctoras"],
+        ["7", "Observaciones y trazabilidad"],
+    ]
+
+    tabla_indice = Table(indice, colWidths=[40, 430])
+    tabla_indice.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    contenido.append(tabla_indice)
+    contenido.append(Spacer(1, 20))
+
+    # =====================================================
+    # DATOS GENERALES
+    # =====================================================
+
+    contenido.append(Paragraph("1. Datos generales de la instalación", styles["Heading2"]))
+
+    centros_detectados = " / ".join(sorted(df_puntos["centro"].dropna().astype(str).unique().tolist())) if not df_puntos.empty else "Pearson 9 / Pearson 22"
+    edificios_detectados = " / ".join(sorted(df_puntos["edificio"].dropna().astype(str).unique().tolist())) if not df_puntos.empty else "No especificado"
+
+    datos_generales = [
+        ["Centro/s", centros_detectados],
+        ["Edificios", edificios_detectados],
+        ["Tipo de instalación", "ACS / AFCH / Solar / puntos terminales"],
+        ["Tipo de documento", "Libro de mantenimiento y control de Legionella"],
+        ["Periodo", f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"],
+        ["Fecha emisión", fecha_informe],
+    ]
+
+    tabla_datos = Table(datos_generales, colWidths=[140, 340])
+    tabla_datos.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    contenido.append(tabla_datos)
+    contenido.append(Spacer(1, 18))
+
+    # =====================================================
+    # PROGRAMA MANTENIMIENTO
+    # =====================================================
+
+    contenido.append(Paragraph("2. Programa de mantenimiento y controles", styles["Heading2"]))
+
+    programa = [
+        ["Control", "Frecuencia", "Valor / criterio correcto"],
+        ["Temperatura acumulador", "Según planificación", "≥ 60 ºC"],
+        ["Temperatura retorno", "Según planificación", "≥ 50 ºC"],
+        ["Cloro residual", "Según planificación", "0,2 - 1,0 mg/L"],
+        ["Temperatura punto terminal", "Según planificación", "Registro de temperatura"],
+        ["Purga", "Según planificación", "Realizada"],
+        ["Revisión visual", "Según planificación", "Correcta / sin anomalías"],
+    ]
+
+    tabla_programa = Table(programa, colWidths=[160, 130, 190])
+    tabla_programa.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.black),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    contenido.append(tabla_programa)
+    contenido.append(Spacer(1, 18))
+
+    # =====================================================
+    # PUNTOS DE CONTROL
+    # =====================================================
+
+    contenido.append(Paragraph("3. Puntos de control registrados", styles["Heading2"]))
+
+    if df_puntos.empty:
+        contenido.append(Paragraph("No constan puntos de control registrados.", styles["Normal"]))
+    else:
+        tabla_puntos = [["Centro", "Edificio", "Instalación", "Tipo", "Punto", "Ubicación"]]
+
+        for _, row in df_puntos.head(80).iterrows():
+            tabla_puntos.append([
+                limpiar_pdf(row.get("centro", ""), 18),
+                limpiar_pdf(row.get("edificio", ""), 22),
+                limpiar_pdf(row.get("instalacion", ""), 16),
+                limpiar_pdf(row.get("tipo_punto", ""), 16),
+                limpiar_pdf(row.get("nombre_punto", ""), 28),
+                limpiar_pdf(row.get("ubicacion", ""), 26),
+            ])
+
+        tabla_p = Table(tabla_puntos, colWidths=[60, 78, 65, 65, 120, 92])
+        tabla_p.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        contenido.append(tabla_p)
+
+    contenido.append(Spacer(1, 18))
+
+    # =====================================================
+    # RESUMEN
+    # =====================================================
+
+    contenido.append(Paragraph("4. Resumen del periodo", styles["Heading2"]))
 
     resumen = [
         ["Total controles", "Correctos", "Incidencias/Riesgos", "Cumplimiento"],
@@ -797,51 +954,97 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
     contenido.append(tabla_resumen)
     contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("2. Controles realizados", styles["Heading2"]))
+    # =====================================================
+    # PLANIFICACIÓN
+    # =====================================================
 
-    tabla_data = [["Fecha", "Centro", "Edificio", "Punto", "Tarea", "Valor", "Estado"]]
+    contenido.append(Paragraph("Planificación activa", styles["Heading3"]))
 
-    for _, row in df.head(60).iterrows():
-        valor = "" if pd.isna(row["valor"]) else str(row["valor"])
-        unidad = "" if pd.isna(row["unidad"]) else str(row["unidad"])
+    if df_plan.empty:
+        contenido.append(Paragraph("No consta planificación activa registrada.", styles["Normal"]))
+    else:
+        tabla_plan = [["Centro", "Edificio", "Punto", "Tarea", "Frecuencia", "Próxima", "Operario"]]
 
-        tabla_data.append([
-            str(row["fecha"])[:10],
-            str(row["centro"]),
-            str(row["edificio"]),
-            str(row["punto"])[:22],
-            str(row["tarea"])[:24],
-            f"{valor} {unidad}",
-            str(row["estado"])
-        ])
+        for _, row in df_plan.head(70).iterrows():
+            tabla_plan.append([
+                limpiar_pdf(row.get("centro", ""), 18),
+                limpiar_pdf(row.get("edificio", ""), 18),
+                limpiar_pdf(row.get("punto", ""), 25),
+                limpiar_pdf(row.get("tarea", ""), 25),
+                limpiar_pdf(row.get("frecuencia", ""), 16),
+                limpiar_pdf(row.get("proxima_fecha", ""), 12),
+                limpiar_pdf(row.get("operario", ""), 20),
+            ])
 
-    tabla = Table(tabla_data, colWidths=[55, 65, 70, 100, 105, 55, 60])
-    tabla.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.black),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+        tabla_pl = Table(tabla_plan, colWidths=[60, 65, 95, 95, 60, 55, 70])
+        tabla_pl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        contenido.append(tabla_pl)
 
-    contenido.append(tabla)
     contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("3. Incidencias detectadas", styles["Heading2"]))
+    # =====================================================
+    # CONTROLES REALIZADOS
+    # =====================================================
+
+    contenido.append(Paragraph("5. Registro de controles realizados", styles["Heading2"]))
+
+    if df.empty:
+        contenido.append(Paragraph("No constan controles registrados en el periodo seleccionado.", styles["Normal"]))
+    else:
+        tabla_data = [["Fecha", "Centro", "Edificio", "Punto", "Tarea", "Valor", "Estado"]]
+
+        for _, row in df.head(100).iterrows():
+            valor = "" if pd.isna(row["valor"]) else str(row["valor"])
+            unidad = "" if pd.isna(row["unidad"]) else str(row["unidad"])
+
+            tabla_data.append([
+                limpiar_pdf(str(row["fecha"])[:10]),
+                limpiar_pdf(row["centro"], 18),
+                limpiar_pdf(row["edificio"], 20),
+                limpiar_pdf(row["punto"], 26),
+                limpiar_pdf(row["tarea"], 26),
+                limpiar_pdf(f"{valor} {unidad}", 14),
+                limpiar_pdf(row["estado"], 12)
+            ])
+
+        tabla = Table(tabla_data, colWidths=[55, 65, 70, 100, 105, 55, 60])
+        tabla.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+
+        contenido.append(tabla)
+
+    contenido.append(Spacer(1, 18))
+
+    # =====================================================
+    # INCIDENCIAS
+    # =====================================================
+
+    contenido.append(Paragraph("6. Incidencias y acciones correctoras", styles["Heading2"]))
 
     if df_inc.empty:
         contenido.append(Paragraph("No constan incidencias registradas en el periodo.", styles["Normal"]))
     else:
         tabla_inc = [["Fecha", "Centro", "Punto", "Tarea", "Estado", "Descripción"]]
 
-        for _, row in df_inc.head(40).iterrows():
+        for _, row in df_inc.head(60).iterrows():
             tabla_inc.append([
-                str(row["fecha_apertura"])[:10],
-                str(row["centro"]),
-                str(row["punto"])[:22],
-                str(row["tarea"])[:22],
-                str(row["estado"]),
-                str(row["descripcion"])[:45],
+                limpiar_pdf(str(row["fecha_apertura"])[:10]),
+                limpiar_pdf(row["centro"], 18),
+                limpiar_pdf(row["punto"], 24),
+                limpiar_pdf(row["tarea"], 24),
+                limpiar_pdf(row["estado"], 14),
+                limpiar_pdf(row["descripcion"], 50),
             ])
 
         tabla_i = Table(tabla_inc, colWidths=[55, 65, 100, 100, 55, 155])
@@ -856,20 +1059,31 @@ def generar_informe_legionella(fecha_inicio, fecha_fin):
         contenido.append(tabla_i)
 
     contenido.append(Spacer(1, 20))
-    contenido.append(Paragraph("4. Observaciones", styles["Heading2"]))
+
+    # =====================================================
+    # OBSERVACIONES
+    # =====================================================
+
+    contenido.append(Paragraph("7. Observaciones y trazabilidad", styles["Heading2"]))
     contenido.append(Paragraph(
-        "Informe generado automáticamente desde el sistema de mantenimiento. "
-        "Los controles registrados incluyen temperaturas, cloro residual, purgas, revisiones visuales "
-        "e incidencias asociadas.",
+        "Libro generado automáticamente desde el sistema de mantenimiento. "
+        "Los datos incluidos proceden de los registros introducidos en la aplicación: "
+        "temperaturas, cloro residual, purgas, revisiones visuales, planificación, incidencias "
+        "y acciones correctoras asociadas.",
         styles["Normal"]
     ))
+
+    contenido.append(Spacer(1, 30))
+    contenido.append(Paragraph("<b>Firma / Responsable:</b> ________________________________", styles["Normal"]))
+    contenido.append(Spacer(1, 10))
+    contenido.append(Paragraph("<b>Fecha:</b> ________________________________", styles["Normal"]))
 
     doc.build(contenido)
 
     st.download_button(
-        "📄 Descargar informe inspección Legionella",
+        "📘 Descargar libro mantenimiento Legionella",
         data=buffer.getvalue(),
-        file_name=f"informe_legionella_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
+        file_name=f"libro_mantenimiento_legionella_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
         mime="application/pdf"
     )
 
