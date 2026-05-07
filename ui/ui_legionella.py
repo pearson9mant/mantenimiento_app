@@ -1612,5 +1612,20 @@ def pantalla_legionella():
         if fecha_inicio > fecha_fin:
             st.error("La fecha de inicio no puede ser posterior a la fecha fin.")
         else:
-            if st.button("📄 Generar informe inspección"):
-                generar_informe_legionella(fecha_inicio, fecha_fin)
+            col_p9, col_p22 = st.columns(2)
+
+    with col_p9:
+       if st.button("📘 Generar libro Pearson 9", use_container_width=True):
+           generar_informe_legionella(
+               fecha_inicio,
+               fecha_fin,
+               "Pearson 9"
+        )
+
+    with col_p22:
+       if st.button("📘 Generar libro Pearson 22", use_container_width=True):
+           generar_informe_legionella(
+               fecha_inicio,
+               fecha_fin,
+               "Pearson 22"
+           )
