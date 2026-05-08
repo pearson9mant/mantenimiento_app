@@ -86,9 +86,17 @@ def asegurar_tabla_ubicaciones_personalizadas():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    modulo = conn.__class__.__module__.lower()
+    es_postgres = "psycopg2" in modulo or "psycopg" in modulo
+
+    if es_postgres:
+        id_sql = "SERIAL PRIMARY KEY"
+    else:
+        id_sql = "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS ubicaciones_personalizadas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_sql},
             centro TEXT,
             edificio TEXT,
             espacio TEXT,
