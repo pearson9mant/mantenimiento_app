@@ -1138,6 +1138,75 @@ def crear_tarea_legionella_manual(
         "Tarea creada manualmente"
     ))
 
+def actualizar_punto_legionella(
+    punto_id,
+    centro,
+    edificio,
+    instalacion,
+    tipo_punto,
+    nombre_punto,
+    ubicacion,
+    observaciones,
+    activo
+):
+    ejecutar("""
+        UPDATE legionella_puntos
+        SET centro = ?,
+            edificio = ?,
+            instalacion = ?,
+            tipo_punto = ?,
+            nombre_punto = ?,
+            ubicacion = ?,
+            observaciones = ?,
+            activo = ?
+        WHERE id = ?
+    """, (
+        centro,
+        edificio,
+        instalacion,
+        tipo_punto,
+        nombre_punto,
+        ubicacion,
+        observaciones,
+        1 if activo else 0,
+        int(punto_id)
+    ))
+
+
+def limpiar_puntos_duplicados_legionella():
+    df = leer_df("""
+        SELECT id, centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion
+        FROM legionella_puntos
+        ORDER BY id
+    """)
+
+    if df.empty:
+        return 0
+
+    df["clave"] = (
+        df["centro"].astype(str).str.strip().str.lower() + "|" +
+        df["edificio"].astype(str).str.strip().str.lower() + "|" +
+        df["instalacion"].astype(str).str.strip().str.lower() + "|" +
+        df["tipo_punto"].astype(str).str.strip().str.lower() + "|" +
+        df["nombre_punto"].astype(str).str.strip().str.lower() + "|" +
+        df["ubicacion"].astype(str).str.strip().str.lower()
+    )
+
+    duplicados = df[df.duplicated("clave", keep="first")]
+
+    if duplicados.empty:
+        return 0
+
+    ids = duplicados["id"].tolist()
+
+    for punto_id in ids:
+        ejecutar("""
+            DELETE FROM legionella_puntos
+            WHERE id = ?
+        """, (int(punto_id),))
+
+    return len(ids)
+
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
 
@@ -1492,11 +1561,11 @@ def pantalla_legionella():
         st.markdown("### ⚙️ Gestión de puntos Legionella")
 
         st.info(
-            "Desde aquí puedes crear nuevos puntos de control, crear tareas manuales, "
-            "activar o desactivar puntos existentes y después crear su planificación automática."
+            "Desde aquí puedes crear, editar, activar/desactivar puntos, crear tareas manuales "
+            "y limpiar duplicados."
         )
 
-        with st.expander("➕ Crear nuevo punto", expanded=True):
+        with st.expander("➕ Crear nuevo punto", expanded=False):
             col1, col2 = st.columns(2)
 
             with col1:
@@ -1579,7 +1648,6 @@ def pantalla_legionella():
                     )
 
                     st.success("Punto creado correctamente.")
-                    st.info("Ahora puedes ir a Planificación y pulsar 'Crear planificación automática desde puntos'.")
                     st.rerun()
 
         with st.expander("➕ Crear control / tarea manual", expanded=False):
@@ -1636,7 +1704,8 @@ def pantalla_legionella():
                 operario_manual = st.selectbox(
                     "Operario",
                     OPERARIOS,
-                    index=OPERARIOS.index(operario_por_centro(centro_tarea)) if operario_por_centro(centro_tarea) in OPERARIOS else 0,
+                    index=OPERARIOS.index(operario_por_centro(centro_tarea))
+                    if operario_por_centro(centro_tarea) in OPERARIOS else 0,
                     key="tarea_manual_operario"
                 )
 
@@ -1663,6 +1732,19 @@ def pantalla_legionella():
                     st.rerun()
 
         st.markdown("---")
+
+        col_dup1, col_dup2 = st.columns(2)
+
+        with col_dup1:
+            if st.button("🧹 Limpiar puntos duplicados", use_container_width=True):
+                eliminados = limpiar_puntos_duplicados_legionella()
+
+                if eliminados > 0:
+                    st.success(f"Se han eliminado {eliminados} puntos duplicados.")
+                    st.rerun()
+                else:
+                    st.info("No se han encontrado puntos duplicados.")
+
         st.markdown("### Puntos existentes")
 
         puntos_admin = obtener_puntos_legionella_admin()
@@ -1690,29 +1772,114 @@ def pantalla_legionella():
                 )
 
                 with st.expander(titulo, expanded=False):
-                    st.write(f"**Tipo:** {row['tipo_punto']}")
-                    st.write(f"**Ubicación:** {row['ubicacion']}")
-                    st.write(f"**Observaciones:** {row['observaciones']}")
+                    col1, col2 = st.columns(2)
 
-                    activo_actual = bool(row["activo"])
-
-                    nuevo_estado = st.checkbox(
-                        "Punto activo",
-                        value=activo_actual,
-                        key=f"activo_punto_leg_{row['id']}"
-                    )
-
-                    if st.button(
-                        "💾 Guardar estado del punto",
-                        key=f"guardar_estado_punto_leg_{row['id']}",
-                        use_container_width=True
-                    ):
-                        actualizar_estado_punto_legionella(
-                            row["id"],
-                            nuevo_estado
+                    with col1:
+                        centro_edit = st.selectbox(
+                            "Centro",
+                            list(CENTROS.keys()),
+                            index=list(CENTROS.keys()).index(row["centro"])
+                            if row["centro"] in list(CENTROS.keys()) else 0,
+                            key=f"edit_centro_punto_{row['id']}"
                         )
 
-                        st.success("Estado del punto actualizado.")
+                        edificios_edit = list(CENTROS.get(centro_edit, {}).keys())
+
+                        edificio_edit = st.selectbox(
+                            "Edificio / zona",
+                            edificios_edit + ["Otro"],
+                            index=(edificios_edit + ["Otro"]).index(row["edificio"])
+                            if row["edificio"] in edificios_edit + ["Otro"] else len(edificios_edit),
+                            key=f"edit_edificio_punto_{row['id']}"
+                        )
+
+                        if edificio_edit == "Otro":
+                            edificio_edit = st.text_input(
+                                "Nombre edificio / zona",
+                                value=str(row["edificio"] or ""),
+                                key=f"edit_edificio_otro_punto_{row['id']}"
+                            )
+
+                        instalacion_edit = st.text_input(
+                            "Instalación",
+                            value=str(row["instalacion"] or ""),
+                            key=f"edit_instalacion_punto_{row['id']}"
+                        )
+
+                        tipo_edit = st.selectbox(
+                            "Tipo de punto",
+                            [
+                                "acumulador",
+                                "acumulador_solar",
+                                "retorno",
+                                "grifo",
+                                "ducha",
+                                "deposito",
+                                "otro",
+                            ],
+                            index=[
+                                "acumulador",
+                                "acumulador_solar",
+                                "retorno",
+                                "grifo",
+                                "ducha",
+                                "deposito",
+                                "otro",
+                            ].index(row["tipo_punto"]) if row["tipo_punto"] in [
+                                "acumulador",
+                                "acumulador_solar",
+                                "retorno",
+                                "grifo",
+                                "ducha",
+                                "deposito",
+                                "otro",
+                            ] else 0,
+                            key=f"edit_tipo_punto_{row['id']}"
+                        )
+
+                    with col2:
+                        nombre_edit = st.text_input(
+                            "Nombre punto",
+                            value=str(row["nombre_punto"] or ""),
+                            key=f"edit_nombre_punto_{row['id']}"
+                        )
+
+                        ubicacion_edit = st.text_input(
+                            "Ubicación",
+                            value=str(row["ubicacion"] or ""),
+                            key=f"edit_ubicacion_punto_{row['id']}"
+                        )
+
+                        observaciones_edit = st.text_area(
+                            "Observaciones",
+                            value=str(row["observaciones"] or ""),
+                            key=f"edit_observaciones_punto_{row['id']}"
+                        )
+
+                        activo_edit = st.checkbox(
+                            "Punto activo",
+                            value=bool(row["activo"]),
+                            key=f"edit_activo_punto_{row['id']}"
+                        )
+
+                    if st.button(
+                        "💾 Guardar cambios del punto",
+                        key=f"guardar_edicion_punto_{row['id']}",
+                        use_container_width=True
+                    ):
+                        actualizar_punto_legionella(
+                            row["id"],
+                            centro_edit,
+                            edificio_edit,
+                            instalacion_edit,
+                            tipo_edit,
+                            nombre_edit,
+                            ubicacion_edit,
+                            observaciones_edit,
+                            activo_edit
+                        )
+
+                        st.success("Punto actualizado correctamente.")
                         st.rerun()
 
             with st.expander("📋 Vista rápida de puntos", expanded=False):
