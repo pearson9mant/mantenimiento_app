@@ -7,6 +7,7 @@ from io import BytesIO
 from modules.ordenes import obtener_ordenes, obtener_historico
 from modules.preventivo import generar_ots_preventivo_si_toca
 from database.db import conectar
+from modules.telegram_alertas import enviar_telegram
 
 
 def leer_df_seguro(sql):
@@ -171,6 +172,13 @@ def pantalla_panel():
     activar_auto_refresco_panel(segundos=30)
 
     st.subheader("📊 Panel general")
+    if st.button("📲 Probar Telegram"):
+    ok = enviar_telegram("✅ Telegram conectado correctamente a Mantenimiento Loreto")
+
+    if ok:
+        st.success("Mensaje enviado")
+    else:
+        st.error("Error enviando Telegram")
 
     ordenes = obtener_ordenes()
     historico = obtener_historico()
