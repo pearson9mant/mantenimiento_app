@@ -49,9 +49,11 @@ ESPACIOS_POR_EDIFICIO = {
         "ESO 1A", "ESO 1B", "ESO 1C",
         "ESO 2A", "ESO 2B", "ESO 2C",
         "ESO 3A", "ESO 3B", "ESO 3C",
-        "ESO 4A", "ESO 4B", "ESO 4C",
-        "Bach 1A", "Bach 1B", "Bach 1C",
-        "Bach 2A", "Bach 2B", "Bach 2C",
+        "Capilla",
+        "Cocina",
+        "Comedor",
+        "Laboratorio",
+        "Secretaria",
         "Pasillo",
         "WC",
         "Otro"
@@ -65,9 +67,6 @@ ESPACIOS_POR_EDIFICIO = {
         "Otro"
     ],
     "Edif. C": [
-        "ESO 1A", "ESO 1B", "ESO 1C",
-        "ESO 2A", "ESO 2B", "ESO 2C",
-        "ESO 3A", "ESO 3B", "ESO 3C",
         "ESO 4A", "ESO 4B", "ESO 4C",
         "Bach 1A", "Bach 1B", "Bach 1C",
         "Bach 2A", "Bach 2B", "Bach 2C",
