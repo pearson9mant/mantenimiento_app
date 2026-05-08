@@ -15,6 +15,7 @@ EDIFICIOS_POR_CENTRO = {
     ]
 }
 
+
 ESPACIOS_POR_EDIFICIO = {
     "Infantil/Primaria": [
         "I3A", "I3B", "I3C",
@@ -77,6 +78,36 @@ ESPACIOS_POR_EDIFICIO = {
 }
 
 
+# =====================================================
+# ASEGURAR TABLA
+# =====================================================
+
+def asegurar_tabla_ubicaciones_personalizadas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ubicaciones_personalizadas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            centro TEXT,
+            edificio TEXT,
+            espacio TEXT,
+            activo INTEGER DEFAULT 1
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# =====================================================
+# CENTROS / EDIFICIOS / ESPACIOS BASE
+# =====================================================
+
+def obtener_centros():
+    return CENTROS
+
+
 def obtener_edificios(centro):
     return EDIFICIOS_POR_CENTRO.get(centro, [])
 
@@ -85,18 +116,37 @@ def obtener_espacios_base(edificio):
     return ESPACIOS_POR_EDIFICIO.get(edificio, ["Otro"])
 
 
-def obtener_espacios_personalizados(edificio):
+# =====================================================
+# ESPACIOS PERSONALIZADOS
+# =====================================================
+
+def obtener_espacios_personalizados(edificio, centro=None):
+    asegurar_tabla_ubicaciones_personalizadas()
+
     conn = conectar()
     cursor = conn.cursor()
 
     try:
-        cursor.execute(_sql("""
-            SELECT espacio
-            FROM ubicaciones_personalizadas
-            WHERE edificio = ? AND activo = 1
-            ORDER BY espacio
-        """), (edificio,))
+        if centro:
+            cursor.execute(_sql("""
+                SELECT espacio
+                FROM ubicaciones_personalizadas
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND activo = 1
+                ORDER BY espacio
+            """), (centro, edificio))
+        else:
+            cursor.execute(_sql("""
+                SELECT espacio
+                FROM ubicaciones_personalizadas
+                WHERE edificio = ?
+                  AND activo = 1
+                ORDER BY espacio
+            """), (edificio,))
+
         datos = [fila[0] for fila in cursor.fetchall()]
+
     except Exception:
         datos = []
 
@@ -104,13 +154,15 @@ def obtener_espacios_personalizados(edificio):
     return datos
 
 
-def obtener_espacios(edificio):
+def obtener_espacios(edificio, centro=None):
     base = obtener_espacios_base(edificio)
-    personalizados = obtener_espacios_personalizados(edificio)
+    personalizados = obtener_espacios_personalizados(edificio, centro)
 
     combinados = []
 
     for espacio in base + personalizados:
+        espacio = str(espacio or "").strip()
+
         if espacio and espacio not in combinados:
             combinados.append(espacio)
 
@@ -122,6 +174,10 @@ def obtener_espacios(edificio):
 
 
 def crear_espacio_personalizado(centro, edificio, espacio):
+    asegurar_tabla_ubicaciones_personalizadas()
+
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
     espacio = str(espacio or "").strip()
 
     if not centro or not edificio or not espacio:
@@ -130,7 +186,8 @@ def crear_espacio_personalizado(centro, edificio, espacio):
     if espacio.lower() == "otro":
         return False, "No hace falta crear 'Otro'. Ya existe."
 
-    existentes = [e.lower() for e in obtener_espacios(edificio)]
+    existentes = [e.lower() for e in obtener_espacios(edificio, centro)]
+
     if espacio.lower() in existentes:
         return False, "Ese espacio ya existe."
 
@@ -150,6 +207,8 @@ def crear_espacio_personalizado(centro, edificio, espacio):
 
 
 def obtener_ubicaciones_personalizadas():
+    asegurar_tabla_ubicaciones_personalizadas()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -160,6 +219,7 @@ def obtener_ubicaciones_personalizadas():
             ORDER BY centro, edificio, espacio
         """)
         datos = cursor.fetchall()
+
     except Exception:
         datos = []
 
@@ -168,6 +228,8 @@ def obtener_ubicaciones_personalizadas():
 
 
 def activar_desactivar_espacio(id_ubicacion, activo):
+    asegurar_tabla_ubicaciones_personalizadas()
+
     conn = conectar()
     cursor = conn.cursor()
 
