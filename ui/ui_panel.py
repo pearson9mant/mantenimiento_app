@@ -172,13 +172,14 @@ def pantalla_panel():
     activar_auto_refresco_panel(segundos=30)
 
     st.subheader("📊 Panel general")
+
     if st.button("📲 Probar Telegram"):
         ok = enviar_telegram("✅ Telegram conectado correctamente a Mantenimiento Loreto")
 
-    if ok:
-        st.success("Mensaje enviado")
-    else:
-        st.error("Error enviando Telegram")
+        if ok:
+            st.success("Mensaje enviado")
+        else:
+            st.error("Error enviando Telegram")
 
     ordenes = obtener_ordenes()
     historico = obtener_historico()
