@@ -5,6 +5,7 @@ from database.db import conectar, _sql, _es_postgres
 from modules.ubicaciones import (
     CENTROS,
     obtener_edificios,
+    obtener_espacios,
     obtener_ubicaciones_personalizadas,
     crear_espacio_personalizado,
     activar_desactivar_espacio
@@ -592,30 +593,34 @@ def pantalla_borrados_inicio():
 
 
 # =====================================================
-# PANTALLA CONFIGURACIÓN
+# CONFIGURACIÓN ESPACIOS
 # =====================================================
 
-def pantalla_configuracion():
-    st.subheader("⚙️ Configuración")
+def pantalla_configuracion_espacios():
+    st.markdown("### 🏫 Espacios configurables")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    sub1, sub2, sub3 = st.tabs([
         "➕ Añadir espacio",
-        "📋 Espacios creados",
-        "💧 Legionella",
-        "✅ Checklist preventivo",
-        "🧹 Borrados"
+        "📋 Personalizados",
+        "👀 Ver espacios por edificio"
     ])
 
-    with tab1:
-        st.markdown("### Añadir nuevo espacio")
+    with sub1:
+        st.markdown("#### Añadir nuevo espacio")
 
         centro = st.selectbox("Centro", CENTROS, key="cfg_centro")
         edificios = obtener_edificios(centro)
+
+        if not edificios:
+            st.warning("No hay edificios configurados para este centro.")
+            return
+
         edificio = st.selectbox("Edificio", edificios, key="cfg_edificio")
 
         espacio = st.text_input(
             "Nuevo espacio",
-            placeholder="Ejemplo: Sala psicomotricidad, Almacén, Despacho..."
+            placeholder="Ejemplo: Sala psicomotricidad, Almacén, Despacho...",
+            key="cfg_nuevo_espacio"
         )
 
         if st.button("➕ Crear espacio", use_container_width=True):
@@ -631,8 +636,8 @@ def pantalla_configuracion():
             else:
                 st.warning(mensaje)
 
-    with tab2:
-        st.markdown("### Espacios personalizados")
+    with sub2:
+        st.markdown("#### Espacios personalizados creados")
 
         ubicaciones = obtener_ubicaciones_personalizadas()
 
@@ -666,7 +671,44 @@ def pantalla_configuracion():
                             activar_desactivar_espacio(id_ubicacion, 1)
                             st.rerun()
 
-    with tab3:
+    with sub3:
+        st.markdown("#### Ver espacios disponibles")
+
+        centro_ver = st.selectbox("Centro", CENTROS, key="cfg_ver_centro")
+        edificios_ver = obtener_edificios(centro_ver)
+
+        if not edificios_ver:
+            st.warning("No hay edificios configurados para este centro.")
+            return
+
+        edificio_ver = st.selectbox("Edificio", edificios_ver, key="cfg_ver_edificio")
+
+        espacios = obtener_espacios(edificio_ver, centro_ver)
+
+        st.success(f"Espacios disponibles en {centro_ver} · {edificio_ver}: {len(espacios)}")
+
+        for espacio in espacios:
+            st.markdown(f"- {espacio}")
+
+
+# =====================================================
+# PANTALLA CONFIGURACIÓN
+# =====================================================
+
+def pantalla_configuracion():
+    st.subheader("⚙️ Configuración")
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🏫 Espacios",
+        "💧 Legionella",
+        "✅ Checklist preventivo",
+        "🧹 Borrados"
+    ])
+
+    with tab1:
+        pantalla_configuracion_espacios()
+
+    with tab2:
         st.markdown("### 💧 Configuración Legionella")
 
         if st.button("🧹 Limpiar puntos inválidos (None)", use_container_width=True):
@@ -779,8 +821,8 @@ def pantalla_configuracion():
                                 activar_desactivar_punto_legionella(id_punto, 1)
                                 st.rerun()
 
-    with tab4:
+    with tab3:
         pantalla_checklist_preventivo_config()
 
-    with tab5:
+    with tab4:
         pantalla_borrados_inicio()
