@@ -1,9 +1,11 @@
 from datetime import date
 from database.db import conectar, _sql
+
 try:
     from modules.telegram_alertas import enviar_telegram
 except Exception:
     enviar_telegram = None
+
 
 ESTADOS_VALIDOS = [
     "Abierta",
@@ -15,6 +17,41 @@ ESTADOS_VALIDOS = [
     "En ejecución"
 ]
 
+
+# =====================================================
+# ASEGURAR COLUMNAS OBSERVACIONES ESTADO
+# =====================================================
+
+def asegurar_columnas_observaciones_estado():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    tablas = ["ordenes_trabajo", "historico_ordenes"]
+
+    for tabla in tablas:
+        try:
+            cursor.execute(f"""
+                ALTER TABLE {tabla}
+                ADD COLUMN IF NOT EXISTS observaciones_estado TEXT DEFAULT ''
+            """)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            try:
+                cursor.execute(f"""
+                    ALTER TABLE {tabla}
+                    ADD COLUMN observaciones_estado TEXT DEFAULT ''
+                """)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
+    conn.close()
+
+
+# =====================================================
+# NUMERACIÓN OT
+# =====================================================
 
 def obtener_curso_escolar(fecha=None):
     if fecha is None:
@@ -135,11 +172,7 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
         WHERE centro_codigo = ?
           AND tipo_codigo = ?
           AND curso_escolar = ?
-    """), (
-        centro_codigo,
-        tipo_codigo,
-        curso_escolar
-    ))
+    """), (centro_codigo, tipo_codigo, curso_escolar))
 
     fila = cursor.fetchone()
 
@@ -152,13 +185,7 @@ def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
             WHERE centro_codigo = ?
               AND tipo_codigo = ?
               AND curso_escolar = ?
-        """), (
-            siguiente,
-            centro_codigo,
-            tipo_codigo,
-            curso_escolar
-        ))
-
+        """), (siguiente, centro_codigo, tipo_codigo, curso_escolar))
     else:
         siguiente = 1
 
@@ -200,6 +227,11 @@ def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
         return "EXT"
 
     return "INC"
+
+
+# =====================================================
+# TELEGRAM
+# =====================================================
 
 def avisar_telegram_nueva_ot(
     numero_ot,
@@ -260,7 +292,13 @@ Descripción:
         return False
 
 
+# =====================================================
+# CREAR / OBTENER ÓRDENES
+# =====================================================
+
 def crear_orden(datos):
+    asegurar_columnas_observaciones_estado()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -292,6 +330,7 @@ def crear_orden(datos):
     fecha_realizacion = datos[20] if len(datos) > 20 else ""
     coste_estimado = datos[21] if len(datos) > 21 else 0
     coste_final = datos[22] if len(datos) > 22 else 0
+    observaciones_estado = datos[23] if len(datos) > 23 else ""
 
     if not tipo_solicitante:
         tipo_solicitante = "Operarios"
@@ -337,9 +376,10 @@ def crear_orden(datos):
             fecha_programada,
             fecha_realizacion,
             coste_estimado,
-            coste_final
+            coste_final,
+            observaciones_estado
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         numero_ot,
         descripcion,
@@ -363,7 +403,8 @@ def crear_orden(datos):
         fecha_programada,
         fecha_realizacion,
         coste_estimado,
-        coste_final
+        coste_final,
+        observaciones_estado
     ))
 
     conn.commit()
@@ -386,6 +427,8 @@ def crear_orden(datos):
 
 
 def obtener_ordenes():
+    asegurar_columnas_observaciones_estado()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -395,10 +438,11 @@ def obtener_ordenes():
                solicitante, fecha_origen, foto, tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final
+               coste_estimado, coste_final, observaciones_estado
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
+
     datos = cursor.fetchall()
 
     conn.close()
@@ -406,6 +450,8 @@ def obtener_ordenes():
 
 
 def obtener_historico():
+    asegurar_columnas_observaciones_estado()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -416,10 +462,11 @@ def obtener_historico():
                tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final
+               coste_estimado, coste_final, observaciones_estado
         FROM historico_ordenes
         ORDER BY id DESC
     """)
+
     datos = cursor.fetchall()
 
     conn.close()
@@ -427,6 +474,8 @@ def obtener_historico():
 
 
 def obtener_ordenes_operario(operario):
+    asegurar_columnas_observaciones_estado()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -445,7 +494,7 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final
+                   coste_estimado, coste_final, observaciones_estado
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -457,34 +506,73 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final
+                   coste_estimado, coste_final, observaciones_estado
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
 
     datos = cursor.fetchall()
+
     conn.close()
     return datos
 
 
-def actualizar_estado(id_orden, nuevo_estado):
+# =====================================================
+# ACTUALIZAR ESTADO / OBSERVACIONES
+# =====================================================
+
+def actualizar_estado(id_orden, nuevo_estado, observaciones_estado=None):
     if nuevo_estado not in ESTADOS_VALIDOS:
         return
+
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if observaciones_estado is None:
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET estado = ?
+            WHERE id = ?
+        """), (nuevo_estado, id_orden))
+    else:
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET estado = ?,
+                observaciones_estado = ?
+            WHERE id = ?
+        """), (nuevo_estado, observaciones_estado, id_orden))
+
+    conn.commit()
+    conn.close()
+
+
+def actualizar_observaciones_estado(id_orden, observaciones_estado):
+    asegurar_columnas_observaciones_estado()
 
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute(_sql("""
         UPDATE ordenes_trabajo
-        SET estado = ?
+        SET observaciones_estado = ?
         WHERE id = ?
-    """), (nuevo_estado, id_orden))
+    """), (observaciones_estado, id_orden))
 
     conn.commit()
     conn.close()
 
+    return True
+
+
+# =====================================================
+# FINALIZAR
+# =====================================================
 
 def finalizar_orden(id_orden, observaciones=""):
+    asegurar_columnas_observaciones_estado()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -494,7 +582,7 @@ def finalizar_orden(id_orden, observaciones=""):
                solicitante, fecha_origen, foto, tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final
+               coste_estimado, coste_final, observaciones_estado
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -508,7 +596,7 @@ def finalizar_orden(id_orden, observaciones=""):
             solicitante, fecha_origen, foto, tipo_solicitante,
             tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
             email_empresa, fecha_programada, fecha_realizacion,
-            coste_estimado, coste_final
+            coste_estimado, coste_final, observaciones_estado
         ) = orden
 
         if tipo_orden == "Externa":
@@ -548,9 +636,10 @@ def finalizar_orden(id_orden, observaciones=""):
                 fecha_programada,
                 fecha_realizacion,
                 coste_estimado,
-                coste_final
+                coste_final,
+                observaciones_estado
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -575,7 +664,8 @@ def finalizar_orden(id_orden, observaciones=""):
             fecha_programada,
             fecha_realizacion,
             coste_estimado,
-            coste_final
+            coste_final,
+            observaciones_estado
         ))
 
         cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
@@ -583,6 +673,10 @@ def finalizar_orden(id_orden, observaciones=""):
     conn.commit()
     conn.close()
 
+
+# =====================================================
+# BORRADOS
+# =====================================================
 
 def borrar_orden(id_orden):
     conn = conectar()
@@ -605,6 +699,10 @@ def borrar_orden_historico(id_orden):
     conn.close()
     return True
 
+
+# =====================================================
+# OTROS
+# =====================================================
 
 def actualizar_tipo_solicitante_por_numero(numero_ot, tipo_solicitante):
     conn = conectar()
@@ -669,7 +767,8 @@ def crear_correctiva_desde_ot(
         "",
         "",
         0,
-        0
+        0,
+        ""
     ))
 
     return True, f"Correctiva creada correctamente: {numero_ot}"
