@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
+import math
+import wave
+from io import BytesIO
 
 from modules.ordenes import obtener_ordenes, obtener_historico
 from modules.preventivo import generar_ots_preventivo_si_toca
 from database.db import conectar
-
 
 
 def leer_df_seguro(sql):
@@ -15,6 +17,96 @@ def leer_df_seguro(sql):
         return df
     except Exception:
         return pd.DataFrame()
+
+
+# =====================================================
+# ALERTA SONORA / AUTO REFRESCO
+# =====================================================
+
+def activar_auto_refresco_panel(segundos=30):
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        st_autorefresh(
+            interval=segundos * 1000,
+            key="auto_refresco_panel_general"
+        )
+    except Exception:
+        st.caption(
+            "🔄 Auto-refresco no instalado. Si quieres activarlo: "
+            "pip install streamlit-autorefresh"
+        )
+
+
+def crear_sonido_alerta():
+    sample_rate = 44100
+    duracion = 0.55
+    frecuencia = 880
+    volumen = 0.45
+
+    buffer = BytesIO()
+
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+
+        for i in range(int(sample_rate * duracion)):
+            valor = int(
+                32767
+                * volumen
+                * math.sin(2 * math.pi * frecuencia * i / sample_rate)
+            )
+            wav.writeframesraw(valor.to_bytes(2, byteorder="little", signed=True))
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def reproducir_alerta_sonora():
+    sonido = crear_sonido_alerta()
+
+    try:
+        st.audio(sonido, format="audio/wav", autoplay=True)
+    except TypeError:
+        st.audio(sonido, format="audio/wav")
+
+
+def obtener_numero_ot(o):
+    return str(valor_ot(o, 1, "numero_ot", "") or "").strip()
+
+
+def obtener_origen_ot(o):
+    return str(valor_ot(o, 11, "origen", "") or "").strip().upper()
+
+
+def detectar_ordenes_nuevas(ordenes):
+    actuales = set()
+
+    for o in ordenes:
+        numero_ot = obtener_numero_ot(o)
+        if numero_ot:
+            actuales.add(numero_ot)
+
+    if "panel_ots_vistas" not in st.session_state:
+        st.session_state["panel_ots_vistas"] = actuales
+        return []
+
+    anteriores = st.session_state["panel_ots_vistas"]
+    nuevas = sorted(list(actuales - anteriores))
+
+    st.session_state["panel_ots_vistas"] = actuales
+
+    return nuevas
+
+
+def mostrar_alerta_nuevas_ordenes(ordenes):
+    nuevas = detectar_ordenes_nuevas(ordenes)
+
+    if not nuevas:
+        return
+
+    st.error(f"🔔 Han entrado {len(nuevas)} orden(es) nueva(s): {', '.join(nuevas)}")
+    reproducir_alerta_sonora()
 
 
 # =====================================================
@@ -76,7 +168,15 @@ def calcular_kpis_panel(ordenes, historico):
 
 
 def pantalla_panel():
+    activar_auto_refresco_panel(segundos=30)
+
     st.subheader("📊 Panel general")
+
+    ordenes = obtener_ordenes()
+    historico = obtener_historico()
+
+    mostrar_alerta_nuevas_ordenes(ordenes)
+
     st.markdown("### 🔧 Preventivos")
 
     if st.button("🔄 Generar preventivos que tocan", use_container_width=True):
@@ -88,9 +188,6 @@ def pantalla_panel():
         st.rerun()
 
     st.markdown("---")
-
-    ordenes = obtener_ordenes()
-    historico = obtener_historico()
 
     # -------------------------------
     # KPIs GENERALES NUEVOS
@@ -108,19 +205,19 @@ def pantalla_panel():
 
     st.markdown("---")
 
-    abiertas = len([o for o in ordenes if o[3] == "Abierta"])
-    en_curso = len([o for o in ordenes if o[3] == "En curso"])
-    pendiente_material = len([o for o in ordenes if o[3] == "Pendiente material"])
+    abiertas = len([o for o in ordenes if valor_ot(o, 3, "estado") == "Abierta"])
+    en_curso = len([o for o in ordenes if valor_ot(o, 3, "estado") == "En curso"])
+    pendiente_material = len([o for o in ordenes if valor_ot(o, 3, "estado") == "Pendiente material"])
     finalizadas = len(historico)
 
     ot_legionella = len([
         o for o in ordenes
-        if len(o) > 11 and (o[11] or "").strip().upper() == "LEGIONELLA"
+        if obtener_origen_ot(o) == "LEGIONELLA"
     ])
 
     ot_profesores = len([
         o for o in ordenes
-        if len(o) > 11 and (o[11] or "").strip().upper() in ["OUTLOOK", "APP"]
+        if obtener_origen_ot(o) in ["OUTLOOK", "APP"]
     ])
 
     st.markdown("### Estado de órdenes")
@@ -141,7 +238,7 @@ def pantalla_panel():
 
     ultimas_profes = [
         o for o in ordenes
-        if len(o) > 11 and (o[11] or "").strip().upper() in ["OUTLOOK", "APP"]
+        if obtener_origen_ot(o) in ["OUTLOOK", "APP"]
     ]
 
     ultimas_profes = ultimas_profes[:5]
@@ -151,17 +248,17 @@ def pantalla_panel():
     else:
         for o in ultimas_profes:
             try:
-                numero_ot = o[1]
-                descripcion = o[2]
-                estado = o[3]
-                fecha = o[4]
-                centro = o[5]
-                edificio = o[6]
-                espacio = o[7]
-                area = o[8]
-                prioridad = o[9]
-                operario = o[10]
-                origen = o[11] if len(o) > 11 else ""
+                numero_ot = valor_ot(o, 1, "numero_ot")
+                descripcion = valor_ot(o, 2, "descripcion")
+                estado = valor_ot(o, 3, "estado")
+                fecha = valor_ot(o, 4, "fecha_creacion")
+                centro = valor_ot(o, 5, "centro")
+                edificio = valor_ot(o, 6, "edificio")
+                espacio = valor_ot(o, 7, "espacio")
+                area = valor_ot(o, 8, "area")
+                prioridad = valor_ot(o, 9, "prioridad")
+                operario = valor_ot(o, 10, "operario")
+                origen = valor_ot(o, 11, "origen")
 
                 icono_estado = {
                     "Abierta": "🔴",
@@ -241,14 +338,14 @@ def pantalla_panel():
 
         for o in ultimas:
             try:
-                numero_ot = o[1]
-                descripcion = o[2]
-                estado = o[3]
-                centro = o[5]
-                edificio = o[6]
-                area = o[8]
-                operario = o[10]
-                origen = o[11] if len(o) > 11 else ""
+                numero_ot = valor_ot(o, 1, "numero_ot")
+                descripcion = valor_ot(o, 2, "descripcion")
+                estado = valor_ot(o, 3, "estado")
+                centro = valor_ot(o, 5, "centro")
+                edificio = valor_ot(o, 6, "edificio")
+                area = valor_ot(o, 8, "area")
+                operario = valor_ot(o, 10, "operario")
+                origen = valor_ot(o, 11, "origen")
 
                 st.markdown(
                     f"**{numero_ot}** · {area or '-'} · {estado}  \n"
