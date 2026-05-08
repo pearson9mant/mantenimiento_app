@@ -1,5 +1,9 @@
 from datetime import date
 from database.db import conectar, _sql
+try:
+    from modules.telegram_alertas import enviar_telegram
+except Exception:
+    enviar_telegram = None
 
 ESTADOS_VALIDOS = [
     "Abierta",
@@ -197,6 +201,64 @@ def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
 
     return "INC"
 
+def avisar_telegram_nueva_ot(
+    numero_ot,
+    descripcion,
+    estado,
+    centro,
+    edificio,
+    espacio,
+    area,
+    prioridad,
+    operario,
+    origen,
+    solicitante,
+    tipo_orden
+):
+    if enviar_telegram is None:
+        return False
+
+    try:
+        origen_txt = str(origen or "").strip().upper()
+        prioridad_txt = str(prioridad or "").strip().upper()
+
+        icono = "🔔"
+
+        if origen_txt in ["LEGIONELLA", "LEG"]:
+            icono = "🚨"
+        elif prioridad_txt in ["ALTA", "URGENTE"]:
+            icono = "⚠️"
+        elif origen_txt in ["OUTLOOK", "APP", "PROFESORES"]:
+            icono = "📩"
+        elif origen_txt in ["PREVENTIVO", "PREV"]:
+            icono = "🔧"
+
+        mensaje = f"""
+{icono} NUEVA ORDEN DE TRABAJO
+
+OT: {numero_ot}
+Estado: {estado}
+Prioridad: {prioridad or "-"}
+Tipo: {tipo_orden or "-"}
+Origen: {origen or "-"}
+
+Centro: {centro or "-"}
+Edificio: {edificio or "-"}
+Espacio: {espacio or "-"}
+Área: {area or "-"}
+
+Operario asignado: {operario or "-"}
+Solicitante: {solicitante or "-"}
+
+Descripción:
+{descripcion or "-"}
+"""
+
+        return enviar_telegram(mensaje)
+
+    except Exception:
+        return False
+
 
 def crear_orden(datos):
     conn = conectar()
@@ -306,6 +368,21 @@ def crear_orden(datos):
 
     conn.commit()
     conn.close()
+
+    avisar_telegram_nueva_ot(
+        numero_ot,
+        descripcion,
+        estado,
+        centro,
+        edificio,
+        espacio,
+        area,
+        prioridad,
+        operario,
+        origen,
+        solicitante,
+        tipo_orden
+    )
 
 
 def obtener_ordenes():
