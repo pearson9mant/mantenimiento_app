@@ -8,6 +8,7 @@ from modules.ordenes import (
     finalizar_orden,
     obtener_siguiente_numero_ot,
     actualizar_estado,
+    actualizar_observaciones_estado,
     obtener_historico,
     borrar_orden,
     borrar_orden_historico,
@@ -198,9 +199,9 @@ def mostrar_checklist_preventivo(numero_ot, operario):
     if hechos == total_checks:
         st.success("Checklist preventivo completado.")
         return True
-    else:
-        st.warning("Faltan puntos del checklist por marcar.")
-        return False
+
+    st.warning("Faltan puntos del checklist por marcar.")
+    return False
 
 
 def pantalla_ordenes():
@@ -364,6 +365,7 @@ def pantalla_ordenes():
                             str(fecha_realizacion) if fecha_realizacion else "",
                             coste_estimado,
                             coste_final,
+                            ""
                         )
 
                         crear_orden(datos_orden)
@@ -470,7 +472,18 @@ def pantalla_ordenes():
                 st.info("No hay órdenes activas")
         else:
             for o in ordenes:
-                if len(o) >= 25:
+                observaciones_estado = ""
+
+                if len(o) >= 26:
+                    (
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, foto, tipo_solicitante,
+                        tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                        email_empresa, fecha_programada, fecha_realizacion,
+                        coste_estimado, coste_final, observaciones_estado
+                    ) = o
+                elif len(o) == 25:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
                         centro, edificio, espacio, area, prioridad, operario,
@@ -571,6 +584,9 @@ def pantalla_ordenes():
                         f"🔧 Tipo orden: **{tipo_orden or 'Interna'}**"
                     )
 
+                    if observaciones_estado:
+                        st.info(f"📝 Observación estado: {observaciones_estado}")
+
                     if tipo_orden == "Externa":
                         st.info(
                             f"🏢 Empresa: **{empresa_externa or '-'}**  \n"
@@ -617,9 +633,21 @@ def pantalla_ordenes():
                             key=f"estado_admin_{id_orden}"
                         )
 
+                        observaciones_estado_nueva = st.text_area(
+                            "Observación del estado",
+                            value=str(observaciones_estado or ""),
+                            placeholder="Motivo del estado actual: en curso, material, proveedor...",
+                            key=f"obs_estado_admin_{id_orden}"
+                        )
+
                         if nuevo_estado != estado and nuevo_estado != "Finalizada":
                             if st.button(f"Actualizar {numero_ot}", key=f"act_admin_{id_orden}"):
-                                actualizar_estado(id_orden, nuevo_estado)
+                                actualizar_estado(id_orden, nuevo_estado, observaciones_estado_nueva)
+                                st.rerun()
+                        else:
+                            if st.button(f"Guardar observación {numero_ot}", key=f"obs_admin_{id_orden}"):
+                                actualizar_observaciones_estado(id_orden, observaciones_estado_nueva)
+                                st.success("Observación guardada.")
                                 st.rerun()
 
                     with c3:
@@ -629,10 +657,12 @@ def pantalla_ordenes():
                                 if not checklist_preventivo_completo(numero_ot):
                                     st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
                                 else:
+                                    actualizar_observaciones_estado(id_orden, observaciones_estado)
                                     finalizar_orden(id_orden)
                                     st.success(f"{numero_ot} finalizada")
                                     st.rerun()
                             else:
+                                actualizar_observaciones_estado(id_orden, observaciones_estado)
                                 finalizar_orden(id_orden)
                                 st.success(f"{numero_ot} finalizada")
                                 st.rerun()
@@ -664,7 +694,19 @@ def pantalla_ordenes():
                 st.info("No hay órdenes finalizadas")
         else:
             for h in historico:
-                if len(h) >= 27:
+                observaciones_estado = ""
+
+                if len(h) >= 28:
+                    (
+                        id_orden, numero_ot, descripcion, estado, fecha,
+                        centro, edificio, espacio, area, prioridad, operario,
+                        origen, solicitante, fecha_origen, fecha_cierre,
+                        observaciones_cierre, foto, tipo_solicitante,
+                        tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                        email_empresa, fecha_programada, fecha_realizacion,
+                        coste_estimado, coste_final, observaciones_estado
+                    ) = h
+                elif len(h) == 27:
                     (
                         id_orden, numero_ot, descripcion, estado, fecha,
                         centro, edificio, espacio, area, prioridad, operario,
@@ -780,6 +822,9 @@ def pantalla_ordenes():
 
                         if observaciones_cierre:
                             st.caption(f"📝 {observaciones_cierre}")
+
+                        if observaciones_estado:
+                            st.info(f"📝 Observación durante el estado: {observaciones_estado}")
 
                         if foto:
                             try:
