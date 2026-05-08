@@ -173,7 +173,7 @@ def pantalla_panel():
 
     st.subheader("📊 Panel general")
     if st.button("📲 Probar Telegram"):
-    ok = enviar_telegram("✅ Telegram conectado correctamente a Mantenimiento Loreto")
+        ok = enviar_telegram("✅ Telegram conectado correctamente a Mantenimiento Loreto")
 
     if ok:
         st.success("Mensaje enviado")
