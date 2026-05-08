@@ -3,6 +3,7 @@ import streamlit as st
 from modules.ordenes import (
     obtener_ordenes_operario,
     actualizar_estado,
+    actualizar_observaciones_estado,
     finalizar_orden,
     crear_correctiva_desde_ot
 )
@@ -96,11 +97,6 @@ def limpiar_tarea_preventiva(descripcion):
 
 
 def extraer_datos_ot_legionella(descripcion, espacio):
-    """
-    Espera descripciones tipo:
-    Control Legionella - Purga - Acumulador ACS
-    Control Legionella - Temperatura retorno - Retorno ACS
-    """
     texto = str(descripcion or "").strip()
     partes = [p.strip() for p in texto.split(" - ")]
 
@@ -428,7 +424,39 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
 
 
 def descomponer_orden_operario(fila):
-    if len(fila) >= 16:
+    observaciones_estado = ""
+
+    if len(fila) >= 26:
+        (
+            id_orden,
+            num_ot,
+            desc,
+            est,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+            origen,
+            solicitante,
+            fecha_origen,
+            foto,
+            tipo_solicitante,
+            tipo_orden,
+            empresa_externa,
+            contacto_empresa,
+            telefono_empresa,
+            email_empresa,
+            fecha_programada,
+            fecha_realizacion,
+            coste_estimado,
+            coste_final,
+            observaciones_estado,
+        ) = fila[:26]
+
+    elif len(fila) >= 16:
         (
             id_orden,
             num_ot,
@@ -505,6 +533,7 @@ def descomponer_orden_operario(fila):
         fecha_origen,
         foto,
         tipo_solicitante,
+        observaciones_estado,
     )
 
 
@@ -577,6 +606,7 @@ def mostrar_crear_correctiva_desde_revision(
         st.success("Correctiva creada desde esta revisión.")
 
     return st.session_state.get(f"correctiva_creada_{id_orden}", False)
+
 
 def pantalla_operario():
     st.subheader("👷 Vista operario")
@@ -663,6 +693,7 @@ def pantalla_operario():
             fecha_origen,
             foto,
             tipo_solicitante,
+            observaciones_estado,
         ) = descomponer_orden_operario(fila)
 
         if es_operario() and normalizar_txt(operario) != normalizar_txt(nombre_operario_actual()):
@@ -683,6 +714,10 @@ def pantalla_operario():
             st.markdown(f"{desc}")
             st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}")
             st.caption(f"Estado actual: {est}")
+
+            if observaciones_estado:
+                st.info(f"📝 Observación estado: {observaciones_estado}")
+
             st.caption(f"👷 Operario: {operario or '-'}")
             st.caption(f"📌 Solicitante: {tipo_solicitante or 'Operarios'}")
 
@@ -711,6 +746,7 @@ def pantalla_operario():
                     espacio,
                     operario
                 )
+
             if es_ot_preventiva(origen, desc):
                 mostrar_crear_correctiva_desde_revision(
                     id_orden=id_orden,
@@ -722,7 +758,7 @@ def pantalla_operario():
                     prioridad="Media",
                     operario=operario,
                     origen_base="Preventivo"
-               )
+                )
 
             if es_ot_legionella(area, origen, desc):
                 mostrar_crear_correctiva_desde_revision(
@@ -735,17 +771,27 @@ def pantalla_operario():
                     prioridad="Alta",
                     operario=operario,
                     origen_base="Legionella"
-               )
+                )
+
+            st.markdown("### 📝 Estado y observaciones")
+
+            observacion_estado_nueva = st.text_area(
+                "Observación del estado",
+                value=str(observaciones_estado or ""),
+                placeholder="Ejemplo: En curso porque falta acceder al aula, pendiente de pieza, esperando proveedor...",
+                key=f"observacion_estado_{id_orden}"
+            )
+
             b1, b2, b3 = st.columns(3)
 
             with b1:
                 if st.button("▶\nEn curso", key=f"curso_rapido_{id_orden}", use_container_width=True):
-                    actualizar_estado(id_orden, "En curso")
+                    actualizar_estado(id_orden, "En curso", observacion_estado_nueva)
                     st.rerun()
 
             with b2:
                 if st.button("📦\nMaterial", key=f"mat_rapido_{id_orden}", use_container_width=True):
-                    actualizar_estado(id_orden, "Pendiente material")
+                    actualizar_estado(id_orden, "Pendiente material", observacion_estado_nueva)
                     st.rerun()
 
             with b3:
@@ -765,6 +811,7 @@ def pantalla_operario():
                         elif not puede_finalizar_legionella(id_orden, area, origen, desc):
                             st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
                         else:
+                            actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
                             finalizar_orden(id_orden, "")
                             st.session_state[f"confirmar_fin_rapido_{id_orden}"] = False
                             st.session_state.pop(f"legionella_guardada_{id_orden}", None)
@@ -890,6 +937,7 @@ def pantalla_operario():
                                         for error in errores:
                                             st.error(error)
                                     else:
+                                        actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
                                         finalizar_orden(id_orden, observaciones_fin)
                                         st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
                                         st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
@@ -898,6 +946,7 @@ def pantalla_operario():
                                         st.rerun()
 
                             else:
+                                actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
                                 finalizar_orden(id_orden, observaciones_fin)
                                 st.session_state[f"confirmar_fin_completo_{id_orden}"] = False
                                 st.session_state.pop(f"materiales_confirmados_{id_orden}", None)
