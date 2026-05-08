@@ -1,26 +1,27 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
+
 from database.db import conectar
 
-from config_gerencia import (
-    TIPOS_SOLICITANTE,
-    ESTADOS_HECHAS,
-    ESTADOS_EN_PROCESO,
-    ESTADOS_FALTAN,
-    MOSTRAR_MESES,
-    MOSTRAR_CENTROS,
-    MOSTRAR_INVENTARIO,
-    STOCK_BAJO,
-)
 
-try:
-    from modules.inventario_aulas import obtener_inventario_aulas
-except Exception:
-    obtener_inventario_aulas = None
+CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
+
+ESTADOS_CERRADOS = [
+    "Finalizada",
+    "Finalizado",
+    "Cerrada",
+    "Cerrado"
+]
+
+ESTADOS_MATERIAL = [
+    "Pendiente material",
+    "Esperando material"
+]
 
 
 # =====================================================
-# ESTILO VISUAL GERENCIA PRO
+# ESTILO VISUAL GERENCIA SIMPLE
 # =====================================================
 
 def aplicar_estilo_gerencia():
@@ -47,70 +48,40 @@ def aplicar_estilo_gerencia():
         opacity: 0.92;
     }
 
-    .gerencia-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 20px;
-        padding: 18px;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-        margin-bottom: 18px;
-    }
-
     .gerencia-section-title {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 900;
         color: #0f172a;
-        margin-top: 12px;
+        margin-top: 20px;
         margin-bottom: 12px;
     }
 
-    .gerencia-alert-ok {
-        background: #dcfce7;
-        color: #166534;
-        border: 1px solid #bbf7d0;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 800;
-        margin-bottom: 12px;
-    }
-
-    .gerencia-alert-warning {
-        background: #fef3c7;
-        color: #92400e;
-        border: 1px solid #fde68a;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 800;
-        margin-bottom: 12px;
-    }
-
-    .gerencia-alert-danger {
-        background: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #fecaca;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 800;
-        margin-bottom: 12px;
-    }
-
-    [data-testid="stMetric"] {
-        background: #ffffff;
+    .gerencia-card-info {
+        background: #f8fafc;
         border: 1px solid #e5e7eb;
-        padding: 16px;
         border-radius: 18px;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
-    }
-
-    [data-testid="stMetricLabel"] {
-        font-weight: 800;
+        padding: 14px 16px;
+        margin-bottom: 14px;
         color: #334155;
+        font-weight: 700;
     }
 
-    [data-testid="stMetricValue"] {
-        font-size: 30px !important;
-        font-weight: 900 !important;
+    div.stButton > button {
+        min-height: 92px;
+        border-radius: 20px;
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        font-size: 18px;
+        font-weight: 900;
         color: #0f172a;
+        white-space: pre-line;
+    }
+
+    div.stButton > button:hover {
+        border: 1px solid #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
     }
 
     div[data-testid="stExpander"] {
@@ -133,6 +104,11 @@ def aplicar_estilo_gerencia():
             padding: 20px 18px;
             border-radius: 20px;
         }
+
+        div.stButton > button {
+            min-height: 82px;
+            font-size: 16px;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -144,6 +120,7 @@ def aplicar_estilo_gerencia():
 
 def leer_tabla(nombre_tabla):
     conn = conectar()
+
     try:
         df = pd.read_sql_query(f"SELECT * FROM {nombre_tabla}", conn)
     except Exception:
@@ -154,551 +131,295 @@ def leer_tabla(nombre_tabla):
     return df
 
 
-def clasificar_estado(estado):
-    estado = str(estado).strip()
-
-    if estado in ESTADOS_HECHAS:
-        return "Hechas"
-
-    if estado in ESTADOS_EN_PROCESO:
-        return "En proceso"
-
-    if estado in ESTADOS_FALTAN:
-        return "Faltan"
-
-    return "Faltan"
-
-
-def clasificar_solicitante(row):
-    solicitante = str(row.get("solicitante", "")).strip()
-    origen = str(row.get("origen", "")).strip()
-
-    texto = f"{solicitante} {origen}".lower()
-
-    for tipo, nombres in TIPOS_SOLICITANTE.items():
-        for nombre in nombres:
-            if nombre.lower() in texto:
-                return tipo
-
-    if "profesor" in texto or "forms" in texto or "outlook" in texto:
-        return "Profesores"
-
-    if "incidencia profesor" in texto or "profesores" in texto:
-        return "Profesores"
-
-    if solicitante:
-        return "Profesores"
-
-    return "Sin clasificar"
-
-
 def preparar_ordenes():
     ordenes = leer_tabla("ordenes_trabajo")
     historico = leer_tabla("historico_ordenes")
 
-    if ordenes.empty and historico.empty:
-        return pd.DataFrame()
+    if not ordenes.empty:
+        ordenes["origen_tabla"] = "activas"
 
     if not historico.empty:
+        historico["origen_tabla"] = "historico"
         historico["estado"] = "Finalizada"
+
+    if ordenes.empty and historico.empty:
+        return pd.DataFrame()
 
     df = pd.concat([ordenes, historico], ignore_index=True)
 
     columnas_defecto = {
+        "numero_ot": "",
         "fecha_creacion": "",
         "fecha_cierre": "",
-        "estado": "Abierta",
         "centro": "Sin centro",
         "edificio": "",
         "espacio": "",
         "descripcion": "",
-        "operario": "Sin asignar",
+        "estado": "Abierta",
+        "operario": "",
         "solicitante": "",
         "origen": "",
-        "numero_ot": "",
-        "prioridad": "",
         "area": "",
+        "prioridad": "",
+        "origen_tabla": "",
     }
 
     for col, valor in columnas_defecto.items():
         if col not in df.columns:
             df[col] = valor
 
-    df["grupo_estado"] = df["estado"].apply(clasificar_estado)
-    df["tipo_solicitante"] = df.apply(clasificar_solicitante, axis=1)
+    df["estado"] = df["estado"].fillna("").astype(str).str.strip()
+    df["centro"] = df["centro"].fillna("").astype(str).str.strip()
+    df["origen"] = df["origen"].fillna("").astype(str).str.strip()
+    df["area"] = df["area"].fillna("").astype(str).str.strip()
 
     df["fecha_dt"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
     df["fecha_cierre_dt"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
-
-    df["mes"] = df["fecha_dt"].dt.strftime("%Y-%m").fillna("Sin fecha")
-
-    df["dias_resolucion"] = (
-        df["fecha_cierre_dt"] - df["fecha_dt"]
-    ).dt.days
 
     return df
 
 
 # =====================================================
-# MÉTRICAS
+# FILTROS Y CONTADORES
 # =====================================================
 
-def calcular_metricas(df):
-    total = len(df)
-    hechas = len(df[df["grupo_estado"] == "Hechas"])
-    proceso = len(df[df["grupo_estado"] == "En proceso"])
-    faltan = len(df[df["grupo_estado"] == "Faltan"])
-    rendimiento = round((hechas / total) * 100, 1) if total else 0
-
-    tiempo = (
-        df["dias_resolucion"].dropna()
-        if "dias_resolucion" in df.columns
-        else pd.Series(dtype=float)
+def es_cerrada(df):
+    return (
+        df["estado"].isin(ESTADOS_CERRADOS)
+        | (df["origen_tabla"] == "historico")
     )
 
-    tiempo_medio = round(tiempo.mean(), 1) if not tiempo.empty else 0
 
-    return total, hechas, proceso, faltan, rendimiento, tiempo_medio
+def es_esperando_material(df):
+    return df["estado"].isin(ESTADOS_MATERIAL)
 
 
-def mostrar_metricas(df):
-    total, hechas, proceso, faltan, rendimiento, tiempo_medio = calcular_metricas(df)
+def es_abierta(df):
+    return (
+        (df["origen_tabla"] == "activas")
+        & (~df["estado"].isin(ESTADOS_CERRADOS))
+        & (~df["estado"].isin(ESTADOS_MATERIAL))
+    )
 
-    st.markdown("<div class='gerencia-section-title'>Resumen ejecutivo</div>", unsafe_allow_html=True)
+
+def obtener_df_tarjeta(df, centro, tipo):
+    datos = df[df["centro"] == centro].copy()
+
+    if tipo == "abiertas":
+        return datos[es_abierta(datos)]
+
+    if tipo == "cerradas":
+        return datos[es_cerrada(datos)]
+
+    if tipo == "material":
+        return datos[es_esperando_material(datos)]
+
+    if tipo == "legionella_mes":
+        return filtrar_realizadas_mes(datos, "legionella")
+
+    if tipo == "preventivas_mes":
+        return filtrar_realizadas_mes(datos, "preventivo")
+
+    return pd.DataFrame()
+
+
+def filtrar_realizadas_mes(df, origen_busqueda):
+    if df.empty:
+        return df
+
+    hoy = datetime.today()
+    mes_actual = hoy.month
+    año_actual = hoy.year
+
+    datos = df[es_cerrada(df)].copy()
+
+    if datos.empty:
+        return datos
+
+    fecha_ref = datos["fecha_cierre_dt"]
+
+    if fecha_ref.isna().all():
+        fecha_ref = datos["fecha_dt"]
+
+    datos = datos[
+        (fecha_ref.dt.month == mes_actual)
+        & (fecha_ref.dt.year == año_actual)
+    ]
+
+    texto = (
+        datos["origen"].fillna("").astype(str)
+        + " "
+        + datos["area"].fillna("").astype(str)
+        + " "
+        + datos["descripcion"].fillna("").astype(str)
+    ).str.lower()
+
+    return datos[texto.str.contains(origen_busqueda, na=False)]
+
+
+def contar(df, centro, tipo):
+    return len(obtener_df_tarjeta(df, centro, tipo))
+
+
+# =====================================================
+# TARJETAS
+# =====================================================
+
+def boton_tarjeta(titulo, cantidad, centro, tipo, icono):
+    texto = f"{icono} {cantidad}\n{titulo}"
+
+    if st.button(texto, key=f"gerencia_{centro}_{tipo}", use_container_width=True):
+        st.session_state["gerencia_detalle"] = {
+            "centro": centro,
+            "tipo": tipo,
+            "titulo": titulo
+        }
+        st.rerun()
+
+
+def mostrar_tarjetas_centro(df, centro):
+    st.markdown(
+        f"<div class='gerencia-section-title'>🏫 {centro}</div>",
+        unsafe_allow_html=True
+    )
 
     c1, c2, c3 = st.columns(3)
-    c4, c5, c6 = st.columns(3)
 
-    c1.metric("Total OTs", total)
-    c2.metric("Hechas", hechas)
-    c3.metric("En proceso", proceso)
-    c4.metric("Pendientes", faltan)
-    c5.metric("Rendimiento", f"{rendimiento}%")
-    c6.metric("Media cierre", f"{tiempo_medio} días")
-
-
-def mostrar_estado_general(df):
-    total, hechas, proceso, faltan, rendimiento, tiempo_medio = calcular_metricas(df)
-
-    st.markdown("<div class='gerencia-section-title'>Estado general</div>", unsafe_allow_html=True)
-
-    if total == 0:
-        st.info("No hay datos suficientes para valorar el estado general.")
-        return
-
-    if faltan >= 15:
-        st.markdown(
-            f"<div class='gerencia-alert-danger'>🔴 Atención: hay {faltan} órdenes pendientes. Conviene priorizar cierres.</div>",
-            unsafe_allow_html=True
-        )
-    elif faltan >= 6:
-        st.markdown(
-            f"<div class='gerencia-alert-warning'>🟠 Hay {faltan} órdenes pendientes. Situación controlada, pero a vigilar.</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            f"<div class='gerencia-alert-ok'>🟢 Mantenimiento controlado. Pendientes actuales: {faltan}.</div>",
-            unsafe_allow_html=True
+    with c1:
+        boton_tarjeta(
+            "Órdenes abiertas",
+            contar(df, centro, "abiertas"),
+            centro,
+            "abiertas",
+            "📂"
         )
 
-    if rendimiento < 50:
-        st.warning(f"Rendimiento bajo: {rendimiento}%.")
-    elif rendimiento >= 75:
-        st.success(f"Buen rendimiento: {rendimiento}%.")
-    else:
-        st.info(f"Rendimiento actual: {rendimiento}%.")
+    with c2:
+        boton_tarjeta(
+            "Órdenes cerradas",
+            contar(df, centro, "cerradas"),
+            centro,
+            "cerradas",
+            "✅"
+        )
+
+    with c3:
+        boton_tarjeta(
+            "Esperando material",
+            contar(df, centro, "material"),
+            centro,
+            "material",
+            "📦"
+        )
+
+
+def mostrar_tarjetas_legionella(df):
+    st.markdown(
+        "<div class='gerencia-section-title'>💧 Legionella realizadas este mes</div>",
+        unsafe_allow_html=True
+    )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        boton_tarjeta(
+            "Legionella Pearson 9",
+            contar(df, "Pearson 9", "legionella_mes"),
+            "Pearson 9",
+            "legionella_mes",
+            "💧"
+        )
+
+    with c2:
+        boton_tarjeta(
+            "Legionella Pearson 22",
+            contar(df, "Pearson 22", "legionella_mes"),
+            "Pearson 22",
+            "legionella_mes",
+            "💧"
+        )
+
+
+def mostrar_tarjetas_preventivas(df):
+    st.markdown(
+        "<div class='gerencia-section-title'>🛠️ Preventivas realizadas este mes</div>",
+        unsafe_allow_html=True
+    )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        boton_tarjeta(
+            "Preventivas Pearson 9",
+            contar(df, "Pearson 9", "preventivas_mes"),
+            "Pearson 9",
+            "preventivas_mes",
+            "🛠️"
+        )
+
+    with c2:
+        boton_tarjeta(
+            "Preventivas Pearson 22",
+            contar(df, "Pearson 22", "preventivas_mes"),
+            "Pearson 22",
+            "preventivas_mes",
+            "🛠️"
+        )
 
 
 # =====================================================
-# LEGIONELLA
+# DETALLE
 # =====================================================
 
-def mostrar_legionella():
-    registros = leer_tabla("legionella_registros")
-    incidencias = leer_tabla("legionella_incidencias")
+def mostrar_detalle(df):
+    detalle = st.session_state.get("gerencia_detalle")
 
-    if registros.empty and incidencias.empty:
+    if not detalle:
         return
 
-    st.markdown("<div class='gerencia-section-title'>💧 Legionella</div>", unsafe_allow_html=True)
+    centro = detalle.get("centro")
+    tipo = detalle.get("tipo")
+    titulo = detalle.get("titulo")
 
-    total = len(registros)
-    ok = 0
-    riesgos = 0
-    incidencias_abiertas = 0
+    datos = obtener_df_tarjeta(df, centro, tipo)
 
-    if not registros.empty and "estado" in registros.columns:
-        ok = len(registros[registros["estado"].astype(str).str.upper() == "OK"])
-        riesgos = len(
-            registros[
-                registros["estado"].astype(str).str.upper().isin(["RIESGO", "INCIDENCIA"])
-            ]
-        )
+    st.markdown("---")
+    st.markdown(
+        f"<div class='gerencia-section-title'>📋 Detalle · {titulo} · {centro}</div>",
+        unsafe_allow_html=True
+    )
 
-    if not incidencias.empty and "estado" in incidencias.columns:
-        incidencias_abiertas = len(
-            incidencias[
-                incidencias["estado"].astype(str).str.lower().isin(["abierta", "pendiente"])
-            ]
-        )
+    if st.button("❌ Cerrar detalle", use_container_width=True):
+        st.session_state.pop("gerencia_detalle", None)
+        st.rerun()
 
-    cumplimiento = round((ok / total) * 100, 1) if total else 0
-
-    l1, l2, l3, l4 = st.columns(4)
-    l1.metric("Controles", total)
-    l2.metric("Correctos", ok)
-    l3.metric("Riesgos/incidencias", riesgos)
-    l4.metric("Cumplimiento", f"{cumplimiento}%")
-
-    if incidencias_abiertas > 0:
-        st.markdown(
-            f"<div class='gerencia-alert-danger'>🔴 Hay {incidencias_abiertas} incidencias de Legionella abiertas.</div>",
-            unsafe_allow_html=True
-        )
-    elif riesgos > 0:
-        st.markdown(
-            "<div class='gerencia-alert-warning'>🟠 Hay registros de Legionella con riesgo/incidencia en el histórico.</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            "<div class='gerencia-alert-ok'>🟢 Legionella sin incidencias abiertas.</div>",
-            unsafe_allow_html=True
-        )
-
-    with st.expander("💧 Ver detalle Legionella", expanded=False):
-        if not registros.empty:
-            columnas = [
-                "fecha",
-                "centro",
-                "edificio",
-                "punto",
-                "tarea",
-                "valor",
-                "unidad",
-                "estado",
-                "resultado",
-                "operario",
-            ]
-            columnas = [c for c in columnas if c in registros.columns]
-            st.dataframe(registros[columnas], use_container_width=True, hide_index=True)
-
-        if not incidencias.empty:
-            st.markdown("#### Incidencias")
-            st.dataframe(incidencias, use_container_width=True, hide_index=True)
-
-
-# =====================================================
-# TABLAS RESUMEN
-# =====================================================
-
-def mostrar_tabla_resumen(df, columnas):
-    if df.empty:
-        st.info("No hay datos para mostrar.")
+    if datos.empty:
+        st.info("No hay registros para mostrar.")
         return
 
-    tabla = (
-        df.groupby(columnas + ["grupo_estado"])
-        .size()
-        .reset_index(name="cantidad")
-    )
+    columnas = [
+        "numero_ot",
+        "fecha_creacion",
+        "fecha_cierre",
+        "centro",
+        "edificio",
+        "espacio",
+        "descripcion",
+        "estado",
+        "operario",
+        "solicitante",
+        "origen",
+        "area",
+        "prioridad",
+    ]
 
-    pivot = tabla.pivot_table(
-        index=columnas,
-        columns="grupo_estado",
-        values="cantidad",
-        fill_value=0
-    ).reset_index()
-
-    for col in ["Hechas", "En proceso", "Faltan"]:
-        if col not in pivot.columns:
-            pivot[col] = 0
-
-    pivot["Total"] = pivot["Hechas"] + pivot["En proceso"] + pivot["Faltan"]
-
-    pivot["Rendimiento %"] = pivot.apply(
-        lambda r: round((r["Hechas"] / r["Total"]) * 100, 1) if r["Total"] else 0,
-        axis=1
-    )
-
-    columnas_orden = columnas + ["Hechas", "En proceso", "Faltan", "Total", "Rendimiento %"]
-    pivot = pivot[columnas_orden]
-    pivot = pivot.sort_values(["Faltan", "Total"], ascending=[False, False])
-
-    st.dataframe(pivot, use_container_width=True, hide_index=True)
-
-
-def mostrar_rendimiento_operarios(df):
-    if df.empty:
-        st.info("No hay datos para mostrar.")
-        return
-
-    if "operario" not in df.columns:
-        st.info("No hay columna de operario.")
-        return
-
-    tabla = (
-        df.groupby("operario")
-        .agg(
-            Total=("grupo_estado", "count"),
-            Hechas=("grupo_estado", lambda x: (x == "Hechas").sum()),
-            En_proceso=("grupo_estado", lambda x: (x == "En proceso").sum()),
-            Faltan=("grupo_estado", lambda x: (x == "Faltan").sum()),
-            Media_cierre_dias=("dias_resolucion", "mean"),
-        )
-        .reset_index()
-    )
-
-    tabla["Rendimiento %"] = tabla.apply(
-        lambda r: round((r["Hechas"] / r["Total"]) * 100, 1) if r["Total"] else 0,
-        axis=1
-    )
-
-    tabla["Media_cierre_dias"] = tabla["Media_cierre_dias"].fillna(0).round(1)
-
-    tabla = tabla.rename(columns={
-        "operario": "Operario",
-        "En_proceso": "En proceso",
-        "Media_cierre_dias": "Media cierre días",
-    })
-
-    tabla = tabla.sort_values(["Faltan", "Total"], ascending=[False, False])
+    columnas = [c for c in columnas if c in datos.columns]
 
     st.dataframe(
-        tabla[
-            [
-                "Operario",
-                "Total",
-                "Hechas",
-                "En proceso",
-                "Faltan",
-                "Rendimiento %",
-                "Media cierre días",
-            ]
-        ],
+        datos[columnas],
         use_container_width=True,
         hide_index=True
     )
-
-
-# =====================================================
-# INVENTARIO
-# =====================================================
-
-def mostrar_inventario():
-    inventario = leer_tabla("inventario")
-
-    if inventario.empty:
-        st.info("No hay inventario registrado.")
-        return
-
-    st.markdown("<div class='gerencia-section-title'>📦 Inventario</div>", unsafe_allow_html=True)
-
-    if "activo" in inventario.columns:
-        inventario = inventario[inventario["activo"].fillna(1).astype(int) == 1]
-
-    if "stock" not in inventario.columns:
-        inventario["stock"] = 0
-
-    inventario["stock"] = pd.to_numeric(inventario["stock"], errors="coerce").fillna(0)
-
-    bajo_stock = inventario[inventario["stock"] <= STOCK_BAJO]
-
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("Materiales activos", len(inventario))
-    c2.metric("Stock bajo", len(bajo_stock))
-
-    if "coste_total" in inventario.columns:
-        inventario["coste_total"] = pd.to_numeric(
-            inventario["coste_total"],
-            errors="coerce"
-        ).fillna(0)
-
-        coste_total = inventario["coste_total"].sum()
-        c3.metric("Valor inventario", f"{coste_total:,.2f} €")
-    else:
-        c3.metric("Valor inventario", "Sin datos")
-
-    if len(bajo_stock) > 0:
-        st.markdown(
-            f"<div class='gerencia-alert-warning'>⚠️ Hay {len(bajo_stock)} materiales con stock bajo.</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            "<div class='gerencia-alert-ok'>🟢 Stock general correcto.</div>",
-            unsafe_allow_html=True
-        )
-
-    with st.expander("📉 Materiales con stock bajo", expanded=False):
-        if bajo_stock.empty:
-            st.success("No hay materiales con stock bajo.")
-        else:
-            columnas = [
-                "codigo",
-                "material",
-                "categoria",
-                "stock",
-                "ubicacion",
-            ]
-            columnas = [c for c in columnas if c in bajo_stock.columns]
-            st.dataframe(bajo_stock[columnas], use_container_width=True, hide_index=True)
-
-    with st.expander("📦 Inventario completo", expanded=False):
-        columnas = [
-            "codigo",
-            "material",
-            "categoria",
-            "stock",
-            "precio_unitario",
-            "coste_total",
-            "ubicacion",
-        ]
-        columnas = [c for c in columnas if c in inventario.columns]
-        st.dataframe(inventario[columnas], use_container_width=True, hide_index=True)
-
-
-# =====================================================
-# INVENTARIO AULAS
-# =====================================================
-
-def cargar_inventario_aulas_df():
-    columnas = [
-        "id",
-        "fecha_revision",
-        "centro",
-        "edificio",
-        "espacio",
-        "elemento",
-        "cantidad",
-        "estado",
-        "ancho",
-        "alto",
-        "fondo",
-        "unidad",
-        "observaciones",
-        "foto",
-        "operario",
-        "fecha_creacion",
-    ]
-
-    if obtener_inventario_aulas is not None:
-        try:
-            datos = obtener_inventario_aulas()
-            if datos:
-                return pd.DataFrame(datos, columns=columnas)
-        except Exception:
-            pass
-
-    aulas = leer_tabla("inventario_aulas")
-
-    if aulas.empty:
-        aulas = leer_tabla("aulas_inventario")
-
-    return aulas
-
-
-def mostrar_inventario_aulas():
-    aulas = cargar_inventario_aulas_df()
-
-    if aulas.empty:
-        st.info("No hay inventario de aulas registrado.")
-        return
-
-    st.markdown("<div class='gerencia-section-title'>🏫 Inventario de aulas</div>", unsafe_allow_html=True)
-
-    columnas_base = [
-        "fecha_revision",
-        "centro",
-        "edificio",
-        "espacio",
-        "elemento",
-        "cantidad",
-        "estado",
-        "ancho",
-        "alto",
-        "fondo",
-        "unidad",
-        "observaciones",
-        "operario",
-        "fecha_creacion",
-    ]
-
-    total_registros = len(aulas)
-
-    estados_malos = [
-        "mal",
-        "malo",
-        "averiado",
-        "averiada",
-        "revisar",
-        "pendiente",
-        "deteriorado",
-        "deteriorada",
-        "roto",
-        "rota",
-        "regular",
-    ]
-
-    elementos_revisar = 0
-
-    if "estado" in aulas.columns:
-        elementos_revisar = len(
-            aulas[
-                aulas["estado"]
-                .astype(str)
-                .str.strip()
-                .str.lower()
-                .isin(estados_malos)
-            ]
-        )
-
-    a1, a2 = st.columns(2)
-    a1.metric("Registros aulas", total_registros)
-    a2.metric("Elementos a revisar", elementos_revisar)
-
-    if elementos_revisar > 0:
-        st.markdown(
-            f"<div class='gerencia-alert-warning'>⚠️ Hay {elementos_revisar} elementos de aula a revisar.</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            "<div class='gerencia-alert-ok'>🟢 Inventario de aulas sin elementos críticos.</div>",
-            unsafe_allow_html=True
-        )
-
-    with st.expander("⚠️ Elementos de aula a revisar", expanded=False):
-        if "estado" not in aulas.columns:
-            st.info("No hay columna de estado en inventario de aulas.")
-        else:
-            revisar = aulas[
-                aulas["estado"]
-                .astype(str)
-                .str.strip()
-                .str.lower()
-                .isin(estados_malos)
-            ]
-
-            if revisar.empty:
-                st.success("No hay elementos de aula pendientes de revisar.")
-            else:
-                columnas_revisar = [c for c in columnas_base if c in revisar.columns]
-                st.dataframe(
-                    revisar[columnas_revisar] if columnas_revisar else revisar,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-    with st.expander("🏫 Inventario de aulas completo", expanded=False):
-        columnas = [c for c in columnas_base if c in aulas.columns]
-        st.dataframe(
-            aulas[columnas] if columnas else aulas,
-            use_container_width=True,
-            hide_index=True
-        )
 
 
 # =====================================================
@@ -710,9 +431,9 @@ def pantalla_gerencia():
 
     st.markdown("""
     <div class="gerencia-hero">
-        <div class="gerencia-title">📊 Gerencia PRO</div>
+        <div class="gerencia-title">📊 Gerencia</div>
         <div class="gerencia-subtitle">
-            Control ejecutivo de mantenimiento, órdenes, operarios, Legionella e inventario
+            Resumen simple por centro: abiertas, cerradas, material, Legionella y preventivas
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -720,92 +441,23 @@ def pantalla_gerencia():
     df = preparar_ordenes()
 
     if df.empty:
-        st.warning("No hay órdenes para analizar.")
-
-        mostrar_legionella()
-
-        if MOSTRAR_INVENTARIO:
-            st.markdown("---")
-            mostrar_inventario()
-
-            st.markdown("---")
-            mostrar_inventario_aulas()
-
+        st.warning("No hay órdenes para mostrar todavía.")
         return
 
-    with st.expander("🔎 Filtros", expanded=True):
-        col1, col2 = st.columns(2)
+    st.markdown(
+        "<div class='gerencia-card-info'>Pulsa una tarjeta para ver el detalle filtrado.</div>",
+        unsafe_allow_html=True
+    )
 
-        centros = ["Todos"] + sorted(df["centro"].dropna().astype(str).unique().tolist())
-        centro_sel = col1.selectbox("Centro", centros)
-
-        meses = ["Todos"] + sorted(df["mes"].dropna().astype(str).unique().tolist(), reverse=True)
-        mes_sel = col2.selectbox("Mes", meses)
-
-    if centro_sel != "Todos":
-        df = df[df["centro"] == centro_sel]
-
-    if mes_sel != "Todos":
-        df = df[df["mes"] == mes_sel]
-
-    mostrar_metricas(df)
+    for centro in CENTROS_GERENCIA:
+        mostrar_tarjetas_centro(df, centro)
 
     st.markdown("---")
 
-    mostrar_estado_general(df)
+    mostrar_tarjetas_legionella(df)
 
     st.markdown("---")
 
-    mostrar_legionella()
+    mostrar_tarjetas_preventivas(df)
 
-    st.markdown("---")
-
-    with st.expander("📌 Órdenes por tipo de solicitante", expanded=True):
-        mostrar_tabla_resumen(df, ["tipo_solicitante"])
-
-    with st.expander("👷 Órdenes por operario", expanded=False):
-        mostrar_tabla_resumen(df, ["operario"])
-
-    with st.expander("📈 Rendimiento real por operario", expanded=False):
-        mostrar_rendimiento_operarios(df)
-
-    if MOSTRAR_CENTROS:
-        with st.expander("🏫 Órdenes por centro", expanded=False):
-            mostrar_tabla_resumen(df, ["centro"])
-
-    if MOSTRAR_MESES:
-        with st.expander("📅 Órdenes por mes", expanded=False):
-            mostrar_tabla_resumen(df, ["mes"])
-
-    with st.expander("📋 Detalle de órdenes", expanded=False):
-        columnas = [
-            "numero_ot",
-            "fecha_creacion",
-            "fecha_cierre",
-            "centro",
-            "edificio",
-            "espacio",
-            "descripcion",
-            "estado",
-            "grupo_estado",
-            "operario",
-            "solicitante",
-            "tipo_solicitante",
-            "origen",
-            "dias_resolucion",
-        ]
-
-        columnas = [c for c in columnas if c in df.columns]
-
-        st.dataframe(
-            df[columnas],
-            use_container_width=True,
-            hide_index=True
-        )
-
-    if MOSTRAR_INVENTARIO:
-        st.markdown("---")
-        mostrar_inventario()
-
-        st.markdown("---")
-        mostrar_inventario_aulas()
+    mostrar_detalle(df)
