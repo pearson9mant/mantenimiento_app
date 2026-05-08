@@ -8,7 +8,8 @@ from modules.ubicaciones import (
     obtener_espacios,
     obtener_ubicaciones_personalizadas,
     crear_espacio_personalizado,
-    activar_desactivar_espacio
+    activar_desactivar_espacio,
+    borrar_espacio_personalizado  
 )
 
 
@@ -635,7 +636,6 @@ def pantalla_configuracion_espacios():
                 st.rerun()
             else:
                 st.warning(mensaje)
-
     with sub2:
         st.markdown("#### Espacios personalizados creados")
 
@@ -654,8 +654,11 @@ def pantalla_configuracion_espacios():
                     st.markdown(f"**Espacio:** {espacio}")
                     st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
 
-                    if activo:
-                        if st.button(
+                    c1, c2 = st.columns(2)
+
+                    with c1:
+                       if activo:
+                            if st.button(
                             f"⛔ Desactivar {espacio}",
                             key=f"desactivar_espacio_{id_ubicacion}",
                             use_container_width=True
@@ -670,6 +673,24 @@ def pantalla_configuracion_espacios():
                         ):
                             activar_desactivar_espacio(id_ubicacion, 1)
                             st.rerun()
+
+                with c2:
+                    confirmar = st.checkbox(
+                        "Confirmar borrado",
+                        key=f"confirmar_borrar_espacio_{id_ubicacion}"
+                    )
+
+                    if st.button(
+                        f"🗑️ Borrar {espacio}",
+                        key=f"borrar_espacio_{id_ubicacion}",
+                        use_container_width=True
+                    ):
+                        if confirmar:
+                            borrar_espacio_personalizado(id_ubicacion)
+                            st.warning("Espacio eliminado.")
+                            st.rerun()
+                        else:
+                            st.error("Marca la confirmación antes de borrar.")
 
     with sub3:
         st.markdown("#### Ver espacios disponibles")
