@@ -251,3 +251,17 @@ def activar_desactivar_espacio(id_ubicacion, activo):
     conn.close()
 
     return True
+
+def borrar_espacio_personalizado(id_ubicacion):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        DELETE FROM ubicaciones_personalizadas
+        WHERE id = ?
+    """), (id_ubicacion,))
+
+    conn.commit()
+    conn.close()
+
+    return True
