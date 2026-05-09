@@ -67,12 +67,12 @@ def aplicar_estilo_gerencia():
     }
 
     div.stButton > button {
-        min-height: 92px;
+        min-height: 90px;
         border-radius: 20px;
         border: 1px solid #e5e7eb;
         background: #ffffff;
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 900;
         color: #0f172a;
         white-space: pre-line;
@@ -106,8 +106,8 @@ def aplicar_estilo_gerencia():
         }
 
         div.stButton > button {
-            min-height: 82px;
-            font-size: 16px;
+            min-height: 78px;
+            font-size: 15px;
         }
     }
     </style>
@@ -131,6 +131,15 @@ def leer_tabla(nombre_tabla):
     return df
 
 
+def leer_primera_tabla_existente(posibles_tablas):
+    for tabla in posibles_tablas:
+        df = leer_tabla(tabla)
+        if not df.empty:
+            return df, tabla
+
+    return pd.DataFrame(), ""
+
+
 def preparar_ordenes():
     ordenes = leer_tabla("ordenes_trabajo")
     historico = leer_tabla("historico_ordenes")
@@ -140,7 +149,8 @@ def preparar_ordenes():
 
     if not historico.empty:
         historico["origen_tabla"] = "historico"
-        historico["estado"] = "Finalizada"
+        if "estado" not in historico.columns:
+            historico["estado"] = "Finalizada"
 
     if ordenes.empty and historico.empty:
         return pd.DataFrame()
@@ -172,11 +182,194 @@ def preparar_ordenes():
     df["centro"] = df["centro"].fillna("").astype(str).str.strip()
     df["origen"] = df["origen"].fillna("").astype(str).str.strip()
     df["area"] = df["area"].fillna("").astype(str).str.strip()
+    df["descripcion"] = df["descripcion"].fillna("").astype(str)
 
     df["fecha_dt"] = pd.to_datetime(df["fecha_creacion"], errors="coerce")
     df["fecha_cierre_dt"] = pd.to_datetime(df["fecha_cierre"], errors="coerce")
 
     return df
+
+
+# =====================================================
+# INVENTARIO
+# =====================================================
+
+def preparar_inventario():
+    df = leer_tabla("inventario")
+
+    if df.empty:
+        return pd.DataFrame()
+
+    columnas_defecto = {
+        "codigo": "",
+        "material": "",
+        "nombre": "",
+        "categoria": "",
+        "stock": 0,
+        "stock_actual": 0,
+        "precio_unitario": 0,
+        "coste_total": 0,
+        "centro": "",
+        "ubicacion": "",
+        "activo": 1,
+        "fecha_compra": "",
+    }
+
+    for col, valor in columnas_defecto.items():
+        if col not in df.columns:
+            df[col] = valor
+
+    if "material" in df.columns and "nombre" in df.columns:
+        df["material_mostrar"] = df["material"].fillna("")
+        df.loc[df["material_mostrar"].astype(str).str.strip() == "", "material_mostrar"] = df["nombre"]
+    else:
+        df["material_mostrar"] = ""
+
+    df["stock_num"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0)
+
+    if df["stock_num"].sum() == 0 and "stock_actual" in df.columns:
+        df["stock_num"] = pd.to_numeric(df["stock_actual"], errors="coerce").fillna(0)
+
+    df["precio_num"] = pd.to_numeric(df["precio_unitario"], errors="coerce").fillna(0)
+    df["coste_total_num"] = pd.to_numeric(df["coste_total"], errors="coerce").fillna(0)
+
+    df["valor_total"] = df["coste_total_num"]
+    df.loc[df["valor_total"] == 0, "valor_total"] = df["stock_num"] * df["precio_num"]
+
+    if "activo" in df.columns:
+        df = df[
+            (df["activo"].isna())
+            | (df["activo"].astype(str).isin(["1", "True", "true", "Activo", "activo", ""]))
+        ]
+
+    return df
+
+
+def preparar_movimientos_inventario():
+    movimientos, tabla = leer_primera_tabla_existente([
+        "movimientos_inventario",
+        "inventario_movimientos",
+        "movimientos_material",
+        "historico_inventario"
+    ])
+
+    if movimientos.empty:
+        return pd.DataFrame()
+
+    columnas_defecto = {
+        "fecha": "",
+        "fecha_movimiento": "",
+        "numero_ot": "",
+        "ot": "",
+        "orden_trabajo": "",
+        "material": "",
+        "nombre_material": "",
+        "tipo": "",
+        "movimiento": "",
+        "cantidad": 0,
+        "precio_unitario": 0,
+        "coste_total": 0,
+        "coste": 0,
+        "operario": "",
+        "centro": "",
+        "observaciones": "",
+    }
+
+    for col, valor in columnas_defecto.items():
+        if col not in movimientos.columns:
+            movimientos[col] = valor
+
+    movimientos["tabla_origen"] = tabla
+
+    movimientos["fecha_mostrar"] = movimientos["fecha"].fillna("").astype(str)
+    movimientos.loc[movimientos["fecha_mostrar"].str.strip() == "", "fecha_mostrar"] = movimientos["fecha_movimiento"].fillna("").astype(str)
+
+    movimientos["numero_ot_mostrar"] = movimientos["numero_ot"].fillna("").astype(str)
+    movimientos.loc[movimientos["numero_ot_mostrar"].str.strip() == "", "numero_ot_mostrar"] = movimientos["ot"].fillna("").astype(str)
+    movimientos.loc[movimientos["numero_ot_mostrar"].str.strip() == "", "numero_ot_mostrar"] = movimientos["orden_trabajo"].fillna("").astype(str)
+
+    movimientos["material_mostrar"] = movimientos["material"].fillna("").astype(str)
+    movimientos.loc[movimientos["material_mostrar"].str.strip() == "", "material_mostrar"] = movimientos["nombre_material"].fillna("").astype(str)
+
+    movimientos["tipo_mostrar"] = movimientos["tipo"].fillna("").astype(str)
+    movimientos.loc[movimientos["tipo_mostrar"].str.strip() == "", "tipo_mostrar"] = movimientos["movimiento"].fillna("").astype(str)
+
+    movimientos["cantidad_num"] = pd.to_numeric(movimientos["cantidad"], errors="coerce").fillna(0)
+    movimientos["precio_num"] = pd.to_numeric(movimientos["precio_unitario"], errors="coerce").fillna(0)
+    movimientos["coste_total_num"] = pd.to_numeric(movimientos["coste_total"], errors="coerce").fillna(0)
+
+    if movimientos["coste_total_num"].sum() == 0:
+        movimientos["coste_total_num"] = pd.to_numeric(movimientos["coste"], errors="coerce").fillna(0)
+
+    movimientos.loc[movimientos["coste_total_num"] == 0, "coste_total_num"] = (
+        movimientos["cantidad_num"].abs() * movimientos["precio_num"]
+    )
+
+    texto_tipo = movimientos["tipo_mostrar"].fillna("").astype(str).str.lower()
+
+    usados = movimientos[
+        texto_tipo.str.contains("salida|uso|utilizado|consumo|retirada", na=False)
+        | (movimientos["cantidad_num"] < 0)
+    ].copy()
+
+    return usados
+
+
+def filtrar_inventario_por_centro(df, centro):
+    if df.empty:
+        return df
+
+    if "centro" in df.columns and df["centro"].fillna("").astype(str).str.strip().any():
+        return df[df["centro"].fillna("").astype(str).str.strip() == centro].copy()
+
+    if "ubicacion" in df.columns:
+        texto = df["ubicacion"].fillna("").astype(str).str.lower()
+        if centro == "Pearson 9":
+            return df[texto.str.contains("pearson 9|p9", na=False)].copy()
+        if centro == "Pearson 22":
+            return df[texto.str.contains("pearson 22|p22", na=False)].copy()
+
+    return df.copy()
+
+
+def filtrar_movimientos_por_centro(movimientos, ordenes, centro):
+    if movimientos.empty:
+        return movimientos
+
+    if "centro" in movimientos.columns and movimientos["centro"].fillna("").astype(str).str.strip().any():
+        return movimientos[movimientos["centro"].fillna("").astype(str).str.strip() == centro].copy()
+
+    if ordenes.empty or "numero_ot" not in ordenes.columns:
+        return movimientos.copy()
+
+    mapa_ot = ordenes[["numero_ot", "centro"]].dropna().copy()
+    mapa_ot["numero_ot"] = mapa_ot["numero_ot"].astype(str)
+    mapa_ot["centro"] = mapa_ot["centro"].astype(str)
+
+    datos = movimientos.copy()
+    datos["numero_ot_mostrar"] = datos["numero_ot_mostrar"].astype(str)
+
+    datos = datos.merge(
+        mapa_ot,
+        left_on="numero_ot_mostrar",
+        right_on="numero_ot",
+        how="left",
+        suffixes=("", "_orden")
+    )
+
+    return datos[datos["centro_orden"] == centro].copy()
+
+
+def total_inventario_centro(centro):
+    inventario = preparar_inventario()
+    datos = filtrar_inventario_por_centro(inventario, centro)
+    return float(datos["valor_total"].sum()) if not datos.empty else 0.0
+
+
+def total_utilizado_centro(centro, ordenes):
+    movimientos = preparar_movimientos_inventario()
+    datos = filtrar_movimientos_por_centro(movimientos, ordenes, centro)
+    return float(datos["coste_total_num"].sum()) if not datos.empty else 0.0
 
 
 # =====================================================
@@ -200,27 +393,6 @@ def es_abierta(df):
         & (~df["estado"].isin(ESTADOS_CERRADOS))
         & (~df["estado"].isin(ESTADOS_MATERIAL))
     )
-
-
-def obtener_df_tarjeta(df, centro, tipo):
-    datos = df[df["centro"] == centro].copy()
-
-    if tipo == "abiertas":
-        return datos[es_abierta(datos)]
-
-    if tipo == "cerradas":
-        return datos[es_cerrada(datos)]
-
-    if tipo == "material":
-        return datos[es_esperando_material(datos)]
-
-    if tipo == "legionella_mes":
-        return filtrar_realizadas_mes(datos, "legionella")
-
-    if tipo == "preventivas_mes":
-        return filtrar_realizadas_mes(datos, "preventivo")
-
-    return pd.DataFrame()
 
 
 def filtrar_realizadas_mes(df, origen_busqueda):
@@ -257,141 +429,143 @@ def filtrar_realizadas_mes(df, origen_busqueda):
     return datos[texto.str.contains(origen_busqueda, na=False)]
 
 
+def obtener_df_tarjeta(df, centro, tipo):
+    datos = df[df["centro"] == centro].copy()
+
+    if tipo == "abiertas":
+        return datos[es_abierta(datos)]
+
+    if tipo == "cerradas":
+        return datos[es_cerrada(datos)]
+
+    if tipo == "material":
+        return datos[es_esperando_material(datos)]
+
+    if tipo == "legionella_mes":
+        return filtrar_realizadas_mes(datos, "legionella")
+
+    if tipo == "preventivas_mes":
+        return filtrar_realizadas_mes(datos, "preventivo")
+
+    return pd.DataFrame()
+
+
 def contar(df, centro, tipo):
     return len(obtener_df_tarjeta(df, centro, tipo))
 
 
+def euros(valor):
+    try:
+        return f"{float(valor):,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00 €"
+
+
 # =====================================================
-# TARJETAS
+# BOTONES
 # =====================================================
+
+def seleccionar_detalle(centro, tipo, titulo):
+    st.session_state["gerencia_detalle"] = {
+        "centro": centro,
+        "tipo": tipo,
+        "titulo": titulo
+    }
+    st.rerun()
+
 
 def boton_tarjeta(titulo, cantidad, centro, tipo, icono):
     texto = f"{icono} {cantidad}\n{titulo}"
 
     if st.button(texto, key=f"gerencia_{centro}_{tipo}", use_container_width=True):
-        st.session_state["gerencia_detalle"] = {
-            "centro": centro,
-            "tipo": tipo,
-            "titulo": titulo
-        }
-        st.rerun()
+        seleccionar_detalle(centro, tipo, titulo)
 
 
-def mostrar_tarjetas_centro(df, centro):
-    st.markdown(
-        f"<div class='gerencia-section-title'>🏫 {centro}</div>",
-        unsafe_allow_html=True
-    )
+def boton_tarjeta_dinero(titulo, importe, centro, tipo, icono):
+    texto = f"{icono} {euros(importe)}\n{titulo}"
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        boton_tarjeta(
-            "Órdenes abiertas",
-            contar(df, centro, "abiertas"),
-            centro,
-            "abiertas",
-            "📂"
-        )
-
-    with c2:
-        boton_tarjeta(
-            "Órdenes cerradas",
-            contar(df, centro, "cerradas"),
-            centro,
-            "cerradas",
-            "✅"
-        )
-
-    with c3:
-        boton_tarjeta(
-            "Esperando material",
-            contar(df, centro, "material"),
-            centro,
-            "material",
-            "📦"
-        )
-
-
-def mostrar_tarjetas_legionella(df):
-    st.markdown(
-        "<div class='gerencia-section-title'>💧 Legionella realizadas este mes</div>",
-        unsafe_allow_html=True
-    )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        boton_tarjeta(
-            "Legionella Pearson 9",
-            contar(df, "Pearson 9", "legionella_mes"),
-            "Pearson 9",
-            "legionella_mes",
-            "💧"
-        )
-
-    with c2:
-        boton_tarjeta(
-            "Legionella Pearson 22",
-            contar(df, "Pearson 22", "legionella_mes"),
-            "Pearson 22",
-            "legionella_mes",
-            "💧"
-        )
-
-
-def mostrar_tarjetas_preventivas(df):
-    st.markdown(
-        "<div class='gerencia-section-title'>🛠️ Preventivas realizadas este mes</div>",
-        unsafe_allow_html=True
-    )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        boton_tarjeta(
-            "Preventivas Pearson 9",
-            contar(df, "Pearson 9", "preventivas_mes"),
-            "Pearson 9",
-            "preventivas_mes",
-            "🛠️"
-        )
-
-    with c2:
-        boton_tarjeta(
-            "Preventivas Pearson 22",
-            contar(df, "Pearson 22", "preventivas_mes"),
-            "Pearson 22",
-            "preventivas_mes",
-            "🛠️"
-        )
+    if st.button(texto, key=f"gerencia_{centro}_{tipo}", use_container_width=True):
+        seleccionar_detalle(centro, tipo, titulo)
 
 
 # =====================================================
-# DETALLE
+# CENTROS
 # =====================================================
 
-def mostrar_detalle(df):
-    detalle = st.session_state.get("gerencia_detalle")
+def mostrar_centro(df, centro):
+    with st.expander(f"🏫 {centro}", expanded=False):
+        c1, c2 = st.columns(2)
 
-    if not detalle:
-        return
+        with c1:
+            boton_tarjeta(
+                "Órdenes abiertas",
+                contar(df, centro, "abiertas"),
+                centro,
+                "abiertas",
+                "📂"
+            )
 
-    centro = detalle.get("centro")
-    tipo = detalle.get("tipo")
-    titulo = detalle.get("titulo")
+        with c2:
+            boton_tarjeta(
+                "Órdenes cerradas",
+                contar(df, centro, "cerradas"),
+                centro,
+                "cerradas",
+                "✅"
+            )
 
+        c3, c4 = st.columns(2)
+
+        with c3:
+            boton_tarjeta(
+                "Legionella este mes",
+                contar(df, centro, "legionella_mes"),
+                centro,
+                "legionella_mes",
+                "💧"
+            )
+
+        with c4:
+            boton_tarjeta(
+                "Preventivas este mes",
+                contar(df, centro, "preventivas_mes"),
+                centro,
+                "preventivas_mes",
+                "🛠️"
+            )
+
+        st.markdown("### 💶 Inventario")
+
+        total_inv = total_inventario_centro(centro)
+        total_usado = total_utilizado_centro(centro, df)
+
+        c5, c6 = st.columns(2)
+
+        with c5:
+            boton_tarjeta_dinero(
+                "Total inventario",
+                total_inv,
+                centro,
+                "inventario_total",
+                "💰"
+            )
+
+        with c6:
+            boton_tarjeta_dinero(
+                "Material utilizado",
+                total_usado,
+                centro,
+                "inventario_utilizado",
+                "📉"
+            )
+
+
+# =====================================================
+# DETALLES
+# =====================================================
+
+def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     datos = obtener_df_tarjeta(df, centro, tipo)
-
-    st.markdown("---")
-    st.markdown(
-        f"<div class='gerencia-section-title'>📋 Detalle · {titulo} · {centro}</div>",
-        unsafe_allow_html=True
-    )
-
-    if st.button("❌ Cerrar detalle", use_container_width=True):
-        st.session_state.pop("gerencia_detalle", None)
-        st.rerun()
 
     if datos.empty:
         st.info("No hay registros para mostrar.")
@@ -422,6 +596,97 @@ def mostrar_detalle(df):
     )
 
 
+def mostrar_detalle_inventario_total(centro):
+    inventario = preparar_inventario()
+    datos = filtrar_inventario_por_centro(inventario, centro)
+
+    if datos.empty:
+        st.info("No hay inventario registrado para mostrar.")
+        return
+
+    columnas = [
+        "codigo",
+        "material_mostrar",
+        "categoria",
+        "stock_num",
+        "precio_num",
+        "valor_total",
+        "ubicacion",
+        "fecha_compra",
+    ]
+
+    columnas = [c for c in columnas if c in datos.columns]
+
+    st.metric("💰 Total inventario", euros(datos["valor_total"].sum()))
+
+    st.dataframe(
+        datos[columnas],
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+def mostrar_detalle_inventario_utilizado(centro, ordenes):
+    movimientos = preparar_movimientos_inventario()
+    datos = filtrar_movimientos_por_centro(movimientos, ordenes, centro)
+
+    if datos.empty:
+        st.info("No hay material utilizado registrado para mostrar.")
+        return
+
+    columnas = [
+        "fecha_mostrar",
+        "numero_ot_mostrar",
+        "material_mostrar",
+        "cantidad_num",
+        "precio_num",
+        "coste_total_num",
+        "operario",
+        "observaciones",
+    ]
+
+    columnas = [c for c in columnas if c in datos.columns]
+
+    st.metric("📉 Total material utilizado", euros(datos["coste_total_num"].sum()))
+
+    st.dataframe(
+        datos[columnas],
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+def mostrar_detalle(df):
+    detalle = st.session_state.get("gerencia_detalle")
+
+    if not detalle:
+        return
+
+    centro = detalle.get("centro")
+    tipo = detalle.get("tipo")
+    titulo = detalle.get("titulo")
+
+    st.markdown("---")
+    st.markdown(
+        f"<div class='gerencia-section-title'>📋 Detalle · {titulo} · {centro}</div>",
+        unsafe_allow_html=True
+    )
+
+    if st.button("❌ Cerrar detalle", use_container_width=True):
+        st.session_state.pop("gerencia_detalle", None)
+        st.rerun()
+
+    if tipo == "inventario_total":
+        mostrar_detalle_inventario_total(centro)
+        return
+
+    if tipo == "inventario_utilizado":
+        mostrar_detalle_inventario_utilizado(centro, df)
+        return
+
+    mostrar_detalle_ordenes(df, centro, tipo, titulo)
+
+
 # =====================================================
 # PANTALLA PRINCIPAL
 # =====================================================
@@ -433,7 +698,7 @@ def pantalla_gerencia():
     <div class="gerencia-hero">
         <div class="gerencia-title">📊 Gerencia</div>
         <div class="gerencia-subtitle">
-            Resumen simple por centro: abiertas, cerradas, material, Legionella y preventivas
+            Vista simplificada por centro: órdenes, Legionella, preventivas e inventario
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -442,22 +707,14 @@ def pantalla_gerencia():
 
     if df.empty:
         st.warning("No hay órdenes para mostrar todavía.")
-        return
+        df = pd.DataFrame()
 
     st.markdown(
-        "<div class='gerencia-card-info'>Pulsa una tarjeta para ver el detalle filtrado.</div>",
+        "<div class='gerencia-card-info'>Pulsa un centro para abrir su resumen. Pulsa una tarjeta para ver el detalle.</div>",
         unsafe_allow_html=True
     )
 
     for centro in CENTROS_GERENCIA:
-        mostrar_tarjetas_centro(df, centro)
-
-    st.markdown("---")
-
-    mostrar_tarjetas_legionella(df)
-
-    st.markdown("---")
-
-    mostrar_tarjetas_preventivas(df)
+        mostrar_centro(df, centro)
 
     mostrar_detalle(df)
