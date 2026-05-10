@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from database.db import conectar, _sql
 
 try:
@@ -14,13 +14,22 @@ ESTADOS_VALIDOS = [
     "Finalizada",
     "Pendiente proveedor",
     "Avisado",
-    "En ejecución"
+    "Pendiente presupuesto",
+    "En ejecución",
+    "Cerrado"
 ]
 
 
 # =====================================================
-# ASEGURAR COLUMNAS OBSERVACIONES ESTADO
+# ASEGURAR COLUMNAS OBSERVACIONES / EXTERNAS
 # =====================================================
+
+def _add_column_seguro(cursor, tabla, columna, tipo):
+    try:
+        cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+    except Exception:
+        pass
+
 
 def asegurar_columnas_observaciones_estado():
     conn = conectar()
@@ -28,24 +37,30 @@ def asegurar_columnas_observaciones_estado():
 
     tablas = ["ordenes_trabajo", "historico_ordenes"]
 
-    for tabla in tablas:
-        try:
-            cursor.execute(f"""
-                ALTER TABLE {tabla}
-                ADD COLUMN IF NOT EXISTS observaciones_estado TEXT DEFAULT ''
-            """)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            try:
-                cursor.execute(f"""
-                    ALTER TABLE {tabla}
-                    ADD COLUMN observaciones_estado TEXT DEFAULT ''
-                """)
-                conn.commit()
-            except Exception:
-                conn.rollback()
+    columnas = [
+        ("observaciones_estado", "TEXT DEFAULT ''"),
+        ("tipo_orden", "TEXT DEFAULT 'Interna'"),
+        ("empresa_externa", "TEXT"),
+        ("contacto_empresa", "TEXT"),
+        ("telefono_empresa", "TEXT"),
+        ("email_empresa", "TEXT"),
+        ("fecha_programada", "TEXT"),
+        ("fecha_aviso_empresa", "TEXT"),
+        ("fecha_realizacion", "TEXT"),
+        ("trabajo_a_realizar", "TEXT"),
+        ("trabajo_realizado", "TEXT"),
+        ("firma_operario", "TEXT"),
+        ("fecha_firma_operario", "TEXT"),
+        ("coste_estimado", "REAL DEFAULT 0"),
+        ("coste_final", "REAL DEFAULT 0"),
+        ("foto", "TEXT"),
+    ]
 
+    for tabla in tablas:
+        for columna, tipo in columnas:
+            _add_column_seguro(cursor, tabla, columna, tipo)
+
+    conn.commit()
     conn.close()
 
 
@@ -264,6 +279,8 @@ def avisar_telegram_nueva_ot(
             icono = "📩"
         elif origen_txt in ["PREVENTIVO", "PREV"]:
             icono = "🔧"
+        elif origen_txt in ["EXTERNA", "EXT", "EMPRESA"]:
+            icono = "🏢"
 
         mensaje = f"""
 {icono} NUEVA ORDEN DE TRABAJO
@@ -326,11 +343,31 @@ def crear_orden(datos):
     contacto_empresa = datos[16] if len(datos) > 16 else ""
     telefono_empresa = datos[17] if len(datos) > 17 else ""
     email_empresa = datos[18] if len(datos) > 18 else ""
-    fecha_programada = datos[19] if len(datos) > 19 else ""
-    fecha_realizacion = datos[20] if len(datos) > 20 else ""
-    coste_estimado = datos[21] if len(datos) > 21 else 0
-    coste_final = datos[22] if len(datos) > 22 else 0
-    observaciones_estado = datos[23] if len(datos) > 23 else ""
+
+    # Formato nuevo
+    if len(datos) > 27:
+        fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
+        fecha_realizacion = datos[20] if len(datos) > 20 else ""
+        trabajo_a_realizar = datos[21] if len(datos) > 21 else ""
+        trabajo_realizado = datos[22] if len(datos) > 22 else ""
+        firma_operario = datos[23] if len(datos) > 23 else ""
+        fecha_firma_operario = datos[24] if len(datos) > 24 else ""
+        coste_estimado = datos[25] if len(datos) > 25 else 0
+        coste_final = datos[26] if len(datos) > 26 else 0
+        observaciones_estado = datos[27] if len(datos) > 27 else ""
+    else:
+        # Compatibilidad con formato anterior
+        fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
+        fecha_realizacion = datos[20] if len(datos) > 20 else ""
+        trabajo_a_realizar = ""
+        trabajo_realizado = ""
+        firma_operario = ""
+        fecha_firma_operario = ""
+        coste_estimado = datos[21] if len(datos) > 21 else 0
+        coste_final = datos[22] if len(datos) > 22 else 0
+        observaciones_estado = datos[23] if len(datos) > 23 else ""
+
+    fecha_programada = fecha_aviso_empresa
 
     if not tipo_solicitante:
         tipo_solicitante = "Operarios"
@@ -342,7 +379,7 @@ def crear_orden(datos):
         operario = "Proveedor externo"
 
         if not estado or estado == "Abierta":
-            estado = "Pendiente proveedor"
+            estado = "Avisado"
 
         if not origen or origen == "APP":
             origen = "EXTERNA"
@@ -374,12 +411,17 @@ def crear_orden(datos):
             telefono_empresa,
             email_empresa,
             fecha_programada,
+            fecha_aviso_empresa,
             fecha_realizacion,
+            trabajo_a_realizar,
+            trabajo_realizado,
+            firma_operario,
+            fecha_firma_operario,
             coste_estimado,
             coste_final,
             observaciones_estado
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         numero_ot,
         descripcion,
@@ -401,7 +443,12 @@ def crear_orden(datos):
         telefono_empresa,
         email_empresa,
         fecha_programada,
+        fecha_aviso_empresa,
         fecha_realizacion,
+        trabajo_a_realizar,
+        trabajo_realizado,
+        firma_operario,
+        fecha_firma_operario,
         coste_estimado,
         coste_final,
         observaciones_estado
@@ -438,7 +485,9 @@ def obtener_ordenes():
                solicitante, fecha_origen, foto, tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final, observaciones_estado
+               coste_estimado, coste_final, observaciones_estado,
+               fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
+               firma_operario, fecha_firma_operario
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
@@ -462,7 +511,9 @@ def obtener_historico():
                tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final, observaciones_estado
+               coste_estimado, coste_final, observaciones_estado,
+               fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
+               firma_operario, fecha_firma_operario
         FROM historico_ordenes
         ORDER BY id DESC
     """)
@@ -494,7 +545,9 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final, observaciones_estado
+                   coste_estimado, coste_final, observaciones_estado,
+                   fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
+                   firma_operario, fecha_firma_operario
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -506,7 +559,9 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final, observaciones_estado
+                   coste_estimado, coste_final, observaciones_estado,
+                   fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
+                   firma_operario, fecha_firma_operario
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
@@ -566,6 +621,46 @@ def actualizar_observaciones_estado(id_orden, observaciones_estado):
     return True
 
 
+def finalizar_trabajo_externo(
+    id_orden,
+    trabajo_realizado="",
+    firma_operario="",
+    coste_final=0,
+    observaciones_estado=""
+):
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(_sql("""
+        UPDATE ordenes_trabajo
+        SET trabajo_realizado = ?,
+            firma_operario = ?,
+            fecha_firma_operario = ?,
+            fecha_realizacion = ?,
+            coste_final = ?,
+            observaciones_estado = ?,
+            estado = 'Cerrado'
+        WHERE id = ?
+    """), (
+        trabajo_realizado,
+        firma_operario,
+        fecha_actual,
+        fecha_actual,
+        coste_final,
+        observaciones_estado,
+        id_orden
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return True
+
+
 # =====================================================
 # FINALIZAR
 # =====================================================
@@ -581,8 +676,10 @@ def finalizar_orden(id_orden, observaciones=""):
                centro, edificio, espacio, area, prioridad, operario, origen,
                solicitante, fecha_origen, foto, tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
-               email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final, observaciones_estado
+               email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
+               trabajo_a_realizar, trabajo_realizado, firma_operario,
+               fecha_firma_operario, coste_estimado, coste_final,
+               observaciones_estado
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -595,8 +692,10 @@ def finalizar_orden(id_orden, observaciones=""):
             centro, edificio, espacio, area, prioridad, operario, origen,
             solicitante, fecha_origen, foto, tipo_solicitante,
             tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
-            email_empresa, fecha_programada, fecha_realizacion,
-            coste_estimado, coste_final, observaciones_estado
+            email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
+            trabajo_a_realizar, trabajo_realizado, firma_operario,
+            fecha_firma_operario, coste_estimado, coste_final,
+            observaciones_estado
         ) = orden
 
         if tipo_orden == "Externa":
@@ -607,7 +706,7 @@ def finalizar_orden(id_orden, observaciones=""):
                 origen = "EXTERNA"
 
             if not fecha_realizacion:
-                fecha_realizacion = ""
+                fecha_realizacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cursor.execute(_sql("""
             INSERT INTO historico_ordenes
@@ -634,12 +733,17 @@ def finalizar_orden(id_orden, observaciones=""):
                 telefono_empresa,
                 email_empresa,
                 fecha_programada,
+                fecha_aviso_empresa,
                 fecha_realizacion,
+                trabajo_a_realizar,
+                trabajo_realizado,
+                firma_operario,
+                fecha_firma_operario,
                 coste_estimado,
                 coste_final,
                 observaciones_estado
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -662,7 +766,12 @@ def finalizar_orden(id_orden, observaciones=""):
             telefono_empresa,
             email_empresa,
             fecha_programada,
+            fecha_aviso_empresa,
             fecha_realizacion,
+            trabajo_a_realizar,
+            trabajo_realizado,
+            firma_operario,
+            fecha_firma_operario,
             coste_estimado,
             coste_final,
             observaciones_estado
@@ -760,6 +869,10 @@ def crear_correctiva_desde_ot(
         "",
         "Operarios",
         "Interna",
+        "",
+        "",
+        "",
+        "",
         "",
         "",
         "",
