@@ -61,6 +61,7 @@ def ejecutar(sql, params=()):
     try:
         cur.execute(adaptar_sql(sql), params)
         conn.commit()
+        st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -68,6 +69,7 @@ def ejecutar(sql, params=()):
         conn.close()
 
 
+@st.cache_data(ttl=30)
 def leer_df(sql, params=()):
     conn = conectar()
     try:
@@ -75,6 +77,7 @@ def leer_df(sql, params=()):
     finally:
         conn.close()
     return df
+
 def asegurar_columnas_planificacion_legionella():
     columnas = [
         ("punto_id", "INTEGER"),
