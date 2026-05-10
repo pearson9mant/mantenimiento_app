@@ -239,15 +239,22 @@ def inicializar_db():
         ("contacto_empresa", "TEXT"),
         ("telefono_empresa", "TEXT"),
         ("email_empresa", "TEXT"),
-        ("fecha_programada", "TEXT"),
+        ("fecha_aviso_empresa", "TEXT"),
         ("fecha_realizacion", "TEXT"),
+        ("trabajo_a_realizar", "TEXT"),
+        ("trabajo_realizado", "TEXT"),
+        ("firma_operario", "TEXT"),
+        ("fecha_firma_operario", "TEXT"),
         ("coste_estimado", f"{real_sql} DEFAULT 0"),
         ("coste_final", f"{real_sql} DEFAULT 0"),
-    ]
+     ]
 
     for columna, tipo in columnas_externas:
         _add_column(cursor, "ordenes_trabajo", columna, tipo)
         _add_column(cursor, "historico_ordenes", columna, tipo)
+        
+    _add_column(cursor, "ordenes_trabajo", "fecha_programada", "TEXT")
+    _add_column(cursor, "historico_ordenes", "fecha_programada", "TEXT")
 
     try:
         cursor.execute("""
