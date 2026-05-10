@@ -67,7 +67,7 @@ def aplicar_estilo_gerencia():
     }
 
     div.stButton > button {
-        min-height: 90px;
+        min-height: 86px;
         border-radius: 20px;
         border: 1px solid #e5e7eb;
         background: #ffffff;
@@ -82,13 +82,6 @@ def aplicar_estilo_gerencia():
         border: 1px solid #2563eb;
         background: #eff6ff;
         color: #1d4ed8;
-    }
-
-    div[data-testid="stExpander"] {
-        border-radius: 18px !important;
-        border: 1px solid #e5e7eb !important;
-        box-shadow: 0 5px 16px rgba(15, 23, 42, 0.05);
-        margin-bottom: 10px;
     }
 
     @media (max-width: 768px) {
@@ -106,7 +99,7 @@ def aplicar_estilo_gerencia():
         }
 
         div.stButton > button {
-            min-height: 78px;
+            min-height: 74px;
             font-size: 15px;
         }
     }
@@ -115,9 +108,33 @@ def aplicar_estilo_gerencia():
 
 
 # =====================================================
+# ESTADO NAVEGACIÓN
+# =====================================================
+
+def iniciar_estado_gerencia():
+    if "gerencia_centro" not in st.session_state:
+        st.session_state["gerencia_centro"] = None
+
+    if "gerencia_detalle" not in st.session_state:
+        st.session_state["gerencia_detalle"] = None
+
+
+def volver_a_centros():
+    st.session_state["gerencia_centro"] = None
+    st.session_state["gerencia_detalle"] = None
+    st.rerun()
+
+
+def volver_a_menu_centro():
+    st.session_state["gerencia_detalle"] = None
+    st.rerun()
+
+
+# =====================================================
 # LECTURA DATOS
 # =====================================================
 
+@st.cache_data(ttl=60)
 def leer_tabla(nombre_tabla):
     conn = conectar()
 
@@ -219,11 +236,8 @@ def preparar_inventario():
         if col not in df.columns:
             df[col] = valor
 
-    if "material" in df.columns and "nombre" in df.columns:
-        df["material_mostrar"] = df["material"].fillna("")
-        df.loc[df["material_mostrar"].astype(str).str.strip() == "", "material_mostrar"] = df["nombre"]
-    else:
-        df["material_mostrar"] = ""
+    df["material_mostrar"] = df["material"].fillna("")
+    df.loc[df["material_mostrar"].astype(str).str.strip() == "", "material_mostrar"] = df["nombre"]
 
     df["stock_num"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0)
 
@@ -462,8 +476,14 @@ def euros(valor):
 
 
 # =====================================================
-# BOTONES
+# NAVEGACIÓN / BOTONES
 # =====================================================
+
+def seleccionar_centro(centro):
+    st.session_state["gerencia_centro"] = centro
+    st.session_state["gerencia_detalle"] = None
+    st.rerun()
+
 
 def seleccionar_detalle(centro, tipo, titulo):
     st.session_state["gerencia_detalle"] = {
@@ -489,75 +509,104 @@ def boton_tarjeta_dinero(titulo, importe, centro, tipo, icono):
 
 
 # =====================================================
-# CENTROS
+# PANTALLAS
 # =====================================================
 
-def mostrar_centro(df, centro):
-    with st.expander(f"🏫 {centro}", expanded=False):
-        c1, c2 = st.columns(2)
+def mostrar_selector_centros():
+    st.markdown(
+        "<div class='gerencia-card-info'>Selecciona un centro para ver su resumen.</div>",
+        unsafe_allow_html=True
+    )
 
-        with c1:
-            boton_tarjeta(
-                "Órdenes abiertas",
-                contar(df, centro, "abiertas"),
-                centro,
-                "abiertas",
-                "📂"
-            )
+    c1, c2 = st.columns(2)
 
-        with c2:
-            boton_tarjeta(
-                "Órdenes cerradas",
-                contar(df, centro, "cerradas"),
-                centro,
-                "cerradas",
-                "✅"
-            )
+    with c1:
+        if st.button("🏫 Pearson 9", use_container_width=True, key="btn_gerencia_p9"):
+            seleccionar_centro("Pearson 9")
 
-        c3, c4 = st.columns(2)
+    with c2:
+        if st.button("🏫 Pearson 22", use_container_width=True, key="btn_gerencia_p22"):
+            seleccionar_centro("Pearson 22")
 
-        with c3:
-            boton_tarjeta(
-                "Legionella este mes",
-                contar(df, centro, "legionella_mes"),
-                centro,
-                "legionella_mes",
-                "💧"
-            )
 
-        with c4:
-            boton_tarjeta(
-                "Preventivas este mes",
-                contar(df, centro, "preventivas_mes"),
-                centro,
-                "preventivas_mes",
-                "🛠️"
-            )
+def mostrar_menu_centro(df, centro):
+    st.markdown(
+        f"<div class='gerencia-section-title'>🏫 {centro}</div>",
+        unsafe_allow_html=True
+    )
 
-        st.markdown("### 💶 Inventario")
+    if st.button("⬅️ Volver a centros", use_container_width=True, key="volver_centros_gerencia"):
+        volver_a_centros()
 
-        total_inv = total_inventario_centro(centro)
-        total_usado = total_utilizado_centro(centro, df)
+    st.markdown(
+        "<div class='gerencia-card-info'>Pulsa una tarjeta para ver solo ese detalle.</div>",
+        unsafe_allow_html=True
+    )
 
-        c5, c6 = st.columns(2)
+    c1, c2 = st.columns(2)
 
-        with c5:
-            boton_tarjeta_dinero(
-                "Total inventario",
-                total_inv,
-                centro,
-                "inventario_total",
-                "💰"
-            )
+    with c1:
+        boton_tarjeta(
+            "Órdenes abiertas",
+            contar(df, centro, "abiertas"),
+            centro,
+            "abiertas",
+            "📂"
+        )
 
-        with c6:
-            boton_tarjeta_dinero(
-                "Material utilizado",
-                total_usado,
-                centro,
-                "inventario_utilizado",
-                "📉"
-            )
+    with c2:
+        boton_tarjeta(
+            "Órdenes cerradas",
+            contar(df, centro, "cerradas"),
+            centro,
+            "cerradas",
+            "✅"
+        )
+
+    c3, c4 = st.columns(2)
+
+    with c3:
+        boton_tarjeta(
+            "Legionella este mes",
+            contar(df, centro, "legionella_mes"),
+            centro,
+            "legionella_mes",
+            "💧"
+        )
+
+    with c4:
+        boton_tarjeta(
+            "Preventivas este mes",
+            contar(df, centro, "preventivas_mes"),
+            centro,
+            "preventivas_mes",
+            "🛠️"
+        )
+
+    st.markdown("### 💶 Inventario")
+
+    total_inv = total_inventario_centro(centro)
+    total_usado = total_utilizado_centro(centro, df)
+
+    c5, c6 = st.columns(2)
+
+    with c5:
+        boton_tarjeta_dinero(
+            "Total inventario",
+            total_inv,
+            centro,
+            "inventario_total",
+            "💰"
+        )
+
+    with c6:
+        boton_tarjeta_dinero(
+            "Material utilizado",
+            total_usado,
+            centro,
+            "inventario_utilizado",
+            "📉"
+        )
 
 
 # =====================================================
@@ -666,15 +715,13 @@ def mostrar_detalle(df):
     tipo = detalle.get("tipo")
     titulo = detalle.get("titulo")
 
-    st.markdown("---")
     st.markdown(
-        f"<div class='gerencia-section-title'>📋 Detalle · {titulo} · {centro}</div>",
+        f"<div class='gerencia-section-title'>📋 {titulo} · {centro}</div>",
         unsafe_allow_html=True
     )
 
-    if st.button("❌ Cerrar detalle", use_container_width=True):
-        st.session_state.pop("gerencia_detalle", None)
-        st.rerun()
+    if st.button("⬅️ Volver al resumen del centro", use_container_width=True, key="volver_menu_centro_gerencia"):
+        volver_a_menu_centro()
 
     if tipo == "inventario_total":
         mostrar_detalle_inventario_total(centro)
@@ -693,12 +740,13 @@ def mostrar_detalle(df):
 
 def pantalla_gerencia():
     aplicar_estilo_gerencia()
+    iniciar_estado_gerencia()
 
     st.markdown("""
     <div class="gerencia-hero">
         <div class="gerencia-title">📊 Gerencia</div>
         <div class="gerencia-subtitle">
-            Vista simplificada por centro: órdenes, Legionella, preventivas e inventario
+            Vista por centro: órdenes, Legionella, preventivas e inventario
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -709,12 +757,15 @@ def pantalla_gerencia():
         st.warning("No hay órdenes para mostrar todavía.")
         df = pd.DataFrame()
 
-    st.markdown(
-        "<div class='gerencia-card-info'>Pulsa un centro para abrir su resumen. Pulsa una tarjeta para ver el detalle.</div>",
-        unsafe_allow_html=True
-    )
+    centro_actual = st.session_state.get("gerencia_centro")
+    detalle_actual = st.session_state.get("gerencia_detalle")
 
-    for centro in CENTROS_GERENCIA:
-        mostrar_centro(df, centro)
+    if not centro_actual:
+        mostrar_selector_centros()
+        return
 
-    mostrar_detalle(df)
+    if detalle_actual:
+        mostrar_detalle(df)
+        return
+
+    mostrar_menu_centro(df, centro_actual)
