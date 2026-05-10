@@ -335,7 +335,6 @@ def crear_orden(datos):
     solicitante = datos[10] if len(datos) > 10 else ""
     fecha_origen = datos[11] if len(datos) > 11 else ""
     foto = datos[12] if len(datos) > 12 else ""
-
     tipo_solicitante = datos[13] if len(datos) > 13 else "Operarios"
 
     tipo_orden = datos[14] if len(datos) > 14 else "Interna"
@@ -344,7 +343,7 @@ def crear_orden(datos):
     telefono_empresa = datos[17] if len(datos) > 17 else ""
     email_empresa = datos[18] if len(datos) > 18 else ""
 
-    # Formato nuevo
+    # Formato nuevo completo
     if len(datos) > 27:
         fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
         fecha_realizacion = datos[20] if len(datos) > 20 else ""
@@ -479,15 +478,14 @@ def obtener_ordenes():
     conn = conectar()
     cursor = conn.cursor()
 
+    # Devuelve 26 columnas para no romper ui/ui_ordenes.py actual
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
                solicitante, fecha_origen, foto, tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final, observaciones_estado,
-               fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
-               firma_operario, fecha_firma_operario
+               coste_estimado, coste_final, observaciones_estado
         FROM ordenes_trabajo
         ORDER BY id DESC
     """)
@@ -504,6 +502,7 @@ def obtener_historico():
     conn = conectar()
     cursor = conn.cursor()
 
+    # Devuelve 28 columnas para no romper histórico actual
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
@@ -511,9 +510,7 @@ def obtener_historico():
                tipo_solicitante,
                tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                email_empresa, fecha_programada, fecha_realizacion,
-               coste_estimado, coste_final, observaciones_estado,
-               fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
-               firma_operario, fecha_firma_operario
+               coste_estimado, coste_final, observaciones_estado
         FROM historico_ordenes
         ORDER BY id DESC
     """)
@@ -538,6 +535,7 @@ def obtener_ordenes_operario(operario):
 
     centro = mapa_operario_centro.get(operario)
 
+    # Devuelve 26 columnas para no romper ui_operario / ui_ordenes
     if centro:
         cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
@@ -545,9 +543,7 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final, observaciones_estado,
-                   fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
-                   firma_operario, fecha_firma_operario
+                   coste_estimado, coste_final, observaciones_estado
             FROM ordenes_trabajo
             WHERE centro = ?
             ORDER BY id DESC
@@ -559,9 +555,7 @@ def obtener_ordenes_operario(operario):
                    solicitante, fecha_origen, foto, tipo_solicitante,
                    tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
                    email_empresa, fecha_programada, fecha_realizacion,
-                   coste_estimado, coste_final, observaciones_estado,
-                   fecha_aviso_empresa, trabajo_a_realizar, trabajo_realizado,
-                   firma_operario, fecha_firma_operario
+                   coste_estimado, coste_final, observaciones_estado
             FROM ordenes_trabajo
             ORDER BY id DESC
         """)
@@ -570,6 +564,44 @@ def obtener_ordenes_operario(operario):
 
     conn.close()
     return datos
+
+
+def obtener_detalle_orden_externa(id_orden):
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT fecha_aviso_empresa,
+               trabajo_a_realizar,
+               trabajo_realizado,
+               firma_operario,
+               fecha_firma_operario
+        FROM ordenes_trabajo
+        WHERE id = ?
+    """), (id_orden,))
+
+    fila = cursor.fetchone()
+
+    conn.close()
+
+    if not fila:
+        return {
+            "fecha_aviso_empresa": "",
+            "trabajo_a_realizar": "",
+            "trabajo_realizado": "",
+            "firma_operario": "",
+            "fecha_firma_operario": "",
+        }
+
+    return {
+        "fecha_aviso_empresa": fila[0] or "",
+        "trabajo_a_realizar": fila[1] or "",
+        "trabajo_realizado": fila[2] or "",
+        "firma_operario": fila[3] or "",
+        "fecha_firma_operario": fila[4] or "",
+    }
 
 
 # =====================================================
