@@ -41,6 +41,51 @@ def _add_column(cursor, tabla, columna, tipo):
         except Exception:
             pass
 
+def crear_indices_rendimiento():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    indices = [
+        # ÓRDENES ACTIVAS
+        "CREATE INDEX IF NOT EXISTS idx_ot_estado ON ordenes_trabajo(estado)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_operario ON ordenes_trabajo(operario)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_centro ON ordenes_trabajo(centro)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_fecha ON ordenes_trabajo(fecha_creacion)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_origen ON ordenes_trabajo(origen)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_centro_fecha ON ordenes_trabajo(centro, fecha_creacion)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_operario_estado ON ordenes_trabajo(operario, estado)",
+
+        # HISTÓRICO
+        "CREATE INDEX IF NOT EXISTS idx_hist_estado ON historico_ordenes(estado)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_operario ON historico_ordenes(operario)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_centro ON historico_ordenes(centro)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_fecha ON historico_ordenes(fecha_creacion)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_origen ON historico_ordenes(origen)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_centro_fecha ON historico_ordenes(centro, fecha_creacion)",
+        "CREATE INDEX IF NOT EXISTS idx_hist_operario_fecha ON historico_ordenes(operario, fecha_creacion)",
+
+        # INVENTARIO
+        "CREATE INDEX IF NOT EXISTS idx_inv_activo ON inventario(activo)",
+        "CREATE INDEX IF NOT EXISTS idx_inv_categoria ON inventario(categoria)",
+        "CREATE INDEX IF NOT EXISTS idx_inv_codigo ON inventario(codigo)",
+
+        # LEGIONELLA
+        "CREATE INDEX IF NOT EXISTS idx_leg_reg_fecha ON legionella_registros(fecha)",
+        "CREATE INDEX IF NOT EXISTS idx_leg_reg_punto ON legionella_registros(punto_id)",
+        "CREATE INDEX IF NOT EXISTS idx_leg_inc_fecha ON legionella_incidencias(fecha)",
+        "CREATE INDEX IF NOT EXISTS idx_leg_puntos_activo ON legionella_puntos(activo)",
+        "CREATE INDEX IF NOT EXISTS idx_leg_puntos_centro ON legionella_puntos(centro)",
+    ]
+
+    for sql in indices:
+        try:
+            cursor.execute(sql)
+        except Exception:
+            pass
+
+    conn.commit()
+    conn.close()
+
 
 def inicializar_db():
     conn = conectar()
@@ -452,3 +497,4 @@ def inicializar_db():
 
     conn.commit()
     conn.close()
+    crear_indices_rendimiento()
