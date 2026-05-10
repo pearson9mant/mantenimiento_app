@@ -12,6 +12,8 @@ from modules.ordenes import (
     obtener_historico,
     borrar_orden,
     borrar_orden_historico,
+    finalizar_trabajo_externo,
+    obtener_detalle_orden_externa,
 )
 
 from modules.preventivo import (
@@ -19,6 +21,22 @@ from modules.preventivo import (
     actualizar_checklist_preventivo,
     checklist_preventivo_completo,
 )
+
+
+# =====================================================
+# CACHE STREAMLIT
+# =====================================================
+
+def limpiar_cache_streamlit():
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+
+    try:
+        st.cache_resource.clear()
+    except Exception:
+        pass
 
 
 # =====================================================
@@ -188,6 +206,7 @@ def mostrar_checklist_preventivo(numero_ot, operario):
                 nuevo_valor,
                 usuario_actual() or operario
             )
+            limpiar_cache_streamlit()
             st.rerun()
 
         if nuevo_valor:
@@ -203,6 +222,10 @@ def mostrar_checklist_preventivo(numero_ot, operario):
     st.warning("Faltan puntos del checklist por marcar.")
     return False
 
+
+# =====================================================
+# PANTALLA
+# =====================================================
 
 def pantalla_ordenes():
     st.subheader("📋 Órdenes de trabajo")
@@ -260,8 +283,12 @@ def pantalla_ordenes():
                 contacto_empresa = ""
                 telefono_empresa = ""
                 email_empresa = ""
-                fecha_programada = ""
+                fecha_aviso_empresa = ""
                 fecha_realizacion = ""
+                trabajo_a_realizar = ""
+                trabajo_realizado = ""
+                firma_operario = ""
+                fecha_firma_operario = ""
                 coste_estimado = 0
                 coste_final = 0
 
@@ -272,7 +299,18 @@ def pantalla_ordenes():
                     contacto_empresa = st.text_input("Persona de contacto", key="orden_contacto_empresa")
                     telefono_empresa = st.text_input("Teléfono empresa", key="orden_telefono_empresa")
                     email_empresa = st.text_input("Email empresa", key="orden_email_empresa")
-                    fecha_programada = st.date_input("Fecha programada", key="orden_fecha_programada")
+
+                    fecha_aviso_empresa = st.date_input(
+                        "Fecha de aviso a la empresa",
+                        key="orden_fecha_aviso_empresa"
+                    )
+
+                    trabajo_a_realizar = st.text_area(
+                        "Trabajo a realizar por la empresa",
+                        placeholder="Ejemplo: revisar equipo, reparar fuga, sustituir pieza...",
+                        key="orden_trabajo_a_realizar"
+                    )
+
                     coste_estimado = st.number_input(
                         "Coste estimado €",
                         min_value=0.0,
@@ -327,12 +365,14 @@ def pantalla_ordenes():
                         st.warning("Indica un operario")
                     elif tipo_orden == "Externa" and not empresa_externa.strip():
                         st.warning("Indica la empresa externa")
+                    elif tipo_orden == "Externa" and not trabajo_a_realizar.strip():
+                        st.warning("Indica el trabajo a realizar")
                     elif not str(espacio).strip():
                         st.warning("Indica un espacio")
                     else:
                         if tipo_orden == "Externa":
                             numero = obtener_siguiente_numero_ot(centro, "EXT")
-                            estado_inicial = "Pendiente proveedor"
+                            estado_inicial = "Avisado"
                             origen_guardar = "EXTERNA"
                             operario_guardar = "Proveedor externo"
                         else:
@@ -361,14 +401,19 @@ def pantalla_ordenes():
                             contacto_empresa,
                             telefono_empresa,
                             email_empresa,
-                            str(fecha_programada) if fecha_programada else "",
+                            str(fecha_aviso_empresa) if fecha_aviso_empresa else "",
                             str(fecha_realizacion) if fecha_realizacion else "",
+                            trabajo_a_realizar,
+                            trabajo_realizado,
+                            firma_operario,
+                            fecha_firma_operario,
                             coste_estimado,
                             coste_final,
                             ""
                         )
 
                         crear_orden(datos_orden)
+                        limpiar_cache_streamlit()
 
                         st.success(
                             f"Orden creada correctamente: {numero} | "
@@ -399,6 +444,7 @@ def pantalla_ordenes():
                         "Pendiente proveedor",
                         "Avisado",
                         "En ejecución",
+                        "Cerrado",
                         "Incidencias",
                     ],
                     key="filtro_estado_admin_ot"
@@ -566,7 +612,7 @@ def pantalla_ordenes():
                     icono_estado = "🟡"
                 elif estado == "Pendiente material":
                     icono_estado = "📦"
-                elif estado in ["Pendiente proveedor", "Avisado", "En ejecución"]:
+                elif estado in ["Pendiente proveedor", "Avisado", "En ejecución", "Cerrado"]:
                     icono_estado = "🏢"
 
                 if tipo_orden == "Externa":
@@ -587,15 +633,45 @@ def pantalla_ordenes():
                     if observaciones_estado:
                         st.info(f"📝 Observación estado: {observaciones_estado}")
 
+                    detalle_externa = {
+                        "fecha_aviso_empresa": "",
+                        "trabajo_a_realizar": "",
+                        "trabajo_realizado": "",
+                        "firma_operario": "",
+                        "fecha_firma_operario": "",
+                    }
+
                     if tipo_orden == "Externa":
+                        detalle_externa = obtener_detalle_orden_externa(id_orden)
+
+                        fecha_aviso_empresa = (
+                            detalle_externa.get("fecha_aviso_empresa")
+                            or fecha_programada
+                            or ""
+                        )
+
+                        trabajo_a_realizar = detalle_externa.get("trabajo_a_realizar", "")
+                        trabajo_realizado_guardado = detalle_externa.get("trabajo_realizado", "")
+                        firma_guardada = detalle_externa.get("firma_operario", "")
+                        fecha_firma_guardada = detalle_externa.get("fecha_firma_operario", "")
+
                         st.info(
                             f"🏢 Empresa: **{empresa_externa or '-'}**  \n"
                             f"👤 Contacto: {contacto_empresa or '-'}  \n"
                             f"☎️ Teléfono: {telefono_empresa or '-'}  \n"
                             f"✉️ Email: {email_empresa or '-'}  \n"
-                            f"📅 Fecha programada: {fecha_programada or '-'}  \n"
+                            f"📅 Fecha aviso empresa: {fecha_aviso_empresa or '-'}  \n"
                             f"💰 Coste estimado: {coste_estimado or 0} €"
                         )
+
+                        if trabajo_a_realizar:
+                            st.warning(f"🛠️ Trabajo a realizar:\n\n{trabajo_a_realizar}")
+
+                        if trabajo_realizado_guardado:
+                            st.success(f"✅ Trabajo realizado:\n\n{trabajo_realizado_guardado}")
+
+                        if firma_guardada:
+                            st.caption(f"✍️ Confirmado por: {firma_guardada} | {fecha_firma_guardada or '-'}")
 
                     if (origen or "").strip().upper() == "PREVENTIVO":
                         mostrar_checklist_preventivo(numero_ot, operario)
@@ -618,9 +694,10 @@ def pantalla_ordenes():
                     with c2:
                         if tipo_orden == "Externa":
                             estados = [
-                                "Pendiente proveedor",
                                 "Avisado",
+                                "Pendiente proveedor",
                                 "En ejecución",
+                                "Cerrado",
                                 "Finalizada",
                             ]
                         else:
@@ -643,29 +720,88 @@ def pantalla_ordenes():
                         if nuevo_estado != estado and nuevo_estado != "Finalizada":
                             if st.button(f"Actualizar {numero_ot}", key=f"act_admin_{id_orden}"):
                                 actualizar_estado(id_orden, nuevo_estado, observaciones_estado_nueva)
+                                limpiar_cache_streamlit()
                                 st.rerun()
                         else:
                             if st.button(f"Guardar observación {numero_ot}", key=f"obs_admin_{id_orden}"):
                                 actualizar_observaciones_estado(id_orden, observaciones_estado_nueva)
+                                limpiar_cache_streamlit()
                                 st.success("Observación guardada.")
                                 st.rerun()
 
                     with c3:
-                        if st.button(f"Finalizar {numero_ot}", key=f"fin_admin_{id_orden}"):
+                        if tipo_orden == "Externa":
+                            with st.form(f"form_fin_ext_{id_orden}", clear_on_submit=False):
+                                st.markdown("#### ✅ Cierre empresa externa")
 
-                            if (origen or "").strip().upper() == "PREVENTIVO":
-                                if not checklist_preventivo_completo(numero_ot):
-                                    st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                                trabajo_realizado = st.text_area(
+                                    "Trabajo realizado por la empresa",
+                                    value=str(detalle_externa.get("trabajo_realizado", "") or ""),
+                                    placeholder="Ejemplo: se sustituye pieza, se repara fuga, se comprueba funcionamiento...",
+                                    key=f"trabajo_realizado_ext_{id_orden}"
+                                )
+
+                                coste_final_nuevo = st.number_input(
+                                    "Coste final €",
+                                    min_value=0.0,
+                                    step=10.0,
+                                    value=float(coste_final or 0),
+                                    key=f"coste_final_ext_{id_orden}"
+                                )
+
+                                firma_nombre = usuario_actual() or "Operario mantenimiento"
+
+                                confirmar_realizado = st.checkbox(
+                                    f"Confirmo que el trabajo externo está realizado. Firma: {firma_nombre}",
+                                    key=f"firma_ext_{id_orden}"
+                                )
+
+                                finalizar_ext = st.form_submit_button(
+                                    f"✅ Finalizar externa {numero_ot}",
+                                    use_container_width=True
+                                )
+
+                                if finalizar_ext:
+                                    if not trabajo_realizado.strip():
+                                        st.error("Indica el trabajo realizado por la empresa.")
+                                    elif not confirmar_realizado:
+                                        st.error("Debes confirmar la firma del operario.")
+                                    else:
+                                        finalizar_trabajo_externo(
+                                            id_orden,
+                                            trabajo_realizado=trabajo_realizado,
+                                            firma_operario=firma_nombre,
+                                            coste_final=coste_final_nuevo,
+                                            observaciones_estado=observaciones_estado_nueva
+                                        )
+
+                                        finalizar_orden(
+                                            id_orden,
+                                            observaciones=f"Trabajo externo confirmado por {firma_nombre}"
+                                        )
+
+                                        limpiar_cache_streamlit()
+                                        st.success(f"{numero_ot} externa finalizada y enviada al histórico")
+                                        st.rerun()
+
+                        else:
+                            if st.button(f"Finalizar {numero_ot}", key=f"fin_admin_{id_orden}"):
+
+                                if (origen or "").strip().upper() == "PREVENTIVO":
+                                    if not checklist_preventivo_completo(numero_ot):
+                                        st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                                    else:
+                                        actualizar_observaciones_estado(id_orden, observaciones_estado)
+                                        finalizar_orden(id_orden)
+                                        limpiar_cache_streamlit()
+                                        st.success(f"{numero_ot} finalizada")
+                                        st.rerun()
                                 else:
                                     actualizar_observaciones_estado(id_orden, observaciones_estado)
                                     finalizar_orden(id_orden)
+                                    limpiar_cache_streamlit()
                                     st.success(f"{numero_ot} finalizada")
                                     st.rerun()
-                            else:
-                                actualizar_observaciones_estado(id_orden, observaciones_estado)
-                                finalizar_orden(id_orden)
-                                st.success(f"{numero_ot} finalizada")
-                                st.rerun()
 
                     with c4:
                         if es_admin() or es_gerencia():
@@ -674,6 +810,7 @@ def pantalla_ordenes():
                             if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_activas_{id_orden}"):
                                 if confirmar_activa:
                                     borrar_orden(id_orden)
+                                    limpiar_cache_streamlit()
                                     st.warning(f"{numero_ot} eliminada")
                                     st.rerun()
                                 else:
@@ -808,7 +945,7 @@ def pantalla_ordenes():
                                 f"👤 Contacto: {contacto_empresa or '-'}  \n"
                                 f"☎️ Teléfono: {telefono_empresa or '-'}  \n"
                                 f"✉️ Email: {email_empresa or '-'}  \n"
-                                f"📅 Fecha programada: {fecha_programada or '-'}  \n"
+                                f"📅 Fecha aviso/programada: {fecha_programada or '-'}  \n"
                                 f"📅 Fecha realización: {fecha_realizacion or '-'}  \n"
                                 f"💰 Coste estimado: {coste_estimado or 0} €  \n"
                                 f"💶 Coste final: {coste_final or 0} €"
@@ -840,6 +977,7 @@ def pantalla_ordenes():
                             if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_hist_{id_orden}"):
                                 if confirmar_hist:
                                     borrar_orden_historico(id_orden)
+                                    limpiar_cache_streamlit()
                                     st.warning(f"{numero_ot} eliminada del histórico")
                                     st.rerun()
                                 else:
