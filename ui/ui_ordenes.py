@@ -418,12 +418,17 @@ def pantalla_ordenes():
                     area_ext = st.selectbox("Área", AREAS, key="orden_ext_area")
                     prioridad_ext = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_ext_prioridad")
 
-                    st.markdown("### 🏢 Datos empresa externa")
 
-                    empresa_externa = st.text_input("Empresa externa", key="orden_ext_empresa")
-                    contacto_empresa = st.text_input("Persona de contacto", key="orden_ext_contacto")
-                    telefono_empresa = st.text_input("Teléfono empresa", key="orden_ext_telefono")
-                    email_empresa = st.text_input("Email empresa", key="orden_ext_email")
+                    st.markdown("### 🏢 Empresa externa")
+
+                    empresa_externa = st.text_input(
+                        "Empresa externa",
+                        key="orden_ext_empresa"
+                    )
+
+                    contacto_empresa = ""
+                    telefono_empresa = ""
+                    email_empresa = ""
 
                     fecha_aviso_empresa = st.date_input(
                         "Fecha de aviso a la empresa",
