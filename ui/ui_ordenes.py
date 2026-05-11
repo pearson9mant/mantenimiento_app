@@ -365,14 +365,12 @@ def pantalla_ordenes():
                         st.warning("Indica un operario")
                     elif tipo_orden == "Externa" and not empresa_externa.strip():
                         st.warning("Indica la empresa externa")
-                    elif tipo_orden == "Externa" and not trabajo_a_realizar.strip():
-                        st.warning("Indica el trabajo a realizar")
                     elif not str(espacio).strip():
                         st.warning("Indica un espacio")
                     else:
                         if tipo_orden == "Externa":
                             numero = obtener_siguiente_numero_ot(centro, "EXT")
-                            estado_inicial = "Avisado"
+                            estado_inicial = "Pendiente proveedor"
                             origen_guardar = "EXTERNA"
                             operario_guardar = "Proveedor externo"
                         else:
