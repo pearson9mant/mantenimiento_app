@@ -259,8 +259,11 @@ def obtener_espacios_completos(centro, edificio):
             edificio_esp = str(esp[2] or "").strip()
             nombre_esp = str(esp[3] or "").strip()
 
-            if centro_esp == centro and edificio_esp == edificio:
-                espacios_filtrados.append(nombre_esp)
+            if nombre_esp:
+                if centro_esp == centro and edificio_esp == edificio:
+                    espacios_filtrados.append(nombre_esp)
+                elif nombre_esp.lower() == "calderas":
+                    espacios_filtrados.append(nombre_esp)
 
         except Exception:
             pass
