@@ -276,10 +276,12 @@ def preparar_movimientos_inventario():
         "numero_ot": "",
         "ot": "",
         "orden_trabajo": "",
+        "codigo_material": "",
         "material": "",
         "nombre_material": "",
         "tipo": "",
         "movimiento": "",
+        "tipo_movimiento": "",
         "cantidad": 0,
         "precio_unitario": 0,
         "coste_total": 0,
@@ -287,6 +289,7 @@ def preparar_movimientos_inventario():
         "operario": "",
         "centro": "",
         "observaciones": "",
+        "motivo": "",
     }
 
     for col, valor in columnas_defecto.items():
@@ -296,33 +299,132 @@ def preparar_movimientos_inventario():
     movimientos["tabla_origen"] = tabla
 
     movimientos["fecha_mostrar"] = movimientos["fecha"].fillna("").astype(str)
-    movimientos.loc[movimientos["fecha_mostrar"].str.strip() == "", "fecha_mostrar"] = movimientos["fecha_movimiento"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["fecha_mostrar"].str.strip() == "",
+        "fecha_mostrar"
+    ] = movimientos["fecha_movimiento"].fillna("").astype(str)
 
     movimientos["numero_ot_mostrar"] = movimientos["numero_ot"].fillna("").astype(str)
-    movimientos.loc[movimientos["numero_ot_mostrar"].str.strip() == "", "numero_ot_mostrar"] = movimientos["ot"].fillna("").astype(str)
-    movimientos.loc[movimientos["numero_ot_mostrar"].str.strip() == "", "numero_ot_mostrar"] = movimientos["orden_trabajo"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["numero_ot_mostrar"].str.strip() == "",
+        "numero_ot_mostrar"
+    ] = movimientos["ot"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["numero_ot_mostrar"].str.strip() == "",
+        "numero_ot_mostrar"
+    ] = movimientos["orden_trabajo"].fillna("").astype(str)
 
     movimientos["material_mostrar"] = movimientos["material"].fillna("").astype(str)
-    movimientos.loc[movimientos["material_mostrar"].str.strip() == "", "material_mostrar"] = movimientos["nombre_material"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["material_mostrar"].str.strip() == "",
+        "material_mostrar"
+    ] = movimientos["nombre_material"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["material_mostrar"].str.strip() == "",
+        "material_mostrar"
+    ] = movimientos["codigo_material"].fillna("").astype(str)
 
     movimientos["tipo_mostrar"] = movimientos["tipo"].fillna("").astype(str)
-    movimientos.loc[movimientos["tipo_mostrar"].str.strip() == "", "tipo_mostrar"] = movimientos["movimiento"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["tipo_mostrar"].str.strip() == "",
+        "tipo_mostrar"
+    ] = movimientos["movimiento"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["tipo_mostrar"].str.strip() == "",
+        "tipo_mostrar"
+    ] = movimientos["tipo_movimiento"].fillna("").astype(str)
 
-    movimientos["cantidad_num"] = pd.to_numeric(movimientos["cantidad"], errors="coerce").fillna(0)
-    movimientos["precio_num"] = pd.to_numeric(movimientos["precio_unitario"], errors="coerce").fillna(0)
-    movimientos["coste_total_num"] = pd.to_numeric(movimientos["coste_total"], errors="coerce").fillna(0)
+    movimientos["observaciones_mostrar"] = movimientos["observaciones"].fillna("").astype(str)
+    movimientos.loc[
+        movimientos["observaciones_mostrar"].str.strip() == "",
+        "observaciones_mostrar"
+    ] = movimientos["motivo"].fillna("").astype(str)
+
+    movimientos["cantidad_num"] = pd.to_numeric(
+        movimientos["cantidad"],
+        errors="coerce"
+    ).fillna(0)
+
+    movimientos["precio_num"] = pd.to_numeric(
+        movimientos["precio_unitario"],
+        errors="coerce"
+    ).fillna(0)
+
+    movimientos["coste_total_num"] = pd.to_numeric(
+        movimientos["coste_total"],
+        errors="coerce"
+    ).fillna(0)
 
     if movimientos["coste_total_num"].sum() == 0:
-        movimientos["coste_total_num"] = pd.to_numeric(movimientos["coste"], errors="coerce").fillna(0)
+        movimientos["coste_total_num"] = pd.to_numeric(
+            movimientos["coste"],
+            errors="coerce"
+        ).fillna(0)
 
-    movimientos.loc[movimientos["coste_total_num"] == 0, "coste_total_num"] = (
-        movimientos["cantidad_num"].abs() * movimientos["precio_num"]
-    )
+    inventario = preparar_inventario()
+
+    if not inventario.empty:
+        inv = inventario.copy()
+
+        if "codigo" not in inv.columns:
+            inv["codigo"] = ""
+
+        inv["codigo"] = inv["codigo"].fillna("").astype(str)
+        inv["material_mostrar"] = inv["material_mostrar"].fillna("").astype(str)
+        inv["precio_num"] = pd.to_numeric(inv["precio_num"], errors="coerce").fillna(0)
+
+        mapa_codigo = inv[["codigo", "precio_num"]].drop_duplicates()
+        mapa_codigo = mapa_codigo.rename(columns={"precio_num": "precio_inventario_codigo"})
+
+        movimientos["codigo_material"] = movimientos["codigo_material"].fillna("").astype(str)
+
+        movimientos = movimientos.merge(
+            mapa_codigo,
+            left_on="codigo_material",
+            right_on="codigo",
+            how="left"
+        )
+
+        movimientos["precio_inventario_codigo"] = pd.to_numeric(
+            movimientos["precio_inventario_codigo"],
+            errors="coerce"
+        ).fillna(0)
+
+        movimientos.loc[
+            movimientos["precio_num"] == 0,
+            "precio_num"
+        ] = movimientos["precio_inventario_codigo"]
+
+        movimientos = movimientos.drop(columns=["codigo"], errors="ignore")
+
+        mapa_material = inv[["material_mostrar", "precio_num"]].drop_duplicates()
+        mapa_material = mapa_material.rename(columns={"precio_num": "precio_inventario_material"})
+
+        movimientos = movimientos.merge(
+            mapa_material,
+            on="material_mostrar",
+            how="left"
+        )
+
+        movimientos["precio_inventario_material"] = pd.to_numeric(
+            movimientos["precio_inventario_material"],
+            errors="coerce"
+        ).fillna(0)
+
+        movimientos.loc[
+            movimientos["precio_num"] == 0,
+            "precio_num"
+        ] = movimientos["precio_inventario_material"]
+
+    movimientos.loc[
+        movimientos["coste_total_num"] == 0,
+        "coste_total_num"
+    ] = movimientos["cantidad_num"].abs() * movimientos["precio_num"]
 
     texto_tipo = movimientos["tipo_mostrar"].fillna("").astype(str).str.lower()
 
     usados = movimientos[
-        texto_tipo.str.contains("salida|uso|utilizado|consumo|retirada", na=False)
+        texto_tipo.str.contains("salida|uso|utilizado|consumo|retirada|descuento", na=False)
         | (movimientos["cantidad_num"] < 0)
     ].copy()
 
@@ -691,7 +793,7 @@ def mostrar_detalle_inventario_utilizado(centro, ordenes):
         "precio_num",
         "coste_total_num",
         "operario",
-        "observaciones",
+        "observaciones_mostrar",
     ]
 
     columnas = [c for c in columnas if c in datos.columns]
