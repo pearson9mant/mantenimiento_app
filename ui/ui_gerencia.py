@@ -599,6 +599,12 @@ def es_abierta(df):
 def es_en_curso(df):
     return df["estado"].isin(["En curso", "En ejecución"])
 
+def es_pendiente_material(df):
+    return df["estado"].isin([
+        "Pendiente material",
+        "Esperando material"
+    ])
+
 
 def filtrar_realizadas_mes(df, origen_busqueda):
     if df.empty:
@@ -642,6 +648,9 @@ def obtener_df_tarjeta(df, centro, tipo):
 
     if tipo == "en_curso":
         return datos[es_en_curso(datos)]
+
+    if tipo == "material":
+        return datos[es_pendiente_material(datos)]
 
     if tipo == "cerradas":
         return datos[es_cerrada(datos)]
@@ -737,7 +746,7 @@ def mostrar_menu_centro(df, centro):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         boton_tarjeta(
@@ -758,6 +767,15 @@ def mostrar_menu_centro(df, centro):
         )
 
     with c3:
+        boton_tarjeta(
+            "Pendiente material",
+            contar(df, centro, "material"),
+            centro,
+            "material",
+            "📦"
+        )
+
+    with c4:
         boton_tarjeta(
             "Órdenes cerradas",
             contar(df, centro, "cerradas"),
