@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 from database.db import conectar
 
 
@@ -16,6 +19,164 @@ def _add_columna_segura(cursor, tabla, columna, tipo):
             pass
 
 
+# =====================================================
+# NORMALIZACIÓN / DUPLICADOS
+# =====================================================
+
+PALABRAS_IGNORAR_MATERIAL = {
+    "de", "del", "la", "el", "los", "las", "un", "una",
+    "para", "por", "con", "sin", "y", "o"
+}
+
+
+def normalizar_texto_material(texto):
+    texto = str(texto or "").strip().lower()
+
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+
+    texto = texto.replace("á", "a")
+    texto = texto.replace("é", "e")
+    texto = texto.replace("í", "i")
+    texto = texto.replace("ó", "o")
+    texto = texto.replace("ú", "u")
+    texto = texto.replace("ñ", "n")
+
+    texto = re.sub(r"[^a-z0-9 ]+", " ", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
+
+    return texto
+
+
+def palabras_clave_material(texto):
+    texto_norm = normalizar_texto_material(texto)
+
+    palabras = [
+        p for p in texto_norm.split()
+        if p and p not in PALABRAS_IGNORAR_MATERIAL and len(p) >= 3
+    ]
+
+    return list(dict.fromkeys(palabras))
+
+
+def buscar_material_duplicado_exacto(material, categoria="", unidad=""):
+    asegurar_columnas_inventario()
+
+    material_norm = normalizar_texto_material(material)
+    categoria_norm = normalizar_texto_material(categoria)
+    unidad_norm = normalizar_texto_material(unidad)
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, codigo, material, categoria, unidad, stock_actual, activo
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+    """)
+
+    filas = cursor.fetchall()
+    conn.close()
+
+    for fila in filas:
+        id_mat, codigo, mat, cat, uni, stock, activo = fila
+
+        if (
+            normalizar_texto_material(mat) == material_norm
+            and normalizar_texto_material(cat) == categoria_norm
+            and normalizar_texto_material(uni) == unidad_norm
+        ):
+            return {
+                "id": id_mat,
+                "codigo": codigo,
+                "material": mat,
+                "categoria": cat,
+                "unidad": uni,
+                "stock_actual": stock,
+            }
+
+    return None
+
+
+def buscar_materiales_parecidos(material, limite=8):
+    asegurar_columnas_inventario()
+
+    palabras_nuevo = set(palabras_clave_material(material))
+
+    if not palabras_nuevo:
+        return []
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, codigo, material, categoria, unidad, stock_actual
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+        ORDER BY material ASC
+    """)
+
+    filas = cursor.fetchall()
+    conn.close()
+
+    parecidos = []
+
+    for fila in filas:
+        id_mat, codigo, mat, cat, uni, stock = fila
+
+        palabras_existente = set(palabras_clave_material(mat))
+
+        if not palabras_existente:
+            continue
+
+        coincidencias = palabras_nuevo.intersection(palabras_existente)
+
+        if coincidencias:
+            puntuacion = len(coincidencias)
+
+            # Si una palabra importante aparece dentro del otro texto, también suma
+            mat_norm = normalizar_texto_material(mat)
+            nuevo_norm = normalizar_texto_material(material)
+
+            for p in palabras_nuevo:
+                if p in mat_norm:
+                    puntuacion += 1
+
+            for p in palabras_existente:
+                if p in nuevo_norm:
+                    puntuacion += 1
+
+            parecidos.append({
+                "id": id_mat,
+                "codigo": codigo,
+                "material": mat,
+                "categoria": cat,
+                "unidad": uni,
+                "stock_actual": stock,
+                "coincidencias": ", ".join(sorted(coincidencias)),
+                "puntuacion": puntuacion,
+            })
+
+    parecidos = sorted(
+        parecidos,
+        key=lambda x: x["puntuacion"],
+        reverse=True
+    )
+
+    return parecidos[:limite]
+
+
+def comprobar_material_antes_crear(material, categoria="", unidad=""):
+    exacto = buscar_material_duplicado_exacto(material, categoria, unidad)
+    parecidos = buscar_materiales_parecidos(material)
+
+    return exacto, parecidos
+
+
+# =====================================================
+# COLUMNAS
+# =====================================================
+
 def asegurar_columnas_inventario():
     conn = conectar()
     cursor = conn.cursor()
@@ -23,6 +184,7 @@ def asegurar_columnas_inventario():
     try:
         _add_columna_segura(cursor, "inventario", "foto", "TEXT")
         _add_columna_segura(cursor, "inventario", "activo", "INTEGER DEFAULT 1")
+        _add_columna_segura(cursor, "inventario", "material_normalizado", "TEXT")
 
         # Costes inventario
         _add_columna_segura(cursor, "inventario", "precio_unitario", "REAL DEFAULT 0")
@@ -41,6 +203,41 @@ def asegurar_columnas_inventario():
 
     conn.close()
 
+
+def actualizar_materiales_normalizados():
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute("""
+            SELECT id, material
+            FROM inventario
+        """)
+
+        filas = cursor.fetchall()
+
+        for id_mat, material in filas:
+            material_norm = normalizar_texto_material(material)
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET material_normalizado = {p}
+                WHERE id = {p}
+            """, (material_norm, id_mat))
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
+    conn.close()
+
+
+# =====================================================
+# CÓDIGO MATERIAL
+# =====================================================
 
 def generar_codigo_material(material, categoria):
     conn = conectar()
@@ -81,6 +278,10 @@ def generar_codigo_material(material, categoria):
     return f"{prefijo}-{siguiente:03d}"
 
 
+# =====================================================
+# CREAR MATERIAL
+# =====================================================
+
 def crear_material_inventario(
     codigo,
     material,
@@ -102,9 +303,24 @@ def crear_material_inventario(
 ):
     asegurar_columnas_inventario()
 
+    material = str(material or "").strip()
+    categoria = str(categoria or "").strip()
+    unidad = str(unidad or "").strip()
+
+    duplicado = buscar_material_duplicado_exacto(material, categoria, unidad)
+
+    if duplicado:
+        return False, (
+            f"Este material ya existe: "
+            f"{duplicado['material']} | Código: {duplicado['codigo']} | "
+            f"Stock actual: {duplicado['stock_actual']}"
+        )
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
+
+    material_normalizado = normalizar_texto_material(material)
 
     cursor.execute(f"""
         INSERT INTO inventario
@@ -122,16 +338,17 @@ def crear_material_inventario(
             observaciones,
             foto,
             activo,
+            material_normalizado,
             precio_unitario,
             coste_total,
             fecha_compra,
             referencia_factura,
             observaciones_coste
         )
-        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
     """, (
         codigo,
-        material.strip(),
+        material,
         categoria,
         unidad,
         float(stock_actual),
@@ -143,6 +360,7 @@ def crear_material_inventario(
         observaciones.strip(),
         foto,
         1,
+        material_normalizado,
         float(precio_unitario or 0),
         float(coste_total or 0),
         str(fecha_compra or "").strip(),
@@ -153,6 +371,12 @@ def crear_material_inventario(
     conn.commit()
     conn.close()
 
+    return True, "Material creado correctamente."
+
+
+# =====================================================
+# OBTENER MATERIALES
+# =====================================================
 
 def obtener_materiales_inventario(
     filtro_texto="",
@@ -224,6 +448,10 @@ def obtener_codigos_materiales():
 
     return datos
 
+
+# =====================================================
+# MOVIMIENTOS
+# =====================================================
 
 def registrar_movimiento_inventario(
     codigo_material,
@@ -319,6 +547,34 @@ def obtener_movimientos_inventario():
     return datos
 
 
+def obtener_movimientos_por_material(codigo_material):
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    cursor.execute(f"""
+        SELECT
+            tipo_movimiento,
+            cantidad,
+            motivo,
+            numero_ot,
+            operario,
+            fecha_movimiento
+        FROM movimientos_inventario
+        WHERE codigo_material = {p}
+        ORDER BY fecha_movimiento DESC
+    """, (codigo_material,))
+
+    datos = cursor.fetchall()
+    conn.close()
+
+    return datos
+
+
+# =====================================================
+# STOCK / SELECTS
+# =====================================================
+
 def obtener_stock_bajo():
     asegurar_columnas_inventario()
 
@@ -381,29 +637,9 @@ def obtener_material_por_codigo(codigo):
     return fila
 
 
-def obtener_movimientos_por_material(codigo_material):
-    conn = conectar()
-    cursor = conn.cursor()
-    p = _ph(conn)
-
-    cursor.execute(f"""
-        SELECT
-            tipo_movimiento,
-            cantidad,
-            motivo,
-            numero_ot,
-            operario,
-            fecha_movimiento
-        FROM movimientos_inventario
-        WHERE codigo_material = {p}
-        ORDER BY fecha_movimiento DESC
-    """, (codigo_material,))
-
-    datos = cursor.fetchall()
-    conn.close()
-
-    return datos
-
+# =====================================================
+# ACTIVAR / DESACTIVAR
+# =====================================================
 
 def desactivar_material(codigo):
     asegurar_columnas_inventario()
