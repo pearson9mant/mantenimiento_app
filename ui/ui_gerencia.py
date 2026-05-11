@@ -309,41 +309,51 @@ def preparar_movimientos_inventario():
         movimientos["numero_ot_mostrar"].str.strip() == "",
         "numero_ot_mostrar"
     ] = movimientos["ot"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["numero_ot_mostrar"].str.strip() == "",
         "numero_ot_mostrar"
     ] = movimientos["orden_trabajo"].fillna("").astype(str)
 
     movimientos["material_mostrar"] = movimientos["material"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["material_mostrar"].str.strip() == "",
         "material_mostrar"
     ] = movimientos["nombre_material"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["material_mostrar"].str.strip() == "",
         "material_mostrar"
     ] = movimientos["codigo_material"].fillna("").astype(str)
 
     movimientos["tipo_mostrar"] = movimientos["tipo"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["tipo_mostrar"].str.strip() == "",
         "tipo_mostrar"
     ] = movimientos["movimiento"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["tipo_mostrar"].str.strip() == "",
         "tipo_mostrar"
     ] = movimientos["tipo_movimiento"].fillna("").astype(str)
 
     movimientos["observaciones_mostrar"] = movimientos["observaciones"].fillna("").astype(str)
+
     movimientos.loc[
         movimientos["observaciones_mostrar"].str.strip() == "",
         "observaciones_mostrar"
     ] = movimientos["motivo"].fillna("").astype(str)
 
+    # =====================================================
+    # NUMÉRICOS SEGUROS FLOAT
+    # =====================================================
+
     movimientos["cantidad_num"] = pd.to_numeric(
         movimientos["cantidad"],
         errors="coerce"
-    ).fillna(0)
+    ).fillna(0).astype(float)
 
     movimientos["precio_num"] = pd.to_numeric(
         movimientos["precio_unitario"],
@@ -359,7 +369,11 @@ def preparar_movimientos_inventario():
         movimientos["coste_total_num"] = pd.to_numeric(
             movimientos["coste"],
             errors="coerce"
-        ).fillna(0)
+        ).fillna(0).astype(float)
+
+    # =====================================================
+    # RECUPERAR PRECIOS DESDE INVENTARIO
+    # =====================================================
 
     inventario = preparar_inventario()
 
@@ -370,13 +384,35 @@ def preparar_movimientos_inventario():
             inv["codigo"] = ""
 
         inv["codigo"] = inv["codigo"].fillna("").astype(str)
-        inv["material_mostrar"] = inv["material_mostrar"].fillna("").astype(str)
-        inv["precio_num"] = pd.to_numeric(inv["precio_num"], errors="coerce").fillna(0)
 
-        mapa_codigo = inv[["codigo", "precio_num"]].drop_duplicates()
-        mapa_codigo = mapa_codigo.rename(columns={"precio_num": "precio_inventario_codigo"})
+        inv["material_mostrar"] = (
+            inv["material_mostrar"]
+            .fillna("")
+            .astype(str)
+        )
 
-        movimientos["codigo_material"] = movimientos["codigo_material"].fillna("").astype(str)
+        inv["precio_num"] = pd.to_numeric(
+            inv["precio_num"],
+            errors="coerce"
+        ).fillna(0).astype(float)
+
+        # =========================
+        # MAPA POR CÓDIGO
+        # =========================
+
+        mapa_codigo = inv[
+            ["codigo", "precio_num"]
+        ].drop_duplicates()
+
+        mapa_codigo = mapa_codigo.rename(columns={
+            "precio_num": "precio_inventario_codigo"
+        })
+
+        movimientos["codigo_material"] = (
+            movimientos["codigo_material"]
+            .fillna("")
+            .astype(str)
+        )
 
         movimientos = movimientos.merge(
             mapa_codigo,
@@ -388,17 +424,29 @@ def preparar_movimientos_inventario():
         movimientos["precio_inventario_codigo"] = pd.to_numeric(
             movimientos["precio_inventario_codigo"],
             errors="coerce"
-        ).fillna(0)
+        ).fillna(0).astype(float)
 
         movimientos.loc[
             movimientos["precio_num"] == 0,
             "precio_num"
         ] = movimientos["precio_inventario_codigo"]
 
-        movimientos = movimientos.drop(columns=["codigo"], errors="ignore")
+        movimientos = movimientos.drop(
+            columns=["codigo"],
+            errors="ignore"
+        )
 
-        mapa_material = inv[["material_mostrar", "precio_num"]].drop_duplicates()
-        mapa_material = mapa_material.rename(columns={"precio_num": "precio_inventario_material"})
+        # =========================
+        # MAPA POR MATERIAL
+        # =========================
+
+        mapa_material = inv[
+            ["material_mostrar", "precio_num"]
+        ].drop_duplicates()
+
+        mapa_material = mapa_material.rename(columns={
+            "precio_num": "precio_inventario_material"
+        })
 
         movimientos = movimientos.merge(
             mapa_material,
@@ -409,22 +457,60 @@ def preparar_movimientos_inventario():
         movimientos["precio_inventario_material"] = pd.to_numeric(
             movimientos["precio_inventario_material"],
             errors="coerce"
-        ).fillna(0)
+        ).fillna(0).astype(float)
 
         movimientos.loc[
             movimientos["precio_num"] == 0,
             "precio_num"
         ] = movimientos["precio_inventario_material"]
 
+    # =====================================================
+    # ASEGURAR FLOATS ANTES DEL CÁLCULO
+    # =====================================================
+
+    movimientos["cantidad_num"] = pd.to_numeric(
+        movimientos["cantidad_num"],
+        errors="coerce"
+    ).fillna(0).astype(float)
+
+    movimientos["precio_num"] = pd.to_numeric(
+        movimientos["precio_num"],
+        errors="coerce"
+    ).fillna(0).astype(float)
+
+    movimientos["coste_total_num"] = pd.to_numeric(
+        movimientos["coste_total_num"],
+        errors="coerce"
+    ).fillna(0).astype(float)
+
+    # =====================================================
+    # CALCULAR COSTE SI FALTA
+    # =====================================================
+
     movimientos.loc[
         movimientos["coste_total_num"] == 0,
         "coste_total_num"
-    ] = movimientos["cantidad_num"].abs() * movimientos["precio_num"]
+    ] = (
+        movimientos["cantidad_num"].abs()
+        * movimientos["precio_num"]
+    )
 
-    texto_tipo = movimientos["tipo_mostrar"].fillna("").astype(str).str.lower()
+    # =====================================================
+    # FILTRAR SOLO SALIDAS / USOS
+    # =====================================================
+
+    texto_tipo = (
+        movimientos["tipo_mostrar"]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+    )
 
     usados = movimientos[
-        texto_tipo.str.contains("salida|uso|utilizado|consumo|retirada|descuento", na=False)
+        texto_tipo.str.contains(
+            "salida|uso|utilizado|consumo|retirada|descuento",
+            na=False
+        )
         | (movimientos["cantidad_num"] < 0)
     ].copy()
 
