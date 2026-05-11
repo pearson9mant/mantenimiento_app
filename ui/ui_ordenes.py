@@ -271,191 +271,231 @@ def pantalla_ordenes():
     # NUEVA ORDEN
     # =====================================================
 
-    with tab1:
-        c1, c2 = st.columns(2)
+        with tab1:
+        tab_interna, tab_externa = st.tabs(["🔧 Interna", "🏢 Externa"])
 
-        with c1:
-            centro = st.selectbox("Centro", CENTROS, key="orden_centro")
-            st.info("Número de OT: se asignará al crear la orden")
+        # =====================================================
+        # NUEVA ORDEN INTERNA
+        # =====================================================
 
-            edificios_disponibles = EDIFICIOS.get(centro, [])
-            edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_edificio_{centro}")
+        with tab_interna:
+            c1, c2 = st.columns(2)
 
-            espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
-            espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"orden_espacio_{edificio}")
+            with c1:
+                centro = st.selectbox("Centro", CENTROS, key="orden_int_centro")
+                st.info("Número de OT interna: se asignará al crear la orden")
 
-            if espacio_sel == "Otro":
-                espacio = st.text_input("Especificar espacio nuevo", key="orden_espacio_otro")
-            else:
-                espacio = espacio_sel
+                edificios_disponibles = EDIFICIOS.get(centro, [])
+                edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_int_edificio_{centro}")
 
-        with c2:
-            tipo_solicitante = st.selectbox(
-                "Tipo solicitante",
-                tipos_solicitante_lista,
-                index=tipos_solicitante_lista.index("Operarios") if "Operarios" in tipos_solicitante_lista else 0,
-                key="orden_tipo_solicitante_fuera_form"
-            )
+                espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
+                espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"orden_int_espacio_{edificio}")
 
-            st.caption(f"Se guardará como: {tipo_solicitante}")
+                if espacio_sel == "Otro":
+                    espacio = st.text_input("Especificar espacio nuevo", key="orden_int_espacio_otro")
+                else:
+                    espacio = espacio_sel
 
-            with st.form("form_nueva_orden", clear_on_submit=True):
-                descripcion = st.text_area("Descripción", key="orden_descripcion")
-
-                area = st.selectbox("Área", AREAS, key="orden_area")
-                prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_prioridad")
-
-                tipo_orden = st.radio(
-                    "Tipo de orden",
-                    ["Interna", "Externa"],
-                    horizontal=True,
-                    key="orden_tipo_orden"
+            with c2:
+                tipo_solicitante = st.selectbox(
+                    "Tipo solicitante",
+                    tipos_solicitante_lista,
+                    index=tipos_solicitante_lista.index("Operarios") if "Operarios" in tipos_solicitante_lista else 0,
+                    key="orden_int_tipo_solicitante"
                 )
 
-                empresa_externa = ""
-                contacto_empresa = ""
-                telefono_empresa = ""
-                email_empresa = ""
-                fecha_aviso_empresa = ""
-                fecha_realizacion = ""
-                trabajo_a_realizar = ""
-                trabajo_realizado = ""
-                firma_operario = ""
-                fecha_firma_operario = ""
-                coste_estimado = 0
-                coste_final = 0
+                with st.form("form_nueva_orden_interna", clear_on_submit=True):
+                    descripcion = st.text_area("Descripción", key="orden_int_descripcion")
+                    area = st.selectbox("Área", AREAS, key="orden_int_area")
+                    prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_int_prioridad")
 
-                if tipo_orden == "Externa":
-                    st.info("🏢 Esta orden será gestionada por una empresa externa.")
-
-                    empresa_externa = st.text_input("Empresa externa", key="orden_empresa_externa")
-                    contacto_empresa = st.text_input("Persona de contacto", key="orden_contacto_empresa")
-                    telefono_empresa = st.text_input("Teléfono empresa", key="orden_telefono_empresa")
-                    email_empresa = st.text_input("Email empresa", key="orden_email_empresa")
-
-                    fecha_aviso_empresa = st.date_input(
-                        "Fecha de aviso a la empresa",
-                        key="orden_fecha_aviso_empresa"
-                    )
-
-                    trabajo_a_realizar = st.text_area(
-                        "Trabajo a realizar por la empresa",
-                        placeholder="Opcional. Ejemplo: revisar equipo, reparar fuga, sustituir pieza...",
-                        key="orden_trabajo_a_realizar"
-                    )
-
-                    coste_estimado = st.number_input(
-                        "Coste estimado €",
-                        min_value=0.0,
-                        step=10.0,
-                        key="orden_coste_estimado"
-                    )
-
-                    operario = "Proveedor externo"
-                    st.caption("Las tareas externas se guardan como Proveedor externo.")
-                else:
                     operario_auto = operario_forzado_si_toca(centro)
 
                     if es_operario():
                         operario = operario_auto
                         st.info(f"👷 Operario asignado automáticamente: {operario}")
                     else:
-                        if operario_auto in OPERARIOS:
-                            indice_operario = OPERARIOS.index(operario_auto)
-                        else:
-                            indice_operario = 0
+                        indice_operario = OPERARIOS.index(operario_auto) if operario_auto in OPERARIOS else 0
 
                         operario_sel = st.selectbox(
                             "Operario",
                             OPERARIOS,
                             index=indice_operario,
-                            key=f"orden_operario_{centro}"
+                            key=f"orden_int_operario_{centro}"
                         )
 
                         if operario_sel == "Otro":
-                            operario = st.text_input("Nombre operario", key="orden_operario_otro")
+                            operario = st.text_input("Nombre operario", key="orden_int_operario_otro")
                         else:
                             operario = operario_sel
 
-                boton_crear = st.form_submit_button("✅ Crear orden", use_container_width=True)
+                    boton_crear_interna = st.form_submit_button("✅ Crear orden interna", use_container_width=True)
 
-                if boton_crear:
-                    tipo_solicitante_guardar = str(
-                        st.session_state.get("orden_tipo_solicitante_fuera_form", "Operarios")
-                    ).strip()
+                    if boton_crear_interna:
+                        tipo_solicitante_guardar = str(tipo_solicitante or "Operarios").strip()
 
-                    if tipo_solicitante_guardar not in tipos_solicitante_lista:
-                        tipo_solicitante_guardar = "Operarios"
+                        if tipo_solicitante_guardar not in tipos_solicitante_lista:
+                            tipo_solicitante_guardar = "Operarios"
 
-                    if es_operario():
-                        tipo_solicitante_guardar = "Operarios"
-                        if tipo_orden != "Externa":
+                        if es_operario():
+                            tipo_solicitante_guardar = "Operarios"
                             operario = usuario_actual()
 
-                    if not descripcion.strip():
-                        st.warning("La descripción es obligatoria")
-
-                    elif not str(espacio).strip():
-                        st.warning("Indica un espacio")
-
-                    elif tipo_orden == "Interna" and not operario.strip():
-                        st.warning("Indica un operario")
-
-                    elif tipo_orden == "Externa" and not empresa_externa.strip():
-                        st.warning("Indica la empresa externa")
-
-                    else:
-                        if tipo_orden == "Externa":
-                            numero = obtener_siguiente_numero_ot(centro, "EXT")
-                            estado_inicial = "Pendiente proveedor"
-                            origen_guardar = "EXTERNA"
-                            operario_guardar = "Proveedor externo"
+                        if not descripcion.strip():
+                            st.warning("La descripción es obligatoria")
+                        elif not str(espacio).strip():
+                            st.warning("Indica un espacio")
+                        elif not operario.strip():
+                            st.warning("Indica un operario")
                         else:
                             numero = obtener_siguiente_numero_ot(centro, "INC")
-                            estado_inicial = "Abierta"
-                            origen_guardar = "APP"
-                            operario_guardar = operario
 
-                        datos_orden = (
-                            numero,
-                            descripcion,
-                            estado_inicial,
-                            centro,
-                            edificio,
-                            espacio,
-                            area,
-                            prioridad,
-                            operario_guardar,
-                            origen_guardar,
-                            "",
-                            "",
-                            "",
-                            tipo_solicitante_guardar,
-                            tipo_orden,
-                            empresa_externa if tipo_orden == "Externa" else "",
-                            contacto_empresa if tipo_orden == "Externa" else "",
-                            telefono_empresa if tipo_orden == "Externa" else "",
-                            email_empresa if tipo_orden == "Externa" else "",
-                            str(fecha_aviso_empresa) if tipo_orden == "Externa" and fecha_aviso_empresa else "",
-                            "",
-                            trabajo_a_realizar if tipo_orden == "Externa" else "",
-                            "",
-                            "",
-                            "",
-                            coste_estimado if tipo_orden == "Externa" else 0,
-                            0,
-                            ""
-                        )
+                            datos_orden = (
+                                numero,
+                                descripcion,
+                                "Abierta",
+                                centro,
+                                edificio,
+                                espacio,
+                                area,
+                                prioridad,
+                                operario,
+                                "APP",
+                                "",
+                                "",
+                                "",
+                                tipo_solicitante_guardar,
+                                "Interna",
+                                "",
+                                "",
+                                "",
+                                "",
+                                "",
+                                "",
+                                0,
+                                0,
+                                ""
+                            )
 
-                        crear_orden(datos_orden)
-                        limpiar_cache_streamlit()
+                            crear_orden(datos_orden)
+                            limpiar_cache_streamlit()
 
-                        st.success(
-                            f"Orden creada correctamente: {numero} | "
-                            f"Tipo: {tipo_orden} | "
-                            f"Solicitante: {tipo_solicitante_guardar}"
-                        )
-                        st.rerun()
+                            st.success(f"Orden interna creada correctamente: {numero}")
+                            st.rerun()
+
+        # =====================================================
+        # NUEVA ORDEN EXTERNA
+        # =====================================================
+
+        with tab_externa:
+            c1, c2 = st.columns(2)
+
+            with c1:
+                centro_ext = st.selectbox("Centro", CENTROS, key="orden_ext_centro")
+                st.info("Número de OT externa: se asignará al crear la orden")
+
+                edificios_disponibles_ext = EDIFICIOS.get(centro_ext, [])
+                edificio_ext = st.selectbox("Edificio", edificios_disponibles_ext, key=f"orden_ext_edificio_{centro_ext}")
+
+                espacios_disponibles_ext = ESPACIOS.get(edificio_ext, ["General", "Otro"])
+                espacio_sel_ext = st.selectbox("Espacio", espacios_disponibles_ext, key=f"orden_ext_espacio_{edificio_ext}")
+
+                if espacio_sel_ext == "Otro":
+                    espacio_ext = st.text_input("Especificar espacio nuevo", key="orden_ext_espacio_otro")
+                else:
+                    espacio_ext = espacio_sel_ext
+
+            with c2:
+                tipo_solicitante_ext = st.selectbox(
+                    "Tipo solicitante",
+                    tipos_solicitante_lista,
+                    index=tipos_solicitante_lista.index("Operarios") if "Operarios" in tipos_solicitante_lista else 0,
+                    key="orden_ext_tipo_solicitante"
+                )
+
+                with st.form("form_nueva_orden_externa", clear_on_submit=True):
+                    descripcion_ext = st.text_area("Descripción / incidencia", key="orden_ext_descripcion")
+                    area_ext = st.selectbox("Área", AREAS, key="orden_ext_area")
+                    prioridad_ext = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_ext_prioridad")
+
+                    st.markdown("### 🏢 Datos empresa externa")
+
+                    empresa_externa = st.text_input("Empresa externa", key="orden_ext_empresa")
+                    contacto_empresa = st.text_input("Persona de contacto", key="orden_ext_contacto")
+                    telefono_empresa = st.text_input("Teléfono empresa", key="orden_ext_telefono")
+                    email_empresa = st.text_input("Email empresa", key="orden_ext_email")
+
+                    fecha_aviso_empresa = st.date_input(
+                        "Fecha de aviso a la empresa",
+                        key="orden_ext_fecha_aviso"
+                    )
+
+                    trabajo_a_realizar = st.text_area(
+                        "Trabajo a realizar",
+                        placeholder="Opcional. Ejemplo: revisar equipo, reparar fuga, sustituir pieza...",
+                        key="orden_ext_trabajo_a_realizar"
+                    )
+
+                    coste_estimado = st.number_input(
+                        "Coste estimado €",
+                        min_value=0.0,
+                        step=10.0,
+                        key="orden_ext_coste_estimado"
+                    )
+
+                    boton_crear_externa = st.form_submit_button("✅ Crear orden externa", use_container_width=True)
+
+                    if boton_crear_externa:
+                        tipo_solicitante_guardar_ext = str(tipo_solicitante_ext or "Operarios").strip()
+
+                        if tipo_solicitante_guardar_ext not in tipos_solicitante_lista:
+                            tipo_solicitante_guardar_ext = "Operarios"
+
+                        if not descripcion_ext.strip():
+                            st.warning("La descripción es obligatoria")
+                        elif not str(espacio_ext).strip():
+                            st.warning("Indica un espacio")
+                        elif not empresa_externa.strip():
+                            st.warning("Indica la empresa externa")
+                        else:
+                            numero_ext = obtener_siguiente_numero_ot(centro_ext, "EXT")
+
+                            datos_orden_ext = (
+                                numero_ext,
+                                descripcion_ext,
+                                "Pendiente proveedor",
+                                centro_ext,
+                                edificio_ext,
+                                espacio_ext,
+                                area_ext,
+                                prioridad_ext,
+                                "Proveedor externo",
+                                "EXTERNA",
+                                "",
+                                "",
+                                "",
+                                tipo_solicitante_guardar_ext,
+                                "Externa",
+                                empresa_externa,
+                                contacto_empresa,
+                                telefono_empresa,
+                                email_empresa,
+                                str(fecha_aviso_empresa) if fecha_aviso_empresa else "",
+                                "",
+                                trabajo_a_realizar,
+                                "",
+                                "",
+                                "",
+                                coste_estimado,
+                                0,
+                                ""
+                            )
+
+                            crear_orden(datos_orden_ext)
+                            limpiar_cache_streamlit()
+
+                            st.success(f"Orden externa creada correctamente: {numero_ext}")
+                            st.rerun()
 
     # =====================================================
     # ÓRDENES ACTIVAS
