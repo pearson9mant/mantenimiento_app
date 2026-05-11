@@ -348,12 +348,12 @@ def preparar_movimientos_inventario():
     movimientos["precio_num"] = pd.to_numeric(
         movimientos["precio_unitario"],
         errors="coerce"
-    ).fillna(0)
+    ).fillna(0).astype(float)
 
     movimientos["coste_total_num"] = pd.to_numeric(
         movimientos["coste_total"],
         errors="coerce"
-    ).fillna(0)
+    ).fillna(0).astype(float)
 
     if movimientos["coste_total_num"].sum() == 0:
         movimientos["coste_total_num"] = pd.to_numeric(
