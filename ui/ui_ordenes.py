@@ -115,6 +115,28 @@ def obtener_tipos_solicitante_lista():
     return list(TIPOS_SOLICITANTE)
 
 
+def centro_del_usuario_operario():
+    usuario = normalizar_txt(usuario_actual())
+
+    if usuario in [
+        "j.a. almeda",
+        "ja almeda",
+        "juan antonio",
+        "juan antonio almeda",
+        "jalmeda",
+        "j.a.almeda",
+    ]:
+        return "Pearson 22"
+
+    if usuario in [
+        "luis lozano",
+        "luis",
+    ]:
+        return "Pearson 9"
+
+    return ""
+
+
 def filtrar_por_operario_obligatorio(filas):
     if not filas:
         return []
@@ -124,10 +146,21 @@ def filtrar_por_operario_obligatorio(filas):
 
     if es_operario():
         usuario = normalizar_txt(usuario_actual())
-        return [
-            f for f in filas
-            if normalizar_txt(obtener_operario_de_fila(f)) == usuario
-        ]
+        centro_usuario = centro_del_usuario_operario()
+
+        filtradas = []
+
+        for f in filas:
+            operario_fila = normalizar_txt(obtener_operario_de_fila(f))
+            centro_fila = f[5] if len(f) > 5 else ""
+            tipo_orden_fila = f[16] if len(f) > 16 else "Interna"
+
+            if operario_fila == usuario:
+                filtradas.append(f)
+            elif tipo_orden_fila == "Externa" and centro_usuario and centro_fila == centro_usuario:
+                filtradas.append(f)
+
+        return filtradas
 
     return filas
 
@@ -307,7 +340,7 @@ def pantalla_ordenes():
 
                     trabajo_a_realizar = st.text_area(
                         "Trabajo a realizar por la empresa",
-                        placeholder="Ejemplo: revisar equipo, reparar fuga, sustituir pieza...",
+                        placeholder="Opcional. Ejemplo: revisar equipo, reparar fuga, sustituir pieza...",
                         key="orden_trabajo_a_realizar"
                     )
 
@@ -361,12 +394,16 @@ def pantalla_ordenes():
 
                     if not descripcion.strip():
                         st.warning("La descripción es obligatoria")
-                    elif tipo_orden == "Interna" and not operario.strip():
-                        st.warning("Indica un operario")
-                    elif tipo_orden == "Externa" and not empresa_externa.strip():
-                        st.warning("Indica la empresa externa")
+
                     elif not str(espacio).strip():
                         st.warning("Indica un espacio")
+
+                    elif tipo_orden == "Interna" and not operario.strip():
+                        st.warning("Indica un operario")
+
+                    elif tipo_orden == "Externa" and not empresa_externa.strip():
+                        st.warning("Indica la empresa externa")
+
                     else:
                         if tipo_orden == "Externa":
                             numero = obtener_siguiente_numero_ot(centro, "EXT")
@@ -395,18 +432,18 @@ def pantalla_ordenes():
                             "",
                             tipo_solicitante_guardar,
                             tipo_orden,
-                            empresa_externa,
-                            contacto_empresa,
-                            telefono_empresa,
-                            email_empresa,
-                            str(fecha_aviso_empresa) if fecha_aviso_empresa else "",
-                            str(fecha_realizacion) if fecha_realizacion else "",
-                            trabajo_a_realizar,
-                            trabajo_realizado,
-                            firma_operario,
-                            fecha_firma_operario,
-                            coste_estimado,
-                            coste_final,
+                            empresa_externa if tipo_orden == "Externa" else "",
+                            contacto_empresa if tipo_orden == "Externa" else "",
+                            telefono_empresa if tipo_orden == "Externa" else "",
+                            email_empresa if tipo_orden == "Externa" else "",
+                            str(fecha_aviso_empresa) if tipo_orden == "Externa" and fecha_aviso_empresa else "",
+                            "",
+                            trabajo_a_realizar if tipo_orden == "Externa" else "",
+                            "",
+                            "",
+                            "",
+                            coste_estimado if tipo_orden == "Externa" else 0,
+                            0,
                             ""
                         )
 
@@ -692,8 +729,8 @@ def pantalla_ordenes():
                     with c2:
                         if tipo_orden == "Externa":
                             estados = [
-                                "Avisado",
                                 "Pendiente proveedor",
+                                "Avisado",
                                 "En ejecución",
                                 "Cerrado",
                                 "Finalizada",
