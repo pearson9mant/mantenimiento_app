@@ -8,7 +8,8 @@ from modules.inventario import (
     registrar_movimiento_inventario,
     obtener_movimientos_por_material,
     desactivar_material,
-    activar_material
+    activar_material,
+    comprobar_material_antes_crear,
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -74,6 +75,41 @@ def pantalla_inventario():
             )
 
             unidad = st.text_input("Unidad", value="uds", key="crear_material_unidad")
+
+            # -------------------------
+            # AVISO DUPLICADOS / PARECIDOS
+            # -------------------------
+            exacto = None
+            parecidos = []
+
+            if material.strip():
+                try:
+                    exacto, parecidos = comprobar_material_antes_crear(
+                        material,
+                        categoria,
+                        unidad
+                    )
+                except Exception:
+                    exacto = None
+                    parecidos = []
+
+                if exacto:
+                    st.error(
+                        f"⚠️ Ya existe este material: "
+                        f"{exacto['material']} | Código: {exacto['codigo']} | "
+                        f"Stock: {exacto['stock_actual']}"
+                    )
+
+                elif parecidos:
+                    st.warning("🔎 Materiales parecidos encontrados. Revisa antes de crear uno nuevo:")
+
+                    for p in parecidos:
+                        st.write(
+                            f"- **{p['material']}** | "
+                            f"Código: `{p['codigo']}` | "
+                            f"Stock: {p['stock_actual']} | "
+                            f"Coincide: {p.get('coincidencias', '-')}"
+                        )
 
             stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0, key="crear_material_stock_actual")
             stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0, key="crear_material_stock_minimo")
@@ -147,10 +183,14 @@ def pantalla_inventario():
             if st.button("Crear material", use_container_width=True):
                 if not material.strip():
                     st.warning("Indica el nombre del material.")
+
+                elif exacto:
+                    st.error("No se puede crear porque ya existe un material igual.")
+
                 else:
                     codigo = generar_codigo_material(material, categoria)
 
-                    crear_material_inventario(
+                    resultado = crear_material_inventario(
                         codigo=codigo,
                         material=material,
                         categoria=categoria,
@@ -170,9 +210,17 @@ def pantalla_inventario():
                         observaciones_coste=observaciones_coste
                     )
 
-                    st.success(f"Material creado correctamente: {codigo}")
-                    limpiar_formulario_crear_material()
-                    st.rerun()
+                    if isinstance(resultado, tuple):
+                        ok, mensaje = resultado
+                    else:
+                        ok, mensaje = True, "Material creado correctamente"
+
+                    if ok:
+                        st.success(f"{mensaje}: {codigo}")
+                        limpiar_formulario_crear_material()
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
 
     # -------------------------
     # BUSCADOR / FILTROS
