@@ -23,6 +23,7 @@ AREAS = [
     "Electricidad",
     "Iluminación",
     "Fontanería",
+    "Termicas",
     "Climatización",
     "Legionella",
     "Mantenimiento general",
