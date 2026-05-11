@@ -243,6 +243,35 @@ def operario_por_centro(centro):
     return OPERARIOS[0] if OPERARIOS else ""
 
 
+def obtener_espacios_completos(centro, edificio):
+    espacios_base = ESPACIOS.get(edificio, [])
+
+    try:
+        espacios_custom = obtener_ubicaciones_personalizadas()
+    except Exception:
+        espacios_custom = []
+
+    espacios_filtrados = []
+
+    for esp in espacios_custom:
+        try:
+            centro_esp = str(esp[1] or "").strip()
+            edificio_esp = str(esp[2] or "").strip()
+            nombre_esp = str(esp[3] or "").strip()
+
+            if centro_esp == centro and edificio_esp == edificio:
+                espacios_filtrados.append(nombre_esp)
+
+        except Exception:
+            pass
+
+    return list(
+        dict.fromkeys(
+            espacios_base + espacios_filtrados + ["General", "Otro"]
+        )
+    )
+
+
 def mostrar_checklist_preventivo(numero_ot, operario):
     st.markdown("### ✅ Checklist preventivo")
 
