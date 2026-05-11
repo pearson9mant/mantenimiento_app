@@ -271,8 +271,8 @@ def pantalla_ordenes():
     # NUEVA ORDEN
     # =====================================================
 
-        with tab1:
-        tab_interna, tab_externa = st.tabs(["🔧 Interna", "🏢 Externa"])
+    with tab1:
+    tab_interna, tab_externa = st.tabs(["🔧 Interna", "🏢 Externa"])
 
         # =====================================================
         # NUEVA ORDEN INTERNA
