@@ -1,5 +1,6 @@
 import streamlit as st
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
+from modules.ubicaciones import obtener_ubicaciones_personalizadas
 from config_gerencia import TIPOS_SOLICITANTE
 
 from modules.ordenes import (
@@ -288,8 +289,24 @@ def pantalla_ordenes():
                 edificios_disponibles = EDIFICIOS.get(centro, [])
                 edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_int_edificio_{centro}")
 
-                espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
-                espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"orden_int_espacio_{edificio}")
+                espacios_base = ESPACIOS.get(edificio, [])
+
+                espacios_custom = obtener_ubicaciones_personalizadas(
+                    centro,
+                    edificio
+                )
+
+                espacios_disponibles = list(
+                    dict.fromkeys(
+                    espacios_base + espacios_custom + ["General", "Otro"]
+                    )
+                )
+
+                espacio_sel = st.selectbox(
+                    "Espacio",
+                    espacios_disponibles,
+                    key=f"orden_int_espacio_{edificio}"
+                )
 
                 if espacio_sel == "Otro":
                     espacio = st.text_input("Especificar espacio nuevo", key="orden_int_espacio_otro")
