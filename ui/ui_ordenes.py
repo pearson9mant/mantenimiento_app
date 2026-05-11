@@ -116,6 +116,46 @@ def obtener_tipos_solicitante_lista():
     return list(TIPOS_SOLICITANTE)
 
 
+def obtener_espacios_completos(centro, edificio):
+    espacios_base = ESPACIOS.get(edificio, [])
+
+    try:
+        espacios_custom_todos = obtener_ubicaciones_personalizadas()
+    except Exception:
+        espacios_custom_todos = []
+
+    espacios_custom = []
+
+    for u in espacios_custom_todos:
+        try:
+            if isinstance(u, dict):
+                centro_u = u.get("centro", "")
+                edificio_u = u.get("edificio", "")
+                espacio_u = u.get("espacio", "")
+                activo_u = u.get("activo", 1)
+            else:
+                centro_u = u[1]
+                edificio_u = u[2]
+                espacio_u = u[3]
+                activo_u = u[4] if len(u) > 4 else 1
+        except Exception:
+            continue
+
+        if (
+            str(centro_u).strip() == str(centro).strip()
+            and str(edificio_u).strip() == str(edificio).strip()
+            and int(activo_u or 1) == 1
+            and str(espacio_u).strip()
+        ):
+            espacios_custom.append(str(espacio_u).strip())
+
+    return list(
+        dict.fromkeys(
+            espacios_base + espacios_custom + ["General", "Otro"]
+        )
+    )
+
+
 def centro_del_usuario_operario():
     usuario = normalizar_txt(usuario_actual())
 
@@ -289,18 +329,7 @@ def pantalla_ordenes():
                 edificios_disponibles = EDIFICIOS.get(centro, [])
                 edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_int_edificio_{centro}")
 
-                espacios_base = ESPACIOS.get(edificio, [])
-
-                espacios_custom = obtener_ubicaciones_personalizadas(
-                    centro,
-                    edificio
-                )
-
-                espacios_disponibles = list(
-                    dict.fromkeys(
-                    espacios_base + espacios_custom + ["General", "Otro"]
-                    )
-                )
+                espacios_disponibles = obtener_espacios_completos(centro, edificio)
 
                 espacio_sel = st.selectbox(
                     "Espacio",
@@ -414,8 +443,13 @@ def pantalla_ordenes():
                 edificios_disponibles_ext = EDIFICIOS.get(centro_ext, [])
                 edificio_ext = st.selectbox("Edificio", edificios_disponibles_ext, key=f"orden_ext_edificio_{centro_ext}")
 
-                espacios_disponibles_ext = ESPACIOS.get(edificio_ext, ["General", "Otro"])
-                espacio_sel_ext = st.selectbox("Espacio", espacios_disponibles_ext, key=f"orden_ext_espacio_{edificio_ext}")
+                espacios_disponibles_ext = obtener_espacios_completos(centro_ext, edificio_ext)
+
+                espacio_sel_ext = st.selectbox(
+                    "Espacio",
+                    espacios_disponibles_ext,
+                    key=f"orden_ext_espacio_{edificio_ext}"
+                )
 
                 if espacio_sel_ext == "Otro":
                     espacio_ext = st.text_input("Especificar espacio nuevo", key="orden_ext_espacio_otro")
@@ -434,7 +468,6 @@ def pantalla_ordenes():
                     descripcion_ext = st.text_area("Descripción / incidencia", key="orden_ext_descripcion")
                     area_ext = st.selectbox("Área", AREAS, key="orden_ext_area")
                     prioridad_ext = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_ext_prioridad")
-
 
                     st.markdown("### 🏢 Empresa externa")
 
