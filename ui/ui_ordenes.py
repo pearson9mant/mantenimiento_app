@@ -1,6 +1,6 @@
 import streamlit as st
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
-from modules.ubicaciones import obtener_ubicaciones_personalizadas
+from modules.ubicaciones import obtener_espacios
 from config_gerencia import TIPOS_SOLICITANTE
 
 from modules.ordenes import (
@@ -114,46 +114,6 @@ def obtener_tipos_solicitante_lista():
     if isinstance(TIPOS_SOLICITANTE, dict):
         return list(TIPOS_SOLICITANTE.keys())
     return list(TIPOS_SOLICITANTE)
-
-
-def obtener_espacios_completos(centro, edificio):
-    espacios_base = ESPACIOS.get(edificio, [])
-
-    try:
-        espacios_custom_todos = obtener_ubicaciones_personalizadas()
-    except Exception:
-        espacios_custom_todos = []
-
-    espacios_custom = []
-
-    for u in espacios_custom_todos:
-        try:
-            if isinstance(u, dict):
-                centro_u = u.get("centro", "")
-                edificio_u = u.get("edificio", "")
-                espacio_u = u.get("espacio", "")
-                activo_u = u.get("activo", 1)
-            else:
-                centro_u = u[1]
-                edificio_u = u[2]
-                espacio_u = u[3]
-                activo_u = u[4] if len(u) > 4 else 1
-        except Exception:
-            continue
-
-        if (
-            str(centro_u).strip() == str(centro).strip()
-            and str(edificio_u).strip() == str(edificio).strip()
-            and int(activo_u or 1) == 1
-            and str(espacio_u).strip()
-        ):
-            espacios_custom.append(str(espacio_u).strip())
-
-    return list(
-        dict.fromkeys(
-            espacios_base + espacios_custom + ["General", "Otro"]
-        )
-    )
 
 
 def centro_del_usuario_operario():
@@ -361,7 +321,7 @@ def pantalla_ordenes():
                 edificios_disponibles = EDIFICIOS.get(centro, [])
                 edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_int_edificio_{centro}")
 
-                espacios_disponibles = obtener_espacios_completos(centro, edificio)
+                espacios_disponibles = obtener_espacios(edificio, centro)
 
                 espacio_sel = st.selectbox(
                     "Espacio",
@@ -475,7 +435,7 @@ def pantalla_ordenes():
                 edificios_disponibles_ext = EDIFICIOS.get(centro_ext, [])
                 edificio_ext = st.selectbox("Edificio", edificios_disponibles_ext, key=f"orden_ext_edificio_{centro_ext}")
 
-                espacios_disponibles_ext = obtener_espacios_completos(centro_ext, edificio_ext)
+                espacios_disponibles_ext = obtener_espacios(edificio_ext, centro_ext)
 
                 espacio_sel_ext = st.selectbox(
                     "Espacio",
