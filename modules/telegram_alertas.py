@@ -33,14 +33,28 @@ def enviar_telegram(mensaje, centro=None):
 
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-        payload = {
-            "chat_id": chat_id,
-            "text": mensaje
-        }
+        chat_ids = [chat_id]
 
-        r = requests.post(url, data=payload, timeout=10)
+        # Copia general para Juan
+        if TELEGRAM_CHAT_ID_GENERAL:
+            if TELEGRAM_CHAT_ID_GENERAL not in chat_ids:
+                chat_ids.append(TELEGRAM_CHAT_ID_GENERAL)
 
-        return r.status_code == 200
+        ok = True
+
+        for chat in chat_ids:
+
+            payload = {
+                "chat_id": chat,
+                "text": mensaje
+            }
+
+            r = requests.post(url, data=payload, timeout=10)
+
+            if r.status_code != 200:
+                ok = False
+
+        return ok
 
     except Exception as e:
         print("ERROR TELEGRAM:", e)
