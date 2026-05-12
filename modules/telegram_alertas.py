@@ -42,5 +42,6 @@ def enviar_telegram(mensaje, centro=None):
 
         return r.status_code == 200
 
-    except Exception:
+    except Exception as e:
+        print("ERROR TELEGRAM:", e)
         return False
