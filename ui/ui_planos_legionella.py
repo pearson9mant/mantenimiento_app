@@ -8,12 +8,14 @@ def pantalla_planos_legionella():
 
     carpeta = Path("assets/planos_legionella")
 
-    st.write("Buscando planos en:", carpeta.resolve())
+    extensiones_validas = ["*.png", "*.jpg", "*.jpeg"]
 
-    planos = list(carpeta.glob("*"))
+    planos = []
+    for extension in extensiones_validas:
+        planos.extend(carpeta.glob(extension))
 
     if not planos:
-        st.error("No encuentro ningún archivo dentro de assets/planos_legionella")
+        st.error("No encuentro planos PNG/JPG dentro de assets/planos_legionella")
         return
 
     plano = st.selectbox(
