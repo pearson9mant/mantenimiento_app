@@ -303,7 +303,7 @@ Descripción:
 {descripcion or "-"}
 """
 
-        return enviar_telegram(mensaje)
+        return enviar_telegram(mensaje, centro)
 
     except Exception:
         return False
