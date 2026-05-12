@@ -11,8 +11,11 @@ def pantalla_planos_legionella():
     extensiones_validas = ["*.png", "*.jpg", "*.jpeg"]
 
     planos = []
+
     for extension in extensiones_validas:
         planos.extend(carpeta.glob(extension))
+
+    planos = sorted(planos, key=lambda p: p.name.lower())
 
     if not planos:
         st.error("No encuentro planos PNG/JPG dentro de assets/planos_legionella")
