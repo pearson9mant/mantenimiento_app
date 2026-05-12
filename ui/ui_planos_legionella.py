@@ -5,28 +5,63 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 
 
 def dibujar_puntos(imagen_path, puntos):
+
     imagen = Image.open(imagen_path).convert("RGB")
     draw = ImageDraw.Draw(imagen)
 
     colores = {
-        "ACS": "red",
-        "AFCH": "blue",
-        "Retorno": "orange",
-        "Acumulador": "purple",
-        "Grifo": "green",
-        "Ducha": "cyan",
+        "ACS": "#ff0000",
+        "AFCH": "#0066ff",
+        "Retorno": "#ff8800",
+        "Acumulador": "#9900ff",
+        "Grifo": "#00aa00",
+        "Ducha": "#00bbbb",
     }
 
     for punto in puntos:
+
         x = int(punto["x"])
         y = int(punto["y"])
+
         tipo = punto.get("tipo", "Grifo")
         nombre = punto.get("nombre", "")
 
-        color = colores.get(tipo, "black")
+        color = colores.get(tipo, "#ff0000")
 
-        draw.ellipse((x - 8, y - 8, x + 8, y + 8), fill=color, outline="black")
-        draw.text((x + 10, y - 10), nombre, fill="black")
+        # círculo más visible
+        radio = 10
+
+        draw.ellipse(
+            (
+                x - radio,
+                y - radio,
+                x + radio,
+                y + radio
+            ),
+            fill=color,
+            outline="white",
+            width=3
+        )
+
+        # caja texto destacada
+        texto_x = x + 16
+        texto_y = y - 18
+
+        draw.rectangle(
+            (
+                texto_x - 4,
+                texto_y - 2,
+                texto_x + (len(nombre) * 8),
+                texto_y + 20
+            ),
+            fill="white"
+        )
+
+        draw.text(
+            (texto_x, texto_y),
+            nombre,
+            fill=color
+        )
 
     return imagen
 
