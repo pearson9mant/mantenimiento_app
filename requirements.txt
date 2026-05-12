@@ -5,3 +5,4 @@ reportlab
 streamlit-autorefresh
 requests
 streamlit-image-coordinates
+Pillow
