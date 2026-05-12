@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 
 def pantalla_planos_legionella():
@@ -27,4 +28,15 @@ def pantalla_planos_legionella():
         format_func=lambda p: p.name
     )
 
-    st.image(str(plano), use_container_width=True)
+    st.info("Haz clic sobre el plano para obtener coordenadas.")
+
+    coordenadas = streamlit_image_coordinates(
+        str(plano),
+        use_column_width=True,
+        key="planos_legionella"
+    )
+
+    if coordenadas:
+        st.success(
+            f"X: {coordenadas['x']} | Y: {coordenadas['y']}"
+        )
