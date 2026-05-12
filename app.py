@@ -3,6 +3,7 @@ from datetime import datetime
 
 from modules.auth import login, barra_sesion
 from database.db import inicializar_db
+from ui.ui_planos_legionella import pantalla_planos_legionella
 
 from ui.ui_panel import pantalla_panel
 from ui.ui_ordenes import pantalla_ordenes
@@ -37,12 +38,21 @@ st.markdown("""
 <meta name="google" content="notranslate">
 
 <style>
+:root {
+    --app-teal: #16b8b5;
+    --app-teal-dark: #079693;
+    --app-navy: #0f172a;
+    --app-blue: #1d4ed8;
+    --app-bg: #f7f9fc;
+    --app-border: #e2e8f0;
+}
+
 html, body, [class*="css"] {
     font-size: 14px !important;
 }
 
 body {
-    background-color: #f4f6f9;
+    background-color: var(--app-bg);
 }
 
 [data-testid="stDecoration"] {
@@ -72,37 +82,36 @@ section.main > div {
     max-width: 1400px;
 }
 
+/* BOTONES GENERALES */
 .stButton > button {
     width: 100%;
-    height: 82px !important;
+    min-height: 82px !important;
     font-size: 16px !important;
     font-weight: 800 !important;
-    border-radius: 18px !important;
+    border-radius: 22px !important;
     white-space: pre-line !important;
-    border: 1px solid #d8dee9 !important;
+    border: 1px solid var(--app-border) !important;
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
     color: #1f2937 !important;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08) !important;
     transition: all 0.15s ease-in-out !important;
 }
 
 .stButton > button:hover {
     transform: translateY(-2px);
-    border-color: #1d4ed8 !important;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14) !important;
+    border-color: var(--app-teal) !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.15) !important;
+    color: var(--app-teal-dark) !important;
 }
 
-[data-testid="stMetricValue"] {
-    font-size: 34px !important;
-}
-
+/* CABECERA INTERIOR */
 .pro-header {
     background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
     color: white;
-    border-radius: 24px;
+    border-radius: 26px;
     padding: 26px 28px;
     margin-bottom: 22px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.20);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.22);
 }
 
 .pro-header-title {
@@ -124,38 +133,117 @@ section.main > div {
     opacity: 0.95;
 }
 
-.titulo-portada {
+/* PORTADA ESTILO APP */
+.portada-wrap {
+    max-width: 520px;
+    margin: 0 auto;
+    padding-top: 18px;
+    padding-bottom: 20px;
     text-align: center;
-    font-size: 34px;
+}
+
+.portada-logo-text {
+    font-size: 42px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: -1px;
+    color: #111827;
+    margin-top: 6px;
+}
+
+.portada-logo-sub {
+    font-size: 11px;
     font-weight: 900;
-    color: #0f172a;
-    margin-top: 12px;
+    letter-spacing: 12px;
+    color: #334155;
+    margin-left: 12px;
     margin-bottom: 4px;
 }
 
-.subtitulo-portada {
-    text-align: center;
-    font-size: 21px;
-    font-weight: 700;
-    color: #1d4ed8;
-    margin-bottom: 8px;
+.portada-logo-o {
+    display: inline-block;
+    color: var(--app-teal);
 }
 
-.version-portada {
-    display: inline-block;
-    background: #e0ecff;
-    color: #1d4ed8;
-    border-radius: 999px;
-    padding: 6px 14px;
+.portada-colegio {
+    font-size: 15px;
     font-weight: 800;
-    font-size: 13px;
-    margin-top: 8px;
+    color: #64748b;
+    margin-top: 10px;
+}
+
+.portada-selecciona {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--app-teal-dark);
+    margin-top: 70px;
+    margin-bottom: 26px;
+}
+
+.perfil-card {
+    text-align: center;
+    margin-bottom: 26px;
+}
+
+.perfil-circulo {
+    width: 188px;
+    height: 188px;
+    border-radius: 999px;
+    background: var(--app-teal);
+    margin: 0 auto 14px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 82px;
+    box-shadow: 0 14px 28px rgba(22, 184, 181, 0.25);
+}
+
+.perfil-label {
+    color: var(--app-teal-dark);
+    font-size: 22px;
+    font-weight: 950;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.perfil-descripcion {
+    background: #f8fafc;
+    border: 1px solid var(--app-border);
+    border-radius: 22px;
+    padding: 14px 18px;
+    color: #334155;
+    font-weight: 800;
+    margin-top: 10px;
     margin-bottom: 20px;
 }
 
+.portada-version {
+    display: inline-block;
+    background: #ccfbf1;
+    color: #0f766e;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-weight: 900;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+.status-pill {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 12px;
+    margin-top: 14px;
+}
+
+/* TEXTOS */
 .info-user {
     background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--app-border);
     border-radius: 18px;
     padding: 14px;
     margin-top: 12px;
@@ -167,7 +255,7 @@ section.main > div {
 .section-title {
     font-size: 22px;
     font-weight: 900;
-    color: #0f172a;
+    color: var(--app-navy);
     margin-bottom: 12px;
 }
 
@@ -180,17 +268,21 @@ section.main > div {
     border-top: 1px solid #e5e7eb;
 }
 
-.status-pill {
-    display: inline-block;
-    background: #dcfce7;
-    color: #166534;
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-weight: 800;
-    font-size: 12px;
+[data-testid="stMetricValue"] {
+    font-size: 34px !important;
+}
+
+/* BOTÓN DE ENTRADA EN PORTADA */
+div[data-testid="stVerticalBlock"] div.stButton > button[kind="secondary"] {
+    cursor: pointer;
 }
 
 @media (max-width: 768px) {
+    .block-container {
+        padding-left: 0.9rem !important;
+        padding-right: 0.9rem !important;
+    }
+
     .pro-header {
         padding: 22px 18px;
         border-radius: 20px;
@@ -209,16 +301,32 @@ section.main > div {
         margin-top: 15px;
     }
 
-    .titulo-portada {
-        font-size: 27px;
+    .portada-wrap {
+        max-width: 100%;
+        padding-top: 6px;
     }
 
-    .subtitulo-portada {
-        font-size: 18px;
+    .portada-logo-text {
+        font-size: 48px;
+    }
+
+    .portada-selecciona {
+        margin-top: 58px;
+        font-size: 17px;
+    }
+
+    .perfil-circulo {
+        width: 160px;
+        height: 160px;
+        font-size: 72px;
+    }
+
+    .perfil-label {
+        font-size: 20px;
     }
 
     .stButton > button {
-        height: 78px !important;
+        min-height: 78px !important;
         font-size: 15px !important;
     }
 }
@@ -302,78 +410,123 @@ def volver_portada():
     st.rerun()
 
 
+def activar_entrada(seccion=None, vista_operario=False):
+    st.session_state["entrada_app"] = True
+    st.session_state["seccion_actual"] = seccion
+    st.session_state["vista_operario"] = vista_operario
+    st.rerun()
+
+
+def tarjeta_visual_perfil(icono, texto):
+    st.markdown(
+        f"""
+        <div class="perfil-card">
+            <div class="perfil-circulo">{icono}</div>
+            <div class="perfil-label">{texto}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def mostrar_portada(perfil, operario_activo):
+    perfil = str(perfil or "").strip().lower()
+
+    st.markdown("<div class='portada-wrap'>", unsafe_allow_html=True)
 
     try:
-        col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
-
-        with col_logo2:
-            st.image("logo cole.jpg", width=230)
-
+        st.image("logo cole.jpg", width=150)
     except Exception:
         st.markdown(
-            "<div style='font-size:64px; text-align:center;'>🏫</div>",
+            """
+            <div class="portada-logo-sub">GRUPO</div>
+            <div class="portada-logo-text">m<span class="portada-logo-o">o</span>ria</div>
+            """,
             unsafe_allow_html=True
         )
 
     st.markdown(
-        f"<div class='titulo-portada'>{APP_NAME}</div>",
+        f"""
+        <div class="portada-colegio">{COLEGIO}</div>
+        <div class="portada-version">{APP_VERSION}</div>
+        <div class="portada-selecciona">Selecciona tu perfil</div>
+        """,
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        f"<div class='subtitulo-portada'>{COLEGIO}</div>",
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        f"<div class='version-portada'>{APP_VERSION}</div>",
-        unsafe_allow_html=True
-    )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
+    # =====================================================
+    # ADMINISTRADOR: puede entrar a los 3 perfiles visuales
+    # =====================================================
     if perfil == "admin":
-        texto_boton = "🔐\nEntrar en administración"
-        descripcion = "Acceso completo al sistema"
+        c1, c2 = st.columns(2)
 
+        with c1:
+            tarjeta_visual_perfil("👷", "Operario")
+            if st.button("Entrar como operario", key="portada_admin_operario", use_container_width=True):
+                activar_entrada("Operario", vista_operario=True)
+
+        with c2:
+            tarjeta_visual_perfil("📊", "Gerencia")
+            if st.button("Entrar en gerencia", key="portada_admin_gerencia", use_container_width=True):
+                activar_entrada("Gerencia")
+
+        c3, c4, c5 = st.columns([1, 1.15, 1])
+
+        with c4:
+            tarjeta_visual_perfil("⚙️", "Administración")
+            if st.button("Entrar en administración", key="portada_admin_admin", use_container_width=True):
+                activar_entrada(None)
+
+    # =====================================================
+    # GERENCIA
+    # =====================================================
     elif perfil == "gerencia":
-        texto_boton = "📊\nEntrar a gerencia"
-        descripcion = "Panel de control y seguimiento"
+        c1, c2, c3 = st.columns([1, 1.15, 1])
 
+        with c2:
+            tarjeta_visual_perfil("📊", "Gerencia")
+            if st.button("Entrar en gerencia", key="portada_gerencia", use_container_width=True):
+                activar_entrada(None)
+
+    # =====================================================
+    # INVENTARIO
+    # =====================================================
     elif perfil == "inventario":
-        texto_boton = "📦\nEntrar a inventario"
-        descripcion = "Gestión de materiales e inventario"
+        c1, c2, c3 = st.columns([1, 1.15, 1])
 
+        with c2:
+            tarjeta_visual_perfil("📦", "Inventario")
+            if st.button("Entrar en inventario", key="portada_inventario", use_container_width=True):
+                activar_entrada(None)
+
+    # =====================================================
+    # OPERARIO
+    # =====================================================
     else:
-        texto_boton = "👷\nEntrar a mi zona"
-        descripcion = (
-            f"Operario: {operario_activo}"
-            if operario_activo
-            else "Zona de operario"
-        )
+        c1, c2, c3 = st.columns([1, 1.15, 1])
+
+        with c2:
+            tarjeta_visual_perfil("👷", "Empleado")
+            if st.button("Entrar a mi zona", key="portada_operario", use_container_width=True):
+                activar_entrada(None)
+
+    usuario = usuario_visible()
+    descripcion = f"Usuario: {usuario} · Perfil: {etiqueta_perfil(perfil)}"
+
+    if operario_activo:
+        descripcion = f"Operario: {operario_activo}"
 
     st.markdown(
-        f"<div class='info-user'>{descripcion}</div>",
+        f"<div class='perfil-descripcion'>{descripcion}</div>",
         unsafe_allow_html=True
     )
 
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-
-    with col2:
-        if st.button(
-            texto_boton,
-            key="btn_entrada_app",
-            use_container_width=True
-        ):
-            st.session_state["entrada_app"] = True
-            st.session_state["seccion_actual"] = None
-            st.rerun()
-
     st.markdown(
-        "<br><span class='status-pill'>● Sistema operativo</span>",
+        "<span class='status-pill'>● Sistema operativo</span>",
         unsafe_allow_html=True
     )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     pintar_footer()
     st.stop()
@@ -430,6 +583,11 @@ def mostrar_menu_admin():
     st.markdown("<br>", unsafe_allow_html=True)
 
     col4, col5, col6 = st.columns(3)
+
+    with col4:
+        if st.button("🗺️\nPlanos Legionella", key="btn_planos_legionella", use_container_width=True):
+            st.session_state["seccion_actual"] = "Planos Legionella"
+            st.rerun()
 
     with col5:
         if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
@@ -537,6 +695,7 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
         key="volver_admin_desde_vista_operario"
     ):
         st.session_state["vista_operario"] = False
+        st.session_state["seccion_actual"] = None
         st.rerun()
 
     st.stop()
@@ -624,6 +783,9 @@ if perfil == "admin":
 
     elif seccion == "Legionella":
         pantalla_legionella()
+
+    elif seccion == "Planos Legionella":
+        pantalla_planos_legionella()
 
     elif seccion == "Preventivo":
         pantalla_preventivo()
