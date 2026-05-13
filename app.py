@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 
-from modules.auth import login, barra_sesion
+from modules.auth import barra_sesion, USUARIOS
 from database.db import inicializar_db
 from ui.ui_planos_legionella import pantalla_planos_legionella
 
@@ -55,18 +55,9 @@ body {
     background-color: var(--app-bg);
 }
 
-[data-testid="stDecoration"] {
-    display: none !important;
-}
-
-[data-testid="stStatusWidget"] {
-    display: none !important;
-}
-
-div[data-testid="stToolbar"] {
-    display: none !important;
-}
-
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+div[data-testid="stToolbar"],
 header[data-testid="stHeader"] {
     display: none !important;
 }
@@ -133,7 +124,7 @@ section.main > div {
     opacity: 0.95;
 }
 
-/* PORTADA ESTILO APP */
+/* PORTADA LOGIN */
 .portada-wrap {
     max-width: 520px;
     margin: 0 auto;
@@ -176,46 +167,8 @@ section.main > div {
     font-size: 18px;
     font-weight: 800;
     color: var(--app-teal-dark);
-    margin-top: 70px;
-    margin-bottom: 26px;
-}
-
-.perfil-card {
-    text-align: center;
-    margin-bottom: 26px;
-}
-
-.perfil-circulo {
-    width: 188px;
-    height: 188px;
-    border-radius: 999px;
-    background: var(--app-teal);
-    margin: 0 auto 14px auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 82px;
-    box-shadow: 0 14px 28px rgba(22, 184, 181, 0.25);
-}
-
-.perfil-label {
-    color: var(--app-teal-dark);
-    font-size: 22px;
-    font-weight: 950;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-}
-
-.perfil-descripcion {
-    background: #f8fafc;
-    border: 1px solid var(--app-border);
-    border-radius: 22px;
-    padding: 14px 18px;
-    color: #334155;
-    font-weight: 800;
-    margin-top: 10px;
-    margin-bottom: 20px;
+    margin-top: 28px;
+    margin-bottom: 22px;
 }
 
 .portada-version {
@@ -229,15 +182,23 @@ section.main > div {
     margin-top: 6px;
 }
 
-.status-pill {
-    display: inline-block;
-    background: #dcfce7;
-    color: #166534;
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-weight: 900;
-    font-size: 12px;
-    margin-top: 14px;
+.login-card {
+    max-width: 420px;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid var(--app-border);
+    border-radius: 24px;
+    padding: 22px 24px 26px 24px;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.10);
+    text-align: left;
+}
+
+.login-card-title {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 950;
+    color: var(--app-navy);
+    margin-bottom: 14px;
 }
 
 /* TEXTOS */
@@ -270,11 +231,6 @@ section.main > div {
 
 [data-testid="stMetricValue"] {
     font-size: 34px !important;
-}
-
-/* BOTÓN DE ENTRADA EN PORTADA */
-div[data-testid="stVerticalBlock"] div.stButton > button[kind="secondary"] {
-    cursor: pointer;
 }
 
 @media (max-width: 768px) {
@@ -311,18 +267,8 @@ div[data-testid="stVerticalBlock"] div.stButton > button[kind="secondary"] {
     }
 
     .portada-selecciona {
-        margin-top: 58px;
+        margin-top: 24px;
         font-size: 17px;
-    }
-
-    .perfil-circulo {
-        width: 160px;
-        height: 160px;
-        font-size: 72px;
-    }
-
-    .perfil-label {
-        font-size: 20px;
     }
 
     .stButton > button {
@@ -410,27 +356,9 @@ def volver_portada():
     st.rerun()
 
 
-def activar_entrada(seccion=None, vista_operario=False):
-    st.session_state["entrada_app"] = True
-    st.session_state["seccion_actual"] = seccion
-    st.session_state["vista_operario"] = vista_operario
-    st.rerun()
-
-
-def tarjeta_visual_perfil(icono, texto):
-    st.markdown(
-        f"""
-        <div class="perfil-card">
-            <div class="perfil-circulo">{icono}</div>
-            <div class="perfil-label">{texto}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def mostrar_portada(perfil, operario_activo):
-    perfil = str(perfil or "").strip().lower()
+def login_portada():
+    if st.session_state.get("login_ok", False):
+        return
 
     st.markdown("<div class='portada-wrap'>", unsafe_allow_html=True)
 
@@ -449,83 +377,38 @@ def mostrar_portada(perfil, operario_activo):
         f"""
         <div class="portada-colegio">{COLEGIO}</div>
         <div class="portada-version">{APP_VERSION}</div>
-        <div class="portada-selecciona">Selecciona tu perfil</div>
+        <div class="portada-selecciona">Acceso al sistema</div>
         """,
         unsafe_allow_html=True
     )
 
-    # =====================================================
-    # ADMINISTRADOR: puede entrar a los 3 perfiles visuales
-    # =====================================================
-    if perfil == "admin":
-        c1, c2 = st.columns(2)
+    st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='login-card-title'>🔐 Identificación</div>", unsafe_allow_html=True)
 
-        with c1:
-            tarjeta_visual_perfil("👷", "Operario")
-            if st.button("Entrar como operario", key="portada_admin_operario", use_container_width=True):
-                activar_entrada("Operario", vista_operario=True)
+    usuario = st.text_input("Usuario", key="login_usuario")
+    password = st.text_input("Contraseña", type="password", key="login_password")
 
-        with c2:
-            tarjeta_visual_perfil("📊", "Gerencia")
-            if st.button("Entrar en gerencia", key="portada_admin_gerencia", use_container_width=True):
-                activar_entrada("Gerencia")
+    if st.button("Entrar", use_container_width=True, key="login_entrar"):
+        usuario = usuario.strip().lower()
+        password = password.strip()
 
-        c3, c4, c5 = st.columns([1, 1.15, 1])
+        if usuario in USUARIOS and password == USUARIOS[usuario]["password"]:
+            datos = USUARIOS[usuario]
 
-        with c4:
-            tarjeta_visual_perfil("⚙️", "Administración")
-            if st.button("Entrar en administración", key="portada_admin_admin", use_container_width=True):
-                activar_entrada(None)
+            st.session_state["login_ok"] = True
+            st.session_state["usuario"] = usuario
+            st.session_state["perfil"] = datos["perfil"]
+            st.session_state["rol"] = datos["perfil"]
+            st.session_state["operario_activo"] = datos["nombre"]
+            st.session_state["entrada_app"] = True
+            st.session_state["seccion_actual"] = None
+            st.session_state["vista_operario"] = False
 
-    # =====================================================
-    # GERENCIA
-    # =====================================================
-    elif perfil == "gerencia":
-        c1, c2, c3 = st.columns([1, 1.15, 1])
+            st.rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos")
 
-        with c2:
-            tarjeta_visual_perfil("📊", "Gerencia")
-            if st.button("Entrar en gerencia", key="portada_gerencia", use_container_width=True):
-                activar_entrada(None)
-
-    # =====================================================
-    # INVENTARIO
-    # =====================================================
-    elif perfil == "inventario":
-        c1, c2, c3 = st.columns([1, 1.15, 1])
-
-        with c2:
-            tarjeta_visual_perfil("📦", "Inventario")
-            if st.button("Entrar en inventario", key="portada_inventario", use_container_width=True):
-                activar_entrada(None)
-
-    # =====================================================
-    # OPERARIO
-    # =====================================================
-    else:
-        c1, c2, c3 = st.columns([1, 1.15, 1])
-
-        with c2:
-            tarjeta_visual_perfil("👷", "Empleado")
-            if st.button("Entrar a mi zona", key="portada_operario", use_container_width=True):
-                activar_entrada(None)
-
-    usuario = usuario_visible()
-    descripcion = f"Usuario: {usuario} · Perfil: {etiqueta_perfil(perfil)}"
-
-    if operario_activo:
-        descripcion = f"Operario: {operario_activo}"
-
-    st.markdown(
-        f"<div class='perfil-descripcion'>{descripcion}</div>",
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        "<span class='status-pill'>● Sistema operativo</span>",
-        unsafe_allow_html=True
-    )
-
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     pintar_footer()
@@ -533,7 +416,6 @@ def mostrar_portada(perfil, operario_activo):
 
 
 def mostrar_menu_admin():
-
     st.markdown(
         "<div class='section-title'>Menú principal</div>",
         unsafe_allow_html=True
@@ -596,7 +478,6 @@ def mostrar_menu_admin():
 
 
 def mostrar_menu_operario():
-
     perfil = st.session_state.get("perfil", "")
     operario = st.session_state.get("operario_activo", "")
 
@@ -606,7 +487,6 @@ def mostrar_menu_operario():
     )
 
     if perfil == "inventario":
-
         col1, col2 = st.columns(2)
 
         with col1:
@@ -644,14 +524,16 @@ def mostrar_menu_operario():
             st.rerun()
 
 
-inicializar_db()
+# =====================================================
+# INICIO APP
+# =====================================================
 
+inicializar_db()
 
 try:
     if "preventivos_auto_revisados" not in st.session_state:
         generar_ots_preventivo_si_toca()
         st.session_state["preventivos_auto_revisados"] = True
-
 except Exception:
     pass
 
@@ -664,35 +546,18 @@ if modo == "incidencias":
     st.stop()
 
 
-perfil = st.session_state.get("perfil", "")
-operario_activo = st.session_state.get("operario_activo", "")
-
 if "seccion_actual" not in st.session_state:
     st.session_state["seccion_actual"] = None
 
 if "entrada_app" not in st.session_state:
-    st.session_state["entrada_app"] = False
+    st.session_state["entrada_app"] = True
 
 
-if not st.session_state.get("login_ok", False):
+login_portada()
 
-    st.markdown("<div class='portada-wrap'>", unsafe_allow_html=True)
 
-    try:
-        st.image("logo cole.jpg", width=150)
-    except Exception:
-        pass
-
-    st.markdown(
-        f"""
-        <div class="portada-colegio">{COLEGIO}</div>
-        <div class="portada-version">{APP_VERSION}</div>
-        <div class="portada-selecciona">Acceso al sistema</div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    login()
+perfil = st.session_state.get("perfil", "")
+operario_activo = st.session_state.get("operario_activo", "")
 
 
 pintar_cabecera()
@@ -700,7 +565,6 @@ barra_sesion()
 
 
 if perfil == "admin" and st.session_state.get("vista_operario", False):
-
     pantalla_operario()
 
     st.markdown("---")
@@ -717,37 +581,14 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
 
 
 if perfil == "gerencia":
-
-    st.markdown("---")
-
-    if st.button(
-        "🏠\nPortada",
-        key="volver_portada_gerencia",
-        use_container_width=True
-    ):
-        volver_portada()
-
-    st.markdown("---")
-
     pantalla_gerencia()
     pintar_footer()
     st.stop()
 
 
 if st.session_state["seccion_actual"] is None:
-
-    if st.button(
-        "⬅\nVolver a portada",
-        key="volver_portada_desde_menu",
-        use_container_width=True
-    ):
-        volver_portada()
-
-    st.markdown("---")
-
     if perfil == "admin":
         mostrar_menu_admin()
-
     else:
         mostrar_menu_operario()
 
@@ -767,11 +608,11 @@ with col_volver1:
 
 with col_volver2:
     if st.button(
-        "🏠\nPortada",
-        key="volver_portada_general",
+        "🏠\nInicio",
+        key="volver_inicio_general",
         use_container_width=True
     ):
-        volver_portada()
+        volver_menu()
 
 
 st.markdown("---")
@@ -819,7 +660,6 @@ if perfil == "admin":
 
 
 else:
-
     st.caption(f"{operario_activo}")
 
     if perfil == "inventario" and seccion not in [
