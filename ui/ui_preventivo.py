@@ -87,15 +87,45 @@ def pantalla_preventivo():
         centro = st.selectbox("Centro", CENTROS, key="prev_centro")
 
         edificios_disponibles = EDIFICIOS.get(centro, [])
-        edificio = st.selectbox("Edificio", edificios_disponibles, key=f"prev_edificio_{centro}")
+        edificio = st.selectbox(
+            "Edificio",
+            edificios_disponibles,
+            key=f"prev_edificio_{centro}"
+        )
 
         espacios_disponibles = obtener_espacios(edificio, centro)
-        espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"prev_espacio_{centro}_{edificio}")
+
+        espacio_sel = st.selectbox(
+            "Espacio",
+            espacios_disponibles,
+            key=f"prev_espacio_{centro}_{edificio}"
+        )
 
         if espacio_sel == "Otro":
             espacio = st.text_input("Especificar espacio", key="prev_espacio_otro")
         else:
             espacio = espacio_sel
+
+        # =====================================================
+        # FECHAS FUERA DEL FORMULARIO
+        # Así se actualiza en pantalla al cambiar frecuencia/fecha
+        # =====================================================
+
+        frecuencia = st.selectbox(
+            "Frecuencia",
+            ["Semanal", "Mensual", "Trimestral", "Semestral", "Anual"],
+            key="prev_frecuencia"
+        )
+
+        ultima_fecha = st.date_input(
+            "Última revisión / fecha base",
+            value=date.today(),
+            key="prev_ultima_fecha"
+        )
+
+        proxima_fecha = calcular_proxima_fecha(ultima_fecha, frecuencia)
+
+        st.info(f"📅 Próxima fecha calculada automáticamente: {proxima_fecha}")
 
         with st.form("form_preventivo", clear_on_submit=True):
             area = st.selectbox("Área", AREAS, key="prev_area")
@@ -110,22 +140,6 @@ def pantalla_preventivo():
                 tarea = st.text_input("Especificar tarea preventiva", key="prev_tarea_otra")
             else:
                 tarea = tarea_sel
-
-            frecuencia = st.selectbox(
-                "Frecuencia",
-                ["Semanal", "Mensual", "Trimestral", "Semestral", "Anual"],
-                key="prev_frecuencia"
-            )
-
-            ultima_fecha = st.date_input(
-                "Última revisión / fecha base",
-                value=date.today(),
-                key="prev_ultima_fecha"
-            )
-
-            proxima_fecha = calcular_proxima_fecha(ultima_fecha, frecuencia)
-
-            st.info(f"📅 Próxima fecha calculada automáticamente: {proxima_fecha}")
 
             operario_auto = operario_por_centro(centro)
 
@@ -153,7 +167,10 @@ def pantalla_preventivo():
                 key="prev_crear_de_todas_formas"
             )
 
-            crear = st.form_submit_button("✅ Crear tarea preventiva", use_container_width=True)
+            crear = st.form_submit_button(
+                "✅ Crear tarea preventiva",
+                use_container_width=True
+            )
 
             if crear:
                 if not str(tarea).strip():
@@ -235,7 +252,9 @@ def pantalla_preventivo():
 
                 estado = "🟢 Activa" if activo else "🔴 Inactiva"
 
-                with st.expander(f"{tarea} | {frecuencia} | Próxima: {proxima_fecha or '-'} | {estado}"):
+                with st.expander(
+                    f"{tarea} | {frecuencia} | Próxima: {proxima_fecha or '-'} | {estado}"
+                ):
                     st.markdown(
                         f"""
                         🏢 {centro} · {edificio} · {espacio}  
