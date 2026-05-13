@@ -15,76 +15,60 @@ USUARIOS = {
     },
 
     "luis": {
-        "password": "luis2026",
+        "password": "1234",
         "perfil": "operario",
         "nombre": "Luis Lozano"
-    },
-
-    "abel": {
-        "password": "abel2026",
-        "perfil": "inventario",
-        "nombre": "Abel Vasquez"
-    },
-
-    "gerencia": {
-        "password": "gerencia2026",
-        "perfil": "gerencia",
-        "nombre": "Gerencia"
     }
 }
 
 
 def login():
+
     if st.session_state.get("login_ok", False):
         return
 
-    st.markdown("## 🔐 Acceso mantenimiento")
+    st.title("🔐 Acceso mantenimiento")
 
     usuario = st.text_input("Usuario")
     password = st.text_input("Contraseña", type="password")
 
-    if st.button("Entrar", use_container_width=True):
+    if st.button("Entrar"):
+
         usuario = usuario.strip().lower()
         password = password.strip()
 
-        if usuario in USUARIOS and password == USUARIOS[usuario]["password"]:
-            datos = USUARIOS[usuario]
+        if usuario in USUARIOS:
 
-            st.session_state["login_ok"] = True
-            st.session_state["usuario"] = usuario
-            st.session_state["perfil"] = datos["perfil"]
-            st.session_state["rol"] = datos["perfil"]
-            st.session_state["operario_activo"] = datos["nombre"]
-            st.session_state["entrada_app"] = False
-            st.session_state["seccion_actual"] = None
+            if password == USUARIOS[usuario]["password"]:
 
-            st.rerun()
-        else:
-            st.error("Usuario o contraseña incorrectos")
+                st.session_state["login_ok"] = True
+                st.session_state["usuario"] = usuario
+                st.session_state["perfil"] = USUARIOS[usuario]["perfil"]
+                st.session_state["operario_activo"] = USUARIOS[usuario]["nombre"]
+
+                st.rerun()
+
+        st.error("Usuario o contraseña incorrectos")
 
     st.stop()
 
 
 def barra_sesion():
+
     nombre = st.session_state.get("operario_activo", "")
     perfil = st.session_state.get("perfil", "")
 
-    if nombre:
-        st.caption(f"Sesión: {nombre} · {perfil}")
+    st.sidebar.success(f"{nombre} ({perfil})")
 
-    if st.button("Cerrar sesión", use_container_width=True):
-        claves = [
+    if st.sidebar.button("Cerrar sesión"):
+
+        for clave in [
             "login_ok",
             "usuario",
             "perfil",
-            "rol",
-            "operario_activo",
-            "entrada_app",
-            "seccion_actual",
-            "vista_operario"
-        ]
+            "operario_activo"
+        ]:
 
-        for clave in claves:
             if clave in st.session_state:
                 del st.session_state[clave]
 
