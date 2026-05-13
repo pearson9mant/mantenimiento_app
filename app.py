@@ -416,9 +416,10 @@ def activar_entrada(seccion=None, vista_operario=False):
     st.session_state["vista_operario"] = vista_operario
     st.rerun()
 
-def procesar_entrada_portada(perfil):
-    if st.session_state.get("entrada_app", False):
-        return
+procesar_entrada_portada(perfil)
+
+if not st.session_state["entrada_app"]:
+    mostrar_portada(perfil, operario_activo)
 
     try:
         entrada = st.query_params.get("entrada", "")
