@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
 from database.db import conectar
+from modules.ordenes import obtener_siguiente_numero_ot
 
 
 OPERARIOS = ["J.A. Almeda", "Abel Vasquez", "Luis Lozano", "Otro"]
@@ -247,31 +248,6 @@ def operario_por_centro(centro):
     return ""
 
 
-def obtener_siguiente_numero_ot():
-    conn = conectar()
-    cur = conn.cursor()
-
-    numeros = []
-
-    for tabla in ["ordenes_trabajo", "historico_ordenes"]:
-        try:
-            cur.execute(f"SELECT numero_ot FROM {tabla} WHERE numero_ot IS NOT NULL")
-            for fila in cur.fetchall():
-                numero = str(fila[0])
-                if numero.startswith("OT-"):
-                    try:
-                        numeros.append(int(numero.replace("OT-", "")))
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-    conn.close()
-
-    siguiente = max(numeros) + 1 if numeros else 1
-    return f"OT-{siguiente:05d}"
-
-
 def existe_ot_legionella_abierta(centro, edificio, descripcion):
     conn = conectar()
     cur = conn.cursor()
@@ -307,7 +283,7 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
     if existe_ot_legionella_abierta(centro, edificio, descripcion):
         return False
 
-    numero_ot = obtener_siguiente_numero_ot()
+    numero_ot = obtener_siguiente_numero_ot(centro, "LEG")
     operario_final = operario or operario_por_centro(centro)
 
     ejecutar(
