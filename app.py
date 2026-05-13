@@ -664,11 +664,6 @@ if modo == "incidencias":
     st.stop()
 
 
-login()
-
-if "usuario_autenticado" not in st.session_state:
-    login()
-
 perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
@@ -679,8 +674,25 @@ if "entrada_app" not in st.session_state:
     st.session_state["entrada_app"] = False
 
 
-if not st.session_state["entrada_app"]:
-    mostrar_portada(perfil, operario_activo)
+if not st.session_state.get("login_ok", False):
+
+    st.markdown("<div class='portada-wrap'>", unsafe_allow_html=True)
+
+    try:
+        st.image("logo cole.jpg", width=150)
+    except Exception:
+        pass
+
+    st.markdown(
+        f"""
+        <div class="portada-colegio">{COLEGIO}</div>
+        <div class="portada-version">{APP_VERSION}</div>
+        <div class="portada-selecciona">Acceso al sistema</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    login()
 
 
 pintar_cabecera()
