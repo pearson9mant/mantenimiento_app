@@ -135,68 +135,63 @@ section.main > div {
 
 /* PORTADA ESTILO APP */
 .portada-wrap {
-    max-width: 520px;
+    max-width: 1120px;
     margin: 0 auto;
-    padding-top: 18px;
-    padding-bottom: 20px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     text-align: center;
 }
 
-.portada-logo-text {
-    font-size: 42px;
-    line-height: 1;
-    font-weight: 950;
-    letter-spacing: -1px;
-    color: #111827;
-    margin-top: 6px;
-}
-
-.portada-logo-sub {
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 12px;
-    color: #334155;
-    margin-left: 12px;
-    margin-bottom: 4px;
-}
-
-.portada-logo-o {
-    display: inline-block;
-    color: var(--app-teal);
-}
-
-.portada-colegio {
-    font-size: 15px;
-    font-weight: 800;
-    color: #64748b;
-    margin-top: 10px;
-}
-
 .portada-selecciona {
-    font-size: 18px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 900;
     color: var(--app-teal-dark);
-    margin-top: 70px;
+    margin-top: 34px;
     margin-bottom: 26px;
+}
+
+.perfil-link {
+    text-decoration: none !important;
 }
 
 .perfil-card {
     text-align: center;
-    margin-bottom: 26px;
+    margin-bottom: 20px;
 }
 
 .perfil-circulo {
-    width: 188px;
-    height: 188px;
+    width: 220px;
+    height: 220px;
     border-radius: 999px;
     background: var(--app-teal);
-    margin: 0 auto 14px auto;
+    margin: 0 auto 10px auto;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 82px;
-    box-shadow: 0 14px 28px rgba(22, 184, 181, 0.25);
+    box-shadow: 0 18px 38px rgba(22, 184, 181, 0.28);
+    transition: all 0.18s ease-in-out;
+    cursor: pointer;
+}
+
+.perfil-circulo:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 24px 46px rgba(22, 184, 181, 0.38);
+}
+
+.perfil-icono {
+    font-size: 72px;
+    line-height: 1;
+    margin-bottom: 18px;
+}
+
+.perfil-texto {
+    font-size: 23px;
+    font-weight: 950;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: white;
 }
 
 .perfil-label {
@@ -316,13 +311,18 @@ div[data-testid="stVerticalBlock"] div.stButton > button[kind="secondary"] {
     }
 
     .perfil-circulo {
-        width: 160px;
-        height: 160px;
-        font-size: 72px;
+        width: 165px;
+        height: 165px;
     }
 
-    .perfil-label {
-        font-size: 20px;
+    .perfil-icono {
+        font-size: 55px;
+        margin-bottom: 12px;
+    }
+
+    .perfil-texto {
+        font-size: 16px;
+        letter-spacing: 1px;
     }
 
     .stButton > button {
@@ -416,14 +416,60 @@ def activar_entrada(seccion=None, vista_operario=False):
     st.session_state["vista_operario"] = vista_operario
     st.rerun()
 
+def procesar_entrada_portada(perfil):
+    entrada = st.query_params.get("entrada", "")
+    entrada = str(entrada or "").strip().lower()
+    perfil = str(perfil or "").strip().lower()
 
-def tarjeta_visual_perfil(icono, texto):
+    if not entrada:
+        return
+
+    seccion = None
+    vista_operario = False
+
+    if perfil == "admin":
+        if entrada == "operario":
+            seccion = "Operario"
+            vista_operario = True
+        elif entrada == "gerencia":
+            seccion = "Gerencia"
+        elif entrada == "administracion":
+            seccion = None
+        else:
+            return
+
+    elif perfil == "gerencia" and entrada == "gerencia":
+        seccion = None
+
+    elif perfil == "inventario" and entrada == "inventario":
+        seccion = None
+
+    elif perfil not in ["admin", "gerencia", "inventario"] and entrada == "operario":
+        seccion = None
+
+    st.session_state["entrada_app"] = True
+    st.session_state["seccion_actual"] = seccion
+    st.session_state["vista_operario"] = vista_operario
+
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+
+    st.rerun()
+
+
+def tarjeta_visual_perfil(icono, texto, entrada):
     st.markdown(
         f"""
-        <div class="perfil-card">
-            <div class="perfil-circulo">{icono}</div>
-            <div class="perfil-label">{texto}</div>
-        </div>
+        <a class="perfil-link" href="?entrada={entrada}">
+            <div class="perfil-card">
+                <div class="perfil-circulo">
+                    <div class="perfil-icono">{icono}</div>
+                    <div class="perfil-texto">{texto}</div>
+                </div>
+            </div>
+        </a>
         """,
         unsafe_allow_html=True
     )
@@ -461,21 +507,15 @@ def mostrar_portada(perfil, operario_activo):
         c1, c2 = st.columns(2)
 
         with c1:
-            tarjeta_visual_perfil("👷", "Operario")
-            if st.button("Entrar como operario", key="portada_admin_operario", use_container_width=True):
-                activar_entrada("Operario", vista_operario=True)
+            tarjeta_visual_perfil("👷", "Operario", "operario")
 
         with c2:
-            tarjeta_visual_perfil("📊", "Gerencia")
-            if st.button("Entrar en gerencia", key="portada_admin_gerencia", use_container_width=True):
-                activar_entrada("Gerencia")
+            tarjeta_visual_perfil("📊", "Gerencia", "gerencia")
 
         c3, c4, c5 = st.columns([1, 1.15, 1])
 
         with c4:
-            tarjeta_visual_perfil("⚙️", "Administración")
-            if st.button("Entrar en administración", key="portada_admin_admin", use_container_width=True):
-                activar_entrada(None)
+            tarjeta_visual_perfil("⚙️", "Administración", "administracion")
 
     # =====================================================
     # GERENCIA
@@ -484,9 +524,7 @@ def mostrar_portada(perfil, operario_activo):
         c1, c2, c3 = st.columns([1, 1.15, 1])
 
         with c2:
-            tarjeta_visual_perfil("📊", "Gerencia")
-            if st.button("Entrar en gerencia", key="portada_gerencia", use_container_width=True):
-                activar_entrada(None)
+            tarjeta_visual_perfil("📊", "Gerencia", "gerencia")
 
     # =====================================================
     # INVENTARIO
@@ -495,9 +533,7 @@ def mostrar_portada(perfil, operario_activo):
         c1, c2, c3 = st.columns([1, 1.15, 1])
 
         with c2:
-            tarjeta_visual_perfil("📦", "Inventario")
-            if st.button("Entrar en inventario", key="portada_inventario", use_container_width=True):
-                activar_entrada(None)
+            tarjeta_visual_perfil("📦", "Inventario", "inventario")
 
     # =====================================================
     # OPERARIO
@@ -506,9 +542,7 @@ def mostrar_portada(perfil, operario_activo):
         c1, c2, c3 = st.columns([1, 1.15, 1])
 
         with c2:
-            tarjeta_visual_perfil("👷", "Empleado")
-            if st.button("Entrar a mi zona", key="portada_operario", use_container_width=True):
-                activar_entrada(None)
+            tarjeta_visual_perfil("👷", "Empleado", "operario")
 
     usuario = usuario_visible()
     descripcion = f"Usuario: {usuario} · Perfil: {etiqueta_perfil(perfil)}"
