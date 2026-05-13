@@ -716,7 +716,7 @@ if "seccion_actual" not in st.session_state:
 if "entrada_app" not in st.session_state:
     st.session_state["entrada_app"] = False
 
-procesar_entrada_portada(perfil)
+
 
 if not st.session_state["entrada_app"]:
     mostrar_portada(perfil, operario_activo)
