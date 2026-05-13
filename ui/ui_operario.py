@@ -560,50 +560,83 @@ def mostrar_crear_correctiva_desde_revision(
     operario,
     origen_base
 ):
-    st.markdown("### 🛠️ Crear correctiva si hay defecto")
+    st.markdown("### 🛠️ Crear correctivas si hay defectos")
 
-    defecto = st.text_area(
-        "Defecto encontrado",
-        placeholder="Ejemplo: Luz de emergencia sin batería en pasillo 2º ESO",
-        key=f"defecto_correctiva_{id_orden}"
+    st.info(
+        "Escribe un defecto por línea. "
+        "Se creará una OT correctiva independiente por cada línea."
     )
 
-    crear_correctiva = st.checkbox(
-        "Crear OT correctiva automática",
-        key=f"crear_correctiva_auto_{id_orden}"
+    defectos_texto = st.text_area(
+        "Defectos encontrados",
+        placeholder=(
+            "Ejemplo:\n"
+            "P0/ACS01 - Grifo cocina pierde agua\n"
+            "P0/ACS02 - Grifo cocina sin caudal\n"
+            "Luz emergencia pasillo sin batería"
+        ),
+        key=f"defectos_correctivas_{id_orden}",
+        height=150
+    )
+
+    crear_correctivas = st.checkbox(
+        "Crear OT correctivas automáticas",
+        key=f"crear_correctivas_auto_{id_orden}"
     )
 
     if st.button(
-        "➕ Crear correctiva",
-        key=f"btn_crear_correctiva_{id_orden}",
+        "➕ Crear correctivas",
+        key=f"btn_crear_correctivas_{id_orden}",
         use_container_width=True
     ):
-        if not crear_correctiva:
-            st.warning("Marca la casilla para crear la OT correctiva.")
+        if not crear_correctivas:
+            st.warning("Marca la casilla para crear las OT correctivas.")
             return False
 
-        ok, mensaje = crear_correctiva_desde_ot(
-            centro=centro,
-            edificio=edificio,
-            espacio=espacio,
-            area=area,
-            prioridad=prioridad,
-            operario=operario,
-            descripcion_defecto=defecto,
-            numero_ot_origen=num_ot,
-            origen=origen_base,
-            solicitante="Operarios",
-        )
+        defectos = [
+            d.strip()
+            for d in str(defectos_texto or "").splitlines()
+            if d.strip()
+        ]
 
-        if ok:
-            st.success(mensaje)
+        if not defectos:
+            st.warning("Escribe al menos un defecto.")
+            return False
+
+        creadas = 0
+        errores = []
+
+        for defecto in defectos:
+            ok, mensaje = crear_correctiva_desde_ot(
+                centro=centro,
+                edificio=edificio,
+                espacio=espacio,
+                area=area,
+                prioridad=prioridad,
+                operario=operario,
+                descripcion_defecto=defecto,
+                numero_ot_origen=num_ot,
+                origen=origen_base,
+                solicitante="Operarios",
+            )
+
+            if ok:
+                creadas += 1
+            else:
+                errores.append(mensaje)
+
+        if creadas > 0:
+            st.success(f"Se han creado {creadas} OT correctivas independientes.")
             st.session_state[f"correctiva_creada_{id_orden}"] = True
-            st.rerun()
-        else:
-            st.warning(mensaje)
+
+        if errores:
+            for error in errores:
+                st.warning(error)
+
+        st.rerun()
 
     if st.session_state.get(f"correctiva_creada_{id_orden}", False):
-        st.success("Correctiva creada desde esta revisión.")
+        st.success("Ya se han creado correctivas desde esta revisión.")
 
     return st.session_state.get(f"correctiva_creada_{id_orden}", False)
 
