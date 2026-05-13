@@ -416,16 +416,8 @@ def activar_entrada(seccion=None, vista_operario=False):
     st.session_state["vista_operario"] = vista_operario
     st.rerun()
 
-procesar_entrada_portada(perfil)
-
-if not st.session_state["entrada_app"]:
-    mostrar_portada(perfil, operario_activo)
-
-    try:
-        entrada = st.query_params.get("entrada", "")
-    except Exception:
-        entrada = ""
-
+def procesar_entrada_portada(perfil):
+    entrada = st.query_params.get("entrada", "")
     entrada = str(entrada or "").strip().lower()
     perfil = str(perfil or "").strip().lower()
 
@@ -446,24 +438,23 @@ if not st.session_state["entrada_app"]:
         else:
             return
 
-    elif perfil == "gerencia":
-        if entrada != "gerencia":
-            return
+    elif perfil == "gerencia" and entrada == "gerencia":
         seccion = None
 
-    elif perfil == "inventario":
-        if entrada != "inventario":
-            return
+    elif perfil == "inventario" and entrada == "inventario":
         seccion = None
 
-    else:
-        if entrada != "operario":
-            return
+    elif perfil not in ["admin", "gerencia", "inventario"] and entrada == "operario":
         seccion = None
 
     st.session_state["entrada_app"] = True
     st.session_state["seccion_actual"] = seccion
     st.session_state["vista_operario"] = vista_operario
+
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
 
     st.rerun()
 
@@ -716,7 +707,7 @@ if "seccion_actual" not in st.session_state:
 if "entrada_app" not in st.session_state:
     st.session_state["entrada_app"] = False
 
-
+procesar_entrada_portada(perfil)
 
 if not st.session_state["entrada_app"]:
     mostrar_portada(perfil, operario_activo)
