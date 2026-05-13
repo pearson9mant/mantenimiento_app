@@ -417,7 +417,14 @@ def activar_entrada(seccion=None, vista_operario=False):
     st.rerun()
 
 def procesar_entrada_portada(perfil):
-    entrada = st.query_params.get("entrada", "")
+    if st.session_state.get("entrada_app", False):
+        return
+
+    try:
+        entrada = st.query_params.get("entrada", "")
+    except Exception:
+        entrada = ""
+
     entrada = str(entrada or "").strip().lower()
     perfil = str(perfil or "").strip().lower()
 
@@ -438,23 +445,24 @@ def procesar_entrada_portada(perfil):
         else:
             return
 
-    elif perfil == "gerencia" and entrada == "gerencia":
+    elif perfil == "gerencia":
+        if entrada != "gerencia":
+            return
         seccion = None
 
-    elif perfil == "inventario" and entrada == "inventario":
+    elif perfil == "inventario":
+        if entrada != "inventario":
+            return
         seccion = None
 
-    elif perfil not in ["admin", "gerencia", "inventario"] and entrada == "operario":
+    else:
+        if entrada != "operario":
+            return
         seccion = None
 
     st.session_state["entrada_app"] = True
     st.session_state["seccion_actual"] = seccion
     st.session_state["vista_operario"] = vista_operario
-
-    try:
-        st.query_params.clear()
-    except Exception:
-        pass
 
     st.rerun()
 
