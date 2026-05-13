@@ -38,10 +38,12 @@ def login():
     if st.session_state.get("login_ok", False):
         return
 
-    usuario = st.text_input("Usuario", key="login_usuario")
-    password = st.text_input("Contraseña", type="password", key="login_password")
+    st.markdown("## 🔐 Acceso mantenimiento")
 
-    if st.button("Entrar", use_container_width=True, key="login_entrar"):
+    usuario = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
+
+    if st.button("Entrar", use_container_width=True):
         usuario = usuario.strip().lower()
         password = password.strip()
 
@@ -55,7 +57,6 @@ def login():
             st.session_state["operario_activo"] = datos["nombre"]
             st.session_state["entrada_app"] = False
             st.session_state["seccion_actual"] = None
-            st.session_state["vista_operario"] = False
 
             st.rerun()
         else:
@@ -71,7 +72,7 @@ def barra_sesion():
     if nombre:
         st.caption(f"Sesión: {nombre} · {perfil}")
 
-    if st.button("Cerrar sesión", use_container_width=True, key="cerrar_sesion_app"):
+    if st.button("Cerrar sesión", use_container_width=True):
         claves = [
             "login_ok",
             "usuario",
