@@ -38,8 +38,6 @@ def login():
     if st.session_state.get("login_ok", False):
         return
 
-    st.markdown("## 🔐 Entrar")
-
     usuario = st.text_input("Usuario")
     password = st.text_input("Contraseña", type="password")
 
