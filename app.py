@@ -666,6 +666,9 @@ if modo == "incidencias":
 
 login()
 
+if "usuario_autenticado" not in st.session_state:
+    login()
+
 perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
