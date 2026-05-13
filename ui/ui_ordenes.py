@@ -945,6 +945,20 @@ def pantalla_ordenes():
     with tab3:
         historico = obtener_historico()
         historico = filtrar_por_operario_obligatorio(historico)
+        st.markdown("### 🔎 Buscar en histórico")
+
+        busqueda_historico = st.text_input(
+            "Buscar por nº OT, descripción, centro, edificio, espacio, operario, origen o solicitante",
+            key="buscar_historico_ot"
+        )
+
+        if busqueda_historico:
+            texto = busqueda_historico.strip().lower()
+
+            historico = [
+                h for h in historico
+                if texto in " ".join([str(campo or "") for campo in h]).lower()
+            ]
 
         if not historico:
             if es_operario():
