@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from database.db import conectar, _sql
 from modules.preventivo import generar_ots_preventivo_si_toca
+from modules.ubicaciones import obtener_espacios
 
 
 TAREAS_PREVENTIVAS = [
@@ -88,7 +89,7 @@ def pantalla_preventivo():
         edificios_disponibles = EDIFICIOS.get(centro, [])
         edificio = st.selectbox("Edificio", edificios_disponibles, key=f"prev_edificio_{centro}")
 
-        espacios_disponibles = ESPACIOS.get(edificio, ["General", "Otro"])
+        espacios_disponibles = obtener_espacios(edificio, centro)
         espacio_sel = st.selectbox("Espacio", espacios_disponibles, key=f"prev_espacio_{centro}_{edificio}")
 
         if espacio_sel == "Otro":
