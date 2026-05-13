@@ -15,7 +15,7 @@ def dibujar_puntos(imagen_path, puntos):
 
     imagen = Image.open(imagen_path).convert("RGB")
     draw = ImageDraw.Draw(imagen)
-    font = cargar_fuente(28)
+    font = cargar_fuente(34)
 
     colores = {
         "ACS": "#ff0000",
