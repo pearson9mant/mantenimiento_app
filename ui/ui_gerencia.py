@@ -677,6 +677,27 @@ def euros(valor):
     except Exception:
         return "0,00 €"
 
+def buscador_dataframe(df, key, placeholder="Buscar..."):
+    if df.empty:
+        return df
+
+    busqueda = st.text_input(
+        "🔎 Buscador",
+        placeholder=placeholder,
+        key=key
+    )
+
+    if not busqueda:
+        return df
+
+    texto = busqueda.strip().lower()
+
+    return df[
+        df.astype(str)
+        .apply(lambda col: col.str.lower().str.contains(texto, na=False))
+        .any(axis=1)
+    ]
+
 
 # =====================================================
 # NAVEGACIÓN / BOTONES
@@ -858,6 +879,11 @@ def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     ]
 
     columnas = [c for c in columnas if c in datos.columns]
+    datos = buscador_dataframe(
+        datos,
+        key=f"buscador_gerencia_{centro}_{tipo}",
+        placeholder="Buscar por OT, operario, aula, descripción, estado..."
+    )
 
     st.dataframe(
         datos[columnas],
