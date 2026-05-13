@@ -5,10 +5,20 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 
 
 def cargar_fuente(tamano=24):
-    try:
-        return ImageFont.truetype("arial.ttf", tamano)
-    except Exception:
-        return ImageFont.load_default()
+
+    fuentes_posibles = [
+        "DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "arial.ttf"
+    ]
+
+    for fuente in fuentes_posibles:
+        try:
+            return ImageFont.truetype(fuente, tamano)
+        except Exception:
+            pass
+
+    return ImageFont.load_default()
 
 
 def dibujar_puntos(imagen_path, puntos):
