@@ -1,13 +1,21 @@
 import streamlit as st
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
+
+
+def cargar_fuente(tamano=24):
+    try:
+        return ImageFont.truetype("arial.ttf", tamano)
+    except Exception:
+        return ImageFont.load_default()
 
 
 def dibujar_puntos(imagen_path, puntos):
 
     imagen = Image.open(imagen_path).convert("RGB")
     draw = ImageDraw.Draw(imagen)
+    font = cargar_fuente(24)
 
     colores = {
         "ACS": "#ff0000",
@@ -28,31 +36,26 @@ def dibujar_puntos(imagen_path, puntos):
 
         color = colores.get(tipo, "#ff0000")
 
-        # círculo más visible
         radio = 10
 
         draw.ellipse(
-            (
-                x - radio,
-                y - radio,
-                x + radio,
-                y + radio
-            ),
+            (x - radio, y - radio, x + radio, y + radio),
             fill=color,
             outline="white",
             width=3
         )
 
-        # caja texto destacada
         texto_x = x + 16
         texto_y = y - 18
 
+        bbox = draw.textbbox((texto_x, texto_y), nombre, font=font)
+
         draw.rectangle(
             (
-                texto_x - 4,
-                texto_y - 2,
-                texto_x + (len(nombre) * 8),
-                texto_y + 20
+                bbox[0] - 5,
+                bbox[1] - 3,
+                bbox[2] + 5,
+                bbox[3] + 3
             ),
             fill="white"
         )
@@ -60,7 +63,8 @@ def dibujar_puntos(imagen_path, puntos):
         draw.text(
             (texto_x, texto_y),
             nombre,
-            fill=color
+            fill=color,
+            font=font
         )
 
     return imagen
@@ -116,7 +120,7 @@ def pantalla_planos_legionella():
         col1, col2 = st.columns(2)
 
         with col1:
-            nombre = st.text_input("Nombre del punto", placeholder="Ej: Grifo baño primaria")
+            nombre = st.text_input("Nombre del punto", placeholder="Ej: P0/ACS01 - Grifo cocina")
 
         with col2:
             tipo = st.selectbox(
