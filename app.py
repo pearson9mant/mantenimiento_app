@@ -648,9 +648,7 @@ inicializar_db()
 
 
 try:
-    if "preventivos_auto_revisados" not in st.session_state:
-        generar_ots_preventivo_si_toca()
-        st.session_state["preventivos_auto_revisados"] = True
+    generar_ots_preventivo_si_toca()
 
 except Exception:
     pass
