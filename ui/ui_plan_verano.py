@@ -18,8 +18,18 @@ ESTADOS_VERANO = [
 PRIORIDADES_VERANO = ["Baja", "Media", "Alta", "Urgente"]
 
 MESES_VERANO = {
+    "Enero": 1,
+    "Febrero": 2,
+    "Marzo": 3,
+    "Abril": 4,
+    "Mayo": 5,
+    "Junio": 6,
     "Julio": 7,
-    "Agosto": 8
+    "Agosto": 8,
+    "Septiembre": 9,
+    "Octubre": 10,
+    "Noviembre": 11,
+    "Diciembre": 12
 }
 
 
@@ -173,6 +183,10 @@ def lista_centros():
     return CENTROS
 
 
+def lista_operarios_plan():
+    return OPERARIOS + ["Empresa externa", "Otro"]
+
+
 def color_trabajo(centro, prioridad, estado):
     centro = str(centro or "")
     prioridad = str(prioridad or "")
@@ -231,6 +245,20 @@ def texto_seguro(valor):
     return str(valor)
 
 
+def obtener_operarios_de_texto(texto):
+    texto = texto_seguro(texto).strip()
+
+    if not texto:
+        return ["Sin operarios"]
+
+    partes = [p.strip() for p in texto.split(",") if p.strip()]
+
+    if not partes:
+        return ["Sin operarios"]
+
+    return partes
+
+
 # =====================================================
 # PANTALLA PRINCIPAL
 # =====================================================
@@ -256,10 +284,15 @@ def pantalla_plan_verano():
             zona = st.text_input("Zona / aula / sala")
 
         with col2:
-            responsable = st.selectbox(
-                "Responsable",
-                OPERARIOS + ["Empresa externa", "Otro"]
+            operarios_seleccionados = st.multiselect(
+                "Operarios asignados",
+                lista_operarios_plan(),
+                max_selections=4,
+                help="Puedes seleccionar hasta 4 operarios o responsables para la misma faena."
             )
+
+            responsable = ", ".join(operarios_seleccionados)
+
             empresa_externa = st.text_input("Empresa externa")
             fecha_inicio = st.date_input("Fecha inicio", value=date.today())
             fecha_fin = st.date_input("Fecha fin", value=date.today())
@@ -271,6 +304,8 @@ def pantalla_plan_verano():
         if st.button("💾 Guardar trabajo", use_container_width=True):
             if not titulo.strip():
                 st.warning("Falta el título.")
+            elif not operarios_seleccionados:
+                st.warning("Selecciona al menos un operario o responsable.")
             elif fecha_fin < fecha_inicio:
                 st.warning("La fecha final no puede ser anterior a la fecha inicial.")
             else:
@@ -324,7 +359,11 @@ def pantalla_plan_verano():
         )
 
     with colf2:
-        mes_nombre = st.selectbox("Mes", ["Julio", "Agosto"])
+        mes_nombre = st.selectbox(
+            "Mes",
+            list(MESES_VERANO.keys()),
+            index=5
+        )
 
     with colf3:
         filtro_centro = st.selectbox(
@@ -333,10 +372,9 @@ def pantalla_plan_verano():
         )
 
     with colf4:
-        responsables = sorted(df["responsable"].fillna("Sin responsable").unique().tolist())
-        filtro_responsable = st.selectbox(
-            "Responsable",
-            ["Todos"] + responsables
+        filtro_operario = st.selectbox(
+            "Operario",
+            ["Todos"] + lista_operarios_plan()
         )
 
     colf5, colf6, colf7 = st.columns(3)
@@ -363,9 +401,13 @@ def pantalla_plan_verano():
     if filtro_centro != "Todos":
         df_filtrado = df_filtrado[df_filtrado["centro"] == filtro_centro]
 
-    if filtro_responsable != "Todos":
+    if filtro_operario != "Todos":
         df_filtrado = df_filtrado[
-            df_filtrado["responsable"].fillna("Sin responsable") == filtro_responsable
+            df_filtrado["responsable"].fillna("").str.contains(
+                filtro_operario,
+                case=False,
+                na=False
+            )
         ]
 
     if filtro_estado != "Todos":
@@ -444,7 +486,7 @@ def pantalla_plan_verano():
         padding-bottom: 6px;
     }
 
-    .bloque-responsable {
+    .bloque-operario {
         font-size: 12px;
         font-weight: 900;
         color: #0f172a;
@@ -516,24 +558,32 @@ def pantalla_plan_verano():
                     )
 
                 else:
-                    trabajos_dia["responsable_visible"] = trabajos_dia["responsable"].fillna("Sin responsable")
-                    responsables_dia = trabajos_dia["responsable_visible"].unique().tolist()
+                    operarios_dia = []
 
-                    for responsable_dia in responsables_dia:
-                        trabajos_resp = trabajos_dia[
-                            trabajos_dia["responsable_visible"] == responsable_dia
+                    for _, fila_op in trabajos_dia.iterrows():
+                        for op in obtener_operarios_de_texto(fila_op.get("responsable", "")):
+                            if op not in operarios_dia:
+                                operarios_dia.append(op)
+
+                    for operario_dia in operarios_dia:
+                        trabajos_op = trabajos_dia[
+                            trabajos_dia["responsable"].fillna("").str.contains(
+                                operario_dia,
+                                case=False,
+                                na=False
+                            )
                         ]
 
                         st.markdown(
                             f"""
-                            <div class="bloque-responsable">
-                                👷 {responsable_dia}
+                            <div class="bloque-operario">
+                                👷 {operario_dia}
                             </div>
                             """,
                             unsafe_allow_html=True
                         )
 
-                        for _, fila in trabajos_resp.iterrows():
+                        for _, fila in trabajos_op.iterrows():
                             bg, color = color_trabajo(
                                 fila.get("centro", ""),
                                 fila.get("prioridad", ""),
@@ -547,6 +597,7 @@ def pantalla_plan_verano():
                             estado = texto_seguro(fila.get("estado", ""))
                             prioridad = texto_seguro(fila.get("prioridad", ""))
                             empresa = texto_seguro(fila.get("empresa_externa", ""))
+                            operarios = texto_seguro(fila.get("responsable", ""))
 
                             fechas = (
                                 f"{fila['fecha_inicio_dt'].strftime('%d/%m')}"
@@ -566,6 +617,7 @@ def pantalla_plan_verano():
                                         {centro}<br>
                                         {edificio} · {zona}<br>
                                         📅 {fechas}<br>
+                                        👥 {operarios}<br>
                                         {estado} · {prioridad}
                                         {extra_empresa}
                                     </div>
@@ -632,7 +684,7 @@ def pantalla_plan_verano():
                         st.rerun()
 
             st.write(f"**Descripción:** {texto_seguro(fila.get('descripcion', ''))}")
-            st.write(f"**Responsable:** {texto_seguro(fila.get('responsable', ''))}")
+            st.write(f"**Operarios:** {texto_seguro(fila.get('responsable', ''))}")
             st.write(f"**Empresa:** {texto_seguro(fila.get('empresa_externa', ''))}")
             st.write(f"**Observaciones:** {texto_seguro(fila.get('observaciones', ''))}")
 
