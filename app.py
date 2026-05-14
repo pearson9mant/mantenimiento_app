@@ -707,10 +707,6 @@ elif perfil == "gerencia":
 else:
     st.caption(f"{operario_activo}")
 
-
-else:
-    st.caption(f"{operario_activo}")
-
     if perfil == "inventario" and seccion not in [
         "Inventario",
         "Inventario aulas"
