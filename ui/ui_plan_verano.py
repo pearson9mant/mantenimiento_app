@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
+from html import escape
 
 from database.db import conectar, _sql
 from config import CENTROS, OPERARIOS
@@ -31,7 +32,6 @@ MESES_VERANO = {
     "Noviembre": 11,
     "Diciembre": 12
 }
-
 
 COLORES_OPERARIOS = {
     "J.A. Almeda": "#2563eb",
@@ -282,35 +282,6 @@ def trabajo_activo_en_dia(fila, dia):
     return inicio <= dia <= fin
 
 
-def barra_colores_operarios(operarios):
-    if not operarios:
-        operarios = ["Sin operarios"]
-
-    ancho = 100 / len(operarios)
-    bloques = ""
-
-    for op in operarios:
-        bloques += f"""
-        <div style="
-            width:{ancho}%;
-            background:{color_operario(op)};
-            height:8px;
-        "></div>
-        """
-
-    return f"""
-    <div style="
-        display:flex;
-        width:100%;
-        overflow:hidden;
-        border-radius:12px 12px 0 0;
-        margin:-8px -8px 8px -8px;
-    ">
-        {bloques}
-    </div>
-    """
-
-
 def nombres_operarios_compacto(operarios):
     if not operarios:
         return "Sin operarios"
@@ -321,14 +292,36 @@ def nombres_operarios_compacto(operarios):
     return " · ".join(operarios[:2]) + f" +{len(operarios) - 2}"
 
 
+def barra_colores_operarios(operarios):
+    if not operarios:
+        operarios = ["Sin operarios"]
+
+    ancho = 100 / len(operarios)
+    bloques = ""
+
+    for op in operarios:
+        bloques += (
+            f"<div style='width:{ancho}%;"
+            f"background:{color_operario(op)};"
+            f"height:9px;'></div>"
+        )
+
+    return (
+        "<div style='display:flex;width:100%;overflow:hidden;"
+        "border-radius:14px 14px 0 0;margin:-9px -9px 9px -9px;'>"
+        f"{bloques}"
+        "</div>"
+    )
+
+
 def tarjeta_trabajo_html(fila):
-    titulo = texto_seguro(fila.get("titulo", ""))
-    centro = texto_seguro(fila.get("centro", ""))
-    edificio = texto_seguro(fila.get("edificio", ""))
-    zona = texto_seguro(fila.get("zona", ""))
-    estado = texto_seguro(fila.get("estado", ""))
-    prioridad = texto_seguro(fila.get("prioridad", ""))
-    empresa = texto_seguro(fila.get("empresa_externa", ""))
+    titulo = escape(texto_seguro(fila.get("titulo", "")))
+    centro = escape(texto_seguro(fila.get("centro", "")))
+    edificio = escape(texto_seguro(fila.get("edificio", "")))
+    zona = escape(texto_seguro(fila.get("zona", "")))
+    estado = escape(texto_seguro(fila.get("estado", "")))
+    prioridad = escape(texto_seguro(fila.get("prioridad", "")))
+    empresa = escape(texto_seguro(fila.get("empresa_externa", "")))
     responsable = texto_seguro(fila.get("responsable", ""))
 
     operarios = obtener_operarios_de_texto(responsable)
@@ -344,16 +337,10 @@ def tarjeta_trabajo_html(fila):
         empresa_html = f"<div class='pv-detalle'>🏢 {empresa}</div>"
 
     return f"""
-    <div class="pv-tarea"
-         style="
-            background:{color_fondo_estado(estado)};
-            border-color:{color_borde_estado(estado)};
-         ">
+    <div class="pv-tarea" style="background:{color_fondo_estado(estado)}; border-color:{color_borde_estado(estado)};">
         {barra_colores_operarios(operarios)}
-
         <div class="pv-titulo">{titulo}</div>
-
-        <div class="pv-detalle">👥 {nombres_operarios_compacto(operarios)}</div>
+        <div class="pv-detalle">👥 {escape(nombres_operarios_compacto(operarios))}</div>
         <div class="pv-detalle">📍 {centro}</div>
         <div class="pv-detalle">{edificio} · {zona}</div>
         <div class="pv-detalle">📅 {fechas}</div>
@@ -361,6 +348,131 @@ def tarjeta_trabajo_html(fila):
         {empresa_html}
     </div>
     """
+
+
+def pintar_estilos_plan_verano():
+    st.markdown("""
+    <style>
+    .pv-leyenda {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin: 8px 0 18px 0;
+    }
+
+    .pv-leyenda-item {
+        display:flex;
+        align-items:center;
+        gap:6px;
+        background:#ffffff;
+        border:1px solid #e5e7eb;
+        border-radius:999px;
+        padding:6px 10px;
+        font-size:12px;
+        font-weight:800;
+        color:#334155;
+    }
+
+    .pv-punto {
+        width:12px;
+        height:12px;
+        border-radius:999px;
+        display:inline-block;
+    }
+
+    .pv-mes-titulo {
+        font-size: 24px;
+        font-weight: 950;
+        color: #0f172a;
+        margin-top: 18px;
+        margin-bottom: 12px;
+    }
+
+    .pv-cabecera-dia {
+        background:#0f172a;
+        color:white;
+        border-radius:14px;
+        padding:8px;
+        text-align:center;
+        font-size:13px;
+        font-weight:950;
+        margin-bottom:8px;
+    }
+
+    .pv-dia {
+        background:#ffffff;
+        border:1px solid #e5e7eb;
+        border-radius:16px;
+        min-height:230px;
+        padding:9px;
+        box-shadow:0 4px 12px rgba(15, 23, 42, 0.06);
+        margin-bottom:12px;
+    }
+
+    .pv-dia-fuera {
+        background:#f8fafc;
+        opacity:0.48;
+    }
+
+    .pv-dia-header {
+        font-size:13px;
+        font-weight:950;
+        color:#0f172a;
+        border-bottom:1px solid #e5e7eb;
+        padding-bottom:6px;
+        margin-bottom:8px;
+    }
+
+    .pv-dia-num {
+        font-size:20px;
+        font-weight:950;
+    }
+
+    .pv-tarea {
+        border:2px solid #e5e7eb;
+        border-radius:15px;
+        padding:9px;
+        margin-bottom:9px;
+        box-shadow:0 3px 8px rgba(15, 23, 42, 0.08);
+        overflow:hidden;
+    }
+
+    .pv-titulo {
+        font-size:12px;
+        font-weight:950;
+        color:#0f172a;
+        line-height:1.2;
+        margin-bottom:5px;
+        text-transform:uppercase;
+    }
+
+    .pv-detalle {
+        font-size:10.5px;
+        color:#334155;
+        font-weight:700;
+        line-height:1.25;
+        margin-top:2px;
+    }
+
+    .pv-estado {
+        display:inline-block;
+        margin-top:5px;
+        padding:3px 7px;
+        border-radius:999px;
+        background:#e2e8f0;
+        color:#334155;
+        font-size:10px;
+        font-weight:900;
+    }
+
+    .pv-sin-trabajos {
+        color:#94a3b8;
+        font-size:12px;
+        font-weight:700;
+        margin-top:8px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # =====================================================
@@ -372,10 +484,6 @@ def pantalla_plan_verano():
 
     st.markdown("## ☀️ Planificación trabajos de verano")
     st.caption("Calendario mensual visual compartido para Administración y Gerencia.")
-
-    # =====================================================
-    # CREAR TRABAJO
-    # =====================================================
 
     with st.expander("➕ Crear nuevo trabajo", expanded=False):
         col1, col2 = st.columns(2)
@@ -444,10 +552,6 @@ def pantalla_plan_verano():
     if df.empty:
         st.info("No hay trabajos con fechas válidas.")
         return
-
-    # =====================================================
-    # FILTROS
-    # =====================================================
 
     st.markdown("### 🔎 Filtros")
 
@@ -539,10 +643,6 @@ def pantalla_plan_verano():
         st.warning("No hay trabajos planificados para ese filtro.")
         return
 
-    # =====================================================
-    # RESUMEN SUPERIOR
-    # =====================================================
-
     total = len(df_filtrado)
     en_ejecucion = len(df_filtrado[df_filtrado["estado"] == "En ejecución"])
     retrasados = len(df_filtrado[df_filtrado["estado"] == "Retrasado"])
@@ -555,159 +655,19 @@ def pantalla_plan_verano():
     m3.metric("Retrasados", retrasados)
     m4.metric("Finalizados", finalizados)
 
-    # =====================================================
-    # ESTILOS CALENDARIO MENSUAL
-    # =====================================================
-
-    st.markdown("""
-    <style>
-    .pv-leyenda {
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        margin: 8px 0 18px 0;
-    }
-
-    .pv-leyenda-item {
-        display:flex;
-        align-items:center;
-        gap:6px;
-        background:#ffffff;
-        border:1px solid #e5e7eb;
-        border-radius:999px;
-        padding:6px 10px;
-        font-size:12px;
-        font-weight:800;
-        color:#334155;
-    }
-
-    .pv-punto {
-        width:12px;
-        height:12px;
-        border-radius:999px;
-        display:inline-block;
-    }
-
-    .pv-mes-titulo {
-        font-size: 24px;
-        font-weight: 950;
-        color: #0f172a;
-        margin-top: 18px;
-        margin-bottom: 12px;
-    }
-
-    .pv-semana {
-        display:grid;
-        grid-template-columns: repeat(7, minmax(130px, 1fr));
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-
-    .pv-dia {
-        background:#ffffff;
-        border:1px solid #e5e7eb;
-        border-radius:16px;
-        min-height:220px;
-        padding:8px;
-        box-shadow:0 4px 12px rgba(15, 23, 42, 0.06);
-        overflow:hidden;
-    }
-
-    .pv-dia-fuera {
-        background:#f8fafc;
-        opacity:0.45;
-    }
-
-    .pv-dia-header {
-        font-size:13px;
-        font-weight:950;
-        color:#0f172a;
-        border-bottom:1px solid #e5e7eb;
-        padding-bottom:6px;
-        margin-bottom:8px;
-    }
-
-    .pv-dia-num {
-        font-size:18px;
-        font-weight:950;
-    }
-
-    .pv-tarea {
-        border:2px solid #e5e7eb;
-        border-radius:14px;
-        padding:8px;
-        margin-bottom:8px;
-        box-shadow:0 3px 8px rgba(15, 23, 42, 0.08);
-        overflow:hidden;
-    }
-
-    .pv-titulo {
-        font-size:12px;
-        font-weight:950;
-        color:#0f172a;
-        line-height:1.2;
-        margin-bottom:5px;
-        text-transform:uppercase;
-    }
-
-    .pv-detalle {
-        font-size:10.5px;
-        color:#334155;
-        font-weight:700;
-        line-height:1.25;
-        margin-top:2px;
-    }
-
-    .pv-estado {
-        display:inline-block;
-        margin-top:5px;
-        padding:3px 7px;
-        border-radius:999px;
-        background:#e2e8f0;
-        color:#334155;
-        font-size:10px;
-        font-weight:900;
-    }
-
-    .pv-sin-trabajos {
-        color:#94a3b8;
-        font-size:12px;
-        font-weight:700;
-        margin-top:8px;
-    }
-
-    @media (max-width: 900px) {
-        .pv-semana {
-            grid-template-columns: repeat(7, minmax(160px, 1fr));
-            overflow-x:auto;
-        }
-
-        .pv-dia {
-            min-height:220px;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # =====================================================
-    # LEYENDA OPERARIOS
-    # =====================================================
+    pintar_estilos_plan_verano()
 
     leyenda_html = "<div class='pv-leyenda'>"
     for op in lista_operarios_plan():
         leyenda_html += f"""
         <div class="pv-leyenda-item">
             <span class="pv-punto" style="background:{color_operario(op)};"></span>
-            {op}
+            {escape(op)}
         </div>
         """
     leyenda_html += "</div>"
 
     st.markdown(leyenda_html, unsafe_allow_html=True)
-
-    # =====================================================
-    # CALENDARIO MENSUAL COMPLETO
-    # =====================================================
 
     st.markdown(
         f"<div class='pv-mes-titulo'>📅 Calendario completo · {mes_nombre} {año}</div>",
@@ -715,59 +675,45 @@ def pantalla_plan_verano():
     )
 
     dias_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+    cabeceras = st.columns(7)
+    for i, nombre in enumerate(dias_nombre):
+        with cabeceras[i]:
+            st.markdown(
+                f"<div class='pv-cabecera-dia'>{nombre}</div>",
+                unsafe_allow_html=True
+            )
+
     semanas = semanas_del_mes(int(año), mes_numero)
 
-    st.markdown(
-        """
-        <div class="pv-semana">
-            <div class="pv-dia-header">Lunes</div>
-            <div class="pv-dia-header">Martes</div>
-            <div class="pv-dia-header">Miércoles</div>
-            <div class="pv-dia-header">Jueves</div>
-            <div class="pv-dia-header">Viernes</div>
-            <div class="pv-dia-header">Sábado</div>
-            <div class="pv-dia-header">Domingo</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     for semana in semanas:
-        html_semana = "<div class='pv-semana'>"
+        columnas = st.columns(7)
 
-        for dia in semana:
+        for i, dia in enumerate(semana):
             trabajos_dia = df_filtrado[
                 df_filtrado.apply(lambda fila: trabajo_activo_en_dia(fila, dia), axis=1)
             ].copy()
 
             clase_fuera = "pv-dia-fuera" if dia.month != mes_numero else ""
 
-            html_semana += f"""
-            <div class="pv-dia {clase_fuera}">
-                <div class="pv-dia-header">
-                    <span class="pv-dia-num">{dia.day}</span><br>
-                    {dias_nombre[dia.weekday()]}
-                </div>
-            """
+            with columnas[i]:
+                html_dia = f"""
+                <div class="pv-dia {clase_fuera}">
+                    <div class="pv-dia-header">
+                        <span class="pv-dia-num">{dia.day}</span><br>
+                        {dias_nombre[dia.weekday()]}
+                    </div>
+                """
 
-            if trabajos_dia.empty:
-                html_semana += "<div class='pv-sin-trabajos'>Sin trabajos</div>"
-            else:
-                for _, fila in trabajos_dia.iterrows():
-                    html_semana += tarjeta_trabajo_html(fila)
+                if trabajos_dia.empty:
+                    html_dia += "<div class='pv-sin-trabajos'>Sin trabajos</div>"
+                else:
+                    for _, fila in trabajos_dia.iterrows():
+                        html_dia += tarjeta_trabajo_html(fila)
 
-            html_semana += "</div>"
+                html_dia += "</div>"
 
-        html_semana += "</div>"
-
-        st.markdown(
-            html_semana,
-            unsafe_allow_html=True
-        )
-
-    # =====================================================
-    # EDICIÓN RÁPIDA
-    # =====================================================
+                st.markdown(html_dia, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### ✏️ Modificar trabajos")
