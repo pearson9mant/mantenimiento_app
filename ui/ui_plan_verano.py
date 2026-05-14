@@ -194,7 +194,15 @@ def lista_centros():
 
 
 def lista_operarios_plan():
-    return OPERARIOS + ["Empresa externa", "Otro"]
+    base = list(OPERARIOS)
+    extra = ["Empresa externa", "Otro"]
+
+    resultado = []
+    for op in base + extra:
+        if op not in resultado:
+            resultado.append(op)
+
+    return resultado
 
 
 def texto_seguro(valor):
@@ -302,13 +310,13 @@ def barra_colores_operarios(operarios):
     for op in operarios:
         bloques += (
             f"<div style='width:{ancho}%;"
-            f"background:{color_operario(op)};"
-            f"height:9px;'></div>"
+            f"height:9px;"
+            f"background:{color_operario(op)};'></div>"
         )
 
     return (
         "<div style='display:flex;width:100%;overflow:hidden;"
-        "border-radius:14px 14px 0 0;margin:-9px -9px 9px -9px;'>"
+        "border-radius:12px 12px 0 0;margin:-8px -8px 8px -8px;'>"
         f"{bloques}"
         "</div>"
     )
@@ -337,7 +345,9 @@ def tarjeta_trabajo_html(fila):
         empresa_html = f"<div class='pv-detalle'>🏢 {empresa}</div>"
 
     return f"""
-    <div class="pv-tarea" style="background:{color_fondo_estado(estado)}; border-color:{color_borde_estado(estado)};">
+    <div class="pv-tarea"
+         style="background:{color_fondo_estado(estado)};
+                border-color:{color_borde_estado(estado)};">
         {barra_colores_operarios(operarios)}
         <div class="pv-titulo">{titulo}</div>
         <div class="pv-detalle">👥 {escape(nombres_operarios_compacto(operarios))}</div>
@@ -353,53 +363,7 @@ def tarjeta_trabajo_html(fila):
 def pintar_estilos_plan_verano():
     st.markdown("""
     <style>
-    .pv-leyenda {
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        margin: 8px 0 18px 0;
-    }
-
-    .pv-leyenda-item {
-        display:flex;
-        align-items:center;
-        gap:6px;
-        background:#ffffff;
-        border:1px solid #e5e7eb;
-        border-radius:999px;
-        padding:6px 10px;
-        font-size:12px;
-        font-weight:800;
-        color:#334155;
-    }
-
-    .pv-punto {
-        width:12px;
-        height:12px;
-        border-radius:999px;
-        display:inline-block;
-    }
-
-    .pv-mes-titulo {
-        font-size: 24px;
-        font-weight: 950;
-        color: #0f172a;
-        margin-top: 18px;
-        margin-bottom: 12px;
-    }
-
-    .pv-cabecera-dia {
-        background:#0f172a;
-        color:white;
-        border-radius:14px;
-        padding:8px;
-        text-align:center;
-        font-size:13px;
-        font-weight:950;
-        margin-bottom:8px;
-    }
-
-    .pv-dia {
+    .pv-card-dia {
         background:#ffffff;
         border:1px solid #e5e7eb;
         border-radius:16px;
@@ -409,9 +373,20 @@ def pintar_estilos_plan_verano():
         margin-bottom:12px;
     }
 
-    .pv-dia-fuera {
+    .pv-card-dia-fuera {
         background:#f8fafc;
-        opacity:0.48;
+        opacity:0.45;
+    }
+
+    .pv-cabecera-dia {
+        background:#0f172a;
+        color:#ffffff;
+        border-radius:14px;
+        padding:8px;
+        text-align:center;
+        font-size:13px;
+        font-weight:950;
+        margin-bottom:8px;
     }
 
     .pv-dia-header {
@@ -431,7 +406,7 @@ def pintar_estilos_plan_verano():
     .pv-tarea {
         border:2px solid #e5e7eb;
         border-radius:15px;
-        padding:9px;
+        padding:8px;
         margin-bottom:9px;
         box-shadow:0 3px 8px rgba(15, 23, 42, 0.08);
         overflow:hidden;
@@ -471,8 +446,54 @@ def pintar_estilos_plan_verano():
         font-weight:700;
         margin-top:8px;
     }
+
+    .pv-mes-titulo {
+        font-size:24px;
+        font-weight:950;
+        color:#0f172a;
+        margin-top:18px;
+        margin-bottom:12px;
+    }
+
+    .pv-leyenda-box {
+        display:flex;
+        align-items:center;
+        gap:7px;
+        background:#ffffff;
+        border:1px solid #e5e7eb;
+        border-radius:999px;
+        padding:6px 10px;
+        font-size:12px;
+        font-weight:800;
+        color:#334155;
+        margin-bottom:6px;
+    }
+
+    .pv-punto {
+        width:12px;
+        height:12px;
+        border-radius:999px;
+        display:inline-block;
+    }
     </style>
     """, unsafe_allow_html=True)
+
+
+def pintar_leyenda():
+    ops = lista_operarios_plan()
+    cols = st.columns(len(ops))
+
+    for i, op in enumerate(ops):
+        with cols[i]:
+            st.markdown(
+                f"""
+                <div class="pv-leyenda-box">
+                    <span class="pv-punto" style="background:{color_operario(op)};"></span>
+                    {escape(op)}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
 
 # =====================================================
@@ -481,6 +502,7 @@ def pintar_estilos_plan_verano():
 
 def pantalla_plan_verano():
     asegurar_tabla_plan_verano()
+    pintar_estilos_plan_verano()
 
     st.markdown("## ☀️ Planificación trabajos de verano")
     st.caption("Calendario mensual visual compartido para Administración y Gerencia.")
@@ -655,19 +677,7 @@ def pantalla_plan_verano():
     m3.metric("Retrasados", retrasados)
     m4.metric("Finalizados", finalizados)
 
-    pintar_estilos_plan_verano()
-
-    leyenda_html = "<div class='pv-leyenda'>"
-    for op in lista_operarios_plan():
-        leyenda_html += f"""
-        <div class="pv-leyenda-item">
-            <span class="pv-punto" style="background:{color_operario(op)};"></span>
-            {escape(op)}
-        </div>
-        """
-    leyenda_html += "</div>"
-
-    st.markdown(leyenda_html, unsafe_allow_html=True)
+    pintar_leyenda()
 
     st.markdown(
         f"<div class='pv-mes-titulo'>📅 Calendario completo · {mes_nombre} {año}</div>",
@@ -694,11 +704,11 @@ def pantalla_plan_verano():
                 df_filtrado.apply(lambda fila: trabajo_activo_en_dia(fila, dia), axis=1)
             ].copy()
 
-            clase_fuera = "pv-dia-fuera" if dia.month != mes_numero else ""
+            clase_fuera = "pv-card-dia-fuera" if dia.month != mes_numero else ""
 
             with columnas[i]:
                 html_dia = f"""
-                <div class="pv-dia {clase_fuera}">
+                <div class="pv-card-dia {clase_fuera}">
                     <div class="pv-dia-header">
                         <span class="pv-dia-num">{dia.day}</span><br>
                         {dias_nombre[dia.weekday()]}
