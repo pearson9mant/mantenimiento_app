@@ -21,6 +21,7 @@ from ui.ui_configuracion import pantalla_configuracion
 from ui.ui_gerencia import pantalla_gerencia
 from modules.preventivo import generar_ots_preventivo_si_toca
 from ui.ui_legionella import generar_ots_legionella_si_toca
+from ui.ui_plan_verano import pantalla_plan_verano
 
 
 APP_VERSION = "v1.0 PRO"
@@ -473,6 +474,11 @@ def mostrar_menu_admin():
             st.rerun()
 
     with col5:
+        if st.button("☀️\nPlan verano", key="btn_plan_verano_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Plan verano"
+            st.rerun()
+
+    with col5:
         if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
@@ -592,9 +598,26 @@ if perfil == "admin" and st.session_state.get("vista_operario", False):
 
 
 if perfil == "gerencia":
-    pantalla_gerencia()
-    pintar_footer()
-    st.stop()
+    if st.session_state["seccion_actual"] is None:
+        st.markdown(
+            "<div class='section-title'>Menú Gerencia</div>",
+            unsafe_allow_html=True
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("📊\nPanel gerencia", key="btn_gerencia_panel", use_container_width=True):
+                st.session_state["seccion_actual"] = "Gerencia"
+                st.rerun()
+
+        with col2:
+            if st.button("☀️\nPlan verano", key="btn_plan_verano_gerencia", use_container_width=True):
+                st.session_state["seccion_actual"] = "Plan verano"
+                st.rerun()
+
+        pintar_footer()
+        st.stop()
 
 
 if st.session_state["seccion_actual"] is None:
@@ -630,7 +653,6 @@ st.markdown("---")
 
 seccion = st.session_state["seccion_actual"]
 
-
 if perfil == "admin":
 
     if seccion == "Panel":
@@ -654,6 +676,9 @@ if perfil == "admin":
     elif seccion == "Planos Legionella":
         pantalla_planos_legionella()
 
+    elif seccion == "Plan verano":
+        pantalla_plan_verano()
+
     elif seccion == "Preventivo":
         pantalla_preventivo()
 
@@ -668,6 +693,14 @@ if perfil == "admin":
 
     elif seccion == "Configuración":
         pantalla_configuracion()
+
+    elif perfil == "gerencia":
+
+       if seccion == "Gerencia":
+           pantalla_gerencia()
+
+       elif seccion == "Plan verano":
+           pantalla_plan_verano()
 
 
 else:
