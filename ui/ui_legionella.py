@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
 from database.db import conectar
-from modules.ordenes import obtener_siguiente_numero_ot
+from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 
 
 OPERARIOS = ["J.A. Almeda", "Abel Vasquez", "Luis Lozano", "Otro"]
@@ -286,21 +286,38 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
     numero_ot = obtener_siguiente_numero_ot(centro, "LEG")
     operario_final = operario or operario_por_centro(centro)
 
-    ejecutar(
-        """
-        INSERT INTO ordenes_trabajo
-        (numero_ot, descripcion, estado, centro, edificio, espacio, area, prioridad, operario, origen, tipo_solicitante)
-        VALUES (?, ?, 'Abierta', ?, ?, ?, 'Legionella', 'Alta', ?, 'Legionella', 'Operarios')
-        """,
-        (
-            numero_ot,
-            descripcion,
-            centro,
-            edificio,
-            punto,
-            operario_final,
-        ),
+    datos_orden = (
+        numero_ot,
+        descripcion,
+        "Abierta",
+        centro,
+        edificio,
+        punto,
+        "Legionella",
+        "Alta",
+        operario_final,
+        "LEGIONELLA",
+        "",
+        "",
+        "",
+        "Operarios",
+        "Interna",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        0,
+        ""
     )
+
+    crear_orden(datos_orden)
 
     return True
 
