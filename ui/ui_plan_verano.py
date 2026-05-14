@@ -760,7 +760,10 @@ def pantalla_plan_verano():
 
         html_semana += "</div>"
 
-        st.markdown(html_semana, unsafe_allow_html=True)
+        st.markdown(
+            html_semana,
+            unsafe_allow_html=True
+        )
 
     # =====================================================
     # EDICIÓN RÁPIDA
