@@ -17,6 +17,7 @@ TAREAS_PREVENTIVAS = [
     "Revisar cisternas",
     "Revisar desagües",
     "Revisar split aire acondicionado",
+    "Revisar o lipiar placas solares",
     "Otra",
 ]
 
