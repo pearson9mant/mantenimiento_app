@@ -22,25 +22,48 @@ def asegurar_tabla_plan_verano():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute(_sql("""
-        CREATE TABLE IF NOT EXISTS plan_verano (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            titulo TEXT,
-            descripcion TEXT,
-            centro TEXT,
-            edificio TEXT,
-            zona TEXT,
-            responsable TEXT,
-            empresa_externa TEXT,
-            fecha_inicio TEXT,
-            fecha_fin TEXT,
-            prioridad TEXT,
-            estado TEXT,
-            observaciones TEXT,
-            creado_por TEXT,
-            fecha_creacion TEXT
-        )
-    """))
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plan_verano (
+                id SERIAL PRIMARY KEY,
+                titulo TEXT,
+                descripcion TEXT,
+                centro TEXT,
+                edificio TEXT,
+                zona TEXT,
+                responsable TEXT,
+                empresa_externa TEXT,
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                prioridad TEXT,
+                estado TEXT,
+                observaciones TEXT,
+                creado_por TEXT,
+                fecha_creacion TEXT
+            )
+        """)
+    except Exception:
+        conn.rollback()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plan_verano (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titulo TEXT,
+                descripcion TEXT,
+                centro TEXT,
+                edificio TEXT,
+                zona TEXT,
+                responsable TEXT,
+                empresa_externa TEXT,
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                prioridad TEXT,
+                estado TEXT,
+                observaciones TEXT,
+                creado_por TEXT,
+                fecha_creacion TEXT
+            )
+        """)
 
     conn.commit()
     conn.close()
