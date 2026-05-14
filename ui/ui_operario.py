@@ -1,7 +1,9 @@
 import streamlit as st
+from datetime import date
 
 from modules.ordenes import (
     obtener_ordenes_operario,
+    obtener_historico,
     actualizar_estado,
     actualizar_observaciones_estado,
     finalizar_orden,
@@ -51,6 +53,42 @@ def es_operario():
 
 def normalizar_txt(valor):
     return str(valor or "").strip().lower()
+
+
+def normalizar_operario_nombre(nombre):
+    texto = normalizar_txt(nombre)
+    limpio = (
+        texto.replace(".", "")
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+    if limpio in [
+        "jaalmeda",
+        "jalmeda",
+        "juanantonio",
+        "juanantonioalmeda",
+        "jalmedac",
+        "jalmedaabatolibaedu"
+    ]:
+        return "j.a. almeda"
+
+    if limpio in [
+        "luislozano",
+        "llozano",
+        "luis"
+    ]:
+        return "luis lozano"
+
+    if limpio in [
+        "abelvasquez",
+        "abel",
+        "avasquez"
+    ]:
+        return "abel vasquez"
+
+    return texto
 
 
 def puede_ver_legionella_operario(operario):
@@ -376,29 +414,53 @@ def normalizar_estado_operario(estado):
     return "Faltan"
 
 
-def calcular_kpis_operario(ordenes):
-    total = len(ordenes)
+def fecha_es_hoy(valor):
+    hoy = date.today().strftime("%Y-%m-%d")
+    texto = str(valor or "").strip()
+    return texto[:10] == hoy
 
-    hechas = len([
-        o for o in ordenes
-        if normalizar_estado_operario(o[3]) == "Hechas"
-    ])
+
+def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
+    historico = historico or []
+
+    total = len(ordenes)
 
     en_proceso = len([
         o for o in ordenes
-        if normalizar_estado_operario(o[3]) == "En proceso"
+        if len(o) > 3 and normalizar_estado_operario(o[3]) == "En proceso"
     ])
 
     faltan = len([
         o for o in ordenes
-        if normalizar_estado_operario(o[3]) == "Faltan"
+        if len(o) > 3 and normalizar_estado_operario(o[3]) == "Faltan"
     ])
 
-    rendimiento = round((hechas / total) * 100, 1) if total else 0
+    hechas_hoy = 0
+    operario_objetivo = normalizar_operario_nombre(operario_sel)
+
+    for h in historico:
+        try:
+            estado = h[3]
+            fecha_hist = h[4]
+            operario_hist = h[10]
+        except Exception:
+            continue
+
+        if normalizar_operario_nombre(operario_hist) != operario_objetivo:
+            continue
+
+        if normalizar_estado_operario(estado) != "Hechas":
+            continue
+
+        if fecha_es_hoy(fecha_hist):
+            hechas_hoy += 1
+
+    base_rendimiento = hechas_hoy + en_proceso + faltan
+    rendimiento = round((hechas_hoy / base_rendimiento) * 100, 1) if base_rendimiento else 0
 
     return {
         "total": total,
-        "hechas": hechas,
+        "hechas": hechas_hoy,
         "en_proceso": en_proceso,
         "faltan": faltan,
         "rendimiento": rendimiento,
@@ -410,16 +472,16 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
         return []
 
     if es_operario():
-        usuario = normalizar_txt(nombre_operario_actual())
+        usuario = normalizar_operario_nombre(nombre_operario_actual())
 
         return [
             o for o in ordenes
-            if normalizar_txt(obtener_operario_fila(o)) == usuario
+            if normalizar_operario_nombre(obtener_operario_fila(o)) == usuario
         ]
 
     return [
         o for o in ordenes
-        if normalizar_txt(obtener_operario_fila(o)) == normalizar_txt(operario_sel)
+        if normalizar_operario_nombre(obtener_operario_fila(o)) == normalizar_operario_nombre(operario_sel)
     ]
 
 
@@ -681,16 +743,25 @@ def pantalla_operario():
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
     ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
 
-    kpis = calcular_kpis_operario(ordenes_operario)
+    try:
+        historico = obtener_historico()
+    except Exception:
+        historico = []
+
+    kpis = calcular_kpis_operario(
+        ordenes_operario,
+        historico=historico,
+        operario_sel=operario_sel
+    )
 
     st.markdown("### 📈 Mi resumen")
 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Mis OT", kpis["total"])
-    k2.metric("✅ Hechas", kpis["hechas"])
+    k2.metric("✅ Hechas hoy", kpis["hechas"])
     k3.metric("🔄 En curso", kpis["en_proceso"])
     k4.metric("⏳ Pendientes", kpis["faltan"])
-    k5.metric("📈 Rendimiento", f'{kpis["rendimiento"]}%')
+    k5.metric("📈 Rendimiento hoy", f'{kpis["rendimiento"]}%')
 
     st.markdown("---")
 
@@ -729,7 +800,7 @@ def pantalla_operario():
             observaciones_estado,
         ) = descomponer_orden_operario(fila)
 
-        if es_operario() and normalizar_txt(operario) != normalizar_txt(nombre_operario_actual()):
+        if es_operario() and normalizar_operario_nombre(operario) != normalizar_operario_nombre(nombre_operario_actual()):
             continue
 
         estado_icono = {
