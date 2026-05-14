@@ -33,6 +33,16 @@ MESES_VERANO = {
 }
 
 
+COLORES_OPERARIOS = {
+    "J.A. Almeda": "#2563eb",
+    "Luis Lozano": "#7c3aed",
+    "Abel Vasquez": "#ea580c",
+    "Empresa externa": "#16a34a",
+    "Otro": "#64748b",
+    "Sin operarios": "#94a3b8"
+}
+
+
 # =====================================================
 # BASE DE DATOS
 # =====================================================
@@ -187,27 +197,60 @@ def lista_operarios_plan():
     return OPERARIOS + ["Empresa externa", "Otro"]
 
 
-def color_trabajo(centro, prioridad, estado):
-    centro = str(centro or "")
-    prioridad = str(prioridad or "")
+def texto_seguro(valor):
+    if pd.isna(valor):
+        return ""
+    return str(valor)
+
+
+def obtener_operarios_de_texto(texto):
+    texto = texto_seguro(texto).strip()
+
+    if not texto:
+        return ["Sin operarios"]
+
+    partes = [p.strip() for p in texto.split(",") if p.strip()]
+    return partes if partes else ["Sin operarios"]
+
+
+def color_operario(nombre):
+    return COLORES_OPERARIOS.get(nombre, "#0f766e")
+
+
+def color_fondo_estado(estado):
     estado = str(estado or "")
 
     if estado == "Finalizado":
-        return "#dcfce7", "#166534"
+        return "#f0fdf4"
 
     if estado == "Retrasado":
-        return "#fee2e2", "#991b1b"
+        return "#fef2f2"
 
-    if prioridad in ["Alta", "Urgente"]:
-        return "#ffedd5", "#9a3412"
+    if estado == "En ejecución":
+        return "#eff6ff"
 
-    if "22" in centro:
-        return "#e0f2fe", "#075985"
+    if estado == "Pendiente material":
+        return "#fffbeb"
 
-    if "9" in centro:
-        return "#ede9fe", "#5b21b6"
+    return "#ffffff"
 
-    return "#f1f5f9", "#334155"
+
+def color_borde_estado(estado):
+    estado = str(estado or "")
+
+    if estado == "Finalizado":
+        return "#22c55e"
+
+    if estado == "Retrasado":
+        return "#ef4444"
+
+    if estado == "En ejecución":
+        return "#2563eb"
+
+    if estado == "Pendiente material":
+        return "#f59e0b"
+
+    return "#e5e7eb"
 
 
 def lunes_de_semana(fecha):
@@ -227,7 +270,7 @@ def semanas_del_mes(año, mes):
 
     actual = inicio
     while actual <= ultimo_dia:
-        semanas.append([actual + timedelta(days=i) for i in range(5)])
+        semanas.append([actual + timedelta(days=i) for i in range(7)])
         actual += timedelta(days=7)
 
     return semanas
@@ -239,24 +282,85 @@ def trabajo_activo_en_dia(fila, dia):
     return inicio <= dia <= fin
 
 
-def texto_seguro(valor):
-    if pd.isna(valor):
-        return ""
-    return str(valor)
+def barra_colores_operarios(operarios):
+    if not operarios:
+        operarios = ["Sin operarios"]
+
+    ancho = 100 / len(operarios)
+    bloques = ""
+
+    for op in operarios:
+        bloques += f"""
+        <div style="
+            width:{ancho}%;
+            background:{color_operario(op)};
+            height:8px;
+        "></div>
+        """
+
+    return f"""
+    <div style="
+        display:flex;
+        width:100%;
+        overflow:hidden;
+        border-radius:12px 12px 0 0;
+        margin:-8px -8px 8px -8px;
+    ">
+        {bloques}
+    </div>
+    """
 
 
-def obtener_operarios_de_texto(texto):
-    texto = texto_seguro(texto).strip()
+def nombres_operarios_compacto(operarios):
+    if not operarios:
+        return "Sin operarios"
 
-    if not texto:
-        return ["Sin operarios"]
+    if len(operarios) <= 2:
+        return " · ".join(operarios)
 
-    partes = [p.strip() for p in texto.split(",") if p.strip()]
+    return " · ".join(operarios[:2]) + f" +{len(operarios) - 2}"
 
-    if not partes:
-        return ["Sin operarios"]
 
-    return partes
+def tarjeta_trabajo_html(fila):
+    titulo = texto_seguro(fila.get("titulo", ""))
+    centro = texto_seguro(fila.get("centro", ""))
+    edificio = texto_seguro(fila.get("edificio", ""))
+    zona = texto_seguro(fila.get("zona", ""))
+    estado = texto_seguro(fila.get("estado", ""))
+    prioridad = texto_seguro(fila.get("prioridad", ""))
+    empresa = texto_seguro(fila.get("empresa_externa", ""))
+    responsable = texto_seguro(fila.get("responsable", ""))
+
+    operarios = obtener_operarios_de_texto(responsable)
+
+    fechas = (
+        f"{fila['fecha_inicio_dt'].strftime('%d/%m')}"
+        f" → "
+        f"{fila['fecha_fin_dt'].strftime('%d/%m')}"
+    )
+
+    empresa_html = ""
+    if empresa:
+        empresa_html = f"<div class='pv-detalle'>🏢 {empresa}</div>"
+
+    return f"""
+    <div class="pv-tarea"
+         style="
+            background:{color_fondo_estado(estado)};
+            border-color:{color_borde_estado(estado)};
+         ">
+        {barra_colores_operarios(operarios)}
+
+        <div class="pv-titulo">{titulo}</div>
+
+        <div class="pv-detalle">👥 {nombres_operarios_compacto(operarios)}</div>
+        <div class="pv-detalle">📍 {centro}</div>
+        <div class="pv-detalle">{edificio} · {zona}</div>
+        <div class="pv-detalle">📅 {fechas}</div>
+        <div class="pv-estado">{estado} · {prioridad}</div>
+        {empresa_html}
+    </div>
+    """
 
 
 # =====================================================
@@ -267,7 +371,7 @@ def pantalla_plan_verano():
     asegurar_tabla_plan_verano()
 
     st.markdown("## ☀️ Planificación trabajos de verano")
-    st.caption("Calendario visual compartido para Administración y Gerencia.")
+    st.caption("Calendario mensual visual compartido para Administración y Gerencia.")
 
     # =====================================================
     # CREAR TRABAJO
@@ -452,181 +556,211 @@ def pantalla_plan_verano():
     m4.metric("Finalizados", finalizados)
 
     # =====================================================
-    # ESTILOS CALENDARIO
+    # ESTILOS CALENDARIO MENSUAL
     # =====================================================
 
     st.markdown("""
     <style>
-    .cal-verano-titulo {
-        font-size: 22px;
-        font-weight: 900;
+    .pv-leyenda {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin: 8px 0 18px 0;
+    }
+
+    .pv-leyenda-item {
+        display:flex;
+        align-items:center;
+        gap:6px;
+        background:#ffffff;
+        border:1px solid #e5e7eb;
+        border-radius:999px;
+        padding:6px 10px;
+        font-size:12px;
+        font-weight:800;
+        color:#334155;
+    }
+
+    .pv-punto {
+        width:12px;
+        height:12px;
+        border-radius:999px;
+        display:inline-block;
+    }
+
+    .pv-mes-titulo {
+        font-size: 24px;
+        font-weight: 950;
         color: #0f172a;
-        margin-top: 20px;
-        margin-bottom: 10px;
+        margin-top: 18px;
+        margin-bottom: 12px;
     }
 
-    .cal-dia {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 10px;
-        min-height: 300px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-    }
-
-    .cal-dia-fuera {
-        opacity: 0.35;
-    }
-
-    .cal-dia-header {
-        font-weight: 900;
-        color: #0f172a;
+    .pv-semana {
+        display:grid;
+        grid-template-columns: repeat(7, minmax(130px, 1fr));
+        gap: 8px;
         margin-bottom: 8px;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 6px;
     }
 
-    .bloque-operario {
-        font-size: 12px;
-        font-weight: 900;
-        color: #0f172a;
-        margin-top: 8px;
-        margin-bottom: 5px;
-        border-bottom: 1px dashed #cbd5e1;
-        padding-bottom: 3px;
+    .pv-dia {
+        background:#ffffff;
+        border:1px solid #e5e7eb;
+        border-radius:16px;
+        min-height:220px;
+        padding:8px;
+        box-shadow:0 4px 12px rgba(15, 23, 42, 0.06);
+        overflow:hidden;
     }
 
-    .cal-trabajo {
-        border-radius: 12px;
-        padding: 8px 9px;
-        margin-bottom: 7px;
-        font-size: 12px;
-        font-weight: 800;
-        line-height: 1.35;
+    .pv-dia-fuera {
+        background:#f8fafc;
+        opacity:0.45;
     }
 
-    .cal-detalle {
-        font-size: 11px;
-        font-weight: 600;
-        opacity: 0.90;
-        margin-top: 3px;
+    .pv-dia-header {
+        font-size:13px;
+        font-weight:950;
+        color:#0f172a;
+        border-bottom:1px solid #e5e7eb;
+        padding-bottom:6px;
+        margin-bottom:8px;
     }
 
-    .sin-trabajos {
+    .pv-dia-num {
+        font-size:18px;
+        font-weight:950;
+    }
+
+    .pv-tarea {
+        border:2px solid #e5e7eb;
+        border-radius:14px;
+        padding:8px;
+        margin-bottom:8px;
+        box-shadow:0 3px 8px rgba(15, 23, 42, 0.08);
+        overflow:hidden;
+    }
+
+    .pv-titulo {
+        font-size:12px;
+        font-weight:950;
+        color:#0f172a;
+        line-height:1.2;
+        margin-bottom:5px;
+        text-transform:uppercase;
+    }
+
+    .pv-detalle {
+        font-size:10.5px;
+        color:#334155;
+        font-weight:700;
+        line-height:1.25;
+        margin-top:2px;
+    }
+
+    .pv-estado {
+        display:inline-block;
+        margin-top:5px;
+        padding:3px 7px;
+        border-radius:999px;
+        background:#e2e8f0;
+        color:#334155;
+        font-size:10px;
+        font-weight:900;
+    }
+
+    .pv-sin-trabajos {
         color:#94a3b8;
         font-size:12px;
+        font-weight:700;
         margin-top:8px;
+    }
+
+    @media (max-width: 900px) {
+        .pv-semana {
+            grid-template-columns: repeat(7, minmax(160px, 1fr));
+            overflow-x:auto;
+        }
+
+        .pv-dia {
+            min-height:220px;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown(f"### 📅 Calendario {mes_nombre} {año}")
+    # =====================================================
+    # LEYENDA OPERARIOS
+    # =====================================================
 
+    leyenda_html = "<div class='pv-leyenda'>"
+    for op in lista_operarios_plan():
+        leyenda_html += f"""
+        <div class="pv-leyenda-item">
+            <span class="pv-punto" style="background:{color_operario(op)};"></span>
+            {op}
+        </div>
+        """
+    leyenda_html += "</div>"
+
+    st.markdown(leyenda_html, unsafe_allow_html=True)
+
+    # =====================================================
+    # CALENDARIO MENSUAL COMPLETO
+    # =====================================================
+
+    st.markdown(
+        f"<div class='pv-mes-titulo'>📅 Calendario completo · {mes_nombre} {año}</div>",
+        unsafe_allow_html=True
+    )
+
+    dias_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     semanas = semanas_del_mes(int(año), mes_numero)
-    dias_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 
-    for num_semana, semana in enumerate(semanas, start=1):
-        st.markdown(
-            f"<div class='cal-verano-titulo'>Semana {num_semana}</div>",
-            unsafe_allow_html=True
-        )
+    st.markdown(
+        """
+        <div class="pv-semana">
+            <div class="pv-dia-header">Lunes</div>
+            <div class="pv-dia-header">Martes</div>
+            <div class="pv-dia-header">Miércoles</div>
+            <div class="pv-dia-header">Jueves</div>
+            <div class="pv-dia-header">Viernes</div>
+            <div class="pv-dia-header">Sábado</div>
+            <div class="pv-dia-header">Domingo</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        columnas = st.columns(5)
+    for semana in semanas:
+        html_semana = "<div class='pv-semana'>"
 
-        for i, dia in enumerate(semana):
+        for dia in semana:
             trabajos_dia = df_filtrado[
                 df_filtrado.apply(lambda fila: trabajo_activo_en_dia(fila, dia), axis=1)
             ].copy()
 
-            clase_fuera = "cal-dia-fuera" if dia.month != mes_numero else ""
+            clase_fuera = "pv-dia-fuera" if dia.month != mes_numero else ""
 
-            with columnas[i]:
-                st.markdown(
-                    f"""
-                    <div class="cal-dia {clase_fuera}">
-                        <div class="cal-dia-header">
-                            {dias_nombre[i]}<br>{dia.strftime("%d/%m")}
-                        </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+            html_semana += f"""
+            <div class="pv-dia {clase_fuera}">
+                <div class="pv-dia-header">
+                    <span class="pv-dia-num">{dia.day}</span><br>
+                    {dias_nombre[dia.weekday()]}
+                </div>
+            """
 
-                if trabajos_dia.empty:
-                    st.markdown(
-                        "<div class='sin-trabajos'>Sin trabajos</div>",
-                        unsafe_allow_html=True
-                    )
+            if trabajos_dia.empty:
+                html_semana += "<div class='pv-sin-trabajos'>Sin trabajos</div>"
+            else:
+                for _, fila in trabajos_dia.iterrows():
+                    html_semana += tarjeta_trabajo_html(fila)
 
-                else:
-                    operarios_dia = []
+            html_semana += "</div>"
 
-                    for _, fila_op in trabajos_dia.iterrows():
-                        for op in obtener_operarios_de_texto(fila_op.get("responsable", "")):
-                            if op not in operarios_dia:
-                                operarios_dia.append(op)
+        html_semana += "</div>"
 
-                    for operario_dia in operarios_dia:
-                        trabajos_op = trabajos_dia[
-                            trabajos_dia["responsable"].fillna("").str.contains(
-                                operario_dia,
-                                case=False,
-                                na=False
-                            )
-                        ]
-
-                        st.markdown(
-                            f"""
-                            <div class="bloque-operario">
-                                👷 {operario_dia}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                        for _, fila in trabajos_op.iterrows():
-                            bg, color = color_trabajo(
-                                fila.get("centro", ""),
-                                fila.get("prioridad", ""),
-                                fila.get("estado", "")
-                            )
-
-                            titulo = texto_seguro(fila.get("titulo", ""))
-                            centro = texto_seguro(fila.get("centro", ""))
-                            edificio = texto_seguro(fila.get("edificio", ""))
-                            zona = texto_seguro(fila.get("zona", ""))
-                            estado = texto_seguro(fila.get("estado", ""))
-                            prioridad = texto_seguro(fila.get("prioridad", ""))
-                            empresa = texto_seguro(fila.get("empresa_externa", ""))
-                            operarios = texto_seguro(fila.get("responsable", ""))
-
-                            fechas = (
-                                f"{fila['fecha_inicio_dt'].strftime('%d/%m')}"
-                                f" → "
-                                f"{fila['fecha_fin_dt'].strftime('%d/%m')}"
-                            )
-
-                            extra_empresa = ""
-                            if empresa:
-                                extra_empresa = f"<br>🏢 {empresa}"
-
-                            st.markdown(
-                                f"""
-                                <div class="cal-trabajo" style="background:{bg}; color:{color};">
-                                    {titulo}
-                                    <div class="cal-detalle">
-                                        {centro}<br>
-                                        {edificio} · {zona}<br>
-                                        📅 {fechas}<br>
-                                        👥 {operarios}<br>
-                                        {estado} · {prioridad}
-                                        {extra_empresa}
-                                    </div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(html_semana, unsafe_allow_html=True)
 
     # =====================================================
     # EDICIÓN RÁPIDA
