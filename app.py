@@ -20,6 +20,7 @@ from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_configuracion import pantalla_configuracion
 from ui.ui_gerencia import pantalla_gerencia
 from modules.preventivo import generar_ots_preventivo_si_toca
+from ui.ui_legionella import generar_ots_legionella_si_toca
 
 
 APP_VERSION = "v1.0 PRO"
@@ -534,6 +535,16 @@ try:
     if "preventivos_auto_revisados" not in st.session_state:
         generar_ots_preventivo_si_toca()
         st.session_state["preventivos_auto_revisados"] = True
+
+except Exception:
+    pass
+
+
+try:
+    if "legionella_auto_revisada" not in st.session_state:
+        generar_ots_legionella_si_toca()
+        st.session_state["legionella_auto_revisada"] = True
+
 except Exception:
     pass
 
