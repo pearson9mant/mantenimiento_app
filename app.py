@@ -694,13 +694,18 @@ if perfil == "admin":
     elif seccion == "Configuración":
         pantalla_configuracion()
 
-    elif perfil == "gerencia":
 
-       if seccion == "Gerencia":
-           pantalla_gerencia()
+elif perfil == "gerencia":
 
-       elif seccion == "Plan verano":
-           pantalla_plan_verano()
+    if seccion == "Gerencia":
+        pantalla_gerencia()
+
+    elif seccion == "Plan verano":
+        pantalla_plan_verano()
+
+
+else:
+    st.caption(f"{operario_activo}")
 
 
 else:
