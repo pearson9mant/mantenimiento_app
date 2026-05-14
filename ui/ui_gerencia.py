@@ -692,11 +692,46 @@ def buscador_dataframe(df, key, placeholder="Buscar..."):
 
     texto = busqueda.strip().lower()
 
-    return df[
-        df.astype(str)
-        .apply(lambda col: col.str.lower().str.contains(texto, na=False))
-        .any(axis=1)
+    datos = df.copy()
+
+    # Buscar texto normal en todas las columnas
+    texto_general = (
+        datos.astype(str)
+        .fillna("")
+        .apply(lambda col: col.str.lower())
+    )
+
+    mascara_texto = texto_general.apply(
+        lambda col: col.str.contains(texto, na=False)
+    ).any(axis=1)
+
+    # Buscar también por fechas en varios formatos
+    mascara_fecha = pd.Series(False, index=datos.index)
+
+    columnas_fecha = [
+        col for col in datos.columns
+        if "fecha" in str(col).lower()
     ]
+
+    for col in columnas_fecha:
+        fechas = pd.to_datetime(datos[col], errors="coerce")
+
+        formatos_fecha = pd.DataFrame({
+            "fecha_iso": fechas.dt.strftime("%Y-%m-%d"),
+            "fecha_es": fechas.dt.strftime("%d/%m/%Y"),
+            "fecha_mes_iso": fechas.dt.strftime("%Y-%m"),
+            "fecha_mes_es": fechas.dt.strftime("%m/%Y"),
+            "fecha_dia_mes": fechas.dt.strftime("%d/%m"),
+            "fecha_anio": fechas.dt.strftime("%Y"),
+        })
+
+        mascara_columna = formatos_fecha.fillna("").apply(
+            lambda c: c.str.lower().str.contains(texto, na=False)
+        ).any(axis=1)
+
+        mascara_fecha = mascara_fecha | mascara_columna
+
+    return datos[mascara_texto | mascara_fecha]
 
 
 # =====================================================
@@ -882,7 +917,7 @@ def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     datos = buscador_dataframe(
         datos,
         key=f"buscador_gerencia_{centro}_{tipo}",
-        placeholder="Buscar por OT, operario, aula, descripción, estado..."
+        placeholder="Buscar por OT, operario, aula, descripción, estado o fecha..."
     )
 
     st.dataframe(
