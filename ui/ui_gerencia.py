@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import unicodedata
 
 from database.db import conectar
 
@@ -677,6 +678,34 @@ def euros(valor):
     except Exception:
         return "0,00 €"
 
+def normalizar_busqueda(texto):
+    texto = str(texto or "").lower().strip()
+
+    texto = "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    )
+
+    texto = texto.replace(".", " ")
+    texto = texto.replace("-", " ")
+    texto = texto.replace("_", " ")
+    texto = texto.replace("/", " ")
+
+    return " ".join(texto.split())
+
+
+def coincide_busqueda_flexible(busqueda, objetivo):
+    busqueda = normalizar_busqueda(busqueda)
+    objetivo = normalizar_busqueda(objetivo)
+
+    if not busqueda:
+        return True
+
+    palabras = busqueda.split()
+
+    return all(palabra in objetivo for palabra in palabras)
+
+
 def buscador_dataframe(df, key, placeholder="Buscar..."):
     if df.empty:
         return df
@@ -690,22 +719,18 @@ def buscador_dataframe(df, key, placeholder="Buscar..."):
     if not busqueda:
         return df
 
-    texto = busqueda.strip().lower()
-
     datos = df.copy()
 
-    # Buscar texto normal en todas las columnas
     texto_general = (
         datos.astype(str)
         .fillna("")
-        .apply(lambda col: col.str.lower())
+        .agg(" ".join, axis=1)
     )
 
     mascara_texto = texto_general.apply(
-        lambda col: col.str.contains(texto, na=False)
-    ).any(axis=1)
+        lambda texto: coincide_busqueda_flexible(busqueda, texto)
+    )
 
-    # Buscar también por fechas en varios formatos
     mascara_fecha = pd.Series(False, index=datos.index)
 
     columnas_fecha = [
@@ -725,9 +750,11 @@ def buscador_dataframe(df, key, placeholder="Buscar..."):
             "fecha_anio": fechas.dt.strftime("%Y"),
         })
 
-        mascara_columna = formatos_fecha.fillna("").apply(
-            lambda c: c.str.lower().str.contains(texto, na=False)
-        ).any(axis=1)
+        texto_fechas = formatos_fecha.fillna("").agg(" ".join, axis=1)
+
+        mascara_columna = texto_fechas.apply(
+            lambda texto: coincide_busqueda_flexible(busqueda, texto)
+        )
 
         mascara_fecha = mascara_fecha | mascara_columna
 
