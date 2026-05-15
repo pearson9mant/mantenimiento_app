@@ -159,6 +159,7 @@ def obtener_items_checklist_por_tarea(tarea):
             "Retirar residuos",
             "Comprobar acabado final",
             "Dejar zona limpia y segura",
+        ]
 
     return [
         "Revisión visual general",
