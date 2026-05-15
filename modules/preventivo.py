@@ -152,6 +152,13 @@ def obtener_items_checklist_por_tarea(tarea):
             "Comprobar desagües",
             "Comprobar malos olores",
         ]
+    if "limpieza" in tarea_txt:
+        return [
+            "Preparar zona de trabajo",
+            "Realizar limpieza",
+            "Retirar residuos",
+            "Comprobar acabado final",
+            "Dejar zona limpia y segura",
 
     return [
         "Revisión visual general",
