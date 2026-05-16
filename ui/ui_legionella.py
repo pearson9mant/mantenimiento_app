@@ -9,7 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
-from database.db import conectar
+from database.db import conectar, _sql
 from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 
 
@@ -515,6 +515,106 @@ def obtener_puntos_legionella_admin():
         FROM legionella_puntos
         ORDER BY centro, edificio, instalacion, nombre_punto
     """)
+
+def borrar_punto_legionella(id_punto):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            adaptar_sql("""
+                SELECT centro, edificio, nombre_punto
+                FROM legionella_puntos
+                WHERE id = ?
+            """),
+            (int(id_punto),)
+        )
+
+        fila = cursor.fetchone()
+
+        if not fila:
+            st.error("No se ha encontrado el punto Legionella.")
+            return False
+
+        centro, edificio, nombre_punto = fila
+
+        # Borra planificación asociada
+        try:
+            cursor.execute(
+                adaptar_sql("DELETE FROM legionella_tareas WHERE punto_id = ?"),
+                (int(id_punto),)
+            )
+        except Exception:
+            pass
+
+        # Borra también tareas antiguas asociadas por texto
+        try:
+            cursor.execute(
+                adaptar_sql("""
+                    DELETE FROM legionella_tareas
+                    WHERE centro = ?
+                      AND edificio = ?
+                      AND punto = ?
+                """),
+                (centro, edificio, nombre_punto)
+            )
+        except Exception:
+            pass
+
+        # Borra registros asociados
+        try:
+            cursor.execute(
+                adaptar_sql("DELETE FROM legionella_registros WHERE punto_id = ?"),
+                (int(id_punto),)
+            )
+        except Exception:
+            pass
+
+        # Borra registros antiguos asociados por texto
+        try:
+            cursor.execute(
+                adaptar_sql("""
+                    DELETE FROM legionella_registros
+                    WHERE centro = ?
+                      AND edificio = ?
+                      AND punto = ?
+                """),
+                (centro, edificio, nombre_punto)
+            )
+        except Exception:
+            pass
+
+        # Borra incidencias asociadas
+        try:
+            cursor.execute(
+                adaptar_sql("""
+                    DELETE FROM legionella_incidencias
+                    WHERE centro = ?
+                      AND edificio = ?
+                      AND punto = ?
+                """),
+                (centro, edificio, nombre_punto)
+            )
+        except Exception:
+            pass
+
+        # Borra el punto
+        cursor.execute(
+            adaptar_sql("DELETE FROM legionella_puntos WHERE id = ?"),
+            (int(id_punto),)
+        )
+
+        conn.commit()
+        st.cache_data.clear()
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error al borrar el punto Legionella: {e}")
+        return False
+
+    finally:
+        conn.close()
 
 
 def calcular_estado_control(proxima_fecha):
@@ -1877,6 +1977,25 @@ def pantalla_legionella():
 
                         st.success("Punto actualizado correctamente.")
                         st.rerun()
+
+                    st.markdown("---")
+
+                    confirmar_borrar_punto = st.checkbox(
+                        "Confirmo borrar definitivamente este punto",
+                        key=f"confirmar_borrar_punto_{row['id']}"
+                    )
+
+                    if st.button(
+                        "🗑️ Borrar punto Legionella",
+                        key=f"borrar_punto_legionella_{row['id']}",
+                        use_container_width=True
+                    ):
+                        if not confirmar_borrar_punto:
+                            st.error("Marca primero la casilla de confirmación.")
+                        else:
+                            if borrar_punto_legionella(row["id"]):
+                                st.success("Punto Legionella borrado correctamente.")
+                                st.rerun()
 
             with st.expander("📋 Vista rápida de puntos", expanded=False):
                 st.dataframe(
