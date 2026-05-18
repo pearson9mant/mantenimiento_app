@@ -22,6 +22,7 @@ from ui.ui_gerencia import pantalla_gerencia
 from modules.preventivo import generar_ots_preventivo_si_toca
 from ui.ui_legionella import generar_ots_legionella_si_toca
 from ui.ui_plan_verano import pantalla_plan_verano
+from ui.ui_empresas_externas import pantalla_empresas_externas
 
 
 APP_VERSION = "v1.0 PRO"
@@ -472,6 +473,10 @@ def mostrar_menu_admin():
         if st.button("🗺️\nPlanos Legionella", key="btn_planos_legionella", use_container_width=True):
             st.session_state["seccion_actual"] = "Planos Legionella"
             st.rerun()
+        if st.button("🏢\nEmpresas externas", key="btn_empresas_externas", use_container_width=True):
+            st.session_state["seccion_actual"] = "Empresas externas"
+            st.rerun()
+    
 
     with col5:
         if st.button("☀️\nPlan verano", key="btn_plan_verano_admin", use_container_width=True):
@@ -693,6 +698,9 @@ if perfil == "admin":
 
     elif seccion == "Configuración":
         pantalla_configuracion()
+
+    elif seccion == "Empresas externas":
+        pantalla_empresas_externas()
 
 
 elif perfil == "gerencia":
