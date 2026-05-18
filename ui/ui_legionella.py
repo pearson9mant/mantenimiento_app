@@ -2342,7 +2342,7 @@ def pantalla_legionella():
                 hide_index=True
             )
 
-                st.markdown("### 📎 PDFs / acciones")
+            st.markdown("### 📎 PDFs / acciones")
 
             for _, row in df_inf.iterrows():
 
