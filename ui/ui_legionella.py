@@ -2038,10 +2038,10 @@ def pantalla_legionella():
                 st.warning("Primero debes tener puntos de Legionella creados.")
             else:
                 with st.expander("➕ Registrar analítica", expanded=True):
-                centro_a = st.selectbox(
-                    "Centro",
-                    sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
-                    key="analitica_centro"
+                    centro_a = st.selectbox(
+                       "Centro",
+                       sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
+                       key="analitica_centro"
                 )
 
                 df_centro_a = puntos_analitica[puntos_analitica["centro"] == centro_a]
