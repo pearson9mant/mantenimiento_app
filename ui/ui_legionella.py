@@ -2028,16 +2028,16 @@ def pantalla_legionella():
                 )
 
         with tab4:
-        st.markdown("### 🧪 Analíticas Legionella")
+            st.markdown("### 🧪 Analíticas Legionella")
 
-        st.info("Aquí puedes guardar las analíticas ya realizadas y subir el PDF del laboratorio.")
+            st.info("Aquí puedes guardar las analíticas ya realizadas y subir el PDF del laboratorio.")
 
-        puntos_analitica = obtener_puntos_legionella_admin()
+            puntos_analitica = obtener_puntos_legionella_admin()
 
-        if puntos_analitica.empty:
-            st.warning("Primero debes tener puntos de Legionella creados.")
-        else:
-            with st.expander("➕ Registrar analítica", expanded=True):
+            if puntos_analitica.empty:
+                st.warning("Primero debes tener puntos de Legionella creados.")
+            else:
+                with st.expander("➕ Registrar analítica", expanded=True):
                 centro_a = st.selectbox(
                     "Centro",
                     sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
