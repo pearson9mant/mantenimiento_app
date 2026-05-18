@@ -2342,52 +2342,69 @@ def pantalla_legionella():
                 hide_index=True
             )
 
-            st.markdown("### 📎 Descargar PDFs")
+                st.markdown("### 📎 PDFs / acciones")
 
             for _, row in df_inf.iterrows():
 
-                if row["pdf"] and Path(str(row["pdf"])).exists():
+                col_pdf, col_borrar = st.columns([4, 1])
 
-                    col_pdf, col_borrar = st.columns([4, 1])
+                with col_pdf:
 
-                    with col_pdf:
+                    titulo_pdf = (
+                        f"📄 {row['tipo_informe']} · "
+                        f"{row['empresa']} · "
+                        f"{row['fecha_informe']}"
+                    )
+
+                    if row["pdf"] and Path(str(row["pdf"])).exists():
 
                         with open(row["pdf"], "rb") as f:
 
                             st.download_button(
-                                label=(
-                                    f"📄 {row['tipo_informe']} · "
-                                    f"{row['empresa']} · "
-                                    f"{row['fecha_informe']}"
-                                ),
+                                label=titulo_pdf,
                                 data=f.read(),
                                 file_name=Path(row["pdf"]).name,
                                 mime="application/pdf",
                                 key=f"pdf_leg_{row['id']}"
                             )
 
-                    with col_borrar:
+                    elif row["pdf"]:
 
-                        if st.button(
-                            "🗑️",
-                            key=f"borrar_informe_leg_{row['id']}"
-                        ):
+                        st.warning(
+                            f"{titulo_pdf} — PDF no encontrado en Render. "
+                            "Puedes borrar el registro y volver a subirlo."
+                        )
 
-                            try:
+                    else:
 
-                                if Path(str(row["pdf"])).exists():
-                                    Path(str(row["pdf"])).unlink()
+                        st.info(
+                            f"{titulo_pdf} — Sin PDF adjunto."
+                        )
 
-                                ejecutar("""
-                                    DELETE FROM legionella_informes
-                                    WHERE id = ?
-                                """, (int(row["id"]),))
+                with col_borrar:
 
-                                st.success("Informe eliminado.")
-                                st.rerun()
+                    if st.button(
+                        "🗑️ Borrar",
+                        key=f"borrar_informe_leg_{row['id']}"
+                    ):
 
-                            except Exception as e:
-                                st.error(f"Error al borrar: {e}")
+                        try:
+
+                            if row["pdf"] and Path(str(row["pdf"])).exists():
+                                Path(str(row["pdf"])).unlink()
+
+                            ejecutar("""
+                                DELETE FROM legionella_informes
+                                WHERE id = ?
+                            """, (int(row["id"]),))
+
+                            st.success("Informe eliminado correctamente.")
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"Error al borrar informe: {e}")
+
+
     with tab5:
         st.markdown("### Próximos controles / estado")
 
