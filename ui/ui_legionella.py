@@ -2059,31 +2059,31 @@ def pantalla_legionella():
             else:
                 with st.expander("➕ Registrar analítica", expanded=True):
                     centro_a = st.selectbox(
-                       "Centro",
-                       sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
-                       key="analitica_centro"
-                )
+                        "Centro",
+                        sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
+                        key="analitica_centro"
+                    )
 
-                df_centro_a = puntos_analitica[puntos_analitica["centro"] == centro_a]
+                    df_centro_a = puntos_analitica[puntos_analitica["centro"] == centro_a]
 
-                edificio_a = st.selectbox(
+                    edificio_a = st.selectbox(
                     "Edificio / zona",
                     sorted(df_centro_a["edificio"].dropna().astype(str).unique().tolist()),
                     key="analitica_edificio"
-                )
+                    )
 
-                df_edificio_a = df_centro_a[df_centro_a["edificio"] == edificio_a]
+                    df_edificio_a = df_centro_a[df_centro_a["edificio"] == edificio_a]
 
-                punto_a = st.selectbox(
-                    "Punto de toma",
-                    sorted(df_edificio_a["nombre_punto"].dropna().astype(str).unique().tolist()),
-                    key="analitica_punto"
-                )
+                    punto_a = st.selectbox(
+                        "Punto de toma",
+                        sorted(df_edificio_a["nombre_punto"].dropna().astype(str).unique().tolist()),
+                        key="analitica_punto"
+                    )
 
-                col_a1, col_a2 = st.columns(2)
+                    col_a1, col_a2 = st.columns(2)
 
-                with col_a1:
-                    laboratorio_a = st.text_input(
+                    with col_a1:
+                        laboratorio_a = st.text_input(
                         "Laboratorio / empresa",
                         placeholder="Ejemplo: Laboratorio externo",
                         key="analitica_laboratorio"
