@@ -110,24 +110,44 @@ def asegurar_columnas_planificacion_legionella():
             pass
 
 def asegurar_tabla_analiticas_legionella():
-    ejecutar("""
-        CREATE TABLE IF NOT EXISTS legionella_analiticas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            centro TEXT,
-            edificio TEXT,
-            punto TEXT,
-            laboratorio TEXT,
-            fecha_toma TEXT,
-            fecha_resultado TEXT,
-            resultado TEXT,
-            numero_informe TEXT,
-            pdf TEXT,
-            observaciones TEXT,
-            frecuencia_dias INTEGER DEFAULT 90,
-            proxima_analitica TEXT,
-            activo INTEGER DEFAULT 1
-        )
-    """)
+    if os.getenv("DATABASE_URL"):
+        ejecutar("""
+            CREATE TABLE IF NOT EXISTS legionella_analiticas (
+                id SERIAL PRIMARY KEY,
+                centro TEXT,
+                edificio TEXT,
+                punto TEXT,
+                laboratorio TEXT,
+                fecha_toma TEXT,
+                fecha_resultado TEXT,
+                resultado TEXT,
+                numero_informe TEXT,
+                pdf TEXT,
+                observaciones TEXT,
+                frecuencia_dias INTEGER DEFAULT 90,
+                proxima_analitica TEXT,
+                activo INTEGER DEFAULT 1
+            )
+        """)
+    else:
+        ejecutar("""
+            CREATE TABLE IF NOT EXISTS legionella_analiticas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                centro TEXT,
+                edificio TEXT,
+                punto TEXT,
+                laboratorio TEXT,
+                fecha_toma TEXT,
+                fecha_resultado TEXT,
+                resultado TEXT,
+                numero_informe TEXT,
+                pdf TEXT,
+                observaciones TEXT,
+                frecuencia_dias INTEGER DEFAULT 90,
+                proxima_analitica TEXT,
+                activo INTEGER DEFAULT 1
+            )
+        """)
 
 
 def limpiar_registros_invalidos_legionella():
