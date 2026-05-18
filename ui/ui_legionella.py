@@ -2052,27 +2052,59 @@ def pantalla_legionella():
 
         st.info(
             "Aquí puedes guardar informes de empresas externas: "
-            "analíticas, limpiezas de depósitos, desinfecciones, certificados y revisiones."
+            "analíticas, limpiezas de depósitos, desinfecciones, "
+            "certificados y revisiones."
         )
 
-        ejecutar("""
-            CREATE TABLE IF NOT EXISTS legionella_informes (
-                id SERIAL PRIMARY KEY,
-                tipo_informe TEXT,
-                empresa TEXT,
-                centro TEXT,
-                edificio TEXT,
-                instalacion TEXT,
-                punto TEXT,
-                fecha_actuacion TEXT,
-                fecha_informe TEXT,
-                resultado TEXT,
-                numero_informe TEXT,
-                pdf TEXT,
-                proxima_fecha TEXT,
-                observaciones TEXT
-            )
-        """)
+        # =====================================================
+        # TABLA INFORMES
+        # =====================================================
+
+        if os.getenv("DATABASE_URL"):
+
+            ejecutar("""
+                CREATE TABLE IF NOT EXISTS legionella_informes (
+                    id SERIAL PRIMARY KEY,
+                    tipo_informe TEXT,
+                    empresa TEXT,
+                    centro TEXT,
+                    edificio TEXT,
+                    instalacion TEXT,
+                    punto TEXT,
+                    fecha_actuacion TEXT,
+                    fecha_informe TEXT,
+                    resultado TEXT,
+                    numero_informe TEXT,
+                    pdf TEXT,
+                    proxima_fecha TEXT,
+                    observaciones TEXT
+                )
+            """)
+
+        else:
+
+            ejecutar("""
+                CREATE TABLE IF NOT EXISTS legionella_informes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tipo_informe TEXT,
+                    empresa TEXT,
+                    centro TEXT,
+                    edificio TEXT,
+                    instalacion TEXT,
+                    punto TEXT,
+                    fecha_actuacion TEXT,
+                    fecha_informe TEXT,
+                    resultado TEXT,
+                    numero_informe TEXT,
+                    pdf TEXT,
+                    proxima_fecha TEXT,
+                    observaciones TEXT
+                )
+            """)
+
+        # =====================================================
+        # FORMULARIO
+        # =====================================================
 
         with st.expander("➕ Subir informe externo", expanded=True):
 
@@ -2089,50 +2121,60 @@ def pantalla_legionella():
                         "Revisión externa",
                         "Certificado",
                         "Otro"
-                    ]
+                    ],
+                    key="leg_tipo_informe"
                 )
 
                 empresa = st.text_input(
-                    "Empresa externa"
+                    "Empresa externa",
+                    key="leg_empresa"
                 )
 
                 centro = st.selectbox(
                     "Centro",
-                    list(CENTROS.keys())
+                    list(CENTROS.keys()),
+                    key="leg_centro"
                 )
 
                 edificio = st.text_input(
-                    "Edificio / zona"
+                    "Edificio / zona",
+                    key="leg_edificio"
                 )
 
                 instalacion = st.selectbox(
                     "Instalación",
-                    ["ACS", "AFCH", "Solar", "Otro"]
+                    ["ACS", "AFCH", "Solar", "Otro"],
+                    key="leg_instalacion"
                 )
 
             with col2:
 
                 punto = st.text_input(
-                    "Punto / depósito"
+                    "Punto / depósito",
+                    key="leg_punto"
                 )
 
                 fecha_actuacion = st.date_input(
                     "Fecha actuación",
-                    value=date.today()
+                    value=date.today(),
+                    key="leg_fecha_actuacion"
                 )
 
                 fecha_informe = st.date_input(
                     "Fecha informe",
-                    value=date.today()
+                    value=date.today(),
+                    key="leg_fecha_informe"
                 )
 
                 resultado = st.selectbox(
                     "Resultado",
-                    ["Correcto", "Con incidencias", "Pendiente"]
+                    ["Correcto", "Con incidencias", "Pendiente"],
+                    key="leg_resultado"
                 )
 
                 numero_informe = st.text_input(
-                    "Número informe"
+                    "Número informe",
+                    key="leg_numero_informe"
                 )
 
             frecuencia = st.selectbox(
@@ -2142,7 +2184,8 @@ def pantalla_legionella():
                     "90 días",
                     "180 días",
                     "365 días"
-                ]
+                ],
+                key="leg_frecuencia"
             )
 
             dias = 0
@@ -2156,7 +2199,7 @@ def pantalla_legionella():
             elif frecuencia == "365 días":
                 dias = 365
 
-            proxima_fecha = None
+            proxima_fecha = ""
 
             if dias > 0:
                 proxima_fecha = (
@@ -2165,16 +2208,23 @@ def pantalla_legionella():
 
             pdf_file = st.file_uploader(
                 "Subir PDF informe",
-                type=["pdf"]
+                type=["pdf"],
+                key="leg_pdf"
             )
 
             observaciones = st.text_area(
-                "Observaciones"
+                "Observaciones",
+                key="leg_observaciones"
             )
+
+            # =====================================================
+            # GUARDAR
+            # =====================================================
 
             if st.button(
                 "💾 Guardar informe",
-                use_container_width=True
+                use_container_width=True,
+                key="guardar_informe_legionella"
             ):
 
                 ruta_pdf = ""
@@ -2193,6 +2243,7 @@ def pantalla_legionella():
                         .replace(" ", "_")
                         .replace("/", "_")
                         .replace("\\", "_")
+                        .replace(":", "_")
                     )
 
                     ruta_archivo = carpeta / nombre_pdf
@@ -2238,6 +2289,10 @@ def pantalla_legionella():
 
                 st.success("Informe guardado correctamente.")
 
+        # =====================================================
+        # HISTÓRICO
+        # =====================================================
+
         st.markdown("### 📚 Histórico informes externos")
 
         df_inf = leer_df("""
@@ -2252,9 +2307,26 @@ def pantalla_legionella():
 
         else:
 
+            if "proxima_fecha" in df_inf.columns:
+
+                df_inf["estado"] = df_inf["proxima_fecha"].apply(
+                    lambda x:
+                        "🔴 TOCA"
+                        if str(x) != "" and pd.notna(x) and pd.to_datetime(x) <= pd.Timestamp.today()
+                        else (
+                            "🟠 PRÓXIMO"
+                            if str(x) != "" and pd.notna(x) and pd.to_datetime(x) <= (pd.Timestamp.today() + pd.Timedelta(days=30))
+                            else "🟢 OK"
+                        )
+                )
+
+            else:
+                df_inf["estado"] = "🟢 OK"
+
             st.dataframe(
                 df_inf[
                     [
+                        "estado",
                         "tipo_informe",
                         "empresa",
                         "centro",
@@ -2279,12 +2351,16 @@ def pantalla_legionella():
                     with open(row["pdf"], "rb") as f:
 
                         st.download_button(
-                            f"📄 {row['tipo_informe']} · {row['empresa']} · {row['fecha_informe']}",
+                            label=(
+                                f"📄 {row['tipo_informe']} · "
+                                f"{row['empresa']} · "
+                                f"{row['fecha_informe']}"
+                            ),
                             data=f.read(),
                             file_name=Path(row["pdf"]).name,
                             mime="application/pdf",
                             key=f"pdf_leg_{row['id']}"
-                        ) 
+                        )
     with tab5:
         st.markdown("### Próximos controles / estado")
 
