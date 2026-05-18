@@ -1358,18 +1358,18 @@ def pantalla_legionella():
 
     st.caption("Control ACS / AFCH · temperaturas · cloro · purgas · incidencias · histórico")
 
-   tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-    [
-        "📋 Registrar control",
-        "🗓️ Planificación",
-        "⚙️ Puntos",
-        "🧪 Analíticas",
-        "📅 Próximos / estado",
-        "📚 Histórico",
-        "🚨 Incidencias",
-        "📄 Informe",
-    ]
-)
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+        [
+            "📋 Registrar control",
+            "🗓️ Planificación",
+            "⚙️ Puntos",
+            "🧪 Analíticas",
+            "📅 Próximos / estado",
+            "📚 Histórico",
+            "🚨 Incidencias",
+            "📄 Informe",
+       ]
+    )
 
     with tab1:
         st.markdown("### Nuevo control")
