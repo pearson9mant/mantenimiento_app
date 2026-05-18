@@ -2361,6 +2361,29 @@ def pantalla_legionella():
                             mime="application/pdf",
                             key=f"pdf_leg_{row['id']}"
                         )
+
+                if st.button(
+                    f"🗑️ Borrar informe {row['id']}",
+                    key=f"borrar_informe_leg_{row['id']}"
+                ):
+
+                    try:
+
+                        # borrar PDF físico
+                        if row["pdf"] and Path(str(row["pdf"])).exists():
+                            Path(str(row["pdf"])).unlink()
+
+                        # borrar registro base datos
+                        ejecutar("""
+                            DELETE FROM legionella_informes
+                            WHERE id = ?
+                        """, (int(row["id"]),))
+
+                        st.success("Informe eliminado correctamente.")
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Error al borrar informe: {e}")
     with tab5:
         st.markdown("### Próximos controles / estado")
 
