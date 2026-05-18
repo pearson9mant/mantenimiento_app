@@ -2348,42 +2348,46 @@ def pantalla_legionella():
 
                 if row["pdf"] and Path(str(row["pdf"])).exists():
 
-                    with open(row["pdf"], "rb") as f:
+                    col_pdf, col_borrar = st.columns([4, 1])
 
-                        st.download_button(
-                            label=(
-                                f"📄 {row['tipo_informe']} · "
-                                f"{row['empresa']} · "
-                                f"{row['fecha_informe']}"
-                            ),
-                            data=f.read(),
-                            file_name=Path(row["pdf"]).name,
-                            mime="application/pdf",
-                            key=f"pdf_leg_{row['id']}"
-                        )
+                    with col_pdf:
 
-                if st.button(
-                    f"🗑️ Borrar informe {row['id']}",
-                    key=f"borrar_informe_leg_{row['id']}"
-                ):
+                        with open(row["pdf"], "rb") as f:
 
-                    try:
+                            st.download_button(
+                                label=(
+                                    f"📄 {row['tipo_informe']} · "
+                                    f"{row['empresa']} · "
+                                    f"{row['fecha_informe']}"
+                                ),
+                                data=f.read(),
+                                file_name=Path(row["pdf"]).name,
+                                mime="application/pdf",
+                                key=f"pdf_leg_{row['id']}"
+                            )
 
-                        # borrar PDF físico
-                        if row["pdf"] and Path(str(row["pdf"])).exists():
-                            Path(str(row["pdf"])).unlink()
+                    with col_borrar:
 
-                        # borrar registro base datos
-                        ejecutar("""
-                            DELETE FROM legionella_informes
-                            WHERE id = ?
-                        """, (int(row["id"]),))
+                        if st.button(
+                            "🗑️",
+                            key=f"borrar_informe_leg_{row['id']}"
+                        ):
 
-                        st.success("Informe eliminado correctamente.")
-                        st.rerun()
+                            try:
 
-                    except Exception as e:
-                        st.error(f"Error al borrar informe: {e}")
+                                if Path(str(row["pdf"])).exists():
+                                    Path(str(row["pdf"])).unlink()
+
+                                ejecutar("""
+                                    DELETE FROM legionella_informes
+                                    WHERE id = ?
+                                """, (int(row["id"]),))
+
+                                st.success("Informe eliminado.")
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"Error al borrar: {e}")
     with tab5:
         st.markdown("### Próximos controles / estado")
 
