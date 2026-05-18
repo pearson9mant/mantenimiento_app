@@ -2048,42 +2048,69 @@ def pantalla_legionella():
                 )
 
         with tab4:
-            st.markdown("### 🧪 Analíticas Legionella")
+        st.markdown("### 🧪 Analíticas Legionella")
 
-            st.info("Aquí puedes guardar las analíticas ya realizadas y subir el PDF del laboratorio.")
+        st.info(
+            "Aquí puedes guardar las analíticas ya realizadas y subir el PDF del laboratorio."
+        )
 
-            puntos_analitica = obtener_puntos_legionella_admin()
+        puntos_analitica = obtener_puntos_legionella_admin()
 
-            if puntos_analitica.empty:
-                st.warning("Primero debes tener puntos de Legionella creados.")
-            else:
-                with st.expander("➕ Registrar analítica", expanded=True):
-                    centro_a = st.selectbox(
-                        "Centro",
-                        sorted(puntos_analitica["centro"].dropna().astype(str).unique().tolist()),
-                        key="analitica_centro"
-                    )
+        if puntos_analitica.empty:
+            st.warning("Primero debes tener puntos de Legionella creados.")
 
-                    df_centro_a = puntos_analitica[puntos_analitica["centro"] == centro_a]
+        else:
+            with st.expander("➕ Registrar analítica", expanded=True):
 
-                    edificio_a = st.selectbox(
+                centro_a = st.selectbox(
+                    "Centro",
+                    sorted(
+                        puntos_analitica["centro"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    ),
+                    key="analitica_centro"
+                )
+
+                df_centro_a = puntos_analitica[
+                    puntos_analitica["centro"] == centro_a
+                ]
+
+                edificio_a = st.selectbox(
                     "Edificio / zona",
-                    sorted(df_centro_a["edificio"].dropna().astype(str).unique().tolist()),
+                    sorted(
+                        df_centro_a["edificio"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    ),
                     key="analitica_edificio"
-                    )
+                )
 
-                    df_edificio_a = df_centro_a[df_centro_a["edificio"] == edificio_a]
+                df_edificio_a = df_centro_a[
+                    df_centro_a["edificio"] == edificio_a
+                ]
 
-                    punto_a = st.selectbox(
-                        "Punto de toma",
-                        sorted(df_edificio_a["nombre_punto"].dropna().astype(str).unique().tolist()),
-                        key="analitica_punto"
-                    )
+                punto_a = st.selectbox(
+                    "Punto de toma",
+                    sorted(
+                        df_edificio_a["nombre_punto"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    ),
+                    key="analitica_punto"
+                )
 
-                    col_a1, col_a2 = st.columns(2)
+                col_a1, col_a2 = st.columns(2)
 
-                    with col_a1:
-                        laboratorio_a = st.text_input(
+                with col_a1:
+
+                    laboratorio_a = st.text_input(
                         "Laboratorio / empresa",
                         placeholder="Ejemplo: Laboratorio externo",
                         key="analitica_laboratorio"
@@ -2102,6 +2129,7 @@ def pantalla_legionella():
                     )
 
                 with col_a2:
+
                     resultado_a = st.selectbox(
                         "Resultado",
                         ["Pendiente", "Apta", "No apta"],
@@ -2115,19 +2143,30 @@ def pantalla_legionella():
 
                     frecuencia_a = st.selectbox(
                         "Frecuencia próxima analítica",
-                        ["Trimestral - 90 días", "Semestral - 180 días", "Anual - 365 días"],
+                        [
+                            "Trimestral - 90 días",
+                            "Semestral - 180 días",
+                            "Anual - 365 días"
+                        ],
                         key="analitica_frecuencia"
                     )
 
                 frecuencia_dias_a = 90
+
                 if "180" in frecuencia_a:
                     frecuencia_dias_a = 180
+
                 elif "365" in frecuencia_a:
                     frecuencia_dias_a = 365
 
-                proxima_analitica_a = fecha_toma_a + timedelta(days=frecuencia_dias_a)
+                proxima_analitica_a = (
+                    fecha_toma_a + timedelta(days=frecuencia_dias_a)
+                )
 
-                st.caption(f"Próxima analítica calculada: {proxima_analitica_a.strftime('%d/%m/%Y')}")
+                st.caption(
+                    f"Próxima analítica calculada: "
+                    f"{proxima_analitica_a.strftime('%d/%m/%Y')}"
+                )
 
                 pdf_a = st.file_uploader(
                     "Subir informe PDF del laboratorio",
@@ -2140,18 +2179,30 @@ def pantalla_legionella():
                     key="analitica_observaciones"
                 )
 
-                if st.button("💾 Guardar analítica", use_container_width=True):
+                if st.button(
+                    "💾 Guardar analítica",
+                    use_container_width=True
+                ):
+
                     if not laboratorio_a or not punto_a:
                         st.error("Falta laboratorio o punto de toma.")
+
                     else:
                         ruta_pdf = ""
 
                         if pdf_a is not None:
+
                             carpeta = Path("uploads/legionella")
                             carpeta.mkdir(parents=True, exist_ok=True)
 
                             nombre_seguro = (
-                                f"analitica_{centro_a}_{edificio_a}_{punto_a}_{fecha_toma_a}_{numero_informe_a}.pdf"
+                                f"analitica_{centro_a}_{edificio_a}_"
+                                f"{punto_a}_{fecha_toma_a}_"
+                                f"{numero_informe_a}.pdf"
+                            )
+
+                            nombre_seguro = (
+                                nombre_seguro
                                 .replace(" ", "_")
                                 .replace("/", "_")
                                 .replace("\\", "_")
@@ -2167,9 +2218,21 @@ def pantalla_legionella():
 
                         ejecutar("""
                             INSERT INTO legionella_analiticas
-                            (centro, edificio, punto, laboratorio, fecha_toma, fecha_resultado,
-                             resultado, numero_informe, pdf, observaciones, frecuencia_dias,
-                             proxima_analitica, activo)
+                            (
+                                centro,
+                                edificio,
+                                punto,
+                                laboratorio,
+                                fecha_toma,
+                                fecha_resultado,
+                                resultado,
+                                numero_informe,
+                                pdf,
+                                observaciones,
+                                frecuencia_dias,
+                                proxima_analitica,
+                                activo
+                            )
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                         """, (
                             centro_a,
@@ -2186,29 +2249,52 @@ def pantalla_legionella():
                             proxima_analitica_a.strftime("%Y-%m-%d")
                         ))
 
-                        st.success("Analítica guardada correctamente.")
-                        st.rerun()
+                        st.success(
+                            "Analítica guardada correctamente. "
+                            "Baja para verla en el histórico."
+                        )
 
         st.markdown("### Histórico analíticas")
 
         df_analiticas = leer_df("""
-            SELECT id, centro, edificio, punto, laboratorio, fecha_toma,
-                   fecha_resultado, resultado, numero_informe, pdf,
-                   frecuencia_dias, proxima_analitica, observaciones
+            SELECT
+                id,
+                centro,
+                edificio,
+                punto,
+                laboratorio,
+                fecha_toma,
+                fecha_resultado,
+                resultado,
+                numero_informe,
+                pdf,
+                frecuencia_dias,
+                proxima_analitica,
+                observaciones
             FROM legionella_analiticas
             ORDER BY fecha_toma DESC, id DESC
         """)
 
         if df_analiticas.empty:
+
             st.info("Todavía no hay analíticas registradas.")
+
         else:
+
             df_analiticas["proxima_dt"] = pd.to_datetime(
                 df_analiticas["proxima_analitica"],
                 errors="coerce"
             )
 
-            df_analiticas["estado"] = df_analiticas["proxima_dt"].apply(
-                lambda x: calcular_estado_control(x) if pd.notna(x) else "Sin fecha"
+            df_analiticas["estado"] = (
+                df_analiticas["proxima_dt"]
+                .apply(
+                    lambda x: (
+                        calcular_estado_control(x)
+                        if pd.notna(x)
+                        else "Sin fecha"
+                    )
+                )
             )
 
             st.dataframe(
@@ -2234,16 +2320,21 @@ def pantalla_legionella():
             st.markdown("### Descargar PDFs guardados")
 
             for _, row in df_analiticas.iterrows():
+
                 if row["pdf"] and Path(str(row["pdf"])).exists():
+
                     with open(row["pdf"], "rb") as f:
+
                         st.download_button(
-                            f"📎 Descargar PDF · {row['centro']} · {row['punto']} · {row['fecha_toma']}",
+                            f"📎 Descargar PDF · "
+                            f"{row['centro']} · "
+                            f"{row['punto']} · "
+                            f"{row['fecha_toma']}",
                             data=f.read(),
                             file_name=Path(row["pdf"]).name,
                             mime="application/pdf",
                             key=f"descargar_pdf_analitica_{row['id']}"
-                        )
-
+                        )   
     with tab5:
         st.markdown("### Próximos controles / estado")
 
