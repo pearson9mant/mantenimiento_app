@@ -2047,7 +2047,7 @@ def pantalla_legionella():
                     hide_index=True
                 )
 
-        with tab4:
+    with tab4:
         st.markdown("### 🧪 Analíticas Legionella")
 
         st.info(
