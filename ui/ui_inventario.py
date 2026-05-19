@@ -211,7 +211,7 @@ def pantalla_inventario():
 
                 foto_data = foto_subida.getvalue()
 
-                st.image(foto_data, width=250)
+                st.image(bytes(foto_data), width=250)
 
             if st.button("Crear material", use_container_width=True):
                 if not material.strip():
@@ -426,9 +426,9 @@ def pantalla_inventario():
 
             if foto_data:
                 try:
-                    st.image(foto_data, width=220)
-                except Exception:
-                    st.caption("Foto no disponible.")
+                    st.image(bytes(foto_data), width=220)
+                except Exception as e:
+                    st.caption(f"Foto no disponible: {e}")
 
             elif foto:
                 try:
