@@ -2279,7 +2279,22 @@ def pantalla_legionella():
         st.markdown("### 📚 Histórico informes externos")
 
         df_inf = leer_df("""
-            SELECT *
+            SELECT
+                id,
+                tipo_informe,
+                empresa,
+                centro,
+                edificio,
+                instalacion,
+                punto,
+                fecha_actuacion,
+                fecha_informe,
+                resultado,
+                numero_informe,
+                pdf,
+                pdf_nombre,
+                proxima_fecha,
+                observaciones
             FROM legionella_informes
             ORDER BY fecha_informe DESC, id DESC
         """)
@@ -2334,9 +2349,19 @@ def pantalla_legionella():
                         f"{row['fecha_informe']}"
                     )
 
-                    pdf_data = row.get("pdf_data", None)
+                    df_pdf = leer_df("""
+                        SELECT pdf_data
+                        FROM legionella_informes
+                        WHERE id = ?
+                    """, (int(row["id"]),))
 
-                    if pdf_data is not None and pdf_data != "":
+                    pdf_data = None
+
+                    if not df_pdf.empty:
+                        pdf_data = df_pdf.iloc[0]["pdf_data"]
+
+                    if pdf_data is not None and pdf_data != b"":
+
                         nombre_descarga = (
                             row["pdf_nombre"]
                             if row.get("pdf_nombre")
