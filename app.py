@@ -23,6 +23,7 @@ from modules.preventivo import generar_ots_preventivo_si_toca
 from ui.ui_legionella import generar_ots_legionella_si_toca
 from ui.ui_plan_verano import pantalla_plan_verano
 from ui.ui_empresas_externas import pantalla_empresas_externas
+from modules.alertas_empresas import obtener_alertas_empresas_externas
 
 
 APP_VERSION = "v1.0 PRO"
@@ -423,6 +424,51 @@ def mostrar_menu_admin():
         "<div class='section-title'>Menú principal</div>",
         unsafe_allow_html=True
     )
+
+    # =====================================================
+    # ALERTAS EMPRESAS / LEGIONELLA
+    # =====================================================
+
+    try:
+
+        alertas = obtener_alertas_empresas_externas()
+
+        toca = alertas["toca"]
+        proximo = alertas["proximo"]
+
+        if toca:
+
+            st.error(
+                f"🔴 Hay {len(toca)} actuaciones externas vencidas"
+            )
+
+            for item in toca:
+
+                st.markdown(
+                    f"- {item['tipo']} · "
+                    f"{item['empresa']} · "
+                    f"{item['centro']} · "
+                    f"{item['fecha']}"
+                )
+
+        if proximo:
+
+            st.warning(
+                f"🟠 Hay {len(proximo)} actuaciones próximas"
+            )
+
+            for item in proximo:
+
+                st.markdown(
+                    f"- {item['tipo']} · "
+                    f"{item['empresa']} · "
+                    f"{item['centro']} · "
+                    f"{item['fecha']}"
+                )
+
+    except Exception as e:
+
+        st.warning(f"Alertas empresas externas: {e}")
 
     col1, col2, col3 = st.columns(3)
 
