@@ -2349,16 +2349,31 @@ def pantalla_legionella():
                         f"{row['fecha_informe']}"
                     )
 
-                    df_pdf = leer_df("""
-                        SELECT pdf_data
-                        FROM legionella_informes
-                        WHERE id = ?
-                    """, (int(row["id"]),))
+                    conn_pdf = conectar()
+                    cur_pdf = conn_pdf.cursor()
 
-                    pdf_data = None
+                    try:
 
-                    if not df_pdf.empty:
-                        pdf_data = df_pdf.iloc[0]["pdf_data"]
+                        cur_pdf.execute(
+                            adaptar_sql("""
+                                SELECT pdf_data
+                                FROM legionella_informes
+                                WHERE id = ?
+                            """),
+                            (int(row["id"]),)
+                        )
+
+                        fila_pdf = cur_pdf.fetchone()
+
+                        pdf_data = (
+                            fila_pdf[0]
+                            if fila_pdf
+                            else None
+                        )
+
+                    finally:
+
+                        conn_pdf.close()
 
                     if pdf_data is not None and pdf_data != b"":
 
