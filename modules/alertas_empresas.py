@@ -63,3 +63,91 @@ def obtener_alertas_empresas_externas():
         "toca": toca,
         "proximo": proximo
     }
+
+from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
+
+
+def existe_ot_externa_abierta(centro, descripcion):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            adaptar_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE centro = ?
+                  AND descripcion = ?
+                  AND origen = 'EXTERNA'
+                  AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
+            """),
+            (centro, descripcion)
+        )
+
+        total = cur.fetchone()[0]
+        return total > 0
+
+    finally:
+        conn.close()
+
+
+def crear_ots_empresas_externas_si_toca():
+    alertas = obtener_alertas_empresas_externas()
+    toca = alertas.get("toca", [])
+
+    creadas = 0
+    ya_existian = 0
+
+    for item in toca:
+        centro = item.get("centro", "")
+        tipo = item.get("tipo", "")
+        empresa = item.get("empresa", "")
+        punto = item.get("punto", "")
+        fecha = item.get("fecha", "")
+
+        descripcion = (
+            f"Gestionar actuación externa vencida - {tipo} - "
+            f"{empresa} - {punto} - Fecha prevista {fecha}"
+        )
+
+        if existe_ot_externa_abierta(centro, descripcion):
+            ya_existian += 1
+            continue
+
+        numero_ot = obtener_siguiente_numero_ot(centro, "EXT")
+
+        datos_orden = (
+            numero_ot,
+            descripcion,
+            "Abierta",
+            centro,
+            "",
+            punto,
+            "Legionella",
+            "Alta",
+            "Abel Vasquez",
+            "EXTERNA",
+            "",
+            "",
+            "",
+            "Operarios",
+            "Externa",
+            empresa,
+            "",
+            "",
+            "",
+            "",
+            "",
+            fecha,
+            "",
+            "",
+            "",
+            0,
+            0,
+            ""
+        )
+
+        crear_orden(datos_orden)
+        creadas += 1
+
+    return creadas, ya_existian
