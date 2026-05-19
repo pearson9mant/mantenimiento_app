@@ -92,62 +92,70 @@ def existe_ot_externa_abierta(centro, descripcion):
 
 
 def crear_ots_empresas_externas_si_toca():
+
     alertas = obtener_alertas_empresas_externas()
+
     toca = alertas.get("toca", [])
 
     creadas = 0
     ya_existian = 0
 
     for item in toca:
-        centro = item.get("centro", "")
-        tipo = item.get("tipo", "")
-        empresa = item.get("empresa", "")
-        punto = item.get("punto", "")
-        fecha = item.get("fecha", "")
 
-        descripcion = (
-            f"Gestionar actuación externa vencida - {tipo} - "
-            f"{empresa} - {punto} - Fecha prevista {fecha}"
-        )
+        try:
 
-        if existe_ot_externa_abierta(centro, descripcion):
-            ya_existian += 1
-            continue
+            centro = item.get("centro", "")
+            tipo = item.get("tipo", "")
+            empresa = item.get("empresa", "")
+            punto = item.get("punto", "")
+            fecha = item.get("fecha", "")
 
-        numero_ot = obtener_siguiente_numero_ot(centro, "EXT")
+            descripcion = (
+                f"Gestionar actuación externa vencida - "
+                f"{tipo} - {empresa} - {punto}"
+            )
 
-        datos_orden = (
-            numero_ot,
-            descripcion,
-            "Abierta",
-            centro,
-            "",
-            punto,
-            "Legionella",
-            "Alta",
-            "Abel Vasquez",
-            "EXTERNA",
-            "",
-            "",
-            "",
-            "Operarios",
-            "Externa",
-            empresa,
-            "",
-            "",
-            "",
-            "",
-            "",
-            fecha,
-            "",
-            "",
-            "",
-            0,
-            0,
-            ""
-        )
+            if existe_ot_externa_abierta(centro, descripcion):
+                ya_existian += 1
+                continue
 
-        crear_orden(datos_orden)
-        creadas += 1
+            numero_ot = obtener_siguiente_numero_ot(
+                centro,
+                "EXT"
+            )
+
+            datos_orden = (
+                numero_ot,                     # numero_ot
+                descripcion,                  # descripcion
+                "Abierta",                    # estado
+                centro,                       # centro
+                "",                           # edificio
+                punto,                        # espacio
+                "Legionella",                 # area
+                "Alta",                       # prioridad
+                "Abel Vasquez",               # operario
+                "EXTERNA",                    # origen
+                "", "", "",                   # solicitante etc
+                "Operarios",                  # tipo_solicitante
+                "Externa",                    # tipo_orden
+                empresa,                      # empresa_externa
+                "", "", "",                   # contacto
+                "", "",                       # telefonos
+                fecha,                        # fecha_programada
+                "", "", "",                   # resto
+                0,
+                0,
+                ""
+            )
+
+            crear_orden(datos_orden)
+
+            creadas += 1
+
+        except Exception as e:
+
+            print(
+                f"ERROR creando OT externa automática: {e}"
+            )
 
     return creadas, ya_existian
