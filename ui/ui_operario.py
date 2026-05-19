@@ -12,6 +12,7 @@ from modules.ordenes import (
 
 from modules.inventario import (
     obtener_materiales_para_select,
+    obtener_material_por_codigo,
     registrar_movimiento_inventario
 )
 
@@ -969,6 +970,30 @@ def pantalla_operario():
                             )
 
                             codigo_sel = material_ot.split(" | ")[0]
+                            datos_mat = obtener_material_por_codigo(codigo_sel)
+
+                            if datos_mat:
+                                try:
+                                    foto_data = datos_mat[16]
+                                except Exception:
+                                    foto_data = None
+
+                                try:
+                                    foto_ruta = datos_mat[14]
+                                except Exception:
+                                    foto_ruta = ""
+
+                                if foto_data:
+                                    try:
+                                        st.image(foto_data, width=180)
+                                    except Exception:
+                                        st.caption("Foto del material no disponible.")
+
+                                elif foto_ruta:
+                                    try:
+                                        st.image(foto_ruta, width=180)
+                                    except Exception:
+                                        st.caption("Foto del material no disponible.")
 
                             cantidad_material = st.number_input(
                                 "Cantidad usada",
