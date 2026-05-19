@@ -23,7 +23,7 @@ from modules.preventivo import generar_ots_preventivo_si_toca
 from ui.ui_legionella import generar_ots_legionella_si_toca
 from ui.ui_plan_verano import pantalla_plan_verano
 from ui.ui_empresas_externas import pantalla_empresas_externas
-from modules.alertas_empresas import obtener_alertas_empresas_externas
+from modules.alertas_empresas import obtener_alertas_empresas_externas, crear_ots_empresas_externas_si_toca
 
 
 APP_VERSION = "v1.0 PRO"
@@ -601,6 +601,14 @@ try:
     if "legionella_auto_revisada" not in st.session_state:
         generar_ots_legionella_si_toca()
         st.session_state["legionella_auto_revisada"] = True
+
+except Exception:
+    pass
+
+try:
+    if "externas_auto_revisadas" not in st.session_state:
+        crear_ots_empresas_externas_si_toca()
+        st.session_state["externas_auto_revisadas"] = True
 
 except Exception:
     pass
