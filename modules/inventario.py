@@ -355,7 +355,11 @@ def crear_material_inventario(
             referencia_factura,
             observaciones_coste
         )
-        ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        VALUES (
+            {p}, {p}, {p}, {p}, {p}, {p}, {p},
+            {p}, {p}, {p}, {p}, {p}, {p}, {p},
+            {p}, {p}, {p}, {p}, {p}, {p}, {p}
+        )
     """, (
         codigo,
         material,
