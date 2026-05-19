@@ -201,20 +201,17 @@ def pantalla_inventario():
             )
 
             ruta_foto = ""
+            foto_nombre = ""
+            foto_data = None
 
             if foto_subida is not None:
-                carpeta = Path("data/fotos_inventario")
-                carpeta.mkdir(parents=True, exist_ok=True)
-
-                nombre_foto = limpiar_nombre_archivo(
+                foto_nombre = limpiar_nombre_archivo(
                     f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}"
                 )
-                ruta_foto = str(carpeta / nombre_foto)
 
-                with open(ruta_foto, "wb") as f:
-                    f.write(foto_subida.getbuffer())
+                foto_data = foto_subida.getvalue()
 
-                st.image(ruta_foto, width=250)
+                st.image(foto_data, width=250)
 
             if st.button("Crear material", use_container_width=True):
                 if not material.strip():
@@ -239,6 +236,8 @@ def pantalla_inventario():
                         proveedor=proveedor,
                         observaciones=observaciones,
                         foto=ruta_foto,
+                        foto_nombre=foto_nombre,
+                        foto_data=foto_data,
                         precio_unitario=precio_unitario,
                         coste_total=coste_total,
                         fecha_compra=fecha_compra,
