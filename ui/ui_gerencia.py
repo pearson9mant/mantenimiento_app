@@ -140,9 +140,44 @@ def leer_tabla(nombre_tabla):
     conn = conectar()
 
     try:
-        df = pd.read_sql_query(f"SELECT * FROM {nombre_tabla}", conn)
+
+        if nombre_tabla == "inventario":
+
+            df = pd.read_sql_query("""
+                SELECT
+                    id,
+                    codigo,
+                    material,
+                    categoria,
+                    unidad,
+                    stock_actual,
+                    stock_minimo,
+                    centro,
+                    edificio,
+                    ubicacion,
+                    proveedor,
+                    observaciones,
+                    fecha_alta,
+                    foto,
+                    foto_nombre,
+                    activo,
+                    precio_unitario,
+                    coste_total,
+                    fecha_compra,
+                    referencia_factura,
+                    observaciones_coste
+                FROM inventario
+            """, conn)
+
+        else:
+            df = pd.read_sql_query(
+                f"SELECT * FROM {nombre_tabla}",
+                conn
+            )
+
     except Exception:
         df = pd.DataFrame()
+
     finally:
         conn.close()
 
