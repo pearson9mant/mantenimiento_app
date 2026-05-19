@@ -134,7 +134,6 @@ def buscar_materiales_parecidos(material, limite=8):
         if coincidencias:
             puntuacion = len(coincidencias)
 
-            # Si una palabra importante aparece dentro del otro texto, también suma
             mat_norm = normalizar_texto_material(mat)
             nuevo_norm = normalizar_texto_material(material)
 
@@ -157,13 +156,7 @@ def buscar_materiales_parecidos(material, limite=8):
                 "puntuacion": puntuacion,
             })
 
-    parecidos = sorted(
-        parecidos,
-        key=lambda x: x["puntuacion"],
-        reverse=True
-    )
-
-    return parecidos[:limite]
+    return sorted(parecidos, key=lambda x: x["puntuacion"], reverse=True)[:limite]
 
 
 def comprobar_material_antes_crear(material, categoria="", unidad=""):
@@ -185,14 +178,14 @@ def asegurar_columnas_inventario():
         _add_columna_segura(cursor, "inventario", "foto", "TEXT")
         _add_columna_segura(cursor, "inventario", "foto_nombre", "TEXT")
 
-        if "sqlite" in cursor.__class__.__module__.lower():
+        if "sqlite" in conn.__class__.__module__.lower():
             _add_columna_segura(cursor, "inventario", "foto_data", "BLOB")
         else:
             _add_columna_segura(cursor, "inventario", "foto_data", "BYTEA")
+
         _add_columna_segura(cursor, "inventario", "activo", "INTEGER DEFAULT 1")
         _add_columna_segura(cursor, "inventario", "material_normalizado", "TEXT")
 
-        # Costes inventario
         _add_columna_segura(cursor, "inventario", "precio_unitario", "REAL DEFAULT 0")
         _add_columna_segura(cursor, "inventario", "coste_total", "REAL DEFAULT 0")
         _add_columna_segura(cursor, "inventario", "fecha_compra", "TEXT")
@@ -204,10 +197,12 @@ def asegurar_columnas_inventario():
         cursor.execute("UPDATE inventario SET coste_total = 0 WHERE coste_total IS NULL")
 
         conn.commit()
+
     except Exception:
         conn.rollback()
 
-    conn.close()
+    finally:
+        conn.close()
 
 
 def actualizar_materiales_normalizados():
@@ -235,10 +230,12 @@ def actualizar_materiales_normalizados():
             """, (material_norm, id_mat))
 
         conn.commit()
+
     except Exception:
         conn.rollback()
 
-    conn.close()
+    finally:
+        conn.close()
 
 
 # =====================================================
@@ -328,66 +325,72 @@ def crear_material_inventario(
     cursor = conn.cursor()
     p = _ph(conn)
 
-    material_normalizado = normalizar_texto_material(material)
+    try:
+        material_normalizado = normalizar_texto_material(material)
 
-    cursor.execute(f"""
-        INSERT INTO inventario
-        (
+        cursor.execute(f"""
+            INSERT INTO inventario
+            (
+                codigo,
+                material,
+                categoria,
+                unidad,
+                stock_actual,
+                stock_minimo,
+                centro,
+                edificio,
+                ubicacion,
+                proveedor,
+                observaciones,
+                foto,
+                foto_nombre,
+                foto_data,
+                activo,
+                material_normalizado,
+                precio_unitario,
+                coste_total,
+                fecha_compra,
+                referencia_factura,
+                observaciones_coste
+            )
+            VALUES (
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}
+            )
+        """, (
             codigo,
             material,
             categoria,
             unidad,
-            stock_actual,
-            stock_minimo,
+            float(stock_actual),
+            float(stock_minimo),
             centro,
             edificio,
-            ubicacion,
-            proveedor,
-            observaciones,
+            str(ubicacion or "").strip(),
+            str(proveedor or "").strip(),
+            str(observaciones or "").strip(),
             foto,
             foto_nombre,
             foto_data,
-            activo,
+            1,
             material_normalizado,
-            precio_unitario,
-            coste_total,
-            fecha_compra,
-            referencia_factura,
-            observaciones_coste
-        )
-        VALUES (
-            {p}, {p}, {p}, {p}, {p}, {p}, {p},
-            {p}, {p}, {p}, {p}, {p}, {p}, {p},
-            {p}, {p}, {p}, {p}, {p}, {p}, {p}
-        )
-    """, (
-        codigo,
-        material,
-        categoria,
-        unidad,
-        float(stock_actual),
-        float(stock_minimo),
-        centro,
-        edificio,
-        ubicacion.strip(),
-        proveedor.strip(),
-        observaciones.strip(),
-        foto,
-        foto_nombre,
-        foto_data,
-        1,
-        material_normalizado,
-        float(precio_unitario or 0),
-        float(coste_total or 0),
-        str(fecha_compra or "").strip(),
-        str(referencia_factura or "").strip(),
-        str(observaciones_coste or "").strip()
-    ))
+            float(precio_unitario or 0),
+            float(coste_total or 0),
+            str(fecha_compra or "").strip(),
+            str(referencia_factura or "").strip(),
+            str(observaciones_coste or "").strip()
+        ))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        return True, "Material creado correctamente."
 
-    return True, "Material creado correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al crear material: {e}"
+
+    finally:
+        conn.close()
 
 
 # =====================================================
@@ -409,8 +412,10 @@ def obtener_materiales_inventario(
 
     sql = """
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, foto_nombre, foto_data, activo,
-               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
         FROM inventario
         WHERE 1=1
     """
@@ -481,69 +486,75 @@ def registrar_movimiento_inventario(
     cursor = conn.cursor()
     p = _ph(conn)
 
-    cursor.execute(f"""
-        SELECT material, stock_actual
-        FROM inventario
-        WHERE codigo = {p}
-    """, (codigo_material,))
+    try:
+        cursor.execute(f"""
+            SELECT material, stock_actual
+            FROM inventario
+            WHERE codigo = {p}
+        """, (codigo_material,))
 
-    fila = cursor.fetchone()
+        fila = cursor.fetchone()
 
-    if not fila:
-        conn.close()
-        return False, "No existe el material."
-
-    material, stock_actual = fila
-    cantidad = float(cantidad)
-    stock_actual = float(stock_actual)
-
-    nuevo_stock = stock_actual
-
-    if tipo_movimiento == "Entrada":
-        nuevo_stock = stock_actual + cantidad
-
-    elif tipo_movimiento == "Salida":
-        if stock_actual < cantidad:
+        if not fila:
             conn.close()
-            return False, f"Stock insuficiente. Disponible: {stock_actual}"
+            return False, "No existe el material."
 
-        nuevo_stock = stock_actual - cantidad
+        material, stock_actual = fila
+        cantidad = float(cantidad)
+        stock_actual = float(stock_actual)
 
-    elif tipo_movimiento == "Ajuste":
-        nuevo_stock = cantidad
+        nuevo_stock = stock_actual
 
-    cursor.execute(f"""
-        UPDATE inventario
-        SET stock_actual = {p}
-        WHERE codigo = {p}
-    """, (nuevo_stock, codigo_material))
+        if tipo_movimiento == "Entrada":
+            nuevo_stock = stock_actual + cantidad
 
-    cursor.execute(f"""
-        INSERT INTO movimientos_inventario
-        (
+        elif tipo_movimiento == "Salida":
+            if stock_actual < cantidad:
+                conn.close()
+                return False, f"Stock insuficiente. Disponible: {stock_actual}"
+
+            nuevo_stock = stock_actual - cantidad
+
+        elif tipo_movimiento == "Ajuste":
+            nuevo_stock = cantidad
+
+        cursor.execute(f"""
+            UPDATE inventario
+            SET stock_actual = {p}
+            WHERE codigo = {p}
+        """, (nuevo_stock, codigo_material))
+
+        cursor.execute(f"""
+            INSERT INTO movimientos_inventario
+            (
+                codigo_material,
+                material,
+                tipo_movimiento,
+                cantidad,
+                motivo,
+                numero_ot,
+                operario
+            )
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})
+        """, (
             codigo_material,
             material,
             tipo_movimiento,
             cantidad,
-            motivo,
-            numero_ot,
-            operario
-        )
-        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})
-    """, (
-        codigo_material,
-        material,
-        tipo_movimiento,
-        cantidad,
-        motivo.strip(),
-        numero_ot.strip(),
-        operario.strip()
-    ))
+            str(motivo or "").strip(),
+            str(numero_ot or "").strip(),
+            str(operario or "").strip()
+        ))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        return True, "Movimiento registrado correctamente."
 
-    return True, "Movimiento registrado correctamente."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al registrar movimiento: {e}"
+
+    finally:
+        conn.close()
 
 
 def obtener_movimientos_inventario():
@@ -643,16 +654,22 @@ def obtener_material_por_codigo(codigo):
 
     cursor.execute(f"""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, foto_nombre, foto_data, activo,
-               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
         FROM inventario
         WHERE codigo = {p}
     """, (codigo,))
 
+    columnas = [desc[0] for desc in cursor.description]
     fila = cursor.fetchone()
     conn.close()
 
-    return fila
+    if fila:
+        return dict(zip(columnas, fila))
+
+    return None
 
 
 # =====================================================
@@ -695,5 +712,4 @@ def activar_material(codigo):
     conn.close()
 
     return True, "Material activado correctamente."
-    
 
