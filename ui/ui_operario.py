@@ -973,19 +973,19 @@ def pantalla_operario():
                             datos_mat = obtener_material_por_codigo(codigo_sel)
 
                             if datos_mat:
-                                try:
-                                    foto_data = datos_mat[15]
-                                except Exception:
-                                    foto_data = None
 
-                                try:
-                                    foto_ruta = datos_mat[13]
-                                except Exception:
-                                    foto_ruta = ""
+                                foto_data = datos_mat.get("foto_data")
+                                foto_ruta = datos_mat.get("foto")
 
                                 if foto_data:
                                     try:
                                         st.image(bytes(foto_data), width=180)
+                                    except Exception:
+                                        st.caption("Foto del material no disponible.")
+
+                                elif foto_ruta:
+                                    try:
+                                        st.image(foto_ruta, width=180)
                                     except Exception:
                                         st.caption("Foto del material no disponible.")
 
