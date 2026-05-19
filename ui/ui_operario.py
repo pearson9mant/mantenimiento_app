@@ -974,18 +974,24 @@ def pantalla_operario():
 
                             if datos_mat:
                                 try:
-                                    foto_data = datos_mat[16]
+                                    foto_data = datos_mat[15]
                                 except Exception:
                                     foto_data = None
 
                                 try:
-                                    foto_ruta = datos_mat[14]
+                                    foto_ruta = datos_mat[13]
                                 except Exception:
                                     foto_ruta = ""
 
                                 if foto_data:
                                     try:
                                         st.image(foto_data, width=180)
+                                    except Exception:
+                                        st.caption("Foto del material no disponible.")
+
+                                elif foto_ruta:
+                                    try:
+                                        st.image(foto_ruta, width=180)
                                     except Exception:
                                         st.caption("Foto del material no disponible.")
 
