@@ -13,6 +13,7 @@ from modules.inventario import (
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
+from modules.alertas_empresas import obtener_alertas_empresas_externas
 
 
 def limpiar_nombre_archivo(texto):
@@ -52,6 +53,41 @@ def limpiar_formulario_crear_material():
 
 def pantalla_inventario():
     st.subheader("📦 Inventario mantenimiento")
+
+    # =====================================================
+    # ALERTAS EMPRESAS EXTERNAS / LEGIONELLA
+    # =====================================================
+
+    try:
+
+        alertas = obtener_alertas_empresas_externas()
+
+        if alertas["toca"] or alertas["proximo"]:
+
+            st.markdown("### 🔔 Avisos empresas externas / Legionella")
+
+            for item in alertas["toca"]:
+
+                st.error(
+                    f"🔴 TOCA gestionar: "
+                    f"{item['tipo']} · "
+                    f"{item['empresa']} · "
+                    f"{item['centro']} · "
+                    f"{item['fecha']}"
+                )
+
+            for item in alertas["proximo"]:
+
+                st.warning(
+                    f"🟠 Próximo: "
+                    f"{item['tipo']} · "
+                    f"{item['empresa']} · "
+                    f"{item['centro']} · "
+                    f"{item['fecha']}"
+                )
+
+    except Exception:
+        pass
 
     operario = st.session_state.get("operario_activo", "")
 
