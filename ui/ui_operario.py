@@ -985,7 +985,7 @@ def pantalla_operario():
 
                                 if foto_data:
                                     try:
-                                        st.image(foto_data, width=180)
+                                        st.image(bytes(foto_data), width=180)
                                     except Exception:
                                         st.caption("Foto del material no disponible.")
 
