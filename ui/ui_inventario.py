@@ -319,57 +319,36 @@ def pantalla_inventario():
         referencia_factura = ""
         observaciones_coste = ""
 
-        try:
-            (
-                id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-                centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                foto, foto_nombre, foto_data, activo, precio_unitario, coste_total,
-                fecha_compra, referencia_factura, observaciones_coste
-            ) = m
+        fila = list(m)
 
-        except ValueError:
-            try:
-                (
-                    id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-                    centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                    foto, activo, precio_unitario, coste_total, fecha_compra,
-                    referencia_factura, observaciones_coste
-                ) = m
+        id_mat = fila[0]
+        codigo = fila[1]
+        material = fila[2]
+        categoria = fila[3]
+        unidad = fila[4]
+        stock_actual = fila[5]
+        stock_minimo = fila[6]
 
-                foto_nombre = ""
-                foto_data = None
+        centro = fila[7]
+        edificio = fila[8]
+        ubicacion = fila[9]
+        proveedor = fila[10]
+        observaciones = fila[11]
 
-            except ValueError:
-                try:
-                    (
-                        id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-                        centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                        foto, activo
-                    ) = m
+        fecha_alta = fila[12] if len(fila) > 12 else ""
+        foto = fila[13] if len(fila) > 13 else ""
 
-                    foto_nombre = ""
-                    foto_data = None
-                    precio_unitario = 0
-                    coste_total = 0
-                    fecha_compra = ""
-                    referencia_factura = ""
-                    observaciones_coste = ""
+        foto_nombre = fila[14] if len(fila) > 14 else ""
+        foto_data = fila[15] if len(fila) > 15 else None
 
-                except ValueError:
-                    (
-                        id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-                        centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
-                    ) = m
+        activo = fila[16] if len(fila) > 16 else 1
 
-                    foto = ""
-                    foto_nombre = ""
-                    foto_data = None
-                    activo = 1
-                    precio_unitario = 0
-                    coste_total = 0
-                    fecha_compra = ""
-                    referencia_factura = ""
-                    observaciones_coste = ""
+        precio_unitario = fila[17] if len(fila) > 17 else 0
+        coste_total = fila[18] if len(fila) > 18 else 0
+
+        fecha_compra = fila[19] if len(fila) > 19 else ""
+        referencia_factura = fila[20] if len(fila) > 20 else ""
+        observaciones_coste = fila[21] if len(fila) > 21 else ""
 
         try:
             precio_unitario = float(precio_unitario or 0)
