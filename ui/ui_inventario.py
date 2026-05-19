@@ -319,36 +319,63 @@ def pantalla_inventario():
         referencia_factura = ""
         observaciones_coste = ""
 
-        fila = list(m)
+        columnas = [
+            "id",
+            "codigo",
+            "material",
+            "categoria",
+            "unidad",
+            "stock_actual",
+            "stock_minimo",
+            "centro",
+            "edificio",
+            "ubicacion",
+            "proveedor",
+            "observaciones",
+            "fecha_alta",
+            "foto",
+            "foto_nombre",
+            "foto_data",
+            "activo",
+            "precio_unitario",
+            "coste_total",
+            "fecha_compra",
+            "referencia_factura",
+            "observaciones_coste"
+        ]
 
-        id_mat = fila[0]
-        codigo = fila[1]
-        material = fila[2]
-        categoria = fila[3]
-        unidad = fila[4]
-        stock_actual = fila[5]
-        stock_minimo = fila[6]
+        material_dict = dict(zip(columnas, m))
 
-        centro = fila[7]
-        edificio = fila[8]
-        ubicacion = fila[9]
-        proveedor = fila[10]
-        observaciones = fila[11]
+        id_mat = material_dict.get("id")
+        codigo = material_dict.get("codigo")
+        material = material_dict.get("material")
+        categoria = material_dict.get("categoria")
+        unidad = material_dict.get("unidad")
 
-        fecha_alta = fila[12] if len(fila) > 12 else ""
-        foto = fila[13] if len(fila) > 13 else ""
+        stock_actual = material_dict.get("stock_actual")
+        stock_minimo = material_dict.get("stock_minimo")
 
-        foto_nombre = fila[14] if len(fila) > 14 else ""
-        foto_data = fila[15] if len(fila) > 15 else None
+        centro = material_dict.get("centro")
+        edificio = material_dict.get("edificio")
+        ubicacion = material_dict.get("ubicacion")
 
-        activo = fila[16] if len(fila) > 16 else 1
+        proveedor = material_dict.get("proveedor")
+        observaciones = material_dict.get("observaciones")
 
-        precio_unitario = fila[17] if len(fila) > 17 else 0
-        coste_total = fila[18] if len(fila) > 18 else 0
+        fecha_alta = material_dict.get("fecha_alta")
 
-        fecha_compra = fila[19] if len(fila) > 19 else ""
-        referencia_factura = fila[20] if len(fila) > 20 else ""
-        observaciones_coste = fila[21] if len(fila) > 21 else ""
+        foto = material_dict.get("foto")
+        foto_nombre = material_dict.get("foto_nombre")
+        foto_data = material_dict.get("foto_data")
+
+        activo = material_dict.get("activo", 1)
+
+        precio_unitario = material_dict.get("precio_unitario", 0)
+        coste_total = material_dict.get("coste_total", 0)
+
+        fecha_compra = material_dict.get("fecha_compra", "")
+        referencia_factura = material_dict.get("referencia_factura", "")
+        observaciones_coste = material_dict.get("observaciones_coste", "")
 
         try:
             precio_unitario = float(precio_unitario or 0)
