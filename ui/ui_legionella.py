@@ -2056,12 +2056,7 @@ def pantalla_legionella():
             "certificados y revisiones."
         )
 
-        # =====================================================
-        # TABLA INFORMES
-        # =====================================================
-
         if os.getenv("DATABASE_URL"):
-
             ejecutar("""
                 CREATE TABLE IF NOT EXISTS legionella_informes (
                     id SERIAL PRIMARY KEY,
@@ -2076,13 +2071,13 @@ def pantalla_legionella():
                     resultado TEXT,
                     numero_informe TEXT,
                     pdf TEXT,
+                    pdf_nombre TEXT,
+                    pdf_data BYTEA,
                     proxima_fecha TEXT,
                     observaciones TEXT
                 )
             """)
-
         else:
-
             ejecutar("""
                 CREATE TABLE IF NOT EXISTS legionella_informes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2097,21 +2092,31 @@ def pantalla_legionella():
                     resultado TEXT,
                     numero_informe TEXT,
                     pdf TEXT,
+                    pdf_nombre TEXT,
+                    pdf_data BLOB,
                     proxima_fecha TEXT,
                     observaciones TEXT
                 )
             """)
 
-        # =====================================================
-        # FORMULARIO
-        # =====================================================
+        try:
+            ejecutar("ALTER TABLE legionella_informes ADD COLUMN pdf_nombre TEXT")
+        except Exception:
+            pass
+
+        try:
+            if os.getenv("DATABASE_URL"):
+                ejecutar("ALTER TABLE legionella_informes ADD COLUMN pdf_data BYTEA")
+            else:
+                ejecutar("ALTER TABLE legionella_informes ADD COLUMN pdf_data BLOB")
+        except Exception:
+            pass
 
         with st.expander("➕ Subir informe externo", expanded=True):
 
             col1, col2 = st.columns(2)
 
             with col1:
-
                 tipo_informe = st.selectbox(
                     "Tipo informe",
                     [
@@ -2125,10 +2130,7 @@ def pantalla_legionella():
                     key="leg_tipo_informe"
                 )
 
-                empresa = st.text_input(
-                    "Empresa externa",
-                    key="leg_empresa"
-                )
+                empresa = st.text_input("Empresa externa", key="leg_empresa")
 
                 centro = st.selectbox(
                     "Centro",
@@ -2136,10 +2138,7 @@ def pantalla_legionella():
                     key="leg_centro"
                 )
 
-                edificio = st.text_input(
-                    "Edificio / zona",
-                    key="leg_edificio"
-                )
+                edificio = st.text_input("Edificio / zona", key="leg_edificio")
 
                 instalacion = st.selectbox(
                     "Instalación",
@@ -2148,11 +2147,7 @@ def pantalla_legionella():
                 )
 
             with col2:
-
-                punto = st.text_input(
-                    "Punto / depósito",
-                    key="leg_punto"
-                )
+                punto = st.text_input("Punto / depósito", key="leg_punto")
 
                 fecha_actuacion = st.date_input(
                     "Fecha actuación",
@@ -2192,10 +2187,8 @@ def pantalla_legionella():
 
             if frecuencia == "90 días":
                 dias = 90
-
             elif frecuencia == "180 días":
                 dias = 180
-
             elif frecuencia == "365 días":
                 dias = 365
 
@@ -2217,10 +2210,6 @@ def pantalla_legionella():
                 key="leg_observaciones"
             )
 
-            # =====================================================
-            # GUARDAR
-            # =====================================================
-
             if st.button(
                 "💾 Guardar informe",
                 use_container_width=True,
@@ -2228,30 +2217,23 @@ def pantalla_legionella():
             ):
 
                 ruta_pdf = ""
+                pdf_nombre = ""
+                pdf_data = None
 
                 if pdf_file is not None:
-
-                    carpeta = Path("uploads/legionella")
-                    carpeta.mkdir(parents=True, exist_ok=True)
-
-                    nombre_pdf = (
+                    pdf_nombre = (
                         f"{tipo_informe}_{centro}_{fecha_informe}.pdf"
                     )
 
-                    nombre_pdf = (
-                        nombre_pdf
+                    pdf_nombre = (
+                        pdf_nombre
                         .replace(" ", "_")
                         .replace("/", "_")
                         .replace("\\", "_")
                         .replace(":", "_")
                     )
 
-                    ruta_archivo = carpeta / nombre_pdf
-
-                    with open(ruta_archivo, "wb") as f:
-                        f.write(pdf_file.getbuffer())
-
-                    ruta_pdf = str(ruta_archivo)
+                    pdf_data = pdf_file.getvalue()
 
                 ejecutar("""
                     INSERT INTO legionella_informes
@@ -2267,10 +2249,12 @@ def pantalla_legionella():
                         resultado,
                         numero_informe,
                         pdf,
+                        pdf_nombre,
+                        pdf_data,
                         proxima_fecha,
                         observaciones
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     tipo_informe,
                     empresa,
@@ -2283,15 +2267,14 @@ def pantalla_legionella():
                     resultado,
                     numero_informe,
                     ruta_pdf,
+                    pdf_nombre,
+                    pdf_data,
                     proxima_fecha,
                     observaciones
                 ))
 
                 st.success("Informe guardado correctamente.")
-
-        # =====================================================
-        # HISTÓRICO
-        # =====================================================
+                st.rerun()
 
         st.markdown("### 📚 Histórico informes externos")
 
@@ -2302,13 +2285,10 @@ def pantalla_legionella():
         """)
 
         if df_inf.empty:
-
             st.info("Todavía no hay informes guardados.")
 
         else:
-
             if "proxima_fecha" in df_inf.columns:
-
                 df_inf["estado"] = df_inf["proxima_fecha"].apply(
                     lambda x:
                         "🔴 TOCA"
@@ -2319,7 +2299,6 @@ def pantalla_legionella():
                             else "🟢 OK"
                         )
                 )
-
             else:
                 df_inf["estado"] = "🟢 OK"
 
@@ -2349,50 +2328,48 @@ def pantalla_legionella():
                 col_pdf, col_borrar = st.columns([4, 1])
 
                 with col_pdf:
-
                     titulo_pdf = (
                         f"📄 {row['tipo_informe']} · "
                         f"{row['empresa']} · "
                         f"{row['fecha_informe']}"
                     )
 
-                    if row["pdf"] and Path(str(row["pdf"])).exists():
+                    pdf_data = row.get("pdf_data", None)
 
+                    if pdf_data is not None and pdf_data != "":
+                        nombre_descarga = (
+                            row["pdf_nombre"]
+                            if row.get("pdf_nombre")
+                            else f"informe_legionella_{row['id']}.pdf"
+                        )
+
+                        st.download_button(
+                            label=titulo_pdf,
+                            data=bytes(pdf_data),
+                            file_name=nombre_descarga,
+                            mime="application/pdf",
+                            key=f"pdf_leg_db_{row['id']}"
+                        )
+
+                    elif row.get("pdf") and Path(str(row["pdf"])).exists():
                         with open(row["pdf"], "rb") as f:
-
                             st.download_button(
                                 label=titulo_pdf,
                                 data=f.read(),
                                 file_name=Path(row["pdf"]).name,
                                 mime="application/pdf",
-                                key=f"pdf_leg_{row['id']}"
+                                key=f"pdf_leg_old_{row['id']}"
                             )
 
-                    elif row["pdf"]:
-
-                        st.warning(
-                            f"{titulo_pdf} — PDF no encontrado en Render. "
-                            "Puedes borrar el registro y volver a subirlo."
-                        )
-
                     else:
-
-                        st.info(
-                            f"{titulo_pdf} — Sin PDF adjunto."
-                        )
+                        st.warning(f"{titulo_pdf} — PDF no disponible.")
 
                 with col_borrar:
-
                     if st.button(
                         "🗑️ Borrar",
                         key=f"borrar_informe_leg_{row['id']}"
                     ):
-
                         try:
-
-                            if row["pdf"] and Path(str(row["pdf"])).exists():
-                                Path(str(row["pdf"])).unlink()
-
                             ejecutar("""
                                 DELETE FROM legionella_informes
                                 WHERE id = ?
