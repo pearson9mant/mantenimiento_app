@@ -323,31 +323,53 @@ def pantalla_inventario():
             (
                 id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
                 centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                foto, activo, precio_unitario, coste_total, fecha_compra,
-                referencia_factura, observaciones_coste
+                foto, foto_nombre, foto_data, activo, precio_unitario, coste_total,
+                fecha_compra, referencia_factura, observaciones_coste
             ) = m
+
         except ValueError:
             try:
                 (
                     id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
                     centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                    foto, activo
+                    foto, activo, precio_unitario, coste_total, fecha_compra,
+                    referencia_factura, observaciones_coste
                 ) = m
+
+                foto_nombre = ""
+                foto_data = None
+
             except ValueError:
                 try:
                     (
                         id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
                         centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
-                        foto
+                        foto, activo
                     ) = m
-                    activo = 1
+
+                    foto_nombre = ""
+                    foto_data = None
+                    precio_unitario = 0
+                    coste_total = 0
+                    fecha_compra = ""
+                    referencia_factura = ""
+                    observaciones_coste = ""
+
                 except ValueError:
                     (
                         id_mat, codigo, material, categoria, unidad, stock_actual, stock_minimo,
                         centro, edificio, ubicacion, proveedor, observaciones, fecha_alta
                     ) = m
+
                     foto = ""
+                    foto_nombre = ""
+                    foto_data = None
                     activo = 1
+                    precio_unitario = 0
+                    coste_total = 0
+                    fecha_compra = ""
+                    referencia_factura = ""
+                    observaciones_coste = ""
 
         try:
             precio_unitario = float(precio_unitario or 0)
@@ -396,7 +418,13 @@ def pantalla_inventario():
             if observaciones_coste:
                 st.info(f"💶 {observaciones_coste}")
 
-            if foto:
+            if foto_data:
+                try:
+                    st.image(foto_data, width=220)
+                except Exception:
+                    st.caption("Foto no disponible.")
+
+            elif foto:
                 try:
                     st.image(foto, width=220)
                 except Exception:
