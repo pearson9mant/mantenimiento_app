@@ -183,6 +183,12 @@ def asegurar_columnas_inventario():
 
     try:
         _add_columna_segura(cursor, "inventario", "foto", "TEXT")
+        _add_columna_segura(cursor, "inventario", "foto_nombre", "TEXT")
+
+        if "sqlite" in cursor.__class__.__module__.lower():
+            _add_columna_segura(cursor, "inventario", "foto_data", "BLOB")
+        else:
+            _add_columna_segura(cursor, "inventario", "foto_data", "BYTEA")
         _add_columna_segura(cursor, "inventario", "activo", "INTEGER DEFAULT 1")
         _add_columna_segura(cursor, "inventario", "material_normalizado", "TEXT")
 
@@ -295,6 +301,8 @@ def crear_material_inventario(
     proveedor,
     observaciones,
     foto="",
+    foto_nombre="",
+    foto_data=None,
     precio_unitario=0,
     coste_total=0,
     fecha_compra="",
@@ -337,6 +345,8 @@ def crear_material_inventario(
             proveedor,
             observaciones,
             foto,
+            foto_nombre,
+            foto_data,
             activo,
             material_normalizado,
             precio_unitario,
@@ -345,7 +355,7 @@ def crear_material_inventario(
             referencia_factura,
             observaciones_coste
         )
-        VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
     """, (
         codigo,
         material,
@@ -359,6 +369,8 @@ def crear_material_inventario(
         proveedor.strip(),
         observaciones.strip(),
         foto,
+        foto_nombre,
+        foto_data,
         1,
         material_normalizado,
         float(precio_unitario or 0),
@@ -393,7 +405,7 @@ def obtener_materiales_inventario(
 
     sql = """
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, foto_nombre, foto_data, activo,
                precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
         FROM inventario
         WHERE 1=1
@@ -625,7 +637,7 @@ def obtener_material_por_codigo(codigo):
 
     cursor.execute(f"""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, foto_nombre, foto_data, activo,
                precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
         FROM inventario
         WHERE codigo = {p}
