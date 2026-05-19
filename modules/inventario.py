@@ -599,8 +599,10 @@ def obtener_stock_bajo():
 
     cursor.execute("""
         SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
-               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta, foto, activo,
-               precio_unitario, coste_total, fecha_compra, referencia_factura, observaciones_coste
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
         FROM inventario
         WHERE stock_actual <= stock_minimo
           AND COALESCE(activo, 1) = 1
