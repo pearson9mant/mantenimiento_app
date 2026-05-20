@@ -301,7 +301,7 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
             WHERE centro = ?
               AND edificio = ?
               AND area = 'Legionella'
-              AND origen = 'Legionella'
+              AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
               AND descripcion = ?
               AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
             """),
