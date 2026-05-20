@@ -24,6 +24,7 @@ from ui.ui_legionella import generar_ots_legionella_si_toca
 from ui.ui_plan_verano import pantalla_plan_verano
 from ui.ui_empresas_externas import pantalla_empresas_externas
 from modules.alertas_empresas import obtener_alertas_empresas_externas, crear_ots_empresas_externas_si_toca
+from ui.ui_estado_aulas import ui_estado_aulas
 
 
 APP_VERSION = "v1.0 PRO"
@@ -529,7 +530,10 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Plan verano"
             st.rerun()
 
-    with col5:
+        if st.button("🏫\nEstado aulas", key="btn_estado_aulas", use_container_width=True):
+            st.session_state["seccion_actual"] = "Estado aulas"
+            st.rerun() 
+
         if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
@@ -755,6 +759,9 @@ if perfil == "admin":
 
     elif seccion == "Empresas externas":
         pantalla_empresas_externas()
+
+    elif seccion == "Estado aulas":
+        ui_estado_aulas()
 
 
 elif perfil == "gerencia":
