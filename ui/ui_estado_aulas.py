@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 
-from modules.ubicaciones import CENTROS, obtener_edificios, obtener_ubicaciones_personalizadas
+from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 from modules.estado_aulas import (
     obtener_estado_aula,
     guardar_estado_aula,
@@ -35,7 +35,9 @@ def ui_estado_aulas():
     edificios = obtener_edificios(centro)
     edificio = st.selectbox("Edificio", edificios, key="estado_aulas_edificio")
 
-    espacios = obtener_ubicaciones_personalizadas(centro, edificio)
+    from modules.ubicaciones import obtener_espacios
+
+    espacios = obtener_espacios(centro, edificio)
 
     if not espacios:
         st.warning("No hay aulas o espacios configurados para este edificio.")
