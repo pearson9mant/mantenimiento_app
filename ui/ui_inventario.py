@@ -291,6 +291,12 @@ def pantalla_inventario():
         key="filtro_categoria_inventario"
     )
 
+    solo_stock_bajo = st.checkbox(
+        "⚠️ Solo materiales con stock bajo",
+        value=False,
+        key="solo_stock_bajo_inventario"
+    )
+
     ver_inactivos = False
     if operario == "Abel Vasquez":
         ver_inactivos = st.checkbox(
@@ -305,6 +311,12 @@ def pantalla_inventario():
         filtro_edificio=filtro_edificio,
         incluir_inactivos=ver_inactivos
     )
+
+    if solo_stock_bajo:
+        materiales = [
+            m for m in materiales
+            if float(m[5] or 0) <= float(m[6] or 0)
+        ]
 
     if not materiales:
         st.info("No hay materiales con esos filtros.")
