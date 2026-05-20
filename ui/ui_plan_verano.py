@@ -5,6 +5,7 @@ from html import escape
 
 from database.db import conectar, _sql
 from config import CENTROS, OPERARIOS
+from ui.ui_plan_verano import crear_trabajo_verano
 
 
 ESTADOS_VERANO = [
