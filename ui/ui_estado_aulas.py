@@ -36,7 +36,7 @@ def ui_estado_aulas():
     edificios = obtener_edificios(centro)
     edificio = st.selectbox("Edificio", edificios, key="estado_aulas_edificio")
 
-    espacios = obtener_espacios(centro, edificio)
+    espacios = obtener_espacios(edificio, centro)
 
     if not espacios:
         st.warning("No hay aulas o espacios configurados para este edificio.")
