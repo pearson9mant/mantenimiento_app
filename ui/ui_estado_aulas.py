@@ -115,6 +115,7 @@ def ui_estado_aulas():
     st.divider()
 
     st.subheader("Órdenes abiertas en esta aula")
+    
     df_abiertas = obtener_ordenes_abiertas_aula(centro, edificio, aula)
 
     if df_abiertas.empty:
@@ -129,7 +130,54 @@ def ui_estado_aulas():
         st.info("No hay actuaciones finalizadas registradas para esta aula.")
     else:
         st.dataframe(df_historico, use_container_width=True, hide_index=True)
+    st.divider()
 
+    st.subheader("☀️ Planificación verano")
+
+    col_verano1, col_verano2 = st.columns(2)
+
+    with col_verano1:
+
+        tipo_tarea_verano = st.selectbox(
+            "Tipo actuación verano",
+            [
+                "Pintura",
+                "Electricidad",
+                "Climatización",
+                "Iluminación",
+                "Mobiliario",
+                "Fontanería",
+                "General"
+            ],
+            key="tipo_tarea_verano_aula"
+        )
+
+    with col_verano2:
+
+        prioridad_verano = st.selectbox(
+            "Prioridad",
+            ["Baja", "Media", "Alta", "Urgente"],
+            index=2,
+            key="prioridad_verano_aula"
+        )
+
+    descripcion_verano = st.text_area(
+        "Descripción actuación verano",
+        value=f"{tipo_tarea_verano} aula {aula}",
+        key="descripcion_verano_aula"
+    )
+
+    if st.button(
+        "➕ Crear tarea verano",
+        use_container_width=True,
+        key="crear_tarea_verano_desde_aula"
+    ):
+
+        st.success(
+            f"Tarea preparada para verano:\n\n"
+            f"{descripcion_verano}\n\n"
+            f"{centro} · {edificio} · {aula}"
+        )
     st.subheader("Histórico de revisiones del aula")
     df_revisiones = obtener_historial_estado_aula(centro, edificio, aula)
 
