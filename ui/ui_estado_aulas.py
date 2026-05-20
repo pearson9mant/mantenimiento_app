@@ -10,6 +10,7 @@ from modules.estado_aulas import (
     obtener_ordenes_abiertas_aula,
     obtener_historico_ordenes_aula,
 )
+from ui.ui_plan_verano import crear_trabajo_verano
 
 
 ESTADOS = ["OK", "Bueno", "Regular", "Mal", "Pendiente", "No aplica"]
@@ -34,8 +35,6 @@ def ui_estado_aulas():
 
     edificios = obtener_edificios(centro)
     edificio = st.selectbox("Edificio", edificios, key="estado_aulas_edificio")
-
-    from modules.ubicaciones import obtener_espacios
 
     espacios = obtener_espacios(centro, edificio)
 
@@ -115,7 +114,7 @@ def ui_estado_aulas():
     st.divider()
 
     st.subheader("Órdenes abiertas en esta aula")
-    
+
     df_abiertas = obtener_ordenes_abiertas_aula(centro, edificio, aula)
 
     if df_abiertas.empty:
@@ -130,6 +129,7 @@ def ui_estado_aulas():
         st.info("No hay actuaciones finalizadas registradas para esta aula.")
     else:
         st.dataframe(df_historico, use_container_width=True, hide_index=True)
+
     st.divider()
 
     st.subheader("☀️ Planificación verano")
@@ -137,7 +137,6 @@ def ui_estado_aulas():
     col_verano1, col_verano2 = st.columns(2)
 
     with col_verano1:
-
         tipo_tarea_verano = st.selectbox(
             "Tipo actuación verano",
             [
@@ -153,7 +152,6 @@ def ui_estado_aulas():
         )
 
     with col_verano2:
-
         prioridad_verano = st.selectbox(
             "Prioridad",
             ["Baja", "Media", "Alta", "Urgente"],
@@ -172,12 +170,29 @@ def ui_estado_aulas():
         use_container_width=True,
         key="crear_tarea_verano_desde_aula"
     ):
+        crear_trabajo_verano({
+            "titulo": f"{tipo_tarea_verano} · {aula}",
+            "descripcion": descripcion_verano,
+            "centro": centro,
+            "edificio": edificio,
+            "zona": aula,
+            "responsable": "",
+            "empresa_externa": "",
+            "fecha_inicio": date.today(),
+            "fecha_fin": date.today(),
+            "prioridad": prioridad_verano,
+            "estado": "Planificado",
+            "observaciones": f"Creado automáticamente desde Estado aulas ({aula})",
+            "creado_por": st.session_state.get("usuario", "")
+        })
 
         st.success(
-            f"Tarea preparada para verano:\n\n"
-            f"{descripcion_verano}\n\n"
-            f"{centro} · {edificio} · {aula}"
+            f"✅ Trabajo de verano creado correctamente:\n\n"
+            f"{descripcion_verano}"
         )
+
+    st.divider()
+
     st.subheader("Histórico de revisiones del aula")
     df_revisiones = obtener_historial_estado_aula(centro, edificio, aula)
 
