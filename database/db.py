@@ -502,6 +502,46 @@ def inicializar_db():
     _add_column(cursor, "preventivo_checklist", "operario", "TEXT")
     _add_column(cursor, "preventivo_checklist", "observaciones", "TEXT")
 
+    # -------------------------------
+    # ESTADO AULAS
+    # -------------------------------
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS estado_aulas (
+            id {id_sql},
+            centro TEXT,
+            edificio TEXT,
+            aula TEXT,
+            estado_general TEXT,
+            estado_pintura TEXT,
+            fecha_ultima_pintura TEXT,
+            estado_electricidad TEXT,
+            estado_iluminacion TEXT,
+            estado_climatizacion TEXT,
+            estado_fontaneria TEXT,
+            estado_mobiliario TEXT,
+            observaciones TEXT,
+            foto TEXT,
+            fecha_revision TEXT,
+            revisado_por TEXT
+        )
+    """)
+
+    _add_column(cursor, "estado_aulas", "centro", "TEXT")
+    _add_column(cursor, "estado_aulas", "edificio", "TEXT")
+    _add_column(cursor, "estado_aulas", "aula", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_general", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_pintura", "TEXT")
+    _add_column(cursor, "estado_aulas", "fecha_ultima_pintura", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_electricidad", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_iluminacion", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_climatizacion", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_fontaneria", "TEXT")
+    _add_column(cursor, "estado_aulas", "estado_mobiliario", "TEXT")
+    _add_column(cursor, "estado_aulas", "observaciones", "TEXT")
+    _add_column(cursor, "estado_aulas", "foto", "TEXT")
+    _add_column(cursor, "estado_aulas", "fecha_revision", "TEXT")
+    _add_column(cursor, "estado_aulas", "revisado_por", "TEXT")
+
     conn.commit()
     conn.close()
     crear_indices_rendimiento()
