@@ -3,6 +3,7 @@ import pandas as pd
 import math
 import wave
 from io import BytesIO
+from datetime import datetime
 
 from modules.ordenes import obtener_ordenes, obtener_historico
 from modules.preventivo import generar_ots_preventivo_si_toca
@@ -168,6 +169,184 @@ def calcular_kpis_panel(ordenes, historico):
     }
 
 
+# =====================================================
+# BLOQUE 1 - ACCIÓN INMEDIATA ADMIN
+# =====================================================
+
+def normalizar_texto_panel(valor):
+    return str(valor or "").strip()
+
+
+def normalizar_centro_panel(centro):
+    centro_txt = normalizar_texto_panel(centro).lower()
+
+    if centro_txt in ["pearson 22", "pearson22", "p22"]:
+        return "Pearson 22"
+
+    if centro_txt in ["pearson 9", "pearson9", "p9"]:
+        return "Pearson 9"
+
+    return normalizar_texto_panel(centro)
+
+
+def calcular_dias_abierta(fecha):
+    try:
+        fecha_dt = pd.to_datetime(fecha, errors="coerce")
+        if pd.isna(fecha_dt):
+            return 0
+
+        hoy = pd.Timestamp(datetime.now().date())
+        return max(int((hoy - fecha_dt).days), 0)
+    except Exception:
+        return 0
+
+
+def orden_a_dict_panel(o):
+    return {
+        "numero_ot": valor_ot(o, 1, "numero_ot", ""),
+        "descripcion": valor_ot(o, 2, "descripcion", ""),
+        "estado": valor_ot(o, 3, "estado", ""),
+        "fecha_creacion": valor_ot(o, 4, "fecha_creacion", ""),
+        "centro": normalizar_centro_panel(valor_ot(o, 5, "centro", "")),
+        "edificio": valor_ot(o, 6, "edificio", ""),
+        "espacio": valor_ot(o, 7, "espacio", ""),
+        "area": valor_ot(o, 8, "area", ""),
+        "prioridad": valor_ot(o, 9, "prioridad", ""),
+        "operario": valor_ot(o, 10, "operario", ""),
+        "origen": valor_ot(o, 11, "origen", ""),
+        "dias_abierta": calcular_dias_abierta(valor_ot(o, 4, "fecha_creacion", "")),
+    }
+
+
+def obtener_ordenes_accion_inmediata(ordenes, centro):
+    datos = [orden_a_dict_panel(o) for o in ordenes]
+
+    df = pd.DataFrame(datos)
+
+    if df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    df = df[df["centro"] == centro].copy()
+
+    if df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    df["estado_norm"] = df["estado"].fillna("").astype(str).str.strip().str.lower()
+    df["prioridad_norm"] = df["prioridad"].fillna("").astype(str).str.strip().str.lower()
+
+    cerradas = ["finalizada", "finalizado", "cerrada", "cerrado"]
+    df = df[~df["estado_norm"].isin(cerradas)].copy()
+
+    urgentes = df[
+        df["prioridad_norm"].isin(["urgente", "alta"])
+    ].sort_values(
+        by=["prioridad_norm", "dias_abierta"],
+        ascending=[False, False]
+    )
+
+    atrasadas = df[
+        df["dias_abierta"] >= 7
+    ].sort_values(
+        by="dias_abierta",
+        ascending=False
+    )
+
+    return urgentes, atrasadas
+
+
+def pintar_tarjeta_ot_accion(ot, color):
+    numero_ot = normalizar_texto_panel(ot.get("numero_ot", ""))
+    descripcion = normalizar_texto_panel(ot.get("descripcion", ""))
+    estado = normalizar_texto_panel(ot.get("estado", ""))
+    prioridad = normalizar_texto_panel(ot.get("prioridad", ""))
+    edificio = normalizar_texto_panel(ot.get("edificio", ""))
+    espacio = normalizar_texto_panel(ot.get("espacio", ""))
+    area = normalizar_texto_panel(ot.get("area", ""))
+    dias = ot.get("dias_abierta", 0)
+
+    st.markdown(
+        f"""
+        <div style="
+            background:#f8fafc;
+            border-radius:14px;
+            padding:12px 14px;
+            margin-bottom:10px;
+            border-left:5px solid {color};
+            box-shadow:0 2px 8px rgba(15,23,42,0.08);
+        ">
+            <div style="font-weight:900;font-size:16px;color:#0f172a;">
+                {numero_ot or "Sin OT"} · {prioridad or "-"}
+            </div>
+            <div style="font-size:14px;margin-top:5px;color:#111827;">
+                {descripcion or "-"}
+            </div>
+            <div style="font-size:13px;color:#475569;margin-top:7px;line-height:1.45;">
+                🏢 {edificio or "-"} · {espacio or "-"}<br>
+                🛠️ {area or "-"} · 📌 {estado or "-"}<br>
+                ⏱️ {dias} días abierta
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def mostrar_columna_accion_centro(ordenes, centro):
+    urgentes, atrasadas = obtener_ordenes_accion_inmediata(ordenes, centro)
+
+    st.markdown(f"### 🏫 {centro}")
+
+    total_urgentes = len(urgentes)
+    total_atrasadas = len(atrasadas)
+
+    a1, a2 = st.columns(2)
+    a1.metric("🔴 Urgentes / Alta", total_urgentes)
+    a2.metric("⏰ Atrasadas +7 días", total_atrasadas)
+
+    st.markdown("#### 🔴 Prioridad alta / urgente")
+
+    if urgentes.empty:
+        st.success("Sin órdenes urgentes.")
+    else:
+        for _, ot in urgentes.head(5).iterrows():
+            pintar_tarjeta_ot_accion(ot, "#dc2626")
+
+        if total_urgentes > 5:
+            st.caption(f"Hay {total_urgentes - 5} urgentes más.")
+
+    st.markdown("#### ⏰ Más atrasadas")
+
+    if atrasadas.empty:
+        st.success("Sin órdenes atrasadas.")
+    else:
+        for _, ot in atrasadas.head(5).iterrows():
+            pintar_tarjeta_ot_accion(ot, "#f97316")
+
+        if total_atrasadas > 5:
+            st.caption(f"Hay {total_atrasadas - 5} atrasadas más.")
+
+
+def mostrar_bloque_accion_inmediata_admin(ordenes):
+    st.markdown("## 🚨 Acción inmediata")
+
+    if not ordenes:
+        st.info("No hay órdenes activas para revisar.")
+        return
+
+    st.caption(
+        "Resumen automático de órdenes que conviene revisar primero: "
+        "prioridad alta/urgente y órdenes abiertas hace más de 7 días."
+    )
+
+    col_p22, col_p9 = st.columns(2)
+
+    with col_p22:
+        mostrar_columna_accion_centro(ordenes, "Pearson 22")
+
+    with col_p9:
+        mostrar_columna_accion_centro(ordenes, "Pearson 9")
+
+
 def pantalla_panel():
     activar_auto_refresco_panel(segundos=30)
 
@@ -185,6 +364,13 @@ def pantalla_panel():
     historico = obtener_historico()
 
     mostrar_alerta_nuevas_ordenes(ordenes)
+
+    # -------------------------------
+    # BLOQUE 1 - ACCIÓN INMEDIATA
+    # -------------------------------
+    mostrar_bloque_accion_inmediata_admin(ordenes)
+
+    st.markdown("---")
 
     st.markdown("### 🔧 Preventivos")
 
