@@ -131,9 +131,12 @@ def obtener_ordenes_abiertas_aula(centro, edificio, aula):
             FROM ordenes_trabajo
             WHERE centro = ?
               AND edificio = ?
-              AND espacio = ?
+              AND (
+                  espacio = ?
+                  OR descripcion LIKE ?
+              )
             ORDER BY fecha_creacion DESC
-        """), conn, params=(centro, edificio, aula))
+        """), conn, params=(centro, edificio, aula, f"%{aula}%")
     except Exception:
         df = pd.DataFrame()
     finally:
