@@ -192,6 +192,17 @@ def asegurar_columnas_inventario():
         _add_columna_segura(cursor, "inventario", "referencia_factura", "TEXT")
         _add_columna_segura(cursor, "inventario", "observaciones_coste", "TEXT")
 
+        # Datos ampliados de OT en historial de inventario
+        _add_columna_segura(cursor, "movimientos_inventario", "descripcion_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "centro_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "edificio_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "espacio_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "area_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "prioridad_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "estado_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "fecha_creacion_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "origen_ot", "TEXT")
+
         cursor.execute("UPDATE inventario SET activo = 1 WHERE activo IS NULL")
         cursor.execute("UPDATE inventario SET precio_unitario = 0 WHERE precio_unitario IS NULL")
         cursor.execute("UPDATE inventario SET coste_total = 0 WHERE coste_total IS NULL")
@@ -474,6 +485,61 @@ def obtener_codigos_materiales():
 # MOVIMIENTOS
 # =====================================================
 
+def obtener_datos_ot_para_inventario(cursor, conn, numero_ot):
+    datos_ot = {
+        "descripcion_ot": "",
+        "centro_ot": "",
+        "edificio_ot": "",
+        "espacio_ot": "",
+        "area_ot": "",
+        "prioridad_ot": "",
+        "estado_ot": "",
+        "fecha_creacion_ot": "",
+        "origen_ot": "",
+    }
+
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return datos_ot
+
+    p = _ph(conn)
+
+    consultas = [
+        """
+        SELECT descripcion, centro, edificio, espacio, area, prioridad, estado, fecha_creacion, origen
+        FROM ordenes_trabajo
+        WHERE numero_ot = {p}
+        """,
+        """
+        SELECT descripcion, centro, edificio, espacio, area, prioridad, estado, fecha_creacion, origen
+        FROM historico_ordenes
+        WHERE numero_ot = {p}
+        """
+    ]
+
+    for consulta in consultas:
+        try:
+            cursor.execute(consulta.format(p=p), (numero_ot,))
+            fila = cursor.fetchone()
+
+            if fila:
+                datos_ot["descripcion_ot"] = fila[0] or ""
+                datos_ot["centro_ot"] = fila[1] or ""
+                datos_ot["edificio_ot"] = fila[2] or ""
+                datos_ot["espacio_ot"] = fila[3] or ""
+                datos_ot["area_ot"] = fila[4] or ""
+                datos_ot["prioridad_ot"] = fila[5] or ""
+                datos_ot["estado_ot"] = fila[6] or ""
+                datos_ot["fecha_creacion_ot"] = str(fila[7] or "")
+                datos_ot["origen_ot"] = fila[8] or ""
+                return datos_ot
+        except Exception:
+            pass
+
+    return datos_ot
+
+
 def registrar_movimiento_inventario(
     codigo_material,
     tipo_movimiento,
@@ -482,6 +548,8 @@ def registrar_movimiento_inventario(
     numero_ot,
     operario
 ):
+    asegurar_columnas_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
@@ -518,6 +586,8 @@ def registrar_movimiento_inventario(
         elif tipo_movimiento == "Ajuste":
             nuevo_stock = cantidad
 
+        datos_ot = obtener_datos_ot_para_inventario(cursor, conn, numero_ot)
+
         cursor.execute(f"""
             UPDATE inventario
             SET stock_actual = {p}
@@ -533,9 +603,21 @@ def registrar_movimiento_inventario(
                 cantidad,
                 motivo,
                 numero_ot,
-                operario
+                operario,
+                descripcion_ot,
+                centro_ot,
+                edificio_ot,
+                espacio_ot,
+                area_ot,
+                prioridad_ot,
+                estado_ot,
+                fecha_creacion_ot,
+                origen_ot
             )
-            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})
+            VALUES (
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}
+            )
         """, (
             codigo_material,
             material,
@@ -543,7 +625,16 @@ def registrar_movimiento_inventario(
             cantidad,
             str(motivo or "").strip(),
             str(numero_ot or "").strip(),
-            str(operario or "").strip()
+            str(operario or "").strip(),
+            datos_ot["descripcion_ot"],
+            datos_ot["centro_ot"],
+            datos_ot["edificio_ot"],
+            datos_ot["espacio_ot"],
+            datos_ot["area_ot"],
+            datos_ot["prioridad_ot"],
+            datos_ot["estado_ot"],
+            datos_ot["fecha_creacion_ot"],
+            datos_ot["origen_ot"]
         ))
 
         conn.commit()
@@ -558,12 +649,16 @@ def registrar_movimiento_inventario(
 
 
 def obtener_movimientos_inventario():
+    asegurar_columnas_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT id, codigo_material, material, tipo_movimiento, cantidad,
-               motivo, numero_ot, operario, fecha_movimiento
+               motivo, numero_ot, operario, fecha_movimiento,
+               descripcion_ot, centro_ot, edificio_ot, espacio_ot,
+               area_ot, prioridad_ot, estado_ot, fecha_creacion_ot, origen_ot
         FROM movimientos_inventario
         ORDER BY fecha_movimiento DESC, id DESC
     """)
@@ -575,6 +670,8 @@ def obtener_movimientos_inventario():
 
 
 def obtener_movimientos_por_material(codigo_material):
+    asegurar_columnas_inventario()
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
@@ -586,7 +683,16 @@ def obtener_movimientos_por_material(codigo_material):
             motivo,
             numero_ot,
             operario,
-            fecha_movimiento
+            fecha_movimiento,
+            descripcion_ot,
+            centro_ot,
+            edificio_ot,
+            espacio_ot,
+            area_ot,
+            prioridad_ot,
+            estado_ot,
+            fecha_creacion_ot,
+            origen_ot
         FROM movimientos_inventario
         WHERE codigo_material = {p}
         ORDER BY fecha_movimiento DESC
@@ -712,4 +818,3 @@ def activar_material(codigo):
     conn.close()
 
     return True, "Material activado correctamente."
-
