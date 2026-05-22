@@ -491,20 +491,29 @@ def pantalla_inventario():
                         "Filtrar historial",
                         ["Todos", "Entradas", "Salidas", "Con OT"],
                         key=f"filtro_historial_{codigo}"
-                     )
+                    )
 
-                     movimientos_filtrados = movimientos
+                    movimientos_filtrados = movimientos
 
-                     if filtro_historial == "Entradas":
-                         movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
+                    if filtro_historial == "Entradas":
+                        movimientos_filtrados = [
+                        mov for mov in movimientos
+                        if mov[0] == "Entrada"
+                    ]
 
-                     elif filtro_historial == "Salidas":
-                         movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
+                    elif filtro_historial == "Salidas":
+                        movimientos_filtrados = [
+                        mov for mov in movimientos
+                    if mov[0] == "Salida"
+                    ]
 
-                     elif filtro_historial == "Con OT":
-                         movimientos_filtrados = [mov for mov in movimientos if mov[3]]
+                    elif filtro_historial == "Con OT":
+                        movimientos_filtrados = [
+                        mov for mov in movimientos
+                    if mov[3]
+                    ]
 
-                     for mov in movimientos_filtrados[:30]:
+                    for mov in movimientos_filtrados[:30]:
 
                          tipo = mov[0]
                          cantidad = mov[1]
