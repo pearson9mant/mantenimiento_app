@@ -468,157 +468,157 @@ def pantalla_inventario():
                             st.rerun()
                         else:
                             st.error(mensaje)
+            # -------------------------
+            # HISTORIAL POR MATERIAL
+            # -------------------------
+            with st.expander(f"📊 Historial {codigo}"):
 
-# -------------------------
-# HISTORIAL POR MATERIAL
-# -------------------------
-with st.expander(f"📊 Historial {codigo}"):
+                movimientos = obtener_movimientos_por_material(codigo)
 
-    movimientos = obtener_movimientos_por_material(codigo)
-
-    if not movimientos:
-        st.info("Sin movimientos.")
-    else:
-        total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
-        total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
-        total_con_ot = len([mov for mov in movimientos if mov[3]])
-
-        h1, h2, h3 = st.columns(3)
-        h1.metric("Entradas", total_entradas)
-        h2.metric("Salidas", total_salidas)
-        h3.metric("Con OT", total_con_ot)
-
-        filtro_historial = st.selectbox(
-            "Filtrar historial",
-            ["Todos", "Entradas", "Salidas", "Con OT"],
-            key=f"filtro_historial_{codigo}"
-        )
-
-        movimientos_filtrados = movimientos
-
-        if filtro_historial == "Entradas":
-            movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
-
-        elif filtro_historial == "Salidas":
-            movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
-
-        elif filtro_historial == "Con OT":
-            movimientos_filtrados = [mov for mov in movimientos if mov[3]]
-
-        for mov in movimientos_filtrados[:30]:
-
-            tipo = mov[0]
-            cantidad = mov[1]
-            motivo = mov[2]
-            ot = mov[3]
-            operario_mov = mov[4]
-            fecha = mov[5]
-
-            descripcion_ot = mov[6] if len(mov) > 6 else ""
-            centro_ot = mov[7] if len(mov) > 7 else ""
-            edificio_ot = mov[8] if len(mov) > 8 else ""
-            espacio_ot = mov[9] if len(mov) > 9 else ""
-            area_ot = mov[10] if len(mov) > 10 else ""
-            prioridad_ot = mov[11] if len(mov) > 11 else ""
-            estado_ot = mov[12] if len(mov) > 12 else ""
-            fecha_creacion_ot = mov[13] if len(mov) > 13 else ""
-            origen_ot = mov[14] if len(mov) > 14 else ""
-
-            if tipo == "Entrada":
-
-                st.success(
-                    f"""
-➕ Entrada · {cantidad}
-
-📅 {fecha}
-👷 {operario_mov or '-'}
-
-📝 {motivo or '-'}
-"""
-                )
-
-            else:
-
-                if ot:
-
-                    html_ot = f"""
-<div style="
-    background:#f8fafc;
-    border-radius:14px;
-    padding:14px;
-    margin-bottom:12px;
-    border-left:5px solid #f59e0b;
-">
-
-<div style="font-size:18px;font-weight:800;color:#0f172a;">
-🛠 {ot}
-</div>
-
-<div style="margin-top:8px;font-size:15px;">
-📦 Salida: <b>{cantidad}</b>
-</div>
-
-<div style="margin-top:8px;font-size:14px;line-height:1.6;color:#334155;">
-
-📍 <b>{centro_ot or '-'}</b> · {edificio_ot or '-'} · {espacio_ot or '-'}<br>
-
-🧰 Área: {area_ot or '-'}<br>
-
-⚡ Prioridad: <b>{prioridad_ot or '-'}</b><br>
-
-📌 Estado OT: <b>{estado_ot or '-'}</b><br>
-
-👷 Operario: {operario_mov or '-'}<br>
-
-🕓 Movimiento: {fecha or '-'}<br>
-
-🗂 Origen: {origen_ot or '-'}<br>
-
-</div>
-
-<div style="
-    margin-top:10px;
-    background:#ffffff;
-    border-radius:10px;
-    padding:10px;
-    border:1px solid #e2e8f0;
-">
-
-<div style="font-size:14px;font-weight:700;margin-bottom:4px;">
-📝 Descripción OT
-</div>
-
-<div style="font-size:14px;color:#111827;">
-{descripcion_ot or '-'}
-</div>
-
-</div>
-
-<div style="
-    margin-top:10px;
-    font-size:13px;
-    color:#64748b;
-">
-📅 Fecha creación OT: {fecha_creacion_ot or '-'}
-</div>
-
-</div>
-"""
-
-                    st.markdown(html_ot, unsafe_allow_html=True)
-
+                if not movimientos:
+                    st.info("Sin movimientos.")
                 else:
+                    total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
+                    total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
+                    total_con_ot = len([mov for mov in movimientos if mov[3]])
 
-                    st.error(
+                    h1, h2, h3 = st.columns(3)
+                    h1.metric("Entradas", total_entradas)
+                    h2.metric("Salidas", total_salidas)
+                    h3.metric("Con OT", total_con_ot)
+
+                    filtro_historial = st.selectbox(
+                        "Filtrar historial",
+                        ["Todos", "Entradas", "Salidas", "Con OT"],
+                        key=f"filtro_historial_{codigo}"
+                     )
+
+                     movimientos_filtrados = movimientos
+
+                     if filtro_historial == "Entradas":
+                         movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
+
+                     elif filtro_historial == "Salidas":
+                         movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
+
+                     elif filtro_historial == "Con OT":
+                         movimientos_filtrados = [mov for mov in movimientos if mov[3]]
+
+                     for mov in movimientos_filtrados[:30]:
+
+                         tipo = mov[0]
+                         cantidad = mov[1]
+                         motivo = mov[2]
+                         ot = mov[3]
+                         operario_mov = mov[4]
+                         fecha = mov[5]
+
+                         descripcion_ot = mov[6] if len(mov) > 6 else ""
+                         centro_ot = mov[7] if len(mov) > 7 else ""
+                         edificio_ot = mov[8] if len(mov) > 8 else ""
+                         espacio_ot = mov[9] if len(mov) > 9 else ""
+                         area_ot = mov[10] if len(mov) > 10 else ""
+                         prioridad_ot = mov[11] if len(mov) > 11 else ""
+                         estado_ot = mov[12] if len(mov) > 12 else ""
+                         fecha_creacion_ot = mov[13] if len(mov) > 13 else ""
+                         origen_ot = mov[14] if len(mov) > 14 else ""
+
+                         if tipo == "Entrada":
+
+                             st.success(
+                                 f"""
+            ➕ Entrada · {cantidad}
+
+            📅 {fecha}
+            👷 {operario_mov or '-'}
+
+            📝 {motivo or '-'}
+            """
+                            )
+
+                        else:
+
+                            if ot:
+
+                                html_ot = f"""
+            <div style="
+                background:#f8fafc;
+                border-radius:14px;
+                padding:14px;
+                margin-bottom:12px;
+                border-left:5px solid #f59e0b;
+            ">
+      
+            <div style="font-size:18px;font-weight:800;color:#0f172a;">
+            🛠 {ot}
+            </div>
+
+            <div style="margin-top:8px;font-size:15px;">
+            📦 Salida: <b>{cantidad}</b>
+            </div>
+
+            <div style="margin-top:8px;font-size:14px;line-height:1.6;color:#334155;">
+
+            📍 <b>{centro_ot or '-'}</b> · {edificio_ot or '-'} · {espacio_ot or '-'}<br>
+
+            🧰 Área: {area_ot or '-'}<br>
+
+            ⚡ Prioridad: <b>{prioridad_ot or '-'}</b><br>
+
+            📌 Estado OT: <b>{estado_ot or '-'}</b><br>
+
+            👷 Operario: {operario_mov or '-'}<br>
+
+            🕓 Movimiento: {fecha or '-'}<br>
+
+            🗂 Origen: {origen_ot or '-'}<br>
+
+            </div>
+
+            <div style="
+                margin-top:10px;
+                background:#ffffff;
+                border-radius:10px;
+                padding:10px;
+                border:1px solid #e2e8f0;
+            ">
+
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px;">
+            📝 Descripción OT
+            </div>
+
+            <div style="font-size:14px;color:#111827;">
+            {descripcion_ot or '-'}
+            </div>
+
+            </div>
+
+            <div style="
+                margin-top:10px;
+                font-size:13px;
+                color:#64748b;
+">
+            📅 Fecha creación OT: {fecha_creacion_ot or '-'}
+            </div>
+
+            </div>
+            """
+
+                                st.markdown(html_ot, unsafe_allow_html=True)
+
+                            else:
+
+                                st.error(
                         f"""
-➖ Salida manual · {cantidad}
+            ➖ Salida manual · {cantidad}
 
-📅 {fecha}
-👷 {operario_mov or '-'}
+            📅 {fecha}
+            👷 {operario_mov or '-'}
 
-📝 {motivo or '-'}
-"""
-                    )
+            📝 {motivo or '-'}
+            """
+                          )
+
             # -------------------------
             # ENTRADAS / SALIDAS
             # -------------------------
