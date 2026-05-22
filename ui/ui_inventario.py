@@ -468,17 +468,7 @@ def pantalla_inventario():
                             st.rerun()
                         else:
                             st.error(mensaje)
-Reemplaza COMPLETAMENTE el bloque que empieza en:
 
-```python
-# -------------------------
-# HISTORIAL POR MATERIAL
-# -------------------------
-```
-
-por este bloque ENTERO ya corregido:
-
-```python
             # -------------------------
             # HISTORIAL POR MATERIAL
             # -------------------------
