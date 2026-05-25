@@ -535,6 +535,10 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Estado aulas"
             st.rerun() 
 
+        if st.button("🔔\nRecordatorios", key="btn_recordatorios", use_container_width=True):
+            st.session_state["seccion_actual"] = "Recordatorios"
+            st.rerun()
+
         if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
@@ -763,6 +767,9 @@ if perfil == "admin":
 
     elif seccion == "Estado aulas":
         ui_estado_aulas()
+
+    elif seccion == "Recordatorios":
+        pantalla_recordatorios()
 
 
 elif perfil == "gerencia":
