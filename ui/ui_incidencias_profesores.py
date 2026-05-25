@@ -153,26 +153,38 @@ def pantalla_incidencias_profesores():
         height=120
     )
 
-    foto = st.file_uploader(
-        "Añadir foto (opcional)",
+    fotos = st.file_uploader(
+        "Añadir fotos (opcional, máximo 5)",
         type=["jpg", "jpeg", "png"],
-        key="foto_incidencia_profesor"
+        accept_multiple_files=True,
+        key="fotos_incidencia_profesor"
     )
 
-    foto_bytes = None
-    foto_error = False
+    fotos_validas = []
+    fotos_error = False
 
-    if foto is not None:
-        if foto.size > 5 * 1024 * 1024:
-            st.warning("La foto supera 5 MB. Sube una imagen más pequeña.")
-            foto_error = True
+    if fotos:
+        if len(fotos) > 5:
+            st.warning("Máximo 5 fotos por incidencia.")
+            fotos_error = True
         else:
-            foto_bytes = foto.getvalue()
-            st.image(
-                foto_bytes,
-                caption="Foto adjunta",
-                use_container_width=True
-            )
+            cols = st.columns(3)
+
+            for i, foto in enumerate(fotos):
+                if foto.size > 5 * 1024 * 1024:
+                    st.warning(f"La foto {foto.name} supera 5 MB.")
+                    fotos_error = True
+                    continue
+
+                foto_bytes = foto.getvalue()
+                fotos_validas.append((foto, foto_bytes))
+
+                with cols[i % 3]:
+                    st.image(
+                        foto_bytes,
+                        caption=f"Foto {i + 1}",
+                        use_container_width=True
+                    )
 
     prioridad = st.radio(
         "Prioridad",
@@ -206,8 +218,8 @@ def pantalla_incidencias_profesores():
             st.warning("Falta indicar el espacio.")
             return
 
-        if foto_error:
-            st.error("No se puede guardar. La foto es demasiado grande.")
+        if fotos_error:
+            st.error("Revisa las fotos. Máximo 5 fotos y máximo 5 MB por foto.")
             return
 
         if centro == "Pearson 9":
@@ -218,30 +230,36 @@ def pantalla_incidencias_profesores():
         numero_ot = obtener_siguiente_numero_ot(centro, "INC")
         fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        ruta_foto = ""
+        rutas_fotos = []
 
-        if foto_bytes is not None:
+        if fotos_validas:
             try:
                 carpeta = Path("uploads/incidencias")
                 carpeta.mkdir(parents=True, exist_ok=True)
 
-                extension = foto.name.split(".")[-1].lower()
-                nombre_original = limpiar_nombre_archivo(foto.name)
-                nombre_foto = limpiar_nombre_archivo(
-                    f"{numero_ot}_{centro}_{edificio}_{espacio}_{nombre_original}"
-                )
+                for i, (foto, foto_bytes) in enumerate(fotos_validas, start=1):
+                    extension = foto.name.split(".")[-1].lower()
+                    nombre_original = limpiar_nombre_archivo(foto.name)
 
-                if not nombre_foto.lower().endswith(f".{extension}"):
-                    nombre_foto = f"{nombre_foto}.{extension}"
+                    nombre_foto = limpiar_nombre_archivo(
+                        f"{numero_ot}_{i}_{centro}_{edificio}_{espacio}_{nombre_original}"
+                    )
 
-                ruta_foto = str(carpeta / nombre_foto)
+                    if not nombre_foto.lower().endswith(f".{extension}"):
+                        nombre_foto = f"{nombre_foto}.{extension}"
 
-                with open(ruta_foto, "wb") as f:
-                    f.write(foto_bytes)
+                    ruta_foto = str(carpeta / nombre_foto)
+
+                    with open(ruta_foto, "wb") as f:
+                        f.write(foto_bytes)
+
+                    rutas_fotos.append(ruta_foto)
 
             except Exception as e:
-                st.error(f"No se pudo guardar la foto: {e}")
+                st.error(f"No se pudieron guardar las fotos: {e}")
                 return
+
+        ruta_foto = "|".join(rutas_fotos)
 
         prioridad_limpia = prioridad.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "")
 
@@ -265,6 +283,9 @@ def pantalla_incidencias_profesores():
         crear_orden(datos)
 
         st.success(f"✅ Incidencia guardada correctamente. Nº OT: {numero_ot}")
+
+        if rutas_fotos:
+            st.info(f"📷 Fotos adjuntas: {len(rutas_fotos)}")
 
         st.info(f"""
         **Resumen de la incidencia:**
