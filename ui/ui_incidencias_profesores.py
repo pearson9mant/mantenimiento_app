@@ -238,30 +238,24 @@ def pantalla_incidencias_profesores():
 
         if fotos_validas:
             try:
-                carpeta = Path("uploads/incidencias")
-                carpeta.mkdir(parents=True, exist_ok=True)
-
                 for i, (foto, foto_bytes) in enumerate(fotos_validas, start=1):
-                    extension = foto.name.split(".")[-1].lower()
-                    nombre_original = limpiar_nombre_archivo(foto.name)
-
                     nombre_foto = limpiar_nombre_archivo(
-                        f"{numero_ot}_{i}_{centro}_{edificio}_{espacio}_{nombre_original}"
+                        f"{numero_ot}_{i}_{foto.name}"
                     )
-
-                    if not nombre_foto.lower().endswith(f".{extension}"):
-                        nombre_foto = f"{nombre_foto}.{extension}"
-
-                    ruta_foto = str(carpeta / nombre_foto)
-
-                    with open(ruta_foto, "wb") as f:
-                        f.write(foto_bytes)
-
-                    rutas_fotos.append(ruta_foto)
-
+        
+                    guardar_foto_ot(
+                        numero_ot=numero_ot,
+                        nombre_foto=nombre_foto,
+                        foto_data=foto_bytes
+                    )
+        
+                    rutas_fotos.append(nombre_foto)
+        
             except Exception as e:
                 st.error(f"No se pudieron guardar las fotos: {e}")
                 return
+
+        
 
         ruta_foto = "|".join(rutas_fotos)
 
