@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date, timedelta
+from pathlib import Path
 
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from database.db import conectar, _sql
@@ -20,6 +21,42 @@ TAREAS_PREVENTIVAS = [
     "Revisar o lipiar placas solares",
     "Otra",
 ]
+
+
+def asegurar_columna_foto_preventivo():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        try:
+            cursor.execute("""
+                ALTER TABLE preventivo_tareas
+                ADD COLUMN IF NOT EXISTS foto TEXT
+            """)
+        except Exception:
+            try:
+                cursor.execute("""
+                    ALTER TABLE preventivo_tareas
+                    ADD COLUMN foto TEXT
+                """)
+            except Exception:
+                pass
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+
+    finally:
+        conn.close()
+
+
+def limpiar_nombre_archivo(texto):
+    texto = str(texto or "")
+    caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
+    for c in caracteres_malos:
+        texto = texto.replace(c, "_")
+    return texto.replace(" ", "_")
 
 
 def calcular_proxima_fecha(fecha_base, frecuencia):
@@ -80,6 +117,8 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
 
 
 def pantalla_preventivo():
+    asegurar_columna_foto_preventivo()
+
     st.subheader("🔧 Mantenimiento preventivo")
 
     tab1, tab2 = st.tabs(["➕ Crear tarea", "📋 Tareas"])
@@ -106,11 +145,6 @@ def pantalla_preventivo():
             espacio = st.text_input("Especificar espacio", key="prev_espacio_otro")
         else:
             espacio = espacio_sel
-
-        # =====================================================
-        # FECHAS FUERA DEL FORMULARIO
-        # Así se actualiza en pantalla al cambiar frecuencia/fecha
-        # =====================================================
 
         frecuencia = st.selectbox(
             "Frecuencia",
@@ -163,6 +197,27 @@ def pantalla_preventivo():
 
             observaciones = st.text_area("Observaciones", key="prev_observaciones")
 
+            foto = st.file_uploader(
+                "Foto preventiva (opcional)",
+                type=["jpg", "jpeg", "png"],
+                key="foto_preventivo"
+            )
+
+            foto_bytes = None
+            foto_error = False
+
+            if foto is not None:
+                if foto.size > 5 * 1024 * 1024:
+                    st.warning("La foto supera 5 MB. Sube una imagen más pequeña.")
+                    foto_error = True
+                else:
+                    foto_bytes = foto.getvalue()
+                    st.image(
+                        foto_bytes,
+                        caption="Foto preventiva",
+                        use_container_width=True
+                    )
+
             crear_de_todas_formas = st.checkbox(
                 "Crear de todas formas si ya existe una preventiva igual",
                 key="prev_crear_de_todas_formas"
@@ -174,6 +229,10 @@ def pantalla_preventivo():
             )
 
             if crear:
+                if foto_error:
+                    st.error("No se puede guardar. La foto es demasiado grande.")
+                    return
+
                 if not str(tarea).strip():
                     st.warning("La tarea es obligatoria")
                 elif not str(espacio).strip():
@@ -196,6 +255,32 @@ def pantalla_preventivo():
                             "Si realmente quieres duplicarla, marca la casilla de confirmación."
                         )
                     else:
+                        ruta_foto = ""
+
+                        if foto_bytes is not None:
+                            try:
+                                carpeta = Path("uploads/preventivo")
+                                carpeta.mkdir(parents=True, exist_ok=True)
+
+                                extension = foto.name.split(".")[-1].lower()
+                                nombre_original = limpiar_nombre_archivo(foto.name)
+
+                                nombre_foto = limpiar_nombre_archivo(
+                                    f"{centro}_{edificio}_{espacio}_{tarea}_{nombre_original}"
+                                )
+
+                                if not nombre_foto.lower().endswith(f".{extension}"):
+                                    nombre_foto = f"{nombre_foto}.{extension}"
+
+                                ruta_foto = str(carpeta / nombre_foto)
+
+                                with open(ruta_foto, "wb") as f:
+                                    f.write(foto_bytes)
+
+                            except Exception as e:
+                                st.error(f"Error guardando foto: {e}")
+                                return
+
                         conn = conectar()
                         cursor = conn.cursor()
 
@@ -205,9 +290,9 @@ def pantalla_preventivo():
                                 centro, edificio, espacio, area,
                                 tarea, frecuencia,
                                 ultima_fecha, proxima_fecha,
-                                operario, activo, observaciones
+                                operario, activo, observaciones, foto
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """), (
                             centro,
                             edificio,
@@ -219,7 +304,8 @@ def pantalla_preventivo():
                             str(proxima_fecha),
                             operario,
                             1,
-                            observaciones
+                            observaciones,
+                            ruta_foto
                         ))
 
                         conn.commit()
@@ -234,7 +320,7 @@ def pantalla_preventivo():
 
         cursor.execute("""
             SELECT id, centro, edificio, espacio, area, tarea,
-                   frecuencia, ultima_fecha, proxima_fecha, operario, activo
+                   frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto
             FROM preventivo_tareas
             ORDER BY id DESC
         """)
@@ -248,7 +334,7 @@ def pantalla_preventivo():
             for t in tareas:
                 (
                     id_tarea, centro, edificio, espacio, area,
-                    tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo
+                    tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto
                 ) = t
 
                 estado = "🟢 Activa" if activo else "🔴 Inactiva"
@@ -265,6 +351,12 @@ def pantalla_preventivo():
                         📅 Próxima revisión: **{proxima_fecha or '-'}**
                         """
                     )
+
+                    if foto:
+                        try:
+                            st.image(foto, caption="Foto preventiva", width=260)
+                        except Exception:
+                            st.caption("Foto preventiva no disponible.")
 
                     c1, c2 = st.columns(2)
 
