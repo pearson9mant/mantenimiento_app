@@ -82,6 +82,14 @@ ESPACIOS_POR_EDIFICIO = {
 }
 
 
+def limpiar_nombre_archivo(texto):
+    texto = str(texto or "")
+    caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
+    for c in caracteres_malos:
+        texto = texto.replace(c, "_")
+    return texto.replace(" ", "_")
+
+
 def pantalla_incidencias_profesores():
     st.markdown("""
     <style>
@@ -147,14 +155,24 @@ def pantalla_incidencias_profesores():
 
     foto = st.file_uploader(
         "Añadir foto (opcional)",
-        type=["jpg", "jpeg", "png"]
+        type=["jpg", "jpeg", "png"],
+        key="foto_incidencia_profesor"
     )
 
     foto_bytes = None
+    foto_error = False
 
     if foto is not None:
-        foto_bytes = foto.getvalue()
-        st.image(foto_bytes, caption="Foto adjunta", use_container_width=True)
+        if foto.size > 5 * 1024 * 1024:
+            st.warning("La foto supera 5 MB. Sube una imagen más pequeña.")
+            foto_error = True
+        else:
+            foto_bytes = foto.getvalue()
+            st.image(
+                foto_bytes,
+                caption="Foto adjunta",
+                use_container_width=True
+            )
 
     prioridad = st.radio(
         "Prioridad",
@@ -188,6 +206,10 @@ def pantalla_incidencias_profesores():
             st.warning("Falta indicar el espacio.")
             return
 
+        if foto_error:
+            st.error("No se puede guardar. La foto es demasiado grande.")
+            return
+
         if centro == "Pearson 9":
             operario = "Luis Lozano"
         else:
@@ -199,15 +221,27 @@ def pantalla_incidencias_profesores():
         ruta_foto = ""
 
         if foto_bytes is not None:
-            carpeta = Path("uploads/incidencias")
-            carpeta.mkdir(parents=True, exist_ok=True)
+            try:
+                carpeta = Path("uploads/incidencias")
+                carpeta.mkdir(parents=True, exist_ok=True)
 
-            extension = foto.name.split(".")[-1].lower()
-            nombre_foto = f"{numero_ot}.{extension}"
-            ruta_foto = str(carpeta / nombre_foto)
+                extension = foto.name.split(".")[-1].lower()
+                nombre_original = limpiar_nombre_archivo(foto.name)
+                nombre_foto = limpiar_nombre_archivo(
+                    f"{numero_ot}_{centro}_{edificio}_{espacio}_{nombre_original}"
+                )
 
-            with open(ruta_foto, "wb") as f:
-                f.write(foto_bytes)
+                if not nombre_foto.lower().endswith(f".{extension}"):
+                    nombre_foto = f"{nombre_foto}.{extension}"
+
+                ruta_foto = str(carpeta / nombre_foto)
+
+                with open(ruta_foto, "wb") as f:
+                    f.write(foto_bytes)
+
+            except Exception as e:
+                st.error(f"No se pudo guardar la foto: {e}")
+                return
 
         prioridad_limpia = prioridad.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "")
 
