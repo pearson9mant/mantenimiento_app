@@ -434,23 +434,29 @@ def mostrar_menu_admin():
 
         resumen_recordatorios = obtener_resumen_recordatorios()
 
-        if resumen_recordatorios["vencidos"] > 0:
-            st.error(
-                f"🔴 {resumen_recordatorios['vencidos']} recordatorios vencidos"
-            )
+        if resumen_recordatorios["vencidos"]:
 
-        if resumen_recordatorios["hoy"] > 0:
-            st.warning(
-                f"🟠 {resumen_recordatorios['hoy']} recordatorios para hoy"
-            )
+            st.error("🔴 Recordatorios vencidos")
 
-        if resumen_recordatorios["mañana"] > 0:
-            st.info(
-                f"🔔 {resumen_recordatorios['mañana']} recordatorios para mañana"
-            )
+            for item in resumen_recordatorios["vencidos"]:
+                st.markdown(f"- {item}")
 
-    except Exception:
-        pass
+        if resumen_recordatorios["hoy"]:
+
+            st.warning("🟠 Recordatorios para hoy")
+
+            for item in resumen_recordatorios["hoy"]:
+                st.markdown(f"- {item}")
+
+        if resumen_recordatorios["mañana"]:
+
+            st.info("🔔 Recordatorios para mañana")
+
+            for item in resumen_recordatorios["mañana"]:
+                st.markdown(f"- {item}")
+
+    except Exception as e:
+        st.warning(f"Error recordatorios: {e}")
 
     # =====================================================
     # ALERTAS EMPRESAS / LEGIONELLA
