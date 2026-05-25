@@ -16,6 +16,20 @@ from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 from modules.alertas_empresas import obtener_alertas_empresas_externas
 
 
+def rol_actual():
+    return str(
+        st.session_state.get("rol")
+        or st.session_state.get("tipo_usuario")
+        or st.session_state.get("perfil")
+        or st.session_state.get("modo")
+        or ""
+    ).strip().lower()
+
+
+def puede_borrar_inventario():
+    return rol_actual() in ["admin", "administracion", "administración"]
+
+
 def limpiar_nombre_archivo(texto):
     texto = str(texto)
     caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
@@ -326,13 +340,17 @@ def pantalla_inventario():
             foto_data = None
 
             if foto_subida is not None:
-                foto_nombre = limpiar_nombre_archivo(
-                    f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}"
-                )
+                if foto_subida.size > 5 * 1024 * 1024:
+                    st.warning("La foto supera 5 MB. Mejor sube una imagen más pequeña.")
+                else:
+                    foto_nombre = limpiar_nombre_archivo(
+                        f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}"
+                    )
 
-                foto_data = foto_subida.getvalue()
+                    foto_data = foto_subida.getvalue()
 
-                st.image(bytes(foto_data), width=250)
+                    st.image(bytes(foto_data), width=250)
+                    st.caption(f"📷 {foto_nombre}")
 
             if st.button("Crear material", use_container_width=True):
                 if not material.strip():
@@ -340,6 +358,9 @@ def pantalla_inventario():
 
                 elif exacto:
                     st.error("No se puede crear porque ya existe un material igual.")
+
+                elif foto_subida is not None and foto_subida.size > 5 * 1024 * 1024:
+                    st.error("No se puede guardar. La foto supera 5 MB.")
 
                 else:
                     codigo = generar_codigo_material(material, categoria)
@@ -416,7 +437,7 @@ def pantalla_inventario():
     )
 
     ver_inactivos = False
-    if operario == "Abel Vasquez":
+    if puede_borrar_inventario():
         ver_inactivos = st.checkbox(
             "Mostrar materiales desactivados",
             key="ver_inactivos_inventario"
@@ -486,6 +507,7 @@ def pantalla_inventario():
         observaciones = material_dict.get("observaciones")
 
         foto = material_dict.get("foto")
+        foto_nombre = material_dict.get("foto_nombre")
         foto_data = material_dict.get("foto_data")
 
         activo = material_dict.get("activo", 1)
@@ -554,32 +576,48 @@ def pantalla_inventario():
             if foto_data:
                 try:
                     st.image(bytes(foto_data), width=220)
+                    if foto_nombre:
+                        st.caption(f"📷 {foto_nombre}")
                 except Exception as e:
                     st.caption(f"Foto no disponible: {e}")
 
             elif foto:
                 try:
                     st.image(foto, width=220)
+                    if foto_nombre:
+                        st.caption(f"📷 {foto_nombre}")
                 except Exception:
                     st.caption("Foto no disponible.")
 
-            if operario == "Abel Vasquez":
+            if puede_borrar_inventario():
                 if activo == 1:
-                    if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
-                        ok, mensaje = desactivar_material(codigo)
-                        if ok:
-                            st.success(mensaje)
-                            st.rerun()
-                        else:
-                            st.error(mensaje)
+                    confirmar = st.checkbox(
+                        f"Confirmo que quiero desactivar {codigo}",
+                        key=f"confirmar_desactivar_{codigo}"
+                    )
+
+                    if confirmar:
+                        if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
+                            ok, mensaje = desactivar_material(codigo)
+                            if ok:
+                                st.success(mensaje)
+                                st.rerun()
+                            else:
+                                st.error(mensaje)
                 else:
-                    if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
-                        ok, mensaje = activar_material(codigo)
-                        if ok:
-                            st.success(mensaje)
-                            st.rerun()
-                        else:
-                            st.error(mensaje)
+                    confirmar_activar = st.checkbox(
+                        f"Confirmo que quiero reactivar {codigo}",
+                        key=f"confirmar_activar_{codigo}"
+                    )
+
+                    if confirmar_activar:
+                        if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
+                            ok, mensaje = activar_material(codigo)
+                            if ok:
+                                st.success(mensaje)
+                                st.rerun()
+                            else:
+                                st.error(mensaje)
 
             with st.expander(f"📊 Historial {codigo}"):
                 mostrar_historial_material(codigo)
