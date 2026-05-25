@@ -917,3 +917,85 @@ def crear_correctiva_desde_ot(
     ))
 
     return True, f"Correctiva creada correctamente: {numero_ot}"
+# =====================================================
+# FOTOS OT
+# =====================================================
+
+def asegurar_tabla_ordenes_fotos():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    modulo = conn.__class__.__module__.lower()
+    es_postgres = "psycopg2" in modulo or "postgres" in modulo
+
+    if es_postgres:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ordenes_fotos (
+                id SERIAL PRIMARY KEY,
+                numero_ot TEXT,
+                nombre_foto TEXT,
+                foto_data BYTEA,
+                fecha_subida TEXT
+            )
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ordenes_fotos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero_ot TEXT,
+                nombre_foto TEXT,
+                foto_data BLOB,
+                fecha_subida TEXT
+            )
+        """)
+
+    conn.commit()
+    conn.close()
+
+
+def guardar_foto_ot(numero_ot, nombre_foto, foto_data):
+    asegurar_tabla_ordenes_fotos()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    fecha_subida = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(_sql("""
+        INSERT INTO ordenes_fotos
+        (
+            numero_ot,
+            nombre_foto,
+            foto_data,
+            fecha_subida
+        )
+        VALUES (?, ?, ?, ?)
+    """), (
+        numero_ot,
+        nombre_foto,
+        foto_data,
+        fecha_subida
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def obtener_fotos_ot(numero_ot):
+    asegurar_tabla_ordenes_fotos()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT nombre_foto, foto_data
+        FROM ordenes_fotos
+        WHERE numero_ot = ?
+        ORDER BY id ASC
+    """), (numero_ot,))
+
+    datos = cursor.fetchall()
+
+    conn.close()
+
+    return datos
