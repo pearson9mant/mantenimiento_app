@@ -2,7 +2,11 @@ import streamlit as st
 from datetime import datetime
 from pathlib import Path
 
-from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
+from modules.ordenes import (
+    crear_orden,
+    obtener_siguiente_numero_ot,
+    guardar_foto_ot
+)
 
 
 ESPACIOS_POR_EDIFICIO = {
