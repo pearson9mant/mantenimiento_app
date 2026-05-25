@@ -372,7 +372,12 @@ def pantalla_ordenes():
                         ["Baja", "Media", "Alta"],
                         key="orden_int_prioridad"
                     )
-
+                    fotos_ot = st.file_uploader(
+                        "📷 Fotos incidencia",
+                        type=["jpg", "jpeg", "png"],
+                        accept_multiple_files=True,
+                        key="orden_int_fotos"
+                    )
                     operario_auto = operario_forzado_si_toca(centro)
 
                     if es_operario():
