@@ -447,6 +447,24 @@ def pantalla_ordenes():
                             )
 
                             crear_orden(datos_orden)
+                            if fotos_ot:
+
+                                try:
+                            
+                                    for i, foto in enumerate(fotos_ot, start=1):
+                            
+                                        foto_bytes = foto.read()
+                            
+                                        nombre_foto = f"{numero}_{i}_{foto.name}"
+                            
+                                        guardar_foto_ot(
+                                            numero_ot=numero,
+                                            nombre_foto=nombre_foto,
+                                            foto_data=foto_bytes
+                                        )
+                            
+                                except Exception as e:
+                                    st.error(f"Error guardando fotos: {e}")
                             limpiar_cache_streamlit()
 
                             st.success(f"Orden interna creada correctamente: {numero}")
