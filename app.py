@@ -430,6 +430,27 @@ def mostrar_menu_admin():
         "<div class='section-title'>Menú principal</div>",
         unsafe_allow_html=True
     )
+    try:
+
+        resumen_recordatorios = obtener_resumen_recordatorios()
+
+        if resumen_recordatorios["vencidos"] > 0:
+            st.error(
+                f"🔴 {resumen_recordatorios['vencidos']} recordatorios vencidos"
+            )
+
+        if resumen_recordatorios["hoy"] > 0:
+            st.warning(
+                f"🟠 {resumen_recordatorios['hoy']} recordatorios para hoy"
+            )
+
+        if resumen_recordatorios["mañana"] > 0:
+            st.info(
+                f"🔔 {resumen_recordatorios['mañana']} recordatorios para mañana"
+            )
+
+    except Exception:
+        pass
 
     # =====================================================
     # ALERTAS EMPRESAS / LEGIONELLA
