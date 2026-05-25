@@ -773,6 +773,37 @@ def pantalla_operario():
         if o[3] in ["Abierta", "En curso", "Pendiente material"]
     ]
 
+    filtro_origen_operario = st.radio(
+        "Filtrar trabajos",
+        ["Todas", "Incidencias", "Preventivo", "Legionella", "☀️ Verano"],
+        horizontal=True,
+        key="filtro_origen_operario"
+    )
+    
+    if filtro_origen_operario == "Preventivo":
+        ordenes_operario = [
+            o for o in ordenes_operario
+            if len(o) > 11 and str(o[11] or "").strip().upper() == "PREVENTIVO"
+        ]
+    
+    elif filtro_origen_operario == "Legionella":
+        ordenes_operario = [
+            o for o in ordenes_operario
+            if len(o) > 11 and str(o[11] or "").strip().upper() == "LEGIONELLA"
+        ]
+    
+    elif filtro_origen_operario == "☀️ Verano":
+        ordenes_operario = [
+            o for o in ordenes_operario
+            if len(o) > 11 and str(o[11] or "").strip().upper() == "VERANO"
+        ]
+    
+    elif filtro_origen_operario == "Incidencias":
+        ordenes_operario = [
+            o for o in ordenes_operario
+            if len(o) > 11 and str(o[11] or "").strip().upper() in ["APP", "OUTLOOK", "PROFESORES"]
+        ]
+
     if not ordenes_operario:
         st.success("No tienes órdenes pendientes.")
         return
