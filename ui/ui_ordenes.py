@@ -575,7 +575,16 @@ def pantalla_ordenes():
             with f2:
                 filtro_origen = st.selectbox(
                     "Origen",
-                    ["Todos", "LEGIONELLA", "OUTLOOK", "APP", "EXTERNA", "PREVENTIVO", "PROFESORES"],
+                    [
+                        "Todos",
+                        "LEGIONELLA",
+                        "OUTLOOK",
+                        "APP",
+                        "EXTERNA",
+                        "PREVENTIVO",
+                        "PROFESORES",
+                        "VERANO"
+                    ],
                     key="filtro_origen_admin_ot"
                 )
 
