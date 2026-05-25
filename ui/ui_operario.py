@@ -880,7 +880,7 @@ def pantalla_operario():
             
                                 try:
                                     st.image(
-                                        foto_data,
+                                        bytes(foto_data),
                                         caption=f"Foto {i + 1}",
                                         use_container_width=True
                                     )
