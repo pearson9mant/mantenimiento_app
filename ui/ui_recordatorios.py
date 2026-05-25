@@ -14,18 +14,32 @@ def asegurar_tabla_recordatorios():
     cursor = conn.cursor()
 
     try:
-        cursor.execute(_sql("""
-            CREATE TABLE IF NOT EXISTS recordatorios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                titulo TEXT,
-                descripcion TEXT,
-                fecha_recordatorio TEXT,
-                prioridad TEXT,
-                estado TEXT DEFAULT 'Pendiente',
-                creado_por TEXT,
-                fecha_creacion TEXT
-            )
-        """))
+        if "postgres" in conn.__class__.__module__.lower():
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS recordatorios (
+                    id SERIAL PRIMARY KEY,
+                    titulo TEXT,
+                    descripcion TEXT,
+                    fecha_recordatorio TEXT,
+                    prioridad TEXT,
+                    estado TEXT DEFAULT 'Pendiente',
+                    creado_por TEXT,
+                    fecha_creacion TEXT
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS recordatorios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    titulo TEXT,
+                    descripcion TEXT,
+                    fecha_recordatorio TEXT,
+                    prioridad TEXT,
+                    estado TEXT DEFAULT 'Pendiente',
+                    creado_por TEXT,
+                    fecha_creacion TEXT
+                )
+            """)
 
         conn.commit()
 
