@@ -2641,18 +2641,21 @@ def pantalla_legionella():
                 df_filtrado = df_filtrado[df_filtrado["estado"] == estado_f]
 
             st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
-            st.markdown("### 📷 Fotos controles")
+            with st.expander("📷 Ver fotos controles", expanded=False):
 
-            for _, row in df_filtrado.iterrows():
-                if row.get("foto"):
-                    try:
-                        st.image(
-                            row["foto"],
-                            caption=f"{row['fecha']} · {row['punto']} · {row['tarea']}",
-                            width=260
-                        )
-                    except Exception:
-                        pass
+                for _, row in df_filtrado.iterrows():
+
+                    if row.get("foto"):
+
+                        try:
+                            st.image(
+                                row["foto"],
+                                caption=f"{row['fecha']} · {row['punto']} · {row['tarea']}",
+                                width=260
+                            )
+
+                        except Exception:
+                            pass
 
             csv = df_filtrado.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
