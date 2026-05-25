@@ -832,35 +832,36 @@ def pantalla_operario():
             if fecha_origen:
                 st.caption(f"Fecha origen: {fecha_origen}")
 
-           if foto:
-
-               try:
-                   
-                   fotos = str(foto).split("|")
-
-                   cols_fotos = st.columns(3)
-
-                   for i, ruta_foto in enumerate(fotos):
-
-                       ruta_foto = str(ruta_foto).strip()
-
-                       if not ruta_foto:
-                           continue
-
-                       with cols_fotos[i % 3]:
-
-                          try:
-                              st.image(
-                                  ruta_foto,
-                                  caption=f"Foto {i + 1}",
-                                  use_container_width=True
-                              )
-
-                          except Exception:
-                              st.caption("📷 Foto no disponible")
-
-               except Exception:
-                   st.caption("📷 Error mostrando fotos")
+            if foto:
+            
+                try:
+            
+                    fotos = str(foto).split("|")
+            
+                    cols_fotos = st.columns(3)
+            
+                    for i, ruta_foto in enumerate(fotos):
+            
+                        ruta_foto = str(ruta_foto).strip()
+            
+                        if not ruta_foto:
+                            continue
+            
+                        with cols_fotos[i % 3]:
+            
+                            try:
+                                st.image(
+                                    ruta_foto,
+                                    caption=f"Foto {i + 1}",
+                                    use_container_width=True
+                                )
+            
+                            except Exception:
+                                st.caption("📷 Foto no disponible")
+            
+                except Exception:
+                    st.caption("📷 Error mostrando fotos")
+                    
             if es_ot_preventiva(origen, desc):
                 mostrar_checklist_preventivo_operario(num_ot, desc, operario)
 
