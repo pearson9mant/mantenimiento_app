@@ -865,31 +865,52 @@ def pantalla_operario():
                 st.caption(f"Fecha origen: {fecha_origen}")
 
             if foto:
-            
+
                 try:
             
-                    fotos = str(foto).split("|")
+                    fotos_db = obtener_fotos_ot(numero_ot)
             
-                    cols_fotos = st.columns(3)
+                    if fotos_db:
             
-                    for i, ruta_foto in enumerate(fotos):
+                        cols_fotos = st.columns(3)
             
-                        ruta_foto = str(ruta_foto).strip()
+                        for i, (nombre_foto, foto_data) in enumerate(fotos_db):
             
-                        if not ruta_foto:
-                            continue
+                            with cols_fotos[i % 3]:
             
-                        with cols_fotos[i % 3]:
+                                try:
+                                    st.image(
+                                        foto_data,
+                                        caption=f"Foto {i + 1}",
+                                        use_container_width=True
+                                    )
             
-                            try:
-                                st.image(
-                                    ruta_foto,
-                                    caption=f"Foto {i + 1}",
-                                    use_container_width=True
-                                )
+                                except Exception:
+                                    st.caption("📷 Foto no disponible")
             
-                            except Exception:
-                                st.caption("📷 Foto no disponible")
+                    else:
+                        fotos = str(foto).split("|")
+            
+                        cols_fotos = st.columns(3)
+            
+                        for i, ruta_foto in enumerate(fotos):
+            
+                            ruta_foto = str(ruta_foto).strip()
+            
+                            if not ruta_foto:
+                                continue
+            
+                            with cols_fotos[i % 3]:
+            
+                                try:
+                                    st.image(
+                                        ruta_foto,
+                                        caption=f"Foto {i + 1}",
+                                        use_container_width=True
+                                    )
+            
+                                except Exception:
+                                    st.caption("📷 Foto no disponible")
             
                 except Exception:
                     st.caption("📷 Error mostrando fotos")
