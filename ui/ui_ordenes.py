@@ -343,9 +343,34 @@ def pantalla_ordenes():
                 )
 
                 with st.form("form_nueva_orden_interna", clear_on_submit=True):
-                    descripcion = st.text_area("Descripción", key="orden_int_descripcion")
-                    area = st.selectbox("Área", AREAS, key="orden_int_area")
-                    prioridad = st.selectbox("Prioridad", ["Baja", "Media", "Alta"], key="orden_int_prioridad")
+
+                    descripcion = st.text_area(
+                        "Descripción",
+                        key="orden_int_descripcion"
+                    )
+                
+                    area = st.selectbox(
+                        "Área",
+                        AREAS,
+                        key="orden_int_area"
+                    )
+                
+                    tipo_ot_manual = st.selectbox(
+                        "Tipo OT",
+                        ["Normal", "☀️ Verano"],
+                        key="tipo_ot_manual"
+                    )
+                
+                    if tipo_ot_manual == "☀️ Verano":
+                        st.session_state["origen_ot_manual"] = "VERANO"
+                    else:
+                        st.session_state["origen_ot_manual"] = "APP"
+                
+                    prioridad = st.selectbox(
+                        "Prioridad",
+                        ["Baja", "Media", "Alta"],
+                        key="orden_int_prioridad"
+                    )
 
                     operario_auto = operario_forzado_si_toca(centro)
 
