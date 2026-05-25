@@ -15,6 +15,7 @@ from modules.ordenes import (
     borrar_orden_historico,
     finalizar_trabajo_externo,
     obtener_detalle_orden_externa,
+    guardar_foto_ot,
 )
 
 from modules.preventivo import (
