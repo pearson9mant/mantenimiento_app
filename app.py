@@ -25,6 +25,7 @@ from ui.ui_plan_verano import pantalla_plan_verano
 from ui.ui_empresas_externas import pantalla_empresas_externas
 from modules.alertas_empresas import obtener_alertas_empresas_externas, crear_ots_empresas_externas_si_toca
 from ui.ui_estado_aulas import ui_estado_aulas
+from ui.ui_recordatorios import pantalla_recordatorios
 
 
 APP_VERSION = "v1.0 PRO"
