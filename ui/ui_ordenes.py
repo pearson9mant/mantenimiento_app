@@ -398,7 +398,7 @@ def pantalla_ordenes():
                                 area,
                                 prioridad,
                                 operario,
-                                "APP",
+                                st.session_state.get("origen_ot_manual", "APP"),
                                 "",
                                 "",
                                 "",
