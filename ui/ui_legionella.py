@@ -807,7 +807,7 @@ def generar_ots_legionella_si_toca():
     return creadas, mensaje
 
 
-def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones):
+def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones, ruta_foto=""):
     centro = punto.get("centro")
     edificio = punto.get("edificio")
     instalacion = punto.get("instalacion") or ""
@@ -1501,8 +1501,65 @@ def pantalla_legionella():
             operario = st.text_input("Nombre operario")
 
         observaciones = st.text_area("Observaciones")
+        foto = st.file_uploader(
+            "Foto control Legionella",
+            type=["jpg", "jpeg", "png"],
+            key="foto_legionella"
+        )
+
+        foto_bytes = None
+        foto_error = False
+        ruta_foto = ""
+
+        if foto is not None:
+
+            if foto.size > 5 * 1024 * 1024:
+                st.warning("La foto supera 5 MB")
+                foto_error = True
+
+            else:
+                foto_bytes = foto.getvalue()
+
+                st.image(
+                    foto_bytes,
+                    caption="Foto control Legionella",
+                    use_container_width=True
+                )
+        
 
         if st.button("Guardar control Legionella", type="primary"):
+            if foto_error:
+                st.error("La foto es demasiado grande.")
+                return
+            if foto_bytes is not None:
+
+                try:
+                    carpeta = Path("uploads/legionella")
+                    carpeta.mkdir(parents=True, exist_ok=True)
+
+                    extension = foto.name.split(".")[-1].lower()
+
+                    nombre_foto = (
+                        f"{centro}_{edificio}_{punto_nombre}_{tarea}"
+                    )
+
+                    nombre_foto = (
+                        nombre_foto
+                        .replace("/", "_")
+                        .replace("\\", "_")
+                        .replace(" ", "_")
+                    )
+
+                    ruta_foto = str(
+                        carpeta / f"{nombre_foto}.{extension}"
+                    )
+
+                    with open(ruta_foto, "wb") as f:
+                        f.write(foto_bytes)
+
+                except Exception as e:
+                    st.error(f"Error guardando foto: {e}")
+                    return    
             estado, resultado = registrar_control(
                 fecha_registro.strftime("%Y-%m-%d"),
                 punto,
@@ -1513,6 +1570,7 @@ def pantalla_legionella():
                 unidad,
                 operario,
                 observaciones,
+                ruta_foto,
             )
 
             if estado == "OK":
