@@ -868,7 +868,7 @@ def pantalla_operario():
 
                 try:
             
-                    fotos_db = obtener_fotos_ot(numero_ot)
+                    fotos_db = obtener_fotos_ot(num_ot)
             
                     if fotos_db:
             
