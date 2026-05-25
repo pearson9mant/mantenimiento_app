@@ -117,6 +117,47 @@ def obtener_recordatorios(incluir_realizados=False):
 
     return df
 
+def obtener_resumen_recordatorios():
+    df = obtener_recordatorios(incluir_realizados=False)
+
+    if df.empty:
+        return {
+            "vencidos": 0,
+            "hoy": 0,
+            "mañana": 0
+        }
+
+    hoy = date.today()
+
+    vencidos = 0
+    hoy_count = 0
+    mañana = 0
+
+    for _, row in df.iterrows():
+
+        try:
+            fecha = pd.to_datetime(
+                row["fecha_recordatorio"]
+            ).date()
+
+        except Exception:
+            continue
+
+        if fecha < hoy:
+            vencidos += 1
+
+        elif fecha == hoy:
+            hoy_count += 1
+
+        elif fecha == hoy + timedelta(days=1):
+            mañana += 1
+
+    return {
+        "vencidos": vencidos,
+        "hoy": hoy_count,
+        "mañana": mañana
+    }
+
 
 def marcar_recordatorio_realizado(recordatorio_id):
     asegurar_tabla_recordatorios()
