@@ -909,11 +909,11 @@ def pantalla_operario():
                                         use_container_width=True
                                     )
             
-                                except Exception:
-                                    st.caption("📷 Foto no disponible")
+                                except Exception as e:
+                                    st.caption(f"📷 Foto no disponible: {e}")
             
-                except Exception:
-                    st.caption("📷 Error mostrando fotos")
+                except Exception as e:
+                    st.error(f"📷 Error mostrando fotos: {e}")
                     
             if es_ot_preventiva(origen, desc):
                 mostrar_checklist_preventivo_operario(num_ot, desc, operario)
