@@ -7,6 +7,7 @@ from modules.ordenes import (
     actualizar_estado,
     actualizar_observaciones_estado,
     finalizar_orden,
+    obtener_fotos_ot,
     crear_correctiva_desde_ot
 )
 
