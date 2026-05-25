@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from pathlib import Path
 from io import BytesIO
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -108,6 +109,15 @@ def asegurar_columnas_planificacion_legionella():
             ejecutar(f"ALTER TABLE legionella_tareas ADD COLUMN {columna} {tipo}")
         except Exception:
             pass
+
+def asegurar_columna_foto_legionella():
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_registros
+            ADD COLUMN foto TEXT
+        """)
+    except Exception:
+        pass
 
 def asegurar_tabla_analiticas_legionella():
     if os.getenv("DATABASE_URL"):
@@ -1347,6 +1357,7 @@ def limpiar_puntos_duplicados_legionella():
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
     asegurar_tabla_analiticas_legionella()
+    asegurar_columna_foto_legionella()
 
     puntos_creados = sembrar_puntos_si_vacio()
 
