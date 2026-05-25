@@ -120,18 +120,16 @@ def obtener_recordatorios(incluir_realizados=False):
 def obtener_resumen_recordatorios():
     df = obtener_recordatorios(incluir_realizados=False)
 
+    resumen = {
+        "vencidos": [],
+        "hoy": [],
+        "mañana": []
+    }
+
     if df.empty:
-        return {
-            "vencidos": 0,
-            "hoy": 0,
-            "mañana": 0
-        }
+        return resumen
 
     hoy = date.today()
-
-    vencidos = 0
-    hoy_count = 0
-    mañana = 0
 
     for _, row in df.iterrows():
 
@@ -143,20 +141,18 @@ def obtener_resumen_recordatorios():
         except Exception:
             continue
 
+        titulo = str(row.get("titulo", ""))
+
         if fecha < hoy:
-            vencidos += 1
+            resumen["vencidos"].append(titulo)
 
         elif fecha == hoy:
-            hoy_count += 1
+            resumen["hoy"].append(titulo)
 
         elif fecha == hoy + timedelta(days=1):
-            mañana += 1
+            resumen["mañana"].append(titulo)
 
-    return {
-        "vencidos": vencidos,
-        "hoy": hoy_count,
-        "mañana": mañana
-    }
+    return resumen
 
 
 def marcar_recordatorio_realizado(recordatorio_id):
