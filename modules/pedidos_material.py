@@ -62,60 +62,52 @@ def crear_pedido_material(
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        INSERT INTO pedidos_material
-        (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """), (
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
-        operario,
-        centro,
-        material,
-        cantidad,
-        prioridad,
-        "Pendiente",
-        observaciones,
-        foto
-    ))
+    modulo = conn.__class__.__module__.lower()
+    es_postgres = "psycopg2" in modulo or "postgres" in modulo
 
-    id_pedido = None
+    if es_postgres:
+        cur.execute(_sql("""
+            INSERT INTO pedidos_material
+            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+        """), (
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            operario,
+            centro,
+            material,
+            cantidad,
+            prioridad,
+            "Pendiente",
+            observaciones,
+            foto
+        ))
 
-    try:
+        fila = cur.fetchone()
+        id_pedido = fila[0] if fila else None
+
+    else:
+        cur.execute(_sql("""
+            INSERT INTO pedidos_material
+            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """), (
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            operario,
+            centro,
+            material,
+            cantidad,
+            prioridad,
+            "Pendiente",
+            observaciones,
+            foto
+        ))
+
         id_pedido = cur.lastrowid
-    except Exception:
-        pass
 
     conn.commit()
-
-    if not id_pedido:
-        try:
-            cur.execute(_sql("""
-                SELECT id
-                FROM pedidos_material
-                WHERE operario = ?
-                  AND centro = ?
-                  AND material = ?
-                  AND cantidad = ?
-                  AND prioridad = ?
-                ORDER BY id DESC
-                LIMIT 1
-            """), (
-                operario,
-                centro,
-                material,
-                cantidad,
-                prioridad
-            ))
-
-            fila = cur.fetchone()
-
-            if fila:
-                id_pedido = fila[0]
-
-        except Exception:
-            id_pedido = None
-
     conn.close()
+
     return id_pedido
 
 
