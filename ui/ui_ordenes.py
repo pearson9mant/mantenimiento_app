@@ -432,7 +432,7 @@ def pantalla_ordenes():
                                 st.session_state.get("origen_ot_manual", "APP"),
                                 "",
                                 "",
-                                "",
+                                "postgres_fotos",
                                 tipo_solicitante_guardar,
                                 "Interna",
                                 "",
