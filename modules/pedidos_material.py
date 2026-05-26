@@ -1,5 +1,6 @@
 from datetime import datetime
 from database.db import conectar, _sql
+from modules.ordenes import guardar_foto_ot
 
 
 ESTADOS_PEDIDO = [
@@ -26,16 +27,36 @@ def crear_tabla_pedidos_material():
             prioridad TEXT,
             estado TEXT,
             observaciones TEXT,
+            foto TEXT,
             fecha_preparado TEXT,
             fecha_entrega TEXT
         )
     """))
 
     conn.commit()
+
+    # Por si la tabla ya existía antes sin la columna foto
+    try:
+        cur.execute(_sql("""
+            ALTER TABLE pedidos_material
+            ADD COLUMN foto TEXT
+        """))
+        conn.commit()
+    except Exception:
+        pass
+
     conn.close()
 
 
-def crear_pedido_material(operario, centro, material, cantidad, prioridad, observaciones=""):
+def crear_pedido_material(
+    operario,
+    centro,
+    material,
+    cantidad,
+    prioridad,
+    observaciones="",
+    foto="postgres_fotos"
+):
     crear_tabla_pedidos_material()
 
     conn = conectar()
@@ -43,8 +64,8 @@ def crear_pedido_material(operario, centro, material, cantidad, prioridad, obser
 
     cur.execute(_sql("""
         INSERT INTO pedidos_material
-        (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         operario,
@@ -53,11 +74,70 @@ def crear_pedido_material(operario, centro, material, cantidad, prioridad, obser
         cantidad,
         prioridad,
         "Pendiente",
-        observaciones
+        observaciones,
+        foto
     ))
 
+    id_pedido = None
+
+    try:
+        id_pedido = cur.lastrowid
+    except Exception:
+        pass
+
     conn.commit()
+
+    if not id_pedido:
+        try:
+            cur.execute(_sql("""
+                SELECT id
+                FROM pedidos_material
+                WHERE operario = ?
+                  AND centro = ?
+                  AND material = ?
+                  AND cantidad = ?
+                  AND prioridad = ?
+                ORDER BY id DESC
+                LIMIT 1
+            """), (
+                operario,
+                centro,
+                material,
+                cantidad,
+                prioridad
+            ))
+
+            fila = cur.fetchone()
+
+            if fila:
+                id_pedido = fila[0]
+
+        except Exception:
+            id_pedido = None
+
     conn.close()
+    return id_pedido
+
+
+def guardar_fotos_pedido_material(id_pedido, fotos):
+    if not id_pedido or not fotos:
+        return
+
+    referencia_pedido = f"PEDIDO-MATERIAL-{id_pedido}"
+
+    for i, foto in enumerate(fotos, start=1):
+        try:
+            foto_bytes = foto.read()
+            nombre_foto = f"{referencia_pedido}_{i}_{foto.name}"
+
+            guardar_foto_ot(
+                numero_ot=referencia_pedido,
+                nombre_foto=nombre_foto,
+                foto_data=foto_bytes
+            )
+
+        except Exception:
+            pass
 
 
 def obtener_pedidos_material(operario=None, solo_pendientes=False):
