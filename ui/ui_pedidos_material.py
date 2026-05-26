@@ -62,28 +62,28 @@ def referencia_pedido(id_pedido):
 
 
 def mostrar_fotos_pedido(id_pedido):
+
     try:
-        fotos = obtener_fotos_ot(
-            referencia_pedido(id_pedido)
-        )
+
+        numero_pedido = f"PED-MAT-{int(id_pedido):04d}"
+
+        fotos = obtener_fotos_ot(numero_pedido)
 
         if fotos:
 
-            with st.expander("📷 Ver fotos"):
+            st.markdown("### 📷 Fotos")
 
-                for nombre_foto, foto_data in fotos:
+            for nombre_foto, foto_data in fotos:
 
-                    st.image(
-                        foto_data,
-                        caption=nombre_foto,
-                        width=250
-                    )
+                st.image(
+                    foto_data,
+                    caption=nombre_foto,
+                    width=250
+                )
 
-        else:
-            st.caption("📷 Sin fotos guardadas")
+    except Exception as e:
 
-    except Exception:
-        st.caption("📷 Fotos no disponibles")
+        st.caption(f"Error fotos: {e}")
 
 
 def ui_pedidos_material():
