@@ -543,6 +543,7 @@ def mostrar_menu_admin():
         if st.button("📩\nIncidencias", key="btn_incidencias", use_container_width=True):
             st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
+            
         if st.button("📩\nPedidos material", key="btn_pedidos_admin", use_container_width=True):
             st.session_state["seccion_actual"] = "Pedidos material"
             st.rerun()
@@ -588,7 +589,7 @@ def mostrar_menu_operario():
     )
 
     if perfil == "inventario":
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("📦\nInventario mantenimiento", key="btn_inv_inventario", use_container_width=True):
@@ -598,6 +599,11 @@ def mostrar_menu_operario():
         with col2:
             if st.button("🏫\nInventario aulas", key="btn_inv_aulas_inventario", use_container_width=True):
                 st.session_state["seccion_actual"] = "Inventario aulas"
+                st.rerun()
+
+        with col3:
+            if st.button("📩\nPedidos material", key="btn_pedidos_inventario", use_container_width=True):
+                st.session_state["seccion_actual"] = "Pedidos material"
                 st.rerun()
 
         return
@@ -808,6 +814,9 @@ if perfil == "admin":
     elif seccion == "Recordatorios":
         pantalla_recordatorios()
 
+    elif seccion == "Pedidos material":
+        ui_pedidos_material()
+
 
 elif perfil == "gerencia":
 
@@ -823,7 +832,7 @@ else:
 
     if perfil == "inventario" and seccion not in [
         "Inventario",
-        "Inventario aulas"
+        "Inventario aulas",
         "Pedidos material"
     ]:
         st.warning("Este usuario solo tiene acceso a Inventario.")
