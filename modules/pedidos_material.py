@@ -19,6 +19,7 @@ def crear_tabla_pedidos_material():
     cur.execute(_sql("""
         CREATE TABLE IF NOT EXISTS pedidos_material (
             id SERIAL PRIMARY KEY,
+            numero_pedido TEXT,
             fecha TEXT,
             operario TEXT,
             centro TEXT,
@@ -35,17 +36,23 @@ def crear_tabla_pedidos_material():
 
     conn.commit()
 
-    # Por si la tabla ya existía antes sin la columna foto
-    try:
-        cur.execute(_sql("""
-            ALTER TABLE pedidos_material
-            ADD COLUMN foto TEXT
-        """))
-        conn.commit()
-    except Exception:
-        pass
+    for columna, tipo in [
+        ("numero_pedido", "TEXT"),
+        ("foto", "TEXT"),
+        ("fecha_preparado", "TEXT"),
+        ("fecha_entrega", "TEXT"),
+    ]:
+        try:
+            cur.execute(f"ALTER TABLE pedidos_material ADD COLUMN {columna} {tipo}")
+            conn.commit()
+        except Exception:
+            pass
 
     conn.close()
+
+
+def formatear_numero_pedido(id_pedido):
+    return f"PED-MAT-{int(id_pedido):04d}"
 
 
 def crear_pedido_material(
@@ -105,25 +112,66 @@ def crear_pedido_material(
 
         id_pedido = cur.lastrowid
 
+    numero_pedido = ""
+
+    if id_pedido:
+        numero_pedido = formatear_numero_pedido(id_pedido)
+
+        cur.execute(_sql("""
+            UPDATE pedidos_material
+            SET numero_pedido = ?
+            WHERE id = ?
+        """), (
+            numero_pedido,
+            id_pedido
+        ))
+
     conn.commit()
     conn.close()
 
     return id_pedido
 
 
+def obtener_numero_pedido(id_pedido):
+    if not id_pedido:
+        return ""
+
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT numero_pedido
+        FROM pedidos_material
+        WHERE id = ?
+    """), (id_pedido,))
+
+    fila = cur.fetchone()
+    conn.close()
+
+    if fila and fila[0]:
+        return fila[0]
+
+    return formatear_numero_pedido(id_pedido)
+
+
 def guardar_fotos_pedido_material(id_pedido, fotos):
     if not id_pedido or not fotos:
         return
 
-    referencia_pedido = f"PEDIDO-MATERIAL-{id_pedido}"
+    numero_pedido = obtener_numero_pedido(id_pedido)
+
+    if not numero_pedido:
+        return
 
     for i, foto in enumerate(fotos, start=1):
         try:
             foto_bytes = foto.read()
-            nombre_foto = f"{referencia_pedido}_{i}_{foto.name}"
+            nombre_foto = f"{numero_pedido}_{i}_{foto.name}"
 
             guardar_foto_ot(
-                numero_ot=referencia_pedido,
+                numero_ot=numero_pedido,
                 nombre_foto=nombre_foto,
                 foto_data=foto_bytes
             )
@@ -197,6 +245,7 @@ def cambiar_estado_pedido(id_pedido, nuevo_estado):
 
     conn.commit()
     conn.close()
+
 
 def borrar_pedido_material(id_pedido):
     crear_tabla_pedidos_material()
