@@ -62,19 +62,14 @@ def referencia_pedido(id_pedido):
 
 
 def mostrar_fotos_pedido(id_pedido):
-
     try:
-
-        numero_pedido = f"PED-MAT-{int(id_pedido):04d}"
-
+        numero_pedido = referencia_pedido(id_pedido)
         fotos = obtener_fotos_ot(numero_pedido)
 
         if fotos:
-
             st.markdown("### 📷 Fotos")
 
             for nombre_foto, foto_data in fotos:
-
                 st.image(
                     bytes(foto_data),
                     caption=nombre_foto,
@@ -82,7 +77,6 @@ def mostrar_fotos_pedido(id_pedido):
                 )
 
     except Exception as e:
-
         st.caption(f"Error fotos: {e}")
 
 
@@ -96,7 +90,6 @@ def ui_pedidos_material():
         return
 
     if es_admin():
-
         tab1, tab2 = st.tabs([
             "➕ Nuevo pedido",
             "📥 Pedidos recibidos"
@@ -109,23 +102,37 @@ def ui_pedidos_material():
             ui_pedidos_abel()
 
     elif es_abel():
-
         ui_pedidos_abel()
 
     else:
-
         ui_pedidos_operario(usuario)
 
 
 def ui_pedidos_operario(operario):
-
     st.subheader("➕ Nuevo pedido")
+
+    # FUERA DEL FORMULARIO PARA VER VISTA PREVIA ANTES DE ENVIAR
+    fotos_pedido = st.file_uploader(
+        "📷 Fotos del material o referencia",
+        type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key="fotos_pedido_material"
+    )
+
+    if fotos_pedido:
+        st.markdown("#### 👀 Vista previa")
+
+        for foto in fotos_pedido:
+            st.image(
+                foto,
+                caption=foto.name,
+                width=180
+            )
 
     with st.form(
         "form_pedido_material",
         clear_on_submit=True
     ):
-
         centro = st.selectbox(
             "Centro",
             list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS
@@ -151,39 +158,17 @@ def ui_pedidos_operario(operario):
             "Observaciones"
         )
 
-        fotos_pedido = st.file_uploader(
-            "📷 Fotos del material o referencia",
-            type=["jpg", "jpeg", "png"],
-            accept_multiple_files=True,
-            key="fotos_pedido_material"
-        )
-        
-        if fotos_pedido:
-
-            st.markdown("#### 👀 Vista previa")
-        
-            for foto in fotos_pedido:
-        
-                st.image(
-                    foto,
-                    caption=foto.name,
-                    width=180
-                )
-
         enviar = st.form_submit_button(
             "📨 Enviar pedido"
         )
 
         if enviar:
-
             if not material.strip():
-
                 st.warning(
                     "Indica el material solicitado."
                 )
 
             else:
-
                 id_pedido = crear_pedido_material(
                     operario=operario,
                     centro=centro,
@@ -195,16 +180,13 @@ def ui_pedidos_operario(operario):
                 )
 
                 if fotos_pedido and id_pedido:
-
                     try:
-
                         guardar_fotos_pedido_material(
                             id_pedido,
                             fotos_pedido
                         )
 
                     except Exception as e:
-
                         st.error(
                             f"Error guardando fotos: {e}"
                         )
@@ -228,16 +210,15 @@ def ui_pedidos_operario(operario):
         return
 
     for p in pedidos:
-
         id_pedido = p[0]
-        fecha = p[1]
-        operario = p[2]
-        centro = p[3]
-        material = p[4]
-        cantidad = p[5]
-        prioridad = p[6]
-        estado = p[7]
-        observaciones = p[8]
+        fecha = p[2] if len(p) > 12 else p[1]
+        operario = p[3] if len(p) > 12 else p[2]
+        centro = p[4] if len(p) > 12 else p[3]
+        material = p[5] if len(p) > 12 else p[4]
+        cantidad = p[6] if len(p) > 12 else p[5]
+        prioridad = p[7] if len(p) > 12 else p[6]
+        estado = p[8] if len(p) > 12 else p[7]
+        observaciones = p[9] if len(p) > 12 else p[8]
 
         icono = {
             "Pendiente": "🟡",
@@ -248,9 +229,8 @@ def ui_pedidos_operario(operario):
         }.get(estado, "⚪")
 
         with st.expander(
-            f"{icono} #{id_pedido} · {material} · {cantidad} uds · {estado}"
+            f"{icono} {referencia_pedido(id_pedido)} · {material} · {cantidad} uds · {estado}"
         ):
-
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
@@ -260,7 +240,6 @@ def ui_pedidos_operario(operario):
 
 
 def ui_pedidos_abel():
-
     st.subheader("📥 Pedidos recibidos")
 
     filtro = st.selectbox(
@@ -285,16 +264,15 @@ def ui_pedidos_abel():
         return
 
     for p in pedidos:
-
         id_pedido = p[0]
-        fecha = p[1]
-        operario = p[2]
-        centro = p[3]
-        material = p[4]
-        cantidad = p[5]
-        prioridad = p[6]
-        estado = p[7]
-        observaciones = p[8]
+        fecha = p[2] if len(p) > 12 else p[1]
+        operario = p[3] if len(p) > 12 else p[2]
+        centro = p[4] if len(p) > 12 else p[3]
+        material = p[5] if len(p) > 12 else p[4]
+        cantidad = p[6] if len(p) > 12 else p[5]
+        prioridad = p[7] if len(p) > 12 else p[6]
+        estado = p[8] if len(p) > 12 else p[7]
+        observaciones = p[9] if len(p) > 12 else p[8]
 
         icono = {
             "Pendiente": "🟡",
@@ -305,9 +283,8 @@ def ui_pedidos_abel():
         }.get(estado, "⚪")
 
         with st.expander(
-            f"{icono} #{id_pedido} · {material} · {cantidad} uds · {operario} · {estado}"
+            f"{icono} {referencia_pedido(id_pedido)} · {material} · {cantidad} uds · {operario} · {estado}"
         ):
-
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Operario:** {operario}")
             st.write(f"**Centro:** {centro}")
@@ -328,7 +305,6 @@ def ui_pedidos_abel():
                 "💾 Guardar estado",
                 key=f"guardar_estado_pedido_{id_pedido}"
             ):
-
                 cambiar_estado_pedido(
                     id_pedido,
                     nuevo_estado
@@ -349,9 +325,7 @@ def ui_pedidos_abel():
                 "🗑️ Borrar pedido",
                 key=f"borrar_pedido_{id_pedido}"
             ):
-
                 if confirmar_borrado:
-
                     borrar_pedido_material(
                         id_pedido
                     )
@@ -363,9 +337,7 @@ def ui_pedidos_abel():
                     st.rerun()
 
                 else:
-
                     st.error(
                         "Debes confirmar el borrado."
                     )
-
 
