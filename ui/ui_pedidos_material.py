@@ -250,4 +250,20 @@ def ui_pedidos_abel():
                 st.success("Estado actualizado.")
                 st.rerun()
 
+            confirmar_borrado = st.checkbox(
+                "Confirmar borrado",
+                key=f"confirmar_borrado_pedido_{id_pedido}"
+            )
+            
+            if st.button(
+                "🗑️ Borrar pedido",
+                key=f"borrar_pedido_{id_pedido}"
+            ):
+                if confirmar_borrado:
+                    borrar_pedido_material(id_pedido)
+                    st.warning("Pedido eliminado.")
+                    st.rerun()
+                else:
+                    st.error("Debes confirmar el borrado.")
+
 
