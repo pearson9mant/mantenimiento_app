@@ -5,6 +5,7 @@ from modules.pedidos_material import (
     crear_pedido_material,
     obtener_pedidos_material,
     cambiar_estado_pedido,
+    guardar_fotos_pedido_material,
     ESTADOS_PEDIDO
 )
 
@@ -26,8 +27,8 @@ PRIORIDADES = [
 
 def usuario_actual():
     return str(
-        st.session_state.get("usuario")
-        or st.session_state.get("operario_activo")
+        st.session_state.get("operario_activo")
+        or st.session_state.get("usuario")
         or st.session_state.get("nombre")
         or ""
     ).strip()
@@ -36,6 +37,10 @@ def usuario_actual():
 def es_abel():
     usuario = usuario_actual().lower()
     return "abel" in usuario
+
+
+def referencia_pedido(id_pedido):
+    return f"PEDIDO-MATERIAL-{id_pedido}"
 
 
 def ui_pedidos_material():
@@ -56,12 +61,23 @@ def ui_pedidos_material():
 def ui_pedidos_operario(operario):
     st.subheader("➕ Nuevo pedido")
 
-    with st.form("form_pedido_material"):
-        centro = st.selectbox("Centro", list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS)
+    with st.form("form_pedido_material", clear_on_submit=True):
+        centro = st.selectbox(
+            "Centro",
+            list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS
+        )
+
         material = st.text_input("Material solicitado")
         cantidad = st.number_input("Cantidad", min_value=1.0, step=1.0)
         prioridad = st.selectbox("Prioridad", PRIORIDADES, index=1)
         observaciones = st.text_area("Observaciones")
+
+        fotos_pedido = st.file_uploader(
+            "📷 Fotos del material o referencia",
+            type=["jpg", "jpeg", "png"],
+            accept_multiple_files=True,
+            key="fotos_pedido_material"
+        )
 
         enviar = st.form_submit_button("📨 Enviar pedido")
 
@@ -69,15 +85,24 @@ def ui_pedidos_operario(operario):
             if not material.strip():
                 st.warning("Indica el material solicitado.")
             else:
-                crear_pedido_material(
+                id_pedido = crear_pedido_material(
                     operario=operario,
                     centro=centro,
                     material=material,
                     cantidad=cantidad,
                     prioridad=prioridad,
-                    observaciones=observaciones
+                    observaciones=observaciones,
+                    foto="postgres_fotos"
                 )
+
+                if fotos_pedido:
+                    try:
+                        guardar_fotos_pedido_material(id_pedido, fotos_pedido)
+                    except Exception as e:
+                        st.error(f"Error guardando fotos: {e}")
+
                 st.success("Pedido enviado a almacén.")
+                st.rerun()
 
     st.divider()
     st.subheader("🕓 Mis pedidos")
@@ -98,6 +123,7 @@ def ui_pedidos_operario(operario):
         prioridad = p[6]
         estado = p[7]
         observaciones = p[8]
+        foto = p[9] if len(p) > 9 else ""
 
         icono = {
             "Pendiente": "🟡",
@@ -107,11 +133,14 @@ def ui_pedidos_operario(operario):
             "Cancelado": "⚫"
         }.get(estado, "⚪")
 
-        with st.expander(f"{icono} {material} · {cantidad} uds · {estado}"):
+        with st.expander(f"{icono} #{id_pedido} · {material} · {cantidad} uds · {estado}"):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
+
+            if foto:
+                st.caption("📷 Fotos guardadas en el sistema")
 
 
 def ui_pedidos_abel():
@@ -143,6 +172,7 @@ def ui_pedidos_abel():
         prioridad = p[6]
         estado = p[7]
         observaciones = p[8]
+        foto = p[9] if len(p) > 9 else ""
 
         icono = {
             "Pendiente": "🟡",
@@ -152,12 +182,15 @@ def ui_pedidos_abel():
             "Cancelado": "⚫"
         }.get(estado, "⚪")
 
-        with st.expander(f"{icono} {material} · {cantidad} uds · {operario} · {estado}"):
+        with st.expander(f"{icono} #{id_pedido} · {material} · {cantidad} uds · {operario} · {estado}"):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Operario:** {operario}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
+
+            if foto:
+                st.caption("📷 Fotos guardadas en el sistema")
 
             nuevo_estado = st.selectbox(
                 "Estado del pedido",
