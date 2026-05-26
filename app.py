@@ -836,6 +836,9 @@ else:
 
     elif seccion == "Inventario aulas":
         pantalla_inventario_aulas()
+        
+    elif seccion == "Pedidos material":
+        ui_pedidos_material()
 
 
 pintar_footer()
