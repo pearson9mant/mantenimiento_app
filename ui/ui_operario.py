@@ -842,7 +842,15 @@ def pantalla_operario():
             "Pendiente material": "📦"
         }.get(est, "⚪")
 
-        titulo = f"{estado_icono} {num_ot} | {prioridad} | {centro or '-'} · {espacio or '-'}"
+        desc_corta = str(desc or "").replace("\n", " ").strip()
+
+        if len(desc_corta) > 45:
+            desc_corta = desc_corta[:45] + "..."
+        
+        titulo = (
+            f"{estado_icono} {num_ot} | {prioridad} | "
+            f"{centro or '-'} · {espacio or '-'} | {desc_corta}"
+        )
 
         with st.expander(titulo, expanded=False):
 
