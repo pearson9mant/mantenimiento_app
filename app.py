@@ -543,6 +543,9 @@ def mostrar_menu_admin():
         if st.button("📩\nIncidencias", key="btn_incidencias", use_container_width=True):
             st.session_state["seccion_actual"] = "Incidencias"
             st.rerun()
+        if st.button("📩\nPedidos material", key="btn_pedidos_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Pedidos material"
+            st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
