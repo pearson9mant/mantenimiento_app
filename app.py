@@ -620,6 +620,9 @@ def mostrar_menu_operario():
         if st.button("📦\nInventario", key="btn_inv_operario", use_container_width=True):
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
+        if st.button("📩\nPedidos material", key="btn_pedidos_material", use_container_width=True):
+            st.session_state["seccion_actual"] = "Pedidos material"
+            st.rerun()  
 
 
 # =====================================================
