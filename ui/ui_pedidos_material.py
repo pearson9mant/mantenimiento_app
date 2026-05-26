@@ -58,17 +58,42 @@ def es_admin():
     ]
 
 
+def es_admin():
+    perfil = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    return perfil in [
+        "admin",
+        "administrador",
+        "administracion",
+        "administración"
+    ]
+
+
 def ui_pedidos_material():
     st.title("📦 Pedidos de material")
 
     usuario = usuario_actual()
 
     if not usuario:
-        st.warning("No se ha detectado el operario actual.")
+        st.warning("No se ha detectado el usuario actual.")
         return
 
-    if es_admin() or es_abel():
+    if es_admin():
+        tab1, tab2 = st.tabs(["➕ Nuevo pedido", "📥 Pedidos recibidos"])
+
+        with tab1:
+            ui_pedidos_operario(usuario)
+
+        with tab2:
+            ui_pedidos_abel()
+
+    elif es_abel():
         ui_pedidos_abel()
+
     else:
         ui_pedidos_operario(usuario)
 
