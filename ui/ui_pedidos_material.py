@@ -8,6 +8,7 @@ from modules.pedidos_material import (
     guardar_fotos_pedido_material,
     ESTADOS_PEDIDO
 )
+from modules.ordenes import obtener_fotos_ot
 
 
 OPERARIOS = [
@@ -39,38 +40,42 @@ def es_abel():
     return "abel" in usuario
 
 
+def es_admin():
+    perfil = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    return perfil in [
+        "admin",
+        "administrador",
+        "administracion",
+        "administración"
+    ]
+
+
 def referencia_pedido(id_pedido):
     return f"PEDIDO-MATERIAL-{id_pedido}"
 
 
-def es_admin():
-    perfil = str(
-        st.session_state.get("perfil")
-        or st.session_state.get("rol")
-        or ""
-    ).strip().lower()
+def mostrar_fotos_pedido(id_pedido):
+    try:
+        fotos = obtener_fotos_ot(referencia_pedido(id_pedido))
 
-    return perfil in [
-        "admin",
-        "administrador",
-        "administracion",
-        "administración"
-    ]
+        if fotos:
+            with st.expander("📷 Ver fotos"):
+                for nombre_foto, foto_data in fotos:
+                    st.image(
+                        foto_data,
+                        caption=nombre_foto,
+                        width=250
+                    )
+        else:
+            st.caption("📷 Sin fotos guardadas")
 
-
-def es_admin():
-    perfil = str(
-        st.session_state.get("perfil")
-        or st.session_state.get("rol")
-        or ""
-    ).strip().lower()
-
-    return perfil in [
-        "admin",
-        "administrador",
-        "administracion",
-        "administración"
-    ]
+    except Exception:
+        st.caption("📷 Fotos no disponibles")
 
 
 def ui_pedidos_material():
@@ -180,7 +185,7 @@ def ui_pedidos_operario(operario):
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
             if foto:
-                st.caption("📷 Fotos guardadas en el sistema")
+                mostrar_fotos_pedido(id_pedido)
 
 
 def ui_pedidos_abel():
@@ -230,7 +235,7 @@ def ui_pedidos_abel():
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
             if foto:
-                st.caption("📷 Fotos guardadas en el sistema")
+                mostrar_fotos_pedido(id_pedido)
 
             nuevo_estado = st.selectbox(
                 "Estado del pedido",
