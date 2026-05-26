@@ -30,7 +30,7 @@ from ui.ui_recordatorios import (
     pantalla_recordatorios,
     obtener_resumen_recordatorios
 )
-
+from ui.ui_pedidos_material import ui_pedidos_material
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
