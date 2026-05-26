@@ -58,7 +58,7 @@ def es_admin():
 
 
 def referencia_pedido(id_pedido):
-    return f"PEDIDO-MATERIAL-{id_pedido}"
+    return f"PED-MAT-{int(id_pedido):04d}"
 
 
 def mostrar_fotos_pedido(id_pedido):
