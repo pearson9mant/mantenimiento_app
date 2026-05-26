@@ -17,7 +17,7 @@ def crear_tabla_pedidos_material():
 
     cur.execute(_sql("""
         CREATE TABLE IF NOT EXISTS pedidos_material (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             fecha TEXT,
             operario TEXT,
             centro TEXT,
