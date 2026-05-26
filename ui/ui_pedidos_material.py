@@ -9,6 +9,7 @@ from modules.pedidos_material import (
     ESTADOS_PEDIDO
 )
 from modules.ordenes import obtener_fotos_ot
+from modules.pedidos_material import borrar_pedido_material
 
 
 OPERARIOS = [
@@ -248,3 +249,19 @@ def ui_pedidos_abel():
                 cambiar_estado_pedido(id_pedido, nuevo_estado)
                 st.success("Estado actualizado.")
                 st.rerun()
+
+def borrar_pedido_material(id_pedido):
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        DELETE FROM pedidos_material
+        WHERE id = ?
+    """), (id_pedido,))
+
+    conn.commit()
+    conn.close()
+
+    return True
