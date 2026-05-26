@@ -205,3 +205,19 @@ def cambiar_estado_pedido(id_pedido, nuevo_estado):
 
     conn.commit()
     conn.close()
+
+def borrar_pedido_material(id_pedido):
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        DELETE FROM pedidos_material
+        WHERE id = ?
+    """), (id_pedido,))
+
+    conn.commit()
+    conn.close()
+
+    return True
