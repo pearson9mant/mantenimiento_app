@@ -76,7 +76,7 @@ def mostrar_fotos_pedido(id_pedido):
             for nombre_foto, foto_data in fotos:
 
                 st.image(
-                    foto_data,
+                    bytes(foto_data),
                     caption=nombre_foto,
                     width=250
                 )
