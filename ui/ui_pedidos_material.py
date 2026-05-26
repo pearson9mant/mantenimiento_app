@@ -6,10 +6,11 @@ from modules.pedidos_material import (
     obtener_pedidos_material,
     cambiar_estado_pedido,
     guardar_fotos_pedido_material,
+    borrar_pedido_material,
     ESTADOS_PEDIDO
 )
+
 from modules.ordenes import obtener_fotos_ot
-from modules.pedidos_material import borrar_pedido_material
 
 
 OPERARIOS = [
@@ -62,16 +63,22 @@ def referencia_pedido(id_pedido):
 
 def mostrar_fotos_pedido(id_pedido):
     try:
-        fotos = obtener_fotos_ot(referencia_pedido(id_pedido))
+        fotos = obtener_fotos_ot(
+            referencia_pedido(id_pedido)
+        )
 
         if fotos:
+
             with st.expander("📷 Ver fotos"):
+
                 for nombre_foto, foto_data in fotos:
+
                     st.image(
                         foto_data,
                         caption=nombre_foto,
                         width=250
                     )
+
         else:
             st.caption("📷 Sin fotos guardadas")
 
@@ -89,7 +96,11 @@ def ui_pedidos_material():
         return
 
     if es_admin():
-        tab1, tab2 = st.tabs(["➕ Nuevo pedido", "📥 Pedidos recibidos"])
+
+        tab1, tab2 = st.tabs([
+            "➕ Nuevo pedido",
+            "📥 Pedidos recibidos"
+        ])
 
         with tab1:
             ui_pedidos_operario(usuario)
@@ -98,25 +109,47 @@ def ui_pedidos_material():
             ui_pedidos_abel()
 
     elif es_abel():
+
         ui_pedidos_abel()
 
     else:
+
         ui_pedidos_operario(usuario)
 
 
 def ui_pedidos_operario(operario):
+
     st.subheader("➕ Nuevo pedido")
 
-    with st.form("form_pedido_material", clear_on_submit=True):
+    with st.form(
+        "form_pedido_material",
+        clear_on_submit=True
+    ):
+
         centro = st.selectbox(
             "Centro",
             list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS
         )
 
-        material = st.text_input("Material solicitado")
-        cantidad = st.number_input("Cantidad", min_value=1.0, step=1.0)
-        prioridad = st.selectbox("Prioridad", PRIORIDADES, index=1)
-        observaciones = st.text_area("Observaciones")
+        material = st.text_input(
+            "Material solicitado"
+        )
+
+        cantidad = st.number_input(
+            "Cantidad",
+            min_value=1.0,
+            step=1.0
+        )
+
+        prioridad = st.selectbox(
+            "Prioridad",
+            PRIORIDADES,
+            index=1
+        )
+
+        observaciones = st.text_area(
+            "Observaciones"
+        )
 
         fotos_pedido = st.file_uploader(
             "📷 Fotos del material o referencia",
@@ -125,12 +158,20 @@ def ui_pedidos_operario(operario):
             key="fotos_pedido_material"
         )
 
-        enviar = st.form_submit_button("📨 Enviar pedido")
+        enviar = st.form_submit_button(
+            "📨 Enviar pedido"
+        )
 
         if enviar:
+
             if not material.strip():
-                st.warning("Indica el material solicitado.")
+
+                st.warning(
+                    "Indica el material solicitado."
+                )
+
             else:
+
                 id_pedido = crear_pedido_material(
                     operario=operario,
                     centro=centro,
@@ -141,25 +182,41 @@ def ui_pedidos_operario(operario):
                     foto="postgres_fotos"
                 )
 
-                if fotos_pedido:
-                    try:
-                        guardar_fotos_pedido_material(id_pedido, fotos_pedido)
-                    except Exception as e:
-                        st.error(f"Error guardando fotos: {e}")
+                if fotos_pedido and id_pedido:
 
-                st.success("Pedido enviado a almacén.")
+                    try:
+
+                        guardar_fotos_pedido_material(
+                            id_pedido,
+                            fotos_pedido
+                        )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error guardando fotos: {e}"
+                        )
+
+                st.success(
+                    "Pedido enviado a almacén."
+                )
+
                 st.rerun()
 
     st.divider()
+
     st.subheader("🕓 Mis pedidos")
 
-    pedidos = obtener_pedidos_material(operario=operario)
+    pedidos = obtener_pedidos_material(
+        operario=operario
+    )
 
     if not pedidos:
         st.info("No tienes pedidos registrados.")
         return
 
     for p in pedidos:
+
         id_pedido = p[0]
         fecha = p[1]
         operario = p[2]
@@ -169,7 +226,6 @@ def ui_pedidos_operario(operario):
         prioridad = p[6]
         estado = p[7]
         observaciones = p[8]
-        foto = p[9] if len(p) > 9 else ""
 
         icono = {
             "Pendiente": "🟡",
@@ -179,25 +235,33 @@ def ui_pedidos_operario(operario):
             "Cancelado": "⚫"
         }.get(estado, "⚪")
 
-        with st.expander(f"{icono} #{id_pedido} · {material} · {cantidad} uds · {estado}"):
+        with st.expander(
+            f"{icono} #{id_pedido} · {material} · {cantidad} uds · {estado}"
+        ):
+
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
-            if foto:
-                mostrar_fotos_pedido(id_pedido)
+            mostrar_fotos_pedido(id_pedido)
 
 
 def ui_pedidos_abel():
+
     st.subheader("📥 Pedidos recibidos")
 
     filtro = st.selectbox(
         "Filtro",
-        ["Pendientes / activos", "Todos"]
+        [
+            "Pendientes / activos",
+            "Todos"
+        ]
     )
 
-    solo_pendientes = filtro == "Pendientes / activos"
+    solo_pendientes = (
+        filtro == "Pendientes / activos"
+    )
 
     pedidos = obtener_pedidos_material(
         operario=None,
@@ -209,6 +273,7 @@ def ui_pedidos_abel():
         return
 
     for p in pedidos:
+
         id_pedido = p[0]
         fecha = p[1]
         operario = p[2]
@@ -218,7 +283,6 @@ def ui_pedidos_abel():
         prioridad = p[6]
         estado = p[7]
         observaciones = p[8]
-        foto = p[9] if len(p) > 9 else ""
 
         icono = {
             "Pendiente": "🟡",
@@ -228,42 +292,68 @@ def ui_pedidos_abel():
             "Cancelado": "⚫"
         }.get(estado, "⚪")
 
-        with st.expander(f"{icono} #{id_pedido} · {material} · {cantidad} uds · {operario} · {estado}"):
+        with st.expander(
+            f"{icono} #{id_pedido} · {material} · {cantidad} uds · {operario} · {estado}"
+        ):
+
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Operario:** {operario}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
-            if foto:
-                mostrar_fotos_pedido(id_pedido)
+            mostrar_fotos_pedido(id_pedido)
 
             nuevo_estado = st.selectbox(
                 "Estado del pedido",
                 ESTADOS_PEDIDO,
-                index=ESTADOS_PEDIDO.index(estado) if estado in ESTADOS_PEDIDO else 0,
+                index=ESTADOS_PEDIDO.index(estado)
+                if estado in ESTADOS_PEDIDO else 0,
                 key=f"estado_pedido_{id_pedido}"
             )
 
-            if st.button("💾 Guardar estado", key=f"guardar_estado_pedido_{id_pedido}"):
-                cambiar_estado_pedido(id_pedido, nuevo_estado)
-                st.success("Estado actualizado.")
+            if st.button(
+                "💾 Guardar estado",
+                key=f"guardar_estado_pedido_{id_pedido}"
+            ):
+
+                cambiar_estado_pedido(
+                    id_pedido,
+                    nuevo_estado
+                )
+
+                st.success(
+                    "Estado actualizado."
+                )
+
                 st.rerun()
 
             confirmar_borrado = st.checkbox(
                 "Confirmar borrado",
                 key=f"confirmar_borrado_pedido_{id_pedido}"
             )
-            
+
             if st.button(
                 "🗑️ Borrar pedido",
                 key=f"borrar_pedido_{id_pedido}"
             ):
+
                 if confirmar_borrado:
-                    borrar_pedido_material(id_pedido)
-                    st.warning("Pedido eliminado.")
+
+                    borrar_pedido_material(
+                        id_pedido
+                    )
+
+                    st.warning(
+                        "Pedido eliminado."
+                    )
+
                     st.rerun()
+
                 else:
-                    st.error("Debes confirmar el borrado.")
+
+                    st.error(
+                        "Debes confirmar el borrado."
+                    )
 
 
