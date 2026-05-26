@@ -157,6 +157,18 @@ def ui_pedidos_operario(operario):
             accept_multiple_files=True,
             key="fotos_pedido_material"
         )
+        
+        if fotos_pedido:
+
+            st.markdown("#### 👀 Vista previa")
+        
+            for foto in fotos_pedido:
+        
+                st.image(
+                    foto,
+                    caption=foto.name,
+                    width=180
+                )
 
         enviar = st.form_submit_button(
             "📨 Enviar pedido"
