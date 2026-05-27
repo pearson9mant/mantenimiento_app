@@ -28,6 +28,7 @@ def crear_tabla_pedidos_material():
             prioridad TEXT,
             estado TEXT,
             observaciones TEXT,
+            link_material TEXT,
             foto TEXT,
             fecha_preparado TEXT,
             fecha_entrega TEXT
@@ -38,6 +39,7 @@ def crear_tabla_pedidos_material():
 
     for columna, tipo in [
         ("numero_pedido", "TEXT"),
+        ("link_material", "TEXT"),
         ("foto", "TEXT"),
         ("fecha_preparado", "TEXT"),
         ("fecha_entrega", "TEXT"),
@@ -62,6 +64,7 @@ def crear_pedido_material(
     cantidad,
     prioridad,
     observaciones="",
+    link_material="",
     foto="postgres_fotos"
 ):
     crear_tabla_pedidos_material()
@@ -75,8 +78,8 @@ def crear_pedido_material(
     if es_postgres:
         cur.execute(_sql("""
             INSERT INTO pedidos_material
-            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, link_material, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
         """), (
             datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -87,6 +90,7 @@ def crear_pedido_material(
             prioridad,
             "Pendiente",
             observaciones,
+            link_material,
             foto
         ))
 
@@ -96,8 +100,8 @@ def crear_pedido_material(
     else:
         cur.execute(_sql("""
             INSERT INTO pedidos_material
-            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, link_material, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             datetime.now().strftime("%Y-%m-%d %H:%M"),
             operario,
@@ -107,6 +111,7 @@ def crear_pedido_material(
             prioridad,
             "Pendiente",
             observaciones,
+            link_material,
             foto
         ))
 
