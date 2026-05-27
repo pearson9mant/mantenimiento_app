@@ -45,13 +45,13 @@ def crear_tabla_pedidos_material():
         ("fecha_entrega", "TEXT"),
     ]:
         try:
-           cur.execute(_sql(f"""
-            ALTER TABLE pedidos_material
-            ADD COLUMN IF NOT EXISTS {columna} {tipo}
-        """))
-
-        conn.commit()
-
+            cur.execute(_sql(f"""
+                ALTER TABLE pedidos_material
+                ADD COLUMN IF NOT EXISTS {columna} {tipo}
+            """))
+    
+            conn.commit()
+    
         except Exception:
             pass
     
