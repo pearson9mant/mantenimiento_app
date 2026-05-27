@@ -61,6 +61,46 @@ def referencia_pedido(id_pedido):
     return f"PED-MAT-{int(id_pedido):04d}"
 
 
+def leer_pedido(p):
+    """
+    Compatible con tabla antigua y nueva.
+    Antigua:
+    id, fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto...
+    
+    Nueva:
+    id, numero_pedido, fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, link_material, foto...
+    """
+
+    if len(p) >= 14:
+        return {
+            "id_pedido": p[0],
+            "numero_pedido": p[1],
+            "fecha": p[2],
+            "operario": p[3],
+            "centro": p[4],
+            "material": p[5],
+            "cantidad": p[6],
+            "prioridad": p[7],
+            "estado": p[8],
+            "observaciones": p[9],
+            "link_material": p[10] or "",
+        }
+
+    return {
+        "id_pedido": p[0],
+        "numero_pedido": referencia_pedido(p[0]),
+        "fecha": p[1],
+        "operario": p[2],
+        "centro": p[3],
+        "material": p[4],
+        "cantidad": p[5],
+        "prioridad": p[6],
+        "estado": p[7],
+        "observaciones": p[8],
+        "link_material": "",
+    }
+
+
 def mostrar_fotos_pedido(id_pedido):
     try:
         numero_pedido = referencia_pedido(id_pedido)
@@ -78,6 +118,18 @@ def mostrar_fotos_pedido(id_pedido):
 
     except Exception as e:
         st.caption(f"Error fotos: {e}")
+
+
+def mostrar_link_material(link_material):
+    link_material = str(link_material or "").strip()
+
+    if not link_material:
+        return
+
+    if link_material.startswith("http://") or link_material.startswith("https://"):
+        st.link_button("🔗 Abrir enlace material", link_material)
+    else:
+        st.info(f"🔗 Enlace / referencia: {link_material}")
 
 
 def ui_pedidos_material():
@@ -111,7 +163,6 @@ def ui_pedidos_material():
 def ui_pedidos_operario(operario):
     st.subheader("➕ Nuevo pedido")
 
-    # FUERA DEL FORMULARIO PARA VER VISTA PREVIA ANTES DE ENVIAR
     fotos_pedido = st.file_uploader(
         "📷 Fotos del material o referencia",
         type=["jpg", "jpeg", "png"],
@@ -158,6 +209,11 @@ def ui_pedidos_operario(operario):
             "Observaciones"
         )
 
+        link_material = st.text_input(
+            "🔗 Enlace referencia material",
+            placeholder="Pega aquí un enlace de Amazon, Leroy, proveedor, catálogo..."
+        )
+
         enviar = st.form_submit_button(
             "📨 Enviar pedido"
         )
@@ -176,6 +232,7 @@ def ui_pedidos_operario(operario):
                     cantidad=cantidad,
                     prioridad=prioridad,
                     observaciones=observaciones,
+                    link_material=link_material,
                     foto="postgres_fotos"
                 )
 
@@ -210,15 +267,18 @@ def ui_pedidos_operario(operario):
         return
 
     for p in pedidos:
-        id_pedido = p[0]
-        fecha = p[2] if len(p) > 12 else p[1]
-        operario = p[3] if len(p) > 12 else p[2]
-        centro = p[4] if len(p) > 12 else p[3]
-        material = p[5] if len(p) > 12 else p[4]
-        cantidad = p[6] if len(p) > 12 else p[5]
-        prioridad = p[7] if len(p) > 12 else p[6]
-        estado = p[8] if len(p) > 12 else p[7]
-        observaciones = p[9] if len(p) > 12 else p[8]
+        datos = leer_pedido(p)
+
+        id_pedido = datos["id_pedido"]
+        numero_pedido = datos["numero_pedido"] or referencia_pedido(id_pedido)
+        fecha = datos["fecha"]
+        centro = datos["centro"]
+        material = datos["material"]
+        cantidad = datos["cantidad"]
+        prioridad = datos["prioridad"]
+        estado = datos["estado"]
+        observaciones = datos["observaciones"]
+        link_material = datos["link_material"]
 
         icono = {
             "Pendiente": "🟡",
@@ -229,13 +289,14 @@ def ui_pedidos_operario(operario):
         }.get(estado, "⚪")
 
         with st.expander(
-            f"{icono} {referencia_pedido(id_pedido)} · {material} · {cantidad} uds · {estado}"
+            f"{icono} {numero_pedido} · {material} · {cantidad} uds · {estado}"
         ):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
+            mostrar_link_material(link_material)
             mostrar_fotos_pedido(id_pedido)
 
 
@@ -264,15 +325,19 @@ def ui_pedidos_abel():
         return
 
     for p in pedidos:
-        id_pedido = p[0]
-        fecha = p[2] if len(p) > 12 else p[1]
-        operario = p[3] if len(p) > 12 else p[2]
-        centro = p[4] if len(p) > 12 else p[3]
-        material = p[5] if len(p) > 12 else p[4]
-        cantidad = p[6] if len(p) > 12 else p[5]
-        prioridad = p[7] if len(p) > 12 else p[6]
-        estado = p[8] if len(p) > 12 else p[7]
-        observaciones = p[9] if len(p) > 12 else p[8]
+        datos = leer_pedido(p)
+
+        id_pedido = datos["id_pedido"]
+        numero_pedido = datos["numero_pedido"] or referencia_pedido(id_pedido)
+        fecha = datos["fecha"]
+        operario = datos["operario"]
+        centro = datos["centro"]
+        material = datos["material"]
+        cantidad = datos["cantidad"]
+        prioridad = datos["prioridad"]
+        estado = datos["estado"]
+        observaciones = datos["observaciones"]
+        link_material = datos["link_material"]
 
         icono = {
             "Pendiente": "🟡",
@@ -283,7 +348,7 @@ def ui_pedidos_abel():
         }.get(estado, "⚪")
 
         with st.expander(
-            f"{icono} {referencia_pedido(id_pedido)} · {material} · {cantidad} uds · {operario} · {estado}"
+            f"{icono} {numero_pedido} · {material} · {cantidad} uds · {operario} · {estado}"
         ):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Operario:** {operario}")
@@ -291,6 +356,7 @@ def ui_pedidos_abel():
             st.write(f"**Prioridad:** {prioridad}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
+            mostrar_link_material(link_material)
             mostrar_fotos_pedido(id_pedido)
 
             nuevo_estado = st.selectbox(
