@@ -196,7 +196,26 @@ def obtener_pedidos_material(operario=None, solo_pendientes=False):
     conn = conectar()
     cur = conn.cursor()
 
-    query = "SELECT * FROM pedidos_material WHERE 1=1"
+    query = """
+        SELECT
+            id,
+            numero_pedido,
+            fecha,
+            operario,
+            centro,
+            material,
+            cantidad,
+            prioridad,
+            estado,
+            observaciones,
+            link_material,
+            foto,
+            fecha_preparado,
+            fecha_entrega
+        FROM pedidos_material
+        WHERE 1=1
+    """
+
     params = []
 
     if operario:
