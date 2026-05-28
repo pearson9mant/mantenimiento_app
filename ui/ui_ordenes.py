@@ -2,6 +2,7 @@ import streamlit as st
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from modules.ubicaciones import obtener_espacios
 from config_gerencia import TIPOS_SOLICITANTE
+from ui.ui_legionella import obtener_checklist_correctivo_legionella
 
 from modules.ordenes import (
     crear_orden,
@@ -978,6 +979,46 @@ def pantalla_ordenes():
                                         st.success(f"{numero_ot} finalizada")
                                         st.rerun()
                                 else:
+                                    descripcion_txt = str(descripcion or "")
+                                
+                                    if "CORRECTIVO LEGIONELLA" in descripcion_txt.upper():
+                                        checklist_leg = obtener_checklist_correctivo_legionella(numero_ot)
+                                
+                                        if checklist_leg is None:
+                                            st.error("No puedes finalizar esta OT correctiva de Legionella hasta completar y guardar el checklist.")
+                                            st.stop()
+                                
+                                        tiene_revision = any([
+                                            int(checklist_leg.get("revisar_consigna") or 0) == 1,
+                                            int(checklist_leg.get("revisar_termostato") or 0) == 1,
+                                            int(checklist_leg.get("revisar_caldera") or 0) == 1,
+                                            int(checklist_leg.get("revisar_resistencia") or 0) == 1,
+                                            int(checklist_leg.get("revisar_recirculacion") or 0) == 1,
+                                            int(checklist_leg.get("revisar_bomba") or 0) == 1,
+                                            int(checklist_leg.get("purgar_aire") or 0) == 1,
+                                            int(checklist_leg.get("esperar_recuperacion") or 0) == 1,
+                                        ])
+                                
+                                        causa = str(checklist_leg.get("causa_detectada") or "").strip()
+                                        nueva_medicion = int(checklist_leg.get("nueva_medicion") or 0) == 1
+                                        temperatura_final = float(checklist_leg.get("temperatura_final") or 0)
+                                
+                                        if not tiene_revision:
+                                            st.error("Marca al menos una revisión realizada antes de finalizar.")
+                                            st.stop()
+                                
+                                        if not causa:
+                                            st.error("Indica la causa detectada antes de finalizar.")
+                                            st.stop()
+                                
+                                        if not nueva_medicion:
+                                            st.error("Debes marcar 'Realizar nueva medición' antes de finalizar.")
+                                            st.stop()
+                                
+                                        if temperatura_final < 50:
+                                            st.error("No puedes finalizar. La temperatura final sigue siendo inferior a 50 ºC.")
+                                            st.stop()
+                                
                                     actualizar_observaciones_estado(id_orden, observaciones_estado)
                                     finalizar_orden(id_orden)
                                     limpiar_cache_streamlit()
