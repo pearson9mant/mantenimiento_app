@@ -1244,22 +1244,46 @@ def pantalla_operario():
                     st.info(f"📝 {observaciones_cierre_hist}")
 
                 try:
-
+                
                     fotos_db = obtener_fotos_ot(num_ot_hist)
-
+                
                     if fotos_db:
-
+                
                         cols_fotos = st.columns(3)
-
+                
                         for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-
+                
                             with cols_fotos[i % 3]:
-
+                
                                 st.image(
                                     bytes(foto_data),
                                     caption=f"Foto {i + 1}",
                                     use_container_width=True
                                 )
-
+                
+                    elif foto_hist:
+                
+                        fotos = str(foto_hist).split("|")
+                        cols_fotos = st.columns(3)
+                
+                        for i, ruta_foto in enumerate(fotos):
+                
+                            ruta_foto = str(ruta_foto).strip()
+                
+                            if not ruta_foto:
+                                continue
+                
+                            with cols_fotos[i % 3]:
+                
+                                try:
+                                    st.image(
+                                        ruta_foto,
+                                        caption=f"Foto {i + 1}",
+                                        use_container_width=True
+                                    )
+                
+                                except Exception as e:
+                                    st.caption(f"📷 Foto no disponible: {e}")
+                
                 except Exception as e:
                     st.caption(f"📷 Error fotos histórico: {e}")
