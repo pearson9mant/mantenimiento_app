@@ -271,7 +271,16 @@ def evaluar_resultado(tipo_control, valor, valor_2=None):
         if valor >= 50:
             return "OK", "Correcto"
         return "RIESGO", "Retorno por debajo de 50 ºC"
-
+    if tipo_control == "Temperatura impulsión ACS":
+        if valor >= 50:
+            return "OK", "Correcto"
+        return "RIESGO", "Impulsión ACS por debajo de 50 ºC"
+    
+    if tipo_control == "Temperatura punto terminal":
+        if valor >= 50:
+        return "OK", "Correcto"
+    return "RIESGO", "Punto terminal ACS por debajo de 50 ºC"
+    
     if tipo_control == "Cloro residual":
         if 0.2 <= valor <= 1.0:
             return "OK", "Correcto"
