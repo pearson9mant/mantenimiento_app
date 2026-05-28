@@ -118,43 +118,55 @@ def asegurar_columna_foto_legionella():
     except Exception:
         pass
 
-def asegurar_tabla_analiticas_legionella():
+def asegurar_tabla_correctivos_legionella():
     if os.getenv("DATABASE_URL"):
         ejecutar("""
-            CREATE TABLE IF NOT EXISTS legionella_analiticas (
+            CREATE TABLE IF NOT EXISTS legionella_correctivos_checklist (
                 id SERIAL PRIMARY KEY,
+                numero_ot TEXT,
                 centro TEXT,
                 edificio TEXT,
                 punto TEXT,
-                laboratorio TEXT,
-                fecha_toma TEXT,
-                fecha_resultado TEXT,
-                resultado TEXT,
-                numero_informe TEXT,
-                pdf TEXT,
+                tarea TEXT,
+                revisar_consigna INTEGER DEFAULT 0,
+                revisar_termostato INTEGER DEFAULT 0,
+                revisar_caldera INTEGER DEFAULT 0,
+                revisar_resistencia INTEGER DEFAULT 0,
+                revisar_recirculacion INTEGER DEFAULT 0,
+                revisar_bomba INTEGER DEFAULT 0,
+                purgar_aire INTEGER DEFAULT 0,
+                esperar_recuperacion INTEGER DEFAULT 0,
+                nueva_medicion INTEGER DEFAULT 0,
+                causa_detectada TEXT,
+                temperatura_final REAL,
+                empresa_externa TEXT,
                 observaciones TEXT,
-                frecuencia_dias INTEGER DEFAULT 90,
-                proxima_analitica TEXT,
-                activo INTEGER DEFAULT 1
+                fecha_actualizacion TEXT
             )
         """)
     else:
         ejecutar("""
-            CREATE TABLE IF NOT EXISTS legionella_analiticas (
+            CREATE TABLE IF NOT EXISTS legionella_correctivos_checklist (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero_ot TEXT,
                 centro TEXT,
                 edificio TEXT,
                 punto TEXT,
-                laboratorio TEXT,
-                fecha_toma TEXT,
-                fecha_resultado TEXT,
-                resultado TEXT,
-                numero_informe TEXT,
-                pdf TEXT,
+                tarea TEXT,
+                revisar_consigna INTEGER DEFAULT 0,
+                revisar_termostato INTEGER DEFAULT 0,
+                revisar_caldera INTEGER DEFAULT 0,
+                revisar_resistencia INTEGER DEFAULT 0,
+                revisar_recirculacion INTEGER DEFAULT 0,
+                revisar_bomba INTEGER DEFAULT 0,
+                purgar_aire INTEGER DEFAULT 0,
+                esperar_recuperacion INTEGER DEFAULT 0,
+                nueva_medicion INTEGER DEFAULT 0,
+                causa_detectada TEXT,
+                temperatura_final REAL,
+                empresa_externa TEXT,
                 observaciones TEXT,
-                frecuencia_dias INTEGER DEFAULT 90,
-                proxima_analitica TEXT,
-                activo INTEGER DEFAULT 1
+                fecha_actualizacion TEXT
             )
         """)
 
