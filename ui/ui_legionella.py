@@ -933,7 +933,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
                 centro,
                 edificio,
                 punto_nombre,
-                tarea,
+                f"CORRECTIVO LEGIONELLA - {tarea} - {resultado}",
                 operario,
             )
 
