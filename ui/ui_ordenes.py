@@ -1157,12 +1157,38 @@ def pantalla_ordenes():
                         if observaciones_estado:
                             st.info(f"📝 Observación durante el estado: {observaciones_estado}")
 
-                        if foto:
-                            try:
+                        
+                        try:
+
+                            fotos_db = obtener_fotos_ot(numero_ot)
+                        
+                            if fotos_db:
+                        
+                                with st.expander("📷 Ver fotos"):
+                        
+                                    cols_fotos = st.columns(3)
+                        
+                                    for i, (nombre_foto, foto_data) in enumerate(fotos_db):
+                        
+                                        with cols_fotos[i % 3]:
+                        
+                                            try:
+                                                st.image(
+                                                    bytes(foto_data),
+                                                    caption=f"Foto {i + 1}",
+                                                    use_container_width=True
+                                                )
+                        
+                                            except Exception:
+                                                st.caption("📷 Foto no disponible")
+                        
+                            elif foto:
+                        
                                 with st.expander("📷 Ver foto"):
                                     st.image(foto, use_container_width=True)
-                            except Exception:
-                                st.caption("📷 Foto no disponible")
+                        
+                        except Exception as e:
+                            st.caption(f"📷 Error fotos histórico: {e}")
 
                     with c2:
                         if es_admin() or es_gerencia():
