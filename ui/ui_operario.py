@@ -8,6 +8,7 @@ from modules.ordenes import (
     actualizar_observaciones_estado,
     finalizar_orden,
     obtener_fotos_ot,
+    guardar_foto_ot,
     crear_correctiva_desde_ot
 )
 
@@ -1098,7 +1099,12 @@ def pantalla_operario():
                                 })
                         else:
                             st.info("No hay materiales dados de alta en Inventario.")
-    
+                    fotos_cierre = st.file_uploader(
+                        "📷 Fotos del trabajo realizado",
+                        type=["jpg", "jpeg", "png"],
+                        accept_multiple_files=True,
+                        key=f"fotos_cierre_{id_orden}"
+                    )
                     if st.button(
                         f"Finalizar con observaciones/material {num_ot}",
                         key=f"fin_completo_operario_{id_orden}",
