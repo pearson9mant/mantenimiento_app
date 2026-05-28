@@ -337,7 +337,27 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
     if not centro or not edificio or not punto or not tarea:
         return False
 
-    descripcion = f"Control Legionella - {tarea} - {punto}"
+    if str(tarea).startswith("CORRECTIVO LEGIONELLA"):
+        descripcion = f"{tarea} - {punto}\n\nChecklist correctivo:\n"
+        descripcion += "- [ ] Revisar consigna acumulador\n"
+        descripcion += "- [ ] Revisar termostato\n"
+        descripcion += "- [ ] Revisar caldera\n"
+        descripcion += "- [ ] Revisar resistencia eléctrica\n"
+        descripcion += "- [ ] Revisar recirculación\n"
+        descripcion += "- [ ] Revisar bomba retorno\n"
+        descripcion += "- [ ] Purgar aire circuito\n"
+        descripcion += "- [ ] Esperar recuperación térmica\n"
+        descripcion += "- [ ] Realizar nueva medición\n"
+        descripcion += "\nCausa detectada:\n"
+        descripcion += "- Consigna incorrecta\n"
+        descripcion += "- Termostato\n"
+        descripcion += "- Caldera\n"
+        descripcion += "- Resistencia\n"
+        descripcion += "- Recirculación / bomba\n"
+        descripcion += "- Aire en circuito\n"
+        descripcion += "- Otra\n"
+    else:
+        descripcion = f"Control Legionella - {tarea} - {punto}"
 
     if existe_ot_legionella_abierta(centro, edificio, descripcion):
         return False
