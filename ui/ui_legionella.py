@@ -1575,12 +1575,21 @@ def pantalla_legionella():
 
             if estado == "OK":
                 st.success(f"Control guardado correctamente: {resultado}")
+            
             elif estado == "RIESGO":
-                st.error(f"Control guardado con RIESGO: {resultado}")
+                st.error(f"⚠️ RIESGO LEGIONELLA: {resultado}")
+                st.warning(
+                    "Se ha registrado la incidencia y se ha generado una OT correctiva automática."
+                )
+            
             elif estado == "ERROR":
                 st.error(resultado)
+            
             else:
-                st.warning(f"Control guardado con incidencia: {resultado}")
+                st.warning(f"⚠️ Incidencia Legionella: {resultado}")
+                st.warning(
+                    "Se ha registrado la incidencia y se ha generado una OT correctiva automática."
+                )
 
     with tab2:
         st.markdown("### 🗓️ Planificación Legionella")
