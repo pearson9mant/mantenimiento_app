@@ -170,6 +170,102 @@ def asegurar_tabla_correctivos_legionella():
             )
         """)
 
+def obtener_checklist_correctivo_legionella(numero_ot):
+    df = leer_df("""
+        SELECT *
+        FROM legionella_correctivos_checklist
+        WHERE numero_ot = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (numero_ot,))
+
+    if df.empty:
+        return None
+
+    return df.iloc[0].to_dict()
+
+
+def guardar_checklist_correctivo_legionella(
+    numero_ot,
+    centro,
+    edificio,
+    punto,
+    tarea,
+    datos
+):
+    existente = obtener_checklist_correctivo_legionella(numero_ot)
+
+    if existente is None:
+        ejecutar("""
+            INSERT INTO legionella_correctivos_checklist
+            (
+                numero_ot, centro, edificio, punto, tarea,
+                revisar_consigna, revisar_termostato, revisar_caldera,
+                revisar_resistencia, revisar_recirculacion, revisar_bomba,
+                purgar_aire, esperar_recuperacion, nueva_medicion,
+                causa_detectada, temperatura_final, empresa_externa,
+                observaciones, fecha_actualizacion
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            numero_ot, centro, edificio, punto, tarea,
+            datos["revisar_consigna"],
+            datos["revisar_termostato"],
+            datos["revisar_caldera"],
+            datos["revisar_resistencia"],
+            datos["revisar_recirculacion"],
+            datos["revisar_bomba"],
+            datos["purgar_aire"],
+            datos["esperar_recuperacion"],
+            datos["nueva_medicion"],
+            datos["causa_detectada"],
+            datos["temperatura_final"],
+            datos["empresa_externa"],
+            datos["observaciones"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+    else:
+        ejecutar("""
+            UPDATE legionella_correctivos_checklist
+            SET revisar_consigna = ?,
+                revisar_termostato = ?,
+                revisar_caldera = ?,
+                revisar_resistencia = ?,
+                revisar_recirculacion = ?,
+                revisar_bomba = ?,
+                purgar_aire = ?,
+                esperar_recuperacion = ?,
+                nueva_medicion = ?,
+                causa_detectada = ?,
+                temperatura_final = ?,
+                empresa_externa = ?,
+                observaciones = ?,
+                fecha_actualizacion = ?
+            WHERE numero_ot = ?
+        """, (
+            datos["revisar_consigna"],
+            datos["revisar_termostato"],
+            datos["revisar_caldera"],
+            datos["revisar_resistencia"],
+            datos["revisar_recirculacion"],
+            datos["revisar_bomba"],
+            datos["purgar_aire"],
+            datos["esperar_recuperacion"],
+            datos["nueva_medicion"],
+            datos["causa_detectada"],
+            datos["temperatura_final"],
+            datos["empresa_externa"],
+            datos["observaciones"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            numero_ot
+        ))
+
+
+def borrar_checklist_correctivo_legionella(numero_ot):
+    ejecutar("""
+        DELETE FROM legionella_correctivos_checklist
+        WHERE numero_ot = ?
+    """, (numero_ot,))
 
 def limpiar_registros_invalidos_legionella():
     conn = conectar()
