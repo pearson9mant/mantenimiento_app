@@ -994,6 +994,145 @@ def pantalla_operario():
                     if st.button("✔\nFinalizar", key=f"fin_rapido_{id_orden}", use_container_width=True):
                         st.session_state[f"confirmar_fin_rapido_{id_orden}"] = True
                         st.rerun()
+
+                    # =====================================================
+                    # CHECKLIST CORRECTIVO LEGIONELLA
+                    # =====================================================
+                    
+                    if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
+                    
+                        st.markdown("### 🧪 Checklist correctivo Legionella")
+                    
+                        checklist = obtener_checklist_correctivo_legionella(num_ot)
+                    
+                        revisar_consigna = st.checkbox(
+                            "Revisar consigna acumulador",
+                            value=bool(checklist.get("revisar_consigna", 0)) if checklist else False,
+                            key=f"leg_consigna_op_{num_ot}"
+                        )
+                    
+                        revisar_termostato = st.checkbox(
+                            "Revisar termostato",
+                            value=bool(checklist.get("revisar_termostato", 0)) if checklist else False,
+                            key=f"leg_termostato_op_{num_ot}"
+                        )
+                    
+                        revisar_caldera = st.checkbox(
+                            "Revisar caldera",
+                            value=bool(checklist.get("revisar_caldera", 0)) if checklist else False,
+                            key=f"leg_caldera_op_{num_ot}"
+                        )
+                    
+                        revisar_resistencia = st.checkbox(
+                            "Revisar resistencia eléctrica",
+                            value=bool(checklist.get("revisar_resistencia", 0)) if checklist else False,
+                            key=f"leg_resistencia_op_{num_ot}"
+                        )
+                    
+                        revisar_recirculacion = st.checkbox(
+                            "Revisar recirculación",
+                            value=bool(checklist.get("revisar_recirculacion", 0)) if checklist else False,
+                            key=f"leg_recirculacion_op_{num_ot}"
+                        )
+                    
+                        revisar_bomba = st.checkbox(
+                            "Revisar bomba retorno",
+                            value=bool(checklist.get("revisar_bomba", 0)) if checklist else False,
+                            key=f"leg_bomba_op_{num_ot}"
+                        )
+                    
+                        purgar_aire = st.checkbox(
+                            "Purgar aire circuito",
+                            value=bool(checklist.get("purgar_aire", 0)) if checklist else False,
+                            key=f"leg_aire_op_{num_ot}"
+                        )
+                    
+                        esperar_recuperacion = st.checkbox(
+                            "Esperar recuperación térmica",
+                            value=bool(checklist.get("esperar_recuperacion", 0)) if checklist else False,
+                            key=f"leg_recuperacion_op_{num_ot}"
+                        )
+                    
+                        nueva_medicion = st.checkbox(
+                            "Realizar nueva medición",
+                            value=bool(checklist.get("nueva_medicion", 0)) if checklist else False,
+                            key=f"leg_medicion_op_{num_ot}"
+                        )
+                    
+                        causa_detectada = st.selectbox(
+                            "Causa detectada",
+                            [
+                                "",
+                                "Consigna incorrecta",
+                                "Termostato",
+                                "Caldera",
+                                "Resistencia",
+                                "Recirculación / bomba",
+                                "Aire en circuito",
+                                "Empresa externa pendiente",
+                                "Otra"
+                            ],
+                            key=f"leg_causa_op_{num_ot}"
+                        )
+                    
+                        temperatura_final = st.number_input(
+                            "Temperatura final ºC",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=float(checklist.get("temperatura_final", 0) or 0) if checklist else 0.0,
+                            step=0.1,
+                            key=f"leg_temp_op_{num_ot}"
+                        )
+                    
+                        empresa_externa_leg = st.text_input(
+                            "Empresa externa / técnico",
+                            value=str(checklist.get("empresa_externa", "") if checklist else ""),
+                            key=f"leg_empresa_op_{num_ot}"
+                        )
+                    
+                        observaciones_leg = st.text_area(
+                            "Observaciones correctivo",
+                            value=str(checklist.get("observaciones", "") if checklist else ""),
+                            key=f"leg_obs_op_{num_ot}"
+                        )
+                    
+                        col_leg1, col_leg2 = st.columns(2)
+                    
+                        with col_leg1:
+                            if st.button(f"💾 Guardar checklist {num_ot}", key=f"guardar_leg_op_{num_ot}"):
+                    
+                                guardar_checklist_correctivo_legionella(
+                                    num_ot,
+                                    centro,
+                                    edificio,
+                                    espacio,
+                                    desc,
+                                    {
+                                        "revisar_consigna": 1 if revisar_consigna else 0,
+                                        "revisar_termostato": 1 if revisar_termostato else 0,
+                                        "revisar_caldera": 1 if revisar_caldera else 0,
+                                        "revisar_resistencia": 1 if revisar_resistencia else 0,
+                                        "revisar_recirculacion": 1 if revisar_recirculacion else 0,
+                                        "revisar_bomba": 1 if revisar_bomba else 0,
+                                        "purgar_aire": 1 if purgar_aire else 0,
+                                        "esperar_recuperacion": 1 if esperar_recuperacion else 0,
+                                        "nueva_medicion": 1 if nueva_medicion else 0,
+                                        "causa_detectada": causa_detectada,
+                                        "temperatura_final": temperatura_final,
+                                        "empresa_externa": empresa_externa_leg,
+                                        "observaciones": observaciones_leg,
+                                    }
+                                )
+                    
+                                st.success("Checklist Legionella guardado")
+                    
+                        with col_leg2:
+                            if st.button(f"🗑️ Reset checklist {num_ot}", key=f"reset_leg_op_{num_ot}"):
+                    
+                                borrar_checklist_correctivo_legionella(num_ot)
+                    
+                                st.warning("Checklist reiniciado")
+                                st.rerun()
     
                 if st.session_state.get(f"confirmar_fin_rapido_{id_orden}", False):
                     st.warning(f"¿Seguro que quieres finalizar {num_ot}?")
