@@ -19,6 +19,8 @@ ESTADOS_VALIDOS = [
     "Cerrado"
 ]
 _COLUMNAS_ORDENES_ASEGURADAS = False
+_TABLA_CONTADOR_ASEGURADA = False
+_TABLA_FOTOS_ASEGURADA = False
 
 # =====================================================
 # ASEGURAR COLUMNAS OBSERVACIONES / EXTERNAS
@@ -118,6 +120,11 @@ def obtener_codigo_tipo(tipo_ot):
 
 
 def asegurar_tabla_contador_ot():
+    global _TABLA_CONTADOR_ASEGURADA
+
+    if _TABLA_CONTADOR_ASEGURADA:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
