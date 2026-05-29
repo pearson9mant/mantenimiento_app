@@ -889,7 +889,7 @@ def pantalla_operario():
 
     st.markdown("---")
 
-    materiales_select = obtener_materiales_para_select()
+    materiales_select = []
 
     ordenes_operario = [
         o for o in ordenes_operario
