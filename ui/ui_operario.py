@@ -615,8 +615,14 @@ def puede_finalizar_preventivo(num_ot, origen, desc):
 
 
 def puede_finalizar_legionella(id_orden, area, origen, desc):
+    desc_txt = str(desc or "").upper()
+
+    if "CORRECTIVO LEGIONELLA" in desc_txt:
+        return True
+
     if es_ot_legionella(area, origen, desc):
         return st.session_state.get(f"legionella_guardada_{id_orden}", False)
+
     return True
 
 
