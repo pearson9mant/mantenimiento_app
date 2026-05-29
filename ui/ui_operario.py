@@ -866,8 +866,11 @@ def pantalla_operario():
     ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
     ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
 
+    try:
+        historico = obtener_historico()
+    except Exception:
+        historico = []
     
-    historico = []
 
     kpis = calcular_kpis_operario(
         ordenes_operario,
