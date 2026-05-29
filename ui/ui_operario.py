@@ -975,14 +975,6 @@ def pantalla_operario():
                         origen_base="Legionella"
                     )
     
-                st.markdown("### 📝 Estado y observaciones")
-    
-                observacion_estado_nueva = st.text_area(
-                    "Observación del estado",
-                    value=str(observaciones_estado or ""),
-                    placeholder="Ejemplo: En curso porque falta acceder al aula, pendiente de pieza, esperando proveedor...",
-                    key=f"observacion_estado_{id_orden}"
-                )
     
                 b1, b2, b3 = st.columns(3)
     
