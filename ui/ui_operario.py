@@ -1127,7 +1127,7 @@ def pantalla_operario():
                         if st.button("✔\nSí, finalizar", key=f"si_fin_rapido_{id_orden}", use_container_width=True):
                             if not puede_finalizar_preventivo(num_ot, origen, desc):
                                 st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
-                            elif not puede_finalizar_legionella(id_orden, area, origen, desc):
+                            elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
                                 st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
                             else:
                                 actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
