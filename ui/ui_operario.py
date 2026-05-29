@@ -1382,11 +1382,8 @@ def pantalla_operario():
 
                 try:
                 
-                    st.caption(f"DEBUG OT histórico: {num_ot_hist}")
 
                     fotos_db = obtener_fotos_ot(num_ot_hist)
-
-                    st.caption(f"DEBUG fotos encontradas: {len(fotos_db)}")
                 
                     if fotos_db:
                 
