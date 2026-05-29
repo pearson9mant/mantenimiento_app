@@ -933,6 +933,11 @@ def crear_correctiva_desde_ot(
 # =====================================================
 
 def asegurar_tabla_ordenes_fotos():
+    global _TABLA_FOTOS_ASEGURADA
+
+    if _TABLA_FOTOS_ASEGURADA:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -962,6 +967,8 @@ def asegurar_tabla_ordenes_fotos():
 
     conn.commit()
     conn.close()
+
+    _TABLA_FOTOS_ASEGURADA = True
 
 
 def guardar_foto_ot(numero_ot, nombre_foto, foto_data):
