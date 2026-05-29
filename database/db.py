@@ -26,7 +26,21 @@ def conectar():
         return psycopg2.connect(database_url)
 
     Path(DB).parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(DB, timeout=30)
+
+    conn = sqlite3.connect(
+        DB,
+        timeout=30,
+        check_same_thread=False
+    )
+
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
+
+    return conn
 
 
 def _add_column(cursor, tabla, columna, tipo):
