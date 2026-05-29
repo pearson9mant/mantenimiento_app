@@ -703,7 +703,6 @@ def descomponer_orden_operario(fila):
         observaciones_estado,
     )
 
-
 def puede_finalizar_preventivo(num_ot, origen, desc):
     if es_ot_preventiva(origen, desc):
         return checklist_preventivo_completo(num_ot)
@@ -711,8 +710,8 @@ def puede_finalizar_preventivo(num_ot, origen, desc):
 
 
 def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
-
     desc_txt = str(desc or "").upper()
+
 
     if "CORRECTIVO LEGIONELLA" in desc_txt:
 
