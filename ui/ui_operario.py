@@ -998,7 +998,7 @@ def pantalla_operario():
                     # =====================================================
                     # CHECKLIST CORRECTIVO LEGIONELLA
                     # =====================================================
-                    
+                    st.caption(f"DEBUG DESC: {desc}")
                     if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
                     
                         st.markdown("### 🧪 Checklist correctivo Legionella")
