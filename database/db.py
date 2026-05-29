@@ -43,17 +43,37 @@ def conectar():
     return conn
 
 
+def _column_exists(cursor, tabla, columna):
+    try:
+        if _es_postgres():
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = %s
+                AND column_name = %s
+            """, (tabla, columna))
+
+            return cursor.fetchone() is not None
+
+        cursor.execute(f"PRAGMA table_info({tabla})")
+
+        return columna in [fila[1] for fila in cursor.fetchall()]
+
+    except Exception:
+        return False
+
+
 def _add_column(cursor, tabla, columna, tipo):
     try:
-        cursor.execute("SAVEPOINT add_column_savepoint")
-        cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
-        cursor.execute("RELEASE SAVEPOINT add_column_savepoint")
+        if _column_exists(cursor, tabla, columna):
+            return
+
+        cursor.execute(
+            f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"
+        )
+
     except Exception:
-        try:
-            cursor.execute("ROLLBACK TO SAVEPOINT add_column_savepoint")
-            cursor.execute("RELEASE SAVEPOINT add_column_savepoint")
-        except Exception:
-            pass
+        pass
 
 def crear_indices_rendimiento():
     conn = conectar()
