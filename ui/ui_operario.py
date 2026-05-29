@@ -1128,7 +1128,7 @@ def pantalla_operario():
                             if not puede_finalizar_preventivo(num_ot, origen, desc):
                                 st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
                             elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
-                                st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
+                                st.error("No puedes finalizar esta OT de Legionella hasta completar el control/checklist correspondiente.")
                             else:
                                 actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
                                 finalizar_orden(id_orden, "")
@@ -1257,7 +1257,7 @@ def pantalla_operario():
                                     st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
     
                                 elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
-                                    st.error("No puedes finalizar esta OT de Legionella hasta guardar el control.")
+                                    st.error("No puedes finalizar esta OT de Legionella hasta completar el control/checklist correspondiente.")
     
                                 elif usar_material and materiales_select:
     
