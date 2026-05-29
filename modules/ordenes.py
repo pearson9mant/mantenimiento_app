@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from database.db import conectar, _sql
+from database.db import conectar, _sql, _add_column
 
 try:
     from modules.telegram_alertas import enviar_telegram
@@ -25,10 +25,7 @@ _COLUMNAS_ORDENES_ASEGURADAS = False
 # =====================================================
 
 def _add_column_seguro(cursor, tabla, columna, tipo):
-    try:
-        cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
-    except Exception:
-        pass
+    _add_column(cursor, tabla, columna, tipo)
 
 
 def asegurar_columnas_observaciones_estado():
