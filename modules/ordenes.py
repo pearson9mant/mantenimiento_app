@@ -18,7 +18,7 @@ ESTADOS_VALIDOS = [
     "En ejecución",
     "Cerrado"
 ]
-
+_COLUMNAS_ORDENES_ASEGURADAS = False
 
 # =====================================================
 # ASEGURAR COLUMNAS OBSERVACIONES / EXTERNAS
