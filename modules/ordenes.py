@@ -32,6 +32,11 @@ def _add_column_seguro(cursor, tabla, columna, tipo):
 
 
 def asegurar_columnas_observaciones_estado():
+    global _COLUMNAS_ORDENES_ASEGURADAS
+
+    if _COLUMNAS_ORDENES_ASEGURADAS:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -62,6 +67,8 @@ def asegurar_columnas_observaciones_estado():
 
     conn.commit()
     conn.close()
+
+    _COLUMNAS_ORDENES_ASEGURADAS = True
 
 
 # =====================================================
