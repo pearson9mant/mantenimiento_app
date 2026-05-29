@@ -2,6 +2,7 @@ import re
 import unicodedata
 
 from database.db import conectar
+_COLUMNAS_INVENTARIO_ASEGURADAS = False
 
 
 def _ph(conn):
@@ -171,6 +172,11 @@ def comprobar_material_antes_crear(material, categoria="", unidad=""):
 # =====================================================
 
 def asegurar_columnas_inventario():
+    global _COLUMNAS_INVENTARIO_ASEGURADAS
+
+    if _COLUMNAS_INVENTARIO_ASEGURADAS:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -214,6 +220,8 @@ def asegurar_columnas_inventario():
 
     finally:
         conn.close()
+
+    _COLUMNAS_INVENTARIO_ASEGURADAS = True)
 
 
 def actualizar_materiales_normalizados():
