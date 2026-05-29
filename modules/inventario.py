@@ -221,7 +221,7 @@ def asegurar_columnas_inventario():
     finally:
         conn.close()
 
-    _COLUMNAS_INVENTARIO_ASEGURADAS = True)
+    _COLUMNAS_INVENTARIO_ASEGURADAS = True
 
 
 def actualizar_materiales_normalizados():
