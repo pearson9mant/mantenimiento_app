@@ -25,6 +25,12 @@ from modules.preventivo import (
     crear_checklist_preventivo,
 )
 
+from ui.ui_legionella import (
+    obtener_checklist_correctivo_legionella,
+    guardar_checklist_correctivo_legionella,
+    borrar_checklist_correctivo_legionella,
+)
+
 
 def rol_actual():
     return str(st.session_state.get("rol", "")).strip().lower()
