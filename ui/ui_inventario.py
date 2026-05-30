@@ -650,12 +650,12 @@ def pantalla_inventario():
                 with col_guardar:
                     if st.button("💾 Guardar cambios", key=f"abel_guardar_{codigo}"):
             
-                        foto_nombre = None
-                        foto_data = None
+                        foto_nombre_nueva = None
+                        foto_data_nueva = None
             
                         if nueva_foto is not None:
-                            foto_nombre = nueva_foto.name
-                            foto_data = nueva_foto.getvalue()
+                            foto_nombre_nueva = nueva_foto.name
+                            foto_data_nueva = nueva_foto.getvalue()
             
                         actualizar_material_abel(
                             codigo=codigo,
@@ -666,8 +666,8 @@ def pantalla_inventario():
                             stock_minimo=nuevo_stock_minimo,
                             precio_unitario=nuevo_precio_unitario,
                             observaciones=nuevas_observaciones,
-                            foto_nombre=foto_nombre,
-                            foto_data=foto_data
+                            foto_nombre=foto_nombre_nueva,
+                            foto_data=foto_data_nueva
                         )
             
                         st.success("Material actualizado correctamente.")
