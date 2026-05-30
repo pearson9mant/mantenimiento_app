@@ -826,3 +826,86 @@ def activar_material(codigo):
     conn.close()
 
     return True, "Material activado correctamente."
+
+
+def actualizar_material_abel(
+    codigo,
+    material,
+    categoria,
+    ubicacion,
+    proveedor,
+    stock_minimo,
+    precio_unitario,
+    observaciones,
+    foto_nombre=None,
+    foto_data=None
+):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+
+        if foto_data is not None:
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET
+                    material = {p},
+                    categoria = {p},
+                    ubicacion = {p},
+                    proveedor = {p},
+                    stock_minimo = {p},
+                    precio_unitario = {p},
+                    observaciones = {p},
+                    foto_nombre = {p},
+                    foto_data = {p}
+                WHERE codigo = {p}
+            """, (
+                material,
+                categoria,
+                ubicacion,
+                proveedor,
+                float(stock_minimo or 0),
+                float(precio_unitario or 0),
+                observaciones,
+                foto_nombre,
+                foto_data,
+                codigo
+            ))
+
+        else:
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET
+                    material = {p},
+                    categoria = {p},
+                    ubicacion = {p},
+                    proveedor = {p},
+                    stock_minimo = {p},
+                    precio_unitario = {p},
+                    observaciones = {p}
+                WHERE codigo = {p}
+            """, (
+                material,
+                categoria,
+                ubicacion,
+                proveedor,
+                float(stock_minimo or 0),
+                float(precio_unitario or 0),
+                observaciones,
+                codigo
+            ))
+
+        conn.commit()
+        return True, "Material actualizado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+
+    finally:
+        conn.close()
