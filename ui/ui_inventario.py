@@ -588,7 +588,92 @@ def pantalla_inventario():
                         st.caption(f"📷 {foto_nombre}")
                 except Exception:
                     st.caption("Foto no disponible.")
+            # -------------------------
+            # EDITAR MATERIAL - ABEL
+            # -------------------------
+            with st.expander("✏️ Editar material"):
+            
+                nuevo_material = st.text_input(
+                    "Material",
+                    value=str(material or ""),
+                    key=f"abel_edit_material_{codigo}"
+                )
+            
+                nueva_categoria = st.text_input(
+                    "Categoría",
+                    value=str(categoria or ""),
+                    key=f"abel_edit_categoria_{codigo}"
+                )
+            
+                nueva_ubicacion = st.text_input(
+                    "Ubicación",
+                    value=str(ubicacion or ""),
+                    key=f"abel_edit_ubicacion_{codigo}"
+                )
+            
+                nuevo_proveedor = st.text_input(
+                    "Proveedor",
+                    value=str(proveedor or ""),
+                    key=f"abel_edit_proveedor_{codigo}"
+                )
+            
+                nuevo_stock_minimo = st.number_input(
+                    "Stock mínimo",
+                    min_value=0.0,
+                    value=float(stock_minimo or 0),
+                    step=1.0,
+                    key=f"abel_edit_stock_minimo_{codigo}"
+                )
+            
+                nuevo_precio_unitario = st.number_input(
+                    "Precio unitario €",
+                    min_value=0.0,
+                    value=float(precio_unitario or 0),
+                    step=0.10,
+                    key=f"abel_edit_precio_{codigo}"
+                )
+            
+                nuevas_observaciones = st.text_area(
+                    "Observaciones",
+                    value=str(observaciones or ""),
+                    key=f"abel_edit_obs_{codigo}"
+                )
+            
+                nueva_foto = st.file_uploader(
+                    "Cambiar foto",
+                    type=["jpg", "jpeg", "png"],
+                    key=f"abel_edit_foto_{codigo}"
+                )
+            
+                col_guardar, col_cancelar = st.columns(2)
+            
+                with col_guardar:
+                    if st.button("💾 Guardar cambios", key=f"abel_guardar_{codigo}"):
+            
+                        foto_nombre = None
+                        foto_data = None
+            
+                        if nueva_foto is not None:
+                            foto_nombre = nueva_foto.name
+                            foto_data = nueva_foto.getvalue()
+            
+                        actualizar_material_abel(
+                            codigo=codigo,
+                            material=nuevo_material,
+                            categoria=nueva_categoria,
+                            ubicacion=nueva_ubicacion,
+                            proveedor=nuevo_proveedor,
+                            stock_minimo=nuevo_stock_minimo,
+                            precio_unitario=nuevo_precio_unitario,
+                            observaciones=nuevas_observaciones,
+                            foto_nombre=foto_nombre,
+                            foto_data=foto_data
+                        )
+            
+                        st.success("Material actualizado correctamente.")
+                        st.rerun()
 
+            
             if puede_borrar_inventario():
                 if activo == 1:
                     confirmar = st.checkbox(
