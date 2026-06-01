@@ -1371,6 +1371,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         file_name=f"libro_mantenimiento_legionella_{centro_filtro.replace(' ', '_')}_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
         mime="application/pdf"
     )
+    
 def crear_tarea_legionella_manual(
     centro,
     edificio,
@@ -1404,6 +1405,38 @@ def crear_tarea_legionella_manual(
         1 if generar_ot else 0,
         "Tarea creada manualmente"
     ))
+
+def asegurar_columnas_plano_legionella():
+
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN ubicacion_exacta TEXT
+        """)
+    except Exception:
+        pass
+
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN plano_nombre TEXT
+        """)
+    except Exception:
+        pass
+
+    try:
+        if os.getenv("DATABASE_URL"):
+            ejecutar("""
+                ALTER TABLE legionella_puntos
+                ADD COLUMN plano_data BYTEA
+            """)
+        else:
+            ejecutar("""
+                ALTER TABLE legionella_puntos
+                ADD COLUMN plano_data BLOB
+            """)
+    except Exception:
+        pass
 
 def actualizar_punto_legionella(
     punto_id,
