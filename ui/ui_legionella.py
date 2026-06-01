@@ -2242,7 +2242,15 @@ def pantalla_legionella():
                             type=["pdf"],
                             key=f"plano_leg_{row['id']}"
                         )
-                    
+
+                        if row.get("plano_data") is not None and row.get("plano_data") != b"":
+                            st.download_button(
+                                "🗺️ Ver / descargar plano actual",
+                                data=bytes(row["plano_data"]),
+                                file_name=row.get("plano_nombre") or f"plano_punto_{row['id']}.pdf",
+                                mime="application/pdf",
+                                key=f"descargar_plano_punto_{row['id']}"
+                             )
                         observaciones_edit = st.text_area(
                             "Observaciones",
                             value=str(row["observaciones"] or ""),
