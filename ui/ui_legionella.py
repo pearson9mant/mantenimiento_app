@@ -71,7 +71,7 @@ def ejecutar(sql, params=()):
         conn.close()
 
 
-@st.cache_data(ttl=30)
+
 def leer_df(sql, params=()):
     conn = conectar()
     try:
