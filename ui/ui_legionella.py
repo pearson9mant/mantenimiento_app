@@ -2258,7 +2258,14 @@ def pantalla_legionella():
                         key=f"guardar_edicion_punto_{row['id']}",
                         use_container_width=True
                     ):
-                        actualizar_punto_legionella(
+
+                        plano_nombre = None
+                        plano_data = None
+                    
+                        if plano_pdf is not None:
+                            plano_nombre = plano_pdf.name
+                            plano_data = plano_pdf.getvalue()
+                       actualizar_punto_legionella(
                             row["id"],
                             centro_edit,
                             edificio_edit,
@@ -2266,8 +2273,11 @@ def pantalla_legionella():
                             tipo_edit,
                             nombre_edit,
                             ubicacion_edit,
+                            ubicacion_exacta_edit,
                             observaciones_edit,
-                            activo_edit
+                            activo_edit,
+                            plano_nombre,
+                            plano_data
                         )
 
                         st.success("Punto actualizado correctamente.")
