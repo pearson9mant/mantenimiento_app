@@ -2212,19 +2212,32 @@ def pantalla_legionella():
                             value=str(row["nombre_punto"] or ""),
                             key=f"edit_nombre_punto_{row['id']}"
                         )
-
+                    
                         ubicacion_edit = st.text_input(
                             "Ubicación",
                             value=str(row["ubicacion"] or ""),
                             key=f"edit_ubicacion_punto_{row['id']}"
                         )
-
+                    
+                        ubicacion_exacta_edit = st.text_input(
+                            "📍 Ubicación exacta",
+                            value=str(row.get("ubicacion_exacta", "") or ""),
+                            placeholder="Ej: Planta baja · WC profesores · Grifo lavabo derecha",
+                            key=f"ubicacion_exacta_{row['id']}"
+                        )
+                    
+                        plano_pdf = st.file_uploader(
+                            "🗺️ Plano ubicación punto",
+                            type=["pdf"],
+                            key=f"plano_leg_{row['id']}"
+                        )
+                    
                         observaciones_edit = st.text_area(
                             "Observaciones",
                             value=str(row["observaciones"] or ""),
                             key=f"edit_observaciones_punto_{row['id']}"
                         )
-
+                    
                         activo_edit = st.checkbox(
                             "Punto activo",
                             value=bool(row["activo"]),
