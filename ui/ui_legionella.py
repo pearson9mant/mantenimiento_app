@@ -2275,7 +2275,7 @@ def pantalla_legionella():
                         if plano_pdf is not None:
                             plano_nombre = plano_pdf.name
                             plano_data = plano_pdf.getvalue()
-                       actualizar_punto_legionella(
+                        actualizar_punto_legionella(
                             row["id"],
                             centro_edit,
                             edificio_edit,
