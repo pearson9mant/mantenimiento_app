@@ -587,13 +587,32 @@ def sembrar_planificacion_legionella(fecha_inicio):
 
             frecuencia = dias_frecuencia(tarea)
             unidad = unidad_por_tarea(tarea)
+            consigna_minima = 60
+            controla_consigna = 1
+            
+            if instalacion == "Solar":
+                consigna_minima = 0
+                controla_consigna = 0
+            
+            if tarea == "Temperatura retorno":
+                consigna_minima = 50
+                controla_consigna = 1
+            
+            if tarea == "Temperatura impulsión ACS":
+                consigna_minima = 50
+                controla_consigna = 1
+            
+            if tarea in ["Cloro residual", "Revisión visual", "Purga"]:
+                consigna_minima = 0
+                controla_consigna = 0
 
             ejecutar("""
                 INSERT INTO legionella_tareas
                 (punto_id, centro, edificio, instalacion, punto, tarea, tipo_control,
                  frecuencia, frecuencia_dias, unidad, fecha_inicio, ultima_fecha,
-                 proxima_fecha, operario, activo, generar_ot, observaciones)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, 1, ?)
+                 proxima_fecha, operario, activo, generar_ot,
+                 consigna_minima, controla_consigna, observaciones)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, 1, ?, ?, ?)
             """, (
                 punto_id,
                 centro,
@@ -608,6 +627,8 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 fecha_inicio,
                 fecha_inicio,
                 operario,
+                consigna_minima,
+                controla_consigna,
                 "Planificación inicial automática"
             ))
 
