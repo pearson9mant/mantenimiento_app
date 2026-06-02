@@ -617,7 +617,8 @@ def sembrar_planificacion_legionella(fecha_inicio):
 def obtener_planificacion_legionella():
     return leer_df("""
         SELECT id, centro, edificio, instalacion, punto, tarea, tipo_control,
-               frecuencia_dias, proxima_fecha, operario, activo, generar_ot
+               frecuencia_dias, proxima_fecha, operario, activo,
+               generar_ot, consigna_minima, controla_consigna
         FROM legionella_tareas
         WHERE centro IS NOT NULL
           AND edificio IS NOT NULL
