@@ -970,9 +970,9 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     if valor is None:
         return "ERROR", "Valor no válido. No se ha guardado el registro."
 
-        # Buscar consigna configurada para esta tarea/punto
-        consigna_minima = 0
-        controla_consigna = 0
+    # Buscar consigna configurada para esta tarea/punto
+    consigna_minima = 0
+    controla_consigna = 0
 
     try:
         df_consigna = leer_df("""
