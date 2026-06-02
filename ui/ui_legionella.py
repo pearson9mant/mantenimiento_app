@@ -366,31 +366,33 @@ def sembrar_puntos_si_vacio():
         conn.close()
 
 
-def evaluar_resultado(tipo_control, valor, valor_2=None):
+def evaluar_resultado(tipo_control, valor, valor_2=None, consigna_minima=None, controla_consigna=1):
     try:
         valor = float(valor)
     except Exception:
         return "INCIDENCIA", "Valor no válido o vacío"
 
-    if tipo_control == "Temperatura acumulador":
-        if valor >= 60:
-            return "OK", "Correcto"
-        return "RIESGO", "Acumulador por debajo de 60 ºC"
+    try:
+        consigna_minima = float(consigna_minima)
+    except Exception:
+        consigna_minima = None
 
-    if tipo_control == "Temperatura retorno":
-        if valor >= 50:
+    controla_consigna = int(controla_consigna or 0)
+
+    if tipo_control in [
+        "Temperatura acumulador",
+        "Temperatura retorno",
+        "Temperatura impulsión ACS",
+        "Temperatura punto terminal",
+    ]:
+        if controla_consigna == 0 or consigna_minima is None or consigna_minima <= 0:
+            return "OK", "Registrado sin consigna automática"
+
+        if valor >= consigna_minima:
             return "OK", "Correcto"
-        return "RIESGO", "Retorno por debajo de 50 ºC"
-    if tipo_control == "Temperatura impulsión ACS":
-        if valor >= 50:
-            return "OK", "Correcto"
-        return "RIESGO", "Impulsión ACS por debajo de 50 ºC"
-    
-    if tipo_control == "Temperatura punto terminal":
-        if valor >= 50:
-            return "OK", "Correcto"
-    return "RIESGO", "Punto terminal ACS por debajo de 50 ºC"
-    
+
+        return "RIESGO", f"{tipo_control} por debajo de {consigna_minima:g} ºC"
+
     if tipo_control == "Cloro residual":
         if 0.2 <= valor <= 1.0:
             return "OK", "Correcto"
