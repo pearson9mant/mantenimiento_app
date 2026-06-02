@@ -418,7 +418,15 @@ def operario_por_centro(centro):
         return "J.A. Almeda"
     return ""
 
-
+def corregir_consignas_solares():
+    ejecutar("""
+        UPDATE legionella_tareas
+        SET consigna_minima = 0,
+            controla_consigna = 0
+        WHERE instalacion = 'Solar'
+           OR LOWER(COALESCE(punto, '')) LIKE '%solar%'
+    """)
+        
 def existe_ot_legionella_abierta(centro, edificio, descripcion):
     conn = conectar()
     cur = conn.cursor()
