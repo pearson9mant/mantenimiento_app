@@ -50,6 +50,7 @@ def pantalla_inventario_aulas():
                 "Pizarra",
                 "Proyector",
                 "Estantería",
+                "Pantalla eléctrica",
                 "Perchero",
                 "Otro"
             ],
