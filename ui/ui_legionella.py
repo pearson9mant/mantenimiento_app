@@ -101,6 +101,8 @@ def asegurar_columnas_planificacion_legionella():
         ("frecuencia_dias", "INTEGER DEFAULT 30"),
         ("fecha_inicio", "TEXT"),
         ("generar_ot", "INTEGER DEFAULT 1"),
+        ("consigna_minima", "REAL DEFAULT 60"),
+        ("controla_consigna", "INTEGER DEFAULT 1"),
     ]
 
     for columna, tipo in columnas:
