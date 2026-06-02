@@ -1964,6 +1964,20 @@ def pantalla_legionella():
                             value=bool(row["activo"]),
                             key=f"activo_leg_{row['id']}"
                         )
+                        consigna_minima = st.number_input(
+                            "Consigna mínima ºC",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=float(row["consigna_minima"] or 0),
+                            step=0.1,
+                            key=f"consigna_leg_{row['id']}"
+                        )
+
+                        controla_consigna = st.checkbox(
+                            "Controlar consigna",
+                            value=bool(row["controla_consigna"]),
+                            key=f"controla_consigna_leg_{row['id']}"
+                        )
 
                     if st.button("💾 Guardar cambios", key=f"guardar_plan_leg_{row['id']}", use_container_width=True):
                         actualizar_plan_legionella(
@@ -1972,7 +1986,9 @@ def pantalla_legionella():
                             proxima_fecha.strftime("%Y-%m-%d"),
                             operario,
                             generar_ot,
-                            activo
+                            activo,
+                            consigna_minima,
+                            controla_consigna
                         )
 
                         st.success("Planificación actualizada.")
