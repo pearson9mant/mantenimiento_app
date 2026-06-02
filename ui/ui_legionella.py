@@ -659,7 +659,16 @@ def obtener_planificacion_legionella():
     """)
 
 
-def actualizar_plan_legionella(tarea_id, frecuencia_dias, proxima_fecha, operario, generar_ot, activo):
+def actualizar_plan_legionella(
+    tarea_id,
+    frecuencia_dias,
+    proxima_fecha,
+    operario,
+    generar_ot,
+    activo,
+    consigna_minima,
+    controla_consigna
+):
     ejecutar("""
         UPDATE legionella_tareas
         SET frecuencia_dias = ?,
@@ -667,7 +676,9 @@ def actualizar_plan_legionella(tarea_id, frecuencia_dias, proxima_fecha, operari
             proxima_fecha = ?,
             operario = ?,
             generar_ot = ?,
-            activo = ?
+            activo = ?,
+            consigna_minima = ?,
+            controla_consigna = ?
         WHERE id = ?
     """, (
         int(frecuencia_dias),
@@ -676,6 +687,8 @@ def actualizar_plan_legionella(tarea_id, frecuencia_dias, proxima_fecha, operari
         operario,
         1 if generar_ot else 0,
         1 if activo else 0,
+        float(consigna_minima or 0),
+        1 if controla_consigna else 0,
         int(tarea_id)
     ))
 
