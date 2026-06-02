@@ -624,11 +624,11 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 f"{frecuencia} días",
                 frecuencia,
                 unidad,
-                fecha_inicio,
-                fecha_inicio,   # <- proxima_fecha
-                operario,
-                consigna_minima,
-                controla_consigna,
+                fecha_inicio,      # fecha_inicio
+                fecha_inicio,      # proxima_fecha
+                operario,          # operario
+                consigna_minima,   # consigna
+                controla_consigna, # controla
                 "Planificación inicial automática"
             ))
 
