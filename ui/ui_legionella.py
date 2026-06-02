@@ -949,7 +949,38 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     if valor is None:
         return "ERROR", "Valor no válido. No se ha guardado el registro."
 
-    estado, resultado = evaluar_resultado(tipo_control, valor, valor_2)
+        # Buscar consigna configurada para esta tarea/punto
+        consigna_minima = 0
+        controla_consigna = 0
+
+    try:
+        df_consigna = leer_df("""
+            SELECT consigna_minima, controla_consigna
+            FROM legionella_tareas
+            WHERE centro = ?
+              AND edificio = ?
+              AND punto = ?
+              AND tarea = ?
+              AND activo = 1
+            ORDER BY id DESC
+            LIMIT 1
+        """, (centro, edificio, punto_nombre, tarea))
+
+        if not df_consigna.empty:
+            consigna_minima = float(df_consigna.iloc[0]["consigna_minima"] or 0)
+            controla_consigna = int(df_consigna.iloc[0]["controla_consigna"] or 0)
+
+    except Exception:
+        consigna_minima = 0
+        controla_consigna = 0
+
+    estado, resultado = evaluar_resultado(
+        tipo_control,
+        valor,
+        valor_2,
+        consigna_minima,
+        controla_consigna
+    )
 
     ejecutar(
         """
