@@ -625,7 +625,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 frecuencia,
                 unidad,
                 fecha_inicio,
-                fecha_inicio,
+                fecha_inicio,   # <- proxima_fecha
                 operario,
                 consigna_minima,
                 controla_consigna,
