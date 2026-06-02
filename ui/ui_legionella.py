@@ -424,8 +424,8 @@ def corregir_consignas_solares():
         SET consigna_minima = 0,
             controla_consigna = 0
         WHERE instalacion = 'Solar'
-           OR LOWER(COALESCE(punto, '')) LIKE '%solar%'
-    """)
+           OR LOWER(COALESCE(punto, '')) LIKE ?
+    """, ("%solar%",))
         
 def existe_ot_legionella_abierta(centro, edificio, descripcion):
     conn = conectar()
