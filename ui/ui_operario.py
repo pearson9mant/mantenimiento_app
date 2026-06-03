@@ -1326,105 +1326,104 @@ def pantalla_operario():
     ]
 
     st.markdown("---")
-    st.markdown("## 🗂️ Mi histórico")
 
-    if not historico_operario:
+    with st.expander("📁 Mi histórico", expanded=False):
 
-        st.info("No hay trabajos finalizados todavía.")
+        if not historico_operario:
 
-    else:
+            st.info("No hay trabajos finalizados todavía.")
 
-        for h in historico_operario[-20:]:
+        else:
 
-            try:
-
-                (
-                    id_hist,
-                    num_ot_hist,
-                    desc_hist,
-                    estado_hist,
-                    fecha_hist,
-                    centro_hist,
-                    edificio_hist,
-                    espacio_hist,
-                    area_hist,
-                    prioridad_hist,
-                    operario_hist,
-                    origen_hist,
-                    solicitante_hist,
-                    fecha_origen_hist,
-                    fecha_cierre_hist,
-                    observaciones_cierre_hist,
-                    foto_hist,
-                    *resto
-                ) = h
-
-            except Exception:
-                continue
-
-            titulo_hist = (
-                f"✅ {num_ot_hist} | "
-                f"{centro_hist or '-'} · {espacio_hist or '-'}"
-            )
-
-            with st.expander(titulo_hist, expanded=False):
-
-                st.markdown(f"### ✅ {num_ot_hist}")
-                st.markdown(desc_hist)
-
-                st.caption(
-                    f"🏢 {centro_hist or '-'} · "
-                    f"{edificio_hist or '-'} · "
-                    f"{espacio_hist or '-'}"
-                )
-
-                st.caption(f"📅 Cierre: {fecha_cierre_hist or '-'}")
-
-                if observaciones_cierre_hist:
-                    st.info(f"📝 {observaciones_cierre_hist}")
+            for h in reversed(historico_operario[-50:]):
 
                 try:
-                
 
-                    fotos_db = obtener_fotos_ot(num_ot_hist)
-                
-                    if fotos_db:
-                
-                        cols_fotos = st.columns(3)
-                
-                        for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-                
-                            with cols_fotos[i % 3]:
-                
-                                st.image(
-                                    bytes(foto_data),
-                                    caption=f"Foto {i + 1}",
-                                    use_container_width=True
-                                )
-                
-                    elif foto_hist:
-                
-                        fotos = str(foto_hist).split("|")
-                        cols_fotos = st.columns(3)
-                
-                        for i, ruta_foto in enumerate(fotos):
-                
-                            ruta_foto = str(ruta_foto).strip()
-                
-                            if not ruta_foto:
-                                continue
-                
-                            with cols_fotos[i % 3]:
-                
-                                try:
+                    (
+                        id_hist,
+                        num_ot_hist,
+                        desc_hist,
+                        estado_hist,
+                        fecha_hist,
+                        centro_hist,
+                        edificio_hist,
+                        espacio_hist,
+                        area_hist,
+                        prioridad_hist,
+                        operario_hist,
+                        origen_hist,
+                        solicitante_hist,
+                        fecha_origen_hist,
+                        fecha_cierre_hist,
+                        observaciones_cierre_hist,
+                        foto_hist,
+                        *resto
+                    ) = h
+
+                except Exception:
+                    continue
+
+                titulo_hist = (
+                    f"✅ {num_ot_hist} | "
+                    f"{centro_hist or '-'} · {espacio_hist or '-'}"
+                )
+
+                with st.expander(titulo_hist, expanded=False):
+
+                    st.markdown(f"### ✅ {num_ot_hist}")
+                    st.markdown(desc_hist)
+
+                    st.caption(
+                        f"🏢 {centro_hist or '-'} · "
+                        f"{edificio_hist or '-'} · "
+                        f"{espacio_hist or '-'}"
+                    )
+
+                    st.caption(f"📅 Cierre: {fecha_cierre_hist or '-'}")
+
+                    if observaciones_cierre_hist:
+                        st.info(f"📝 {observaciones_cierre_hist}")
+
+                    try:
+                        fotos_db = obtener_fotos_ot(num_ot_hist)
+
+                        if fotos_db:
+
+                            cols_fotos = st.columns(3)
+
+                            for i, (nombre_foto, foto_data) in enumerate(fotos_db):
+
+                                with cols_fotos[i % 3]:
+
                                     st.image(
-                                        ruta_foto,
+                                        bytes(foto_data),
                                         caption=f"Foto {i + 1}",
                                         use_container_width=True
                                     )
-                
-                                except Exception as e:
-                                    st.caption(f"📷 Foto no disponible: {e}")
-                
-                except Exception as e:
-                    st.caption(f"📷 Error fotos histórico: {e}")
+
+                        elif foto_hist:
+
+                            fotos = str(foto_hist).split("|")
+                            cols_fotos = st.columns(3)
+
+                            for i, ruta_foto in enumerate(fotos):
+
+                                ruta_foto = str(ruta_foto).strip()
+
+                                if not ruta_foto:
+                                    continue
+
+                                with cols_fotos[i % 3]:
+
+                                    try:
+                                        st.image(
+                                            ruta_foto,
+                                            caption=f"Foto {i + 1}",
+                                            use_container_width=True
+                                        )
+
+                                    except Exception as e:
+                                        st.caption(f"📷 Foto no disponible: {e}")
+
+                    except Exception as e:
+                        st.caption(f"📷 Error fotos histórico: {e}")
