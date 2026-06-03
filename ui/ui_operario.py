@@ -802,7 +802,18 @@ def mostrar_crear_correctiva_desde_revision(
         st.success("Ya se han creado correctivas desde esta revisión.")
 
     return st.session_state.get(f"correctiva_creada_{id_orden}", False)
+    
+def filtrar_seguridad_operario(ordenes, operario_sel):
+    if not ordenes:
+        return []
 
+    operario_objetivo = normalizar_operario_nombre(operario_sel)
+
+    return [
+        o for o in ordenes
+        if len(o) > 10
+        and normalizar_operario_nombre(o[10]) == operario_objetivo
+    ]
 
 def pantalla_operario():
     st.subheader("👷 Vista operario")
