@@ -1,5 +1,8 @@
 import streamlit as st
 from pathlib import Path
+from collections import defaultdict
+
+from database.db import conectar, _sql
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 
 from modules.inventario_aulas import (
@@ -7,6 +10,27 @@ from modules.inventario_aulas import (
     guardar_inventario_aula,
     obtener_inventario_aulas
 )
+
+
+def borrar_inventario_aula(id_reg):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            _sql("DELETE FROM inventario_aulas WHERE id = ?"),
+            (int(id_reg),)
+        )
+        conn.commit()
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error al borrar registro: {e}")
+        return False
+
+    finally:
+        conn.close()
 
 
 def pantalla_inventario_aulas():
@@ -56,6 +80,13 @@ def pantalla_inventario_aulas():
             ],
             key="inv_aula_elemento"
         )
+
+        if elemento == "Otro":
+            elemento = st.text_input(
+                "Especificar elemento",
+                placeholder="Ejemplo: ventilador, altavoz, cortina...",
+                key="inv_aula_elemento_otro"
+            )
 
         cantidad = st.number_input(
             "Cantidad",
@@ -135,7 +166,7 @@ def pantalla_inventario_aulas():
                 st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📋 Registros guardados")
+    st.markdown("### 🏫 Aulas inventariadas")
 
     registros = obtener_inventario_aulas()
 
@@ -143,47 +174,128 @@ def pantalla_inventario_aulas():
         st.info("Todavía no hay registros de inventario de aulas.")
         return
 
-    for r in registros[:50]:
-        (
-            id_reg,
-            fecha_revision,
-            centro,
-            edificio,
-            espacio,
-            elemento,
-            cantidad,
-            estado,
-            ancho,
-            alto,
-            fondo,
-            unidad,
-            observaciones,
-            foto,
-            operario,
-            fecha_creacion
-        ) = r
+    filtro_centro = st.selectbox(
+        "Filtrar centro",
+        ["Todos"] + sorted(list(set([str(r[2]) for r in registros if r[2]]))),
+        key="filtro_inv_aulas_centro"
+    )
 
-        if estado in ["Dañado", "Falta", "Retirar"]:
-            icono = "🔴"
-        elif estado == "Regular":
-            icono = "🟡"
+    registros_filtrados = registros
+
+    if filtro_centro != "Todos":
+        registros_filtrados = [
+            r for r in registros_filtrados
+            if str(r[2]) == filtro_centro
+        ]
+
+    aulas = defaultdict(list)
+
+    for r in registros_filtrados:
+        centro = r[2]
+        edificio = r[3]
+        espacio = r[4]
+
+        clave_aula = f"{centro} | {edificio} | {espacio}"
+        aulas[clave_aula].append(r)
+
+    if not aulas:
+        st.info("No hay aulas con ese filtro.")
+        return
+
+    for aula, elementos in aulas.items():
+
+        total_elementos = sum(int(e[6] or 0) for e in elementos)
+
+        estados = [e[7] for e in elementos]
+
+        if any(e in ["Dañado", "Falta", "Retirar"] for e in estados):
+            icono_aula = "🔴"
+        elif any(e == "Regular" for e in estados):
+            icono_aula = "🟡"
         else:
-            icono = "✅"
+            icono_aula = "✅"
 
-        titulo = f"{icono} {elemento} | {espacio} | Cantidad: {cantidad} | {estado}"
+        titulo_aula = f"{icono_aula} {aula} · {len(elementos)} registros · {total_elementos} uds."
 
-        with st.expander(titulo, expanded=False):
-            st.markdown(f"### {elemento} · {espacio}")
-            st.markdown(f"**Cantidad:** {cantidad} · **Estado:** {estado}")
-            st.markdown(f"📏 {ancho} x {alto} x {fondo} {unidad}")
-            st.markdown(f"🏢 {centro} · {edificio}")
-            st.caption(f"Revisado por {operario or '-'} · {fecha_revision}")
+        with st.expander(titulo_aula, expanded=False):
 
-            if observaciones:
-                st.info(observaciones)
+            st.markdown(f"### 🏫 {aula}")
 
-            if foto:
-                try:
-                    st.image(foto, width=250)
-                except Exception:
-                    st.caption("Foto no disponible.")
+            resumen = defaultdict(int)
+
+            for e in elementos:
+                elemento = e[5]
+                cantidad = int(e[6] or 0)
+                resumen[elemento] += cantidad
+
+            st.markdown("#### Resumen del aula")
+
+            for elemento, cantidad in resumen.items():
+                st.write(f"• **{cantidad} x {elemento}**")
+
+            st.markdown("---")
+            st.markdown("#### Detalle")
+
+            for r in elementos:
+                (
+                    id_reg,
+                    fecha_revision,
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento,
+                    cantidad,
+                    estado,
+                    ancho,
+                    alto,
+                    fondo,
+                    unidad,
+                    observaciones,
+                    foto,
+                    operario,
+                    fecha_creacion
+                ) = r
+
+                if estado in ["Dañado", "Falta", "Retirar"]:
+                    icono = "🔴"
+                elif estado == "Regular":
+                    icono = "🟡"
+                else:
+                    icono = "✅"
+
+                with st.expander(
+                    f"{icono} {elemento} · Cantidad: {cantidad} · {estado}",
+                    expanded=False
+                ):
+
+                    st.markdown(f"### {elemento}")
+                    st.markdown(f"**Cantidad:** {cantidad} · **Estado:** {estado}")
+                    st.markdown(f"📏 {ancho} x {alto} x {fondo} {unidad}")
+                    st.markdown(f"🏢 {centro} · {edificio} · {espacio}")
+                    st.caption(f"Revisado por {operario or '-'} · {fecha_revision}")
+
+                    if observaciones:
+                        st.info(observaciones)
+
+                    if foto:
+                        try:
+                            st.image(foto, width=250)
+                        except Exception:
+                            st.caption("Foto no disponible.")
+
+                    confirmar = st.checkbox(
+                        "Confirmo borrar este registro",
+                        key=f"confirmar_borrar_inv_aula_{id_reg}"
+                    )
+
+                    if st.button(
+                        f"🗑️ Borrar {elemento}",
+                        key=f"borrar_inv_aula_{id_reg}",
+                        use_container_width=True
+                    ):
+                        if not confirmar:
+                            st.error("Marca primero la confirmación.")
+                        else:
+                            if borrar_inventario_aula(id_reg):
+                                st.warning("Registro borrado correctamente.")
+                                st.rerun()
