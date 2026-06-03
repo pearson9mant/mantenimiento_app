@@ -532,12 +532,12 @@ def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
 
     en_proceso = len([
         o for o in ordenes
-        if len(o) > 3 and normalizar_estado_operario(o[3]) == "En proceso"
+        if len(o) > 3 and str(o[3] or "").strip() == "En curso"
     ])
 
     faltan = len([
         o for o in ordenes
-        if len(o) > 3 and normalizar_estado_operario(o[3]) == "Faltan"
+        if len(o) > 3 and str(o[3] or "").strip() in ["Abierta", "Pendiente material"]
     ])
 
     hechas_hoy = 0
@@ -545,8 +545,7 @@ def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
 
     for h in historico:
         try:
-            estado = h[3]
-            fecha_hist = h[4]
+            fecha_cierre_hist = h[14]
             operario_hist = h[10]
         except Exception:
             continue
@@ -554,10 +553,7 @@ def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
         if normalizar_operario_nombre(operario_hist) != operario_objetivo:
             continue
 
-        if normalizar_estado_operario(estado) != "Hechas":
-            continue
-
-        if fecha_es_hoy(fecha_hist):
+        if fecha_es_hoy(fecha_cierre_hist):
             hechas_hoy += 1
 
     base_rendimiento = hechas_hoy + en_proceso + faltan
@@ -570,24 +566,6 @@ def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
         "faltan": faltan,
         "rendimiento": rendimiento,
     }
-
-
-def filtrar_seguridad_operario(ordenes, operario_sel):
-    if not ordenes:
-        return []
-
-    if es_operario():
-        usuario = normalizar_operario_nombre(nombre_operario_actual())
-
-        return [
-            o for o in ordenes
-            if normalizar_operario_nombre(obtener_operario_fila(o)) == usuario
-        ]
-
-    return [
-        o for o in ordenes
-        if normalizar_operario_nombre(obtener_operario_fila(o)) == normalizar_operario_nombre(operario_sel)
-    ]
 
 
 def descomponer_orden_operario(fila):
