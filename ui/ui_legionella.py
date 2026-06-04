@@ -1616,6 +1616,21 @@ def pantalla_legionella():
         st.info(mensaje)
 
     st.subheader("💧 Legionella")
+    import os
+
+    ruta_plano = "assets/planos_legionella/Puntos_control_legionela.pdf"
+    
+    if os.path.exists(ruta_plano):
+        with open(ruta_plano, "rb") as pdf_file:
+            st.download_button(
+                label="📄 Ver plano puntos control Legionella",
+                data=pdf_file,
+                file_name="Puntos_control_legionela.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+    else:
+        st.warning("No se encontró el plano de Legionella.")
 
     with st.expander("🛡️ Mantenimiento de datos Legionella", expanded=False):
         st.caption("Limpia registros antiguos incompletos. No toca los registros correctos.")
