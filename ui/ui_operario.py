@@ -1051,29 +1051,29 @@ def pantalla_operario():
 
                 if es_ot_legionella(area, origen, desc):
 
-                if str(centro).strip() == "Pearson 9":
-                    pdf_puntos = Path(
-                        "assets/planos_legionella/Puntos_control_legionela_Pearson_9.pdf"
-                    )
-                    nombre_pdf = "Puntos_control_legionela_Pearson_9.pdf"
-                else:
-                    pdf_puntos = Path(
-                        "assets/planos_legionella/Puntos_control_legionela.pdf"
-                    )
-                    nombre_pdf = "Puntos_control_legionela.pdf"
-            
-                if pdf_puntos.exists():
-            
-                    with open(pdf_puntos, "rb") as f:
-            
-                        st.download_button(
-                            "🗺️ Ver plano de puntos de control",
-                            data=f.read(),
-                            file_name=nombre_pdf,
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key=f"plano_legionella_{id_orden}"
+                    if str(centro).strip() == "Pearson 9":
+                        pdf_puntos = Path(
+                            "assets/planos_legionella/Puntos_control_legionela_Pearson_9.pdf"
                         )
+                        nombre_pdf = "Puntos_control_legionela_Pearson_9.pdf"
+                    else:
+                        pdf_puntos = Path(
+                            "assets/planos_legionella/Puntos_control_legionela.pdf"
+                        )
+                        nombre_pdf = "Puntos_control_legionela.pdf"
+                
+                    if pdf_puntos.exists():
+                
+                        with open(pdf_puntos, "rb") as f:
+                
+                            st.download_button(
+                                "🗺️ Ver plano de puntos de control",
+                                data=f.read(),
+                                file_name=nombre_pdf,
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key=f"plano_legionella_{id_orden}"
+                            )
     
                 if es_ot_preventiva(origen, desc):
                     mostrar_crear_correctiva_desde_revision(
