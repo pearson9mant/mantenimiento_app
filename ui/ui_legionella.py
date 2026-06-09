@@ -2076,17 +2076,6 @@ def pantalla_legionella():
                     pdf_ref = Path(
                         "assets/planos_legionella/Puntos_control_legionela.pdf"
                     )
-                
-                if pdf_ref.exists():
-                    with open(pdf_ref, "rb") as f:
-                        st.download_button(
-                            "🗺️ Ver plano de referencia",
-                            data=f.read(),
-                            file_name=pdf_ref.name,
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key=f"plano_ref_{centro_nuevo}"
-                        )
 
                 edificios_disponibles = list(CENTROS.get(centro_nuevo, {}).keys())
 
