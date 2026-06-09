@@ -2105,6 +2105,9 @@ def pantalla_legionella():
                         "grifo",
                         "ducha",
                         "deposito",
+                        "muestra",
+                        "fuente",
+                        "lavamanos",
                         "otro",
                     ],
                     key="nuevo_punto_tipo"
