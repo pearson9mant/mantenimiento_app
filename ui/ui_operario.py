@@ -393,7 +393,7 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
                 nuevo_valor,
                 nombre_operario_actual() or operario
             )
-            st.rerun()
+            
 
         if nuevo_valor:
             hechos += 1
