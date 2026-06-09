@@ -2156,7 +2156,7 @@ def pantalla_legionella():
                             file_name=pdf_ref.name,
                             mime="application/pdf",
                             use_container_width=True,
-                            key=f"plano_ref_{centro_nuevo}"
+                            key=f"plano_ref_crear_punto_{centro_nuevo}"
                         )
 
             observaciones_nueva = st.text_area(
