@@ -1603,10 +1603,10 @@ def pantalla_legionella():
     asegurar_tabla_correctivos_legionella()
     asegurar_columnas_plano_legionella()
 
-    puntos_creados = sembrar_puntos_si_vacio()
+    # puntos_creados = sembrar_puntos_si_vacio()
 
-    if puntos_creados:
-        st.success(f"Se han creado {puntos_creados} puntos automáticos de Legionella que faltaban.")
+    # if puntos_creados:
+    #     st.success(f"Se han creado {puntos_creados} puntos automáticos de Legionella que faltaban.")
 
     ots_creadas, mensaje = generar_ots_legionella_si_toca()
 
