@@ -2432,8 +2432,11 @@ def pantalla_legionella():
                             st.error("Marca primero la casilla de confirmación.")
                         else:
                             if borrar_punto_legionella(row["id"]):
+                                st.cache_data.clear()
                                 st.success("Punto Legionella borrado correctamente.")
                                 st.rerun()
+                            else:
+                                st.error("No se ha podido borrar el punto Legionella.")
 
             with st.expander("📋 Vista rápida de puntos", expanded=False):
                 st.dataframe(
