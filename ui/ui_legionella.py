@@ -2068,6 +2068,25 @@ def pantalla_legionella():
                     list(CENTROS.keys()),
                     key="nuevo_punto_centro"
                 )
+                if centro_nuevo == "Pearson 9":
+                    pdf_ref = Path(
+                        "assets/planos_legionella/Puntos_control_legionela_Pearson_9.pdf"
+                    )
+                else:
+                    pdf_ref = Path(
+                        "assets/planos_legionella/Puntos_control_legionela.pdf"
+                    )
+                
+                if pdf_ref.exists():
+                    with open(pdf_ref, "rb") as f:
+                        st.download_button(
+                            "🗺️ Ver plano de referencia",
+                            data=f.read(),
+                            file_name=pdf_ref.name,
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key=f"plano_ref_{centro_nuevo}"
+                        )
 
                 edificios_disponibles = list(CENTROS.get(centro_nuevo, {}).keys())
 
@@ -2313,6 +2332,7 @@ def pantalla_legionella():
                                 "ducha",
                                 "deposito",
                                 "muestra",
+                                "fuente",
                                 "lavamanos",
                                 "otro",
                             ],
@@ -2324,6 +2344,7 @@ def pantalla_legionella():
                                 "ducha",
                                 "deposito",
                                 "muestra",
+                                "fuente",
                                 "lavamanos",
                                 "otro",
                             ].index(row["tipo_punto"]) if row["tipo_punto"] in [
@@ -2334,6 +2355,7 @@ def pantalla_legionella():
                                 "ducha",
                                 "deposito",
                                 "muestra",
+                                "fuente",
                                 "lavamanos",
                                 "otro",
                             ] else 0,
