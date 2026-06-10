@@ -529,7 +529,7 @@ def tareas_por_tipo_punto(tipo_punto):
     if tipo_punto == "retorno":
         tareas.insert(0, "Temperatura retorno")
 
-    if tipo_punto in ["grifo", "ducha"]:
+    if tipo_punto in ["grifo", "ducha" lavamanos", "fuente"]:
         tareas.insert(0, "Cloro residual")
         tareas.insert(1, "Temperatura punto terminal")
 
