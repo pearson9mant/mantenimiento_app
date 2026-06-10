@@ -2071,7 +2071,7 @@ def pantalla_legionella():
                 if centro_nuevo == "Pearson 9":
                     pdf_ref = Path(
                         pdf_ref = Path(
-                            "assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"
+                            "assetsplanos_legionellaPuntos_control_legionela_Pearson_9_v2.pdf"
 
                     )
                 else:
