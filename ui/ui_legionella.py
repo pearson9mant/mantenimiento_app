@@ -2133,9 +2133,13 @@ def pantalla_legionella():
                     key="nuevo_punto_ubicacion"
                 )
                 if centro_nuevo == "Pearson 9":
-                    pdf_ref = Path("assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf")
+                    pdf_ref = Path(
+                        "assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"
+                    )
                 else:
-                    pdf_ref = Path("assets/planos_legionella/Puntos_control_legionela.pdf")
+                    pdf_ref = Path(
+                        "assets/planos_legionella/Puntos_control_legionela.pdf"
+                    )
                 
                 if pdf_ref.exists():
                     with open(pdf_ref, "rb") as f:
@@ -2147,6 +2151,8 @@ def pantalla_legionella():
                             use_container_width=True,
                             key=f"plano_ref_crear_punto_{centro_nuevo}"
                         )
+                else:
+                    st.warning(f"No se encontró el plano: {pdf_ref}")
 
             observaciones_nueva = st.text_area(
                 "Observaciones",
