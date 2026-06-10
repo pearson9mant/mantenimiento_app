@@ -2070,7 +2070,7 @@ def pantalla_legionella():
                 )
                 if centro_nuevo == "Pearson 9":
                     pdf_ref = Path(
-                        "assets/planos_legionella/Puntos_control_legionela_Pearson_9.pdf"
+                        "assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"
                     )
                 else:
                     pdf_ref = Path(
@@ -2133,7 +2133,7 @@ def pantalla_legionella():
                     key="nuevo_punto_ubicacion"
                 )
                 if centro_nuevo == "Pearson 9":
-                    pdf_ref = Path("assets/planos_legionella/Puntos_control_legionela_Pearson_9.pdf")
+                    pdf_ref = Path("assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf")
                 else:
                     pdf_ref = Path("assets/planos_legionella/Puntos_control_legionela.pdf")
                 
