@@ -2344,6 +2344,7 @@ def pantalla_legionella():
                                 "muestra",
                                 "fuente",
                                 "lavamanos",
+                                "Válvulas",
                                 "otro",
                             ],
                             index=[
@@ -2356,6 +2357,7 @@ def pantalla_legionella():
                                 "muestra",
                                 "fuente",
                                 "lavamanos",
+                                "Válvulas",
                                 "otro",
                             ].index(row["tipo_punto"]) if row["tipo_punto"] in [
                                 "acumulador",
@@ -2367,6 +2369,7 @@ def pantalla_legionella():
                                 "muestra",
                                 "fuente",
                                 "lavamanos",
+                                "Válvulas",
                                 "otro",
                             ] else 0,
                             key=f"edit_tipo_punto_{row['id']}"
