@@ -1463,12 +1463,48 @@ def crear_tarea_legionella_manual(
     operario,
     generar_ot
 ):
+
+    consigna_minima = 0
+    controla_consigna = 0
+
+    if tarea == "Temperatura acumulador":
+        consigna_minima = 60
+        controla_consigna = 1
+
+    elif tarea in [
+        "Temperatura retorno",
+        "Temperatura impulsión ACS",
+        "Temperatura punto terminal"
+    ]:
+        consigna_minima = 50
+        controla_consigna = 1
+
     ejecutar("""
         INSERT INTO legionella_tareas
-        (centro, edificio, instalacion, punto, tarea, tipo_control,
-         frecuencia, frecuencia_dias, unidad, fecha_inicio, ultima_fecha,
-         proxima_fecha, operario, activo, generar_ot, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?)
+        (
+            centro,
+            edificio,
+            instalacion,
+            punto,
+            tarea,
+            tipo_control,
+            frecuencia,
+            frecuencia_dias,
+            unidad,
+            fecha_inicio,
+            ultima_fecha,
+            proxima_fecha,
+            operario,
+            activo,
+            generar_ot,
+            consigna_minima,
+            controla_consigna,
+            observaciones
+        )
+        VALUES
+        (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?
+        )
     """, (
         centro,
         edificio,
@@ -1483,6 +1519,8 @@ def crear_tarea_legionella_manual(
         date.today().strftime("%Y-%m-%d"),
         operario,
         1 if generar_ot else 0,
+        consigna_minima,
+        controla_consigna,
         "Tarea creada manualmente"
     ))
 
