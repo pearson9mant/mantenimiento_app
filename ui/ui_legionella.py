@@ -633,6 +633,9 @@ def sembrar_planificacion_legionella(fecha_inicio):
         operario = operario_por_centro(centro)
 
         for tarea in tareas_por_tipo_punto(tipo_punto):
+            tipo_punto,
+            tipo_control_punto
+        ):
             if existe_plan_legionella(punto_id, tarea):
                 continue
 
