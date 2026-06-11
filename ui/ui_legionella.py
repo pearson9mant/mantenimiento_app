@@ -2525,6 +2525,24 @@ def pantalla_legionella():
                             ] else 0,
                             key=f"edit_tipo_punto_{row['id']}"
                         )
+                        opciones_tipo_control = [
+                            "Solo AFS",
+                            "Solo ACS",
+                            "ACS + AFS",
+                            "Acumulador",
+                            "Retorno",
+                            "Muestra"
+                        ]
+                        
+                        valor_tipo_control = row.get("tipo_control_punto") or ""
+                        
+                        tipo_control_punto_edit = st.selectbox(
+                            "Tipo de control",
+                            opciones_tipo_control,
+                            index=opciones_tipo_control.index(valor_tipo_control)
+                            if valor_tipo_control in opciones_tipo_control else 0,
+                            key=f"edit_tipo_control_{row['id']}"
+                        )
 
                     with col2:
                         nombre_edit = st.text_input(
