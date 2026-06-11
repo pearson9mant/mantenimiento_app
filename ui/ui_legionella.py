@@ -535,19 +535,39 @@ def dias_frecuencia(tarea):
     return 30
 
 
-def tareas_por_tipo_punto(tipo_punto):
+def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
+    
     tareas = ["Revisión visual", "Purga"]
 
-    if tipo_punto in ["acumulador", "acumulador_solar"]:
+    if tipo_control_punto == "Acumulador":
         tareas.insert(0, "Temperatura acumulador")
         tareas.insert(1, "Temperatura impulsión ACS")
 
-    if tipo_punto == "retorno":
+    elif tipo_control_punto == "Retorno":
         tareas.insert(0, "Temperatura retorno")
 
-    if tipo_punto in ["grifo", "ducha", "lavamanos", "fuente"]:
+    elif tipo_control_punto == "Solo AFS":
+        tareas.insert(0, "Control AFS")
+
+    elif tipo_control_punto == "Solo ACS":
+        tareas.insert(0, "Control ACS terminal")
+
+    elif tipo_control_punto == "ACS + AFS":
         tareas.insert(0, "Control AFS")
         tareas.insert(1, "Control ACS terminal")
+
+    else:
+        # Compatibilidad con puntos antiguos
+        if tipo_punto in ["acumulador", "acumulador_solar"]:
+            tareas.insert(0, "Temperatura acumulador")
+            tareas.insert(1, "Temperatura impulsión ACS")
+
+        elif tipo_punto == "retorno":
+            tareas.insert(0, "Temperatura retorno")
+
+        elif tipo_punto in ["grifo", "ducha", "lavamanos", "fuente"]:
+            tareas.insert(0, "Control AFS")
+            tareas.insert(1, "Control ACS terminal")
 
     return tareas
 
