@@ -298,6 +298,14 @@ def mostrar_ejecucion_legionella_operario(
             "Revisión visual correcta",
             key=f"leg_revision_afs_{id_orden}"
         )
+        if not purga_realizada:
+            st.warning("Purga pendiente")
+        
+        if not aireador_limpio:
+            st.warning("Aireador pendiente de limpieza/desinfección")
+        
+        if not revision_visual_ok:
+            st.warning("Revisión visual desfavorable")
 
     elif tarea == "Control ACS terminal":
         tipo_control = "Control ACS terminal"
@@ -327,7 +335,15 @@ def mostrar_ejecucion_legionella_operario(
         revision_visual_ok = st.checkbox(
             "Revisión visual correcta",
             key=f"leg_revision_acs_{id_orden}"
-        )    
+        )
+        if not purga_realizada:
+            st.warning("Purga pendiente")
+        
+        if not aireador_limpio:
+            st.warning("Aireador pendiente de limpieza/desinfección")
+        
+        if not revision_visual_ok:
+            st.warning("Revisión visual desfavorable")
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
