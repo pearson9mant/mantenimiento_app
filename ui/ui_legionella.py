@@ -1820,8 +1820,12 @@ def pantalla_legionella():
 
         punto = df_filtrado.iloc[0].to_dict()
         tipo_punto = punto["tipo_punto"]
-
-        tareas = tareas_por_tipo_punto(tipo_punto)
+        tipo_control_punto = punto.get("tipo_control_punto", "")
+        
+        tareas = tareas_por_tipo_punto(
+            tipo_punto,
+            tipo_control_punto
+        )
 
         tarea = st.selectbox("Tarea", tareas)
 
