@@ -720,16 +720,36 @@ def borrar_plan_legionella(tarea_id):
         WHERE id = ?
     """, (int(tarea_id),))
 
-def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, observaciones):
+def crear_punto_legionella(
+    centro,
+    edificio,
+    instalacion,
+    tipo_punto,
+    tipo_control_punto,
+    nombre_punto,
+    ubicacion,
+    observaciones
+):
     ejecutar("""
         INSERT INTO legionella_puntos
-        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        (
+            centro,
+            edificio,
+            instalacion,
+            tipo_punto,
+            tipo_control_punto,
+            nombre_punto,
+            ubicacion,
+            activo,
+            observaciones
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
     """, (
         centro,
         edificio,
         instalacion,
         tipo_punto,
+        tipo_control_punto,
         nombre_punto,
         ubicacion,
         observaciones
