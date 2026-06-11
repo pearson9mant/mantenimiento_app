@@ -2235,6 +2235,18 @@ def pantalla_legionella():
                     ],
                     key="nuevo_punto_tipo"
                 )
+                tipo_control_punto_nuevo = st.selectbox(
+                    "Tipo de control",
+                    [
+                        "Solo AFS",
+                        "Solo ACS",
+                        "ACS + AFS",
+                        "Acumulador",
+                        "Retorno",
+                        "Muestra"
+                    ],
+                    key="nuevo_punto_tipo_control"
+                )
 
                 nombre_punto_nuevo = st.text_input(
                     "Nombre del punto",
