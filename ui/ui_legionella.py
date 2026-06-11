@@ -529,7 +529,13 @@ def dias_frecuencia(tarea):
     ]:
         return 7
 
-    if tarea in ["Purga", "Revisión visual", "Temperatura punto terminal"]:
+    if tarea in [
+        "Purga",
+        "Revisión visual",
+        "Temperatura punto terminal",
+        "Control AFS",
+        "Control ACS terminal"
+    ]:
         return 30
 
     return 30
