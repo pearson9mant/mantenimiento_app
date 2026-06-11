@@ -629,6 +629,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
         instalacion = punto["instalacion"]
         nombre_punto = punto["nombre_punto"]
         tipo_punto = punto["tipo_punto"]
+        tipo_control_punto = punto.get("tipo_control_punto", "")
         operario = operario_por_centro(centro)
 
         for tarea in tareas_por_tipo_punto(tipo_punto):
