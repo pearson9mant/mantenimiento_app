@@ -392,7 +392,23 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, consigna_minima=None, c
             return "OK", "Correcto"
 
         return "RIESGO", f"{tipo_control} por debajo de {consigna_minima:g} ºC"
-
+    if tipo_control == "Control AFS":
+        temperatura = valor
+        cloro = valor_2
+    
+        if temperatura > 25:
+            return "RIESGO", "Temperatura AFS elevada"
+    
+        if cloro is not None and not (0.2 <= float(cloro) <= 1.0):
+            return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
+    
+        return "OK", "Control AFS correcto"
+    
+    if tipo_control == "Control ACS terminal":
+        if valor >= 50:
+            return "OK", "Temperatura ACS terminal correcta"
+    
+        return "RIESGO", "Temperatura ACS terminal inferior a 50 ºC"
     if tipo_control == "Cloro residual":
         if 0.2 <= valor <= 1.0:
             return "OK", "Correcto"
