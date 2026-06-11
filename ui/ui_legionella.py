@@ -530,8 +530,8 @@ def tareas_por_tipo_punto(tipo_punto):
         tareas.insert(0, "Temperatura retorno")
 
     if tipo_punto in ["grifo", "ducha", "lavamanos", "fuente"]:
-        tareas.insert(0, "Cloro residual")
-        tareas.insert(1, "Temperatura punto terminal")
+        tareas.insert(0, "Control AFS")
+        tareas.insert(1, "Control ACS terminal")
 
     return tareas
 
@@ -542,6 +542,12 @@ def unidad_por_tarea(tarea):
 
     if tarea == "Cloro residual":
         return "mg/L"
+
+    if tarea == "Control AFS":
+        return "ºC / mg/L"
+
+    if tarea == "Control ACS terminal":
+        return "ºC"
 
     if tarea == "Revisión visual":
         return "OK/KO"
