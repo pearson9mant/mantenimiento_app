@@ -2021,15 +2021,20 @@ def pantalla_legionella():
                             value=bool(row["activo"]),
                             key=f"activo_leg_{row['id']}"
                         )
+                        unidad_consigna = "ºC"
+
+                        if "cloro" in str(row["tarea"]).lower():
+                            unidad_consigna = "mg/L"
+                        
                         consigna_minima = st.number_input(
-                            "Consigna mínima ºC",
+                            f"Consigna mínima {unidad_consigna}",
                             min_value=0.0,
                             max_value=100.0,
                             value=float(row["consigna_minima"] or 0),
                             step=0.1,
                             key=f"consigna_leg_{row['id']}"
                         )
-
+                        
                         controla_consigna = st.checkbox(
                             "Controlar consigna",
                             value=bool(row["controla_consigna"]),
