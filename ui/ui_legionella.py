@@ -579,7 +579,12 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
 
 
 def unidad_por_tarea(tarea):
-    if tarea in ["Temperatura acumulador", "Temperatura retorno", "Temperatura punto terminal"]:
+    if tarea in [
+        "Temperatura acumulador",
+        "Temperatura retorno",
+        "Temperatura impulsión ACS",
+        "Temperatura punto terminal"
+    ]:
         return "ºC"
 
     if tarea == "Cloro residual":
