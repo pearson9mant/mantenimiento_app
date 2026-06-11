@@ -1578,6 +1578,14 @@ def asegurar_columnas_plano_legionella():
     except Exception:
         pass
 
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN tipo_control_punto TEXT
+        """)
+    except Exception:
+        pass
+
 def actualizar_punto_legionella(
     punto_id,
     centro,
