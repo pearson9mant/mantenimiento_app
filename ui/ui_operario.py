@@ -395,11 +395,33 @@ def mostrar_ejecucion_legionella_operario(
         st.success("Control de Legionella guardado para esta OT.")
         return True
 
-    if st.button(
-        f"💾 Guardar control Legionella {num_ot}",
-        key=f"guardar_legionella_ot_{id_orden}",
-        use_container_width=True
-    ):
+if st.button(
+    f"💾 Guardar control Legionella {num_ot}",
+    key=f"guardar_legionella_ot_{id_orden}",
+    use_container_width=True
+):
+    observaciones_finales = observaciones_leg or ""
+
+    incidencias_checklist = []
+
+    if tarea in ["Control AFS", "Control ACS terminal"]:
+
+        if not purga_realizada:
+            incidencias_checklist.append("Purga no realizada")
+
+        if not aireador_limpio:
+            incidencias_checklist.append("Aireador pendiente de limpieza/desinfección")
+
+        if not revision_visual_ok:
+            incidencias_checklist.append("Revisión visual desfavorable")
+
+        if incidencias_checklist:
+            observaciones_finales = (
+                observaciones_finales
+                + "\nChecklist: "
+                + " | ".join(incidencias_checklist)
+            ).strip()
+    
         estado, resultado = registrar_control(
             fecha_control.strftime("%Y-%m-%d"),
             punto,
@@ -409,24 +431,28 @@ def mostrar_ejecucion_legionella_operario(
             valor_2,
             unidad,
             operario,
-            observaciones_leg,
+            observaciones_finales,
         )
-
+    
         if estado == "ERROR":
             st.error(resultado)
             return False
-
+    
+        if incidencias_checklist and estado == "OK":
+            estado = "INCIDENCIA"
+            resultado = " | ".join(incidencias_checklist)
+    
         st.session_state[f"legionella_guardada_{id_orden}"] = True
-
+    
         if estado == "OK":
             st.success(f"Control guardado correctamente: {resultado}")
         elif estado == "RIESGO":
             st.error(f"Control guardado con RIESGO: {resultado}")
         else:
             st.warning(f"Control guardado con incidencia: {resultado}")
-
+    
         st.rerun()
-
+    
     st.info("Guarda el control de Legionella antes de finalizar esta OT.")
     return False
 
