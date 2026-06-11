@@ -421,6 +421,10 @@ def mostrar_ejecucion_legionella_operario(
                 + "\nChecklist: "
                 + " | ".join(incidencias_checklist)
             ).strip()
+            
+            tipo_control = "Revisión visual"
+            valor = 0
+            valor_2 = None
     
         estado, resultado = registrar_control(
             fecha_control.strftime("%Y-%m-%d"),
