@@ -260,6 +260,8 @@ def mostrar_ejecucion_legionella_operario(
             step=0.01,
             key=f"leg_valor_{id_orden}"
         )
+        valor_2 = None
+        
     elif tarea == "Control AFS":
         tipo_control = "Control AFS"
         unidad = "ºC / mg/L"
