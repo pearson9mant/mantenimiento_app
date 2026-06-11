@@ -2590,6 +2590,7 @@ def pantalla_legionella():
                             edificio_edit,
                             instalacion_edit,
                             tipo_edit,
+                            tipo_control_punto_edit,
                             nombre_edit,
                             ubicacion_edit,
                             ubicacion_exacta_edit,
