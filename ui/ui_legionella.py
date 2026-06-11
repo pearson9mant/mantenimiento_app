@@ -769,10 +769,19 @@ def actualizar_estado_punto_legionella(punto_id, activo):
 
 def obtener_puntos_legionella_admin():
     return leer_df("""
-        SELECT id, centro, edificio, instalacion, tipo_punto,
-               nombre_punto, ubicacion, ubicacion_exacta,
-               plano_nombre, plano_data,
-               activo, observaciones
+        SELECT id,
+               centro,
+               edificio,
+               instalacion,
+               tipo_punto,
+               tipo_control_punto,
+               nombre_punto,
+               ubicacion,
+               ubicacion_exacta,
+               plano_nombre,
+               plano_data,
+               activo,
+               observaciones
         FROM legionella_puntos
         ORDER BY centro, edificio, instalacion, nombre_punto
     """)
