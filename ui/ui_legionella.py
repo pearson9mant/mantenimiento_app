@@ -2009,7 +2009,29 @@ def pantalla_legionella():
 
                 except Exception as e:
                     st.error(f"Error guardando foto: {e}")
-                    return    
+                    return 
+                    observaciones_finales = observaciones or ""
+
+                    if tarea in ["Control AFS", "Control ACS terminal"]:
+                        checklist = []
+                    
+                        checklist.append(
+                            "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
+                        )
+                    
+                        checklist.append(
+                            "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No"
+                        )
+                    
+                        checklist.append(
+                            "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
+                        )
+                    
+                        observaciones_finales = (
+                            observaciones_finales
+                            + "\nChecklist: "
+                            + " | ".join(checklist)
+                        ).strip()
             estado, resultado = registrar_control(
                 fecha_registro.strftime("%Y-%m-%d"),
                 punto,
