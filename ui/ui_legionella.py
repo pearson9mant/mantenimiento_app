@@ -662,7 +662,13 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 consigna_minima = 50
                 controla_consigna = 1
             
-            if tarea in ["Cloro residual", "Revisión visual", "Purga"]:
+            if tarea in [
+                "Cloro residual",
+                "Revisión visual",
+                "Purga",
+                "Control AFS",
+                "Control ACS terminal"
+            ]:
                 consigna_minima = 0
                 controla_consigna = 0
 
