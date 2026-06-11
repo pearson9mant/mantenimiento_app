@@ -260,6 +260,72 @@ def mostrar_ejecucion_legionella_operario(
             step=0.01,
             key=f"leg_valor_{id_orden}"
         )
+    elif tarea == "Control AFS":
+        tipo_control = "Control AFS"
+        unidad = "ºC / mg/L"
+    
+        valor = st.number_input(
+            "Temperatura AFS ºC",
+            min_value=0.0,
+            max_value=50.0,
+            value=18.0,
+            step=0.1,
+            key=f"leg_temp_afs_{id_orden}"
+        )
+    
+        valor_2 = st.number_input(
+            "Cloro residual libre mg/L",
+            min_value=0.0,
+            max_value=5.0,
+            value=0.5,
+            step=0.01,
+            key=f"leg_cloro_afs_{id_orden}"
+        )
+    
+        purga_realizada = st.checkbox(
+            "Purga realizada",
+            key=f"leg_purga_afs_{id_orden}"
+        )
+    
+        aireador_limpio = st.checkbox(
+            "Aireador limpio/desinfectado",
+            key=f"leg_aireador_afs_{id_orden}"
+        )
+    
+        revision_visual_ok = st.checkbox(
+            "Revisión visual correcta",
+            key=f"leg_revision_afs_{id_orden}"
+        )
+
+    elif tarea == "Control ACS terminal":
+        tipo_control = "Control ACS terminal"
+        unidad = "ºC"
+    
+        valor = st.number_input(
+            "Temperatura ACS terminal ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=50.0,
+            step=0.1,
+            key=f"leg_temp_acs_{id_orden}"
+        )
+    
+        valor_2 = None
+    
+        purga_realizada = st.checkbox(
+            "Purga realizada",
+            key=f"leg_purga_acs_{id_orden}"
+        )
+    
+        aireador_limpio = st.checkbox(
+            "Aireador limpio/desinfectado",
+            key=f"leg_aireador_acs_{id_orden}"
+        )
+    
+        revision_visual_ok = st.checkbox(
+            "Revisión visual correcta",
+            key=f"leg_revision_acs_{id_orden}"
+        )    
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
