@@ -2047,7 +2047,8 @@ def pantalla_legionella():
 
             observaciones_finales = observaciones or ""
 
-            if tarea in ["Control AFS", "Control ACS terminal"]:
+            if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
+                
                 checklist = []
 
                 checklist.append(
