@@ -1093,7 +1093,7 @@ def generar_ots_legionella_si_toca():
     return creadas, mensaje
 
 
-def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, unidad, operario, observaciones, ruta_foto=""):
+def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, valor_3, unidad, operario, observaciones, ruta_foto=""):
     centro = punto.get("centro")
     edificio = punto.get("edificio")
     instalacion = punto.get("instalacion") or ""
