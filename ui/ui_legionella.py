@@ -1892,6 +1892,41 @@ def pantalla_legionella():
             purga_realizada = st.checkbox("Purga realizada")
             aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
             revision_visual_ok = st.checkbox("Revisión visual correcta")
+        elif tarea == "Control punto terminal completo":
+
+            tipo_control = "Control punto terminal completo"
+            unidad = "Control completo"
+        
+            temperatura_afs = st.number_input(
+                "Temperatura AFS ºC",
+                min_value=0.0,
+                max_value=50.0,
+                value=18.0,
+                step=0.1
+            )
+        
+            cloro_residual = st.number_input(
+                "Cloro residual libre mg/L",
+                min_value=0.0,
+                max_value=5.0,
+                value=0.5,
+                step=0.01
+            )
+        
+            temperatura_acs = st.number_input(
+                "Temperatura ACS terminal ºC",
+                min_value=0.0,
+                max_value=100.0,
+                value=50.0,
+                step=0.1
+            )
+        
+            purga_realizada = st.checkbox("Purga realizada")
+            aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
+            revision_visual_ok = st.checkbox("Revisión visual correcta")
+        
+            valor = temperatura_afs
+            valor_2 = cloro_residual    
         
         elif tarea == "Control ACS terminal":
             tipo_control = "Control ACS terminal"
