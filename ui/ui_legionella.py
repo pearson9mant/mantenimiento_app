@@ -2062,6 +2062,7 @@ def pantalla_legionella():
                 st.warning(f"⚠️ INCIDENCIA LEGIONELLA: {resultado}")
                 st.warning("Se ha registrado en incidencias y se ha generado una OT automática.")
                 st.toast("⚠️ Incidencia Legionella registrada", icon="⚠️")
+                
     with tab2:
         st.markdown("### 🗓️ Planificación Legionella")
 
