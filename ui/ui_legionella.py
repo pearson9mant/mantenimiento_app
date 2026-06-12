@@ -3328,35 +3328,55 @@ def pantalla_legionella():
 
             st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
             st.markdown("### Detalle de controles")
-
+            
             for _, row in df_filtrado.iterrows():
-
-                valor2 = "" if pd.isna(row["valor_2"]) else row["valor_2"]
             
                 with st.expander(
                     f"{row['fecha']} · {row['punto']} · {row['tarea']} · {row['estado']}"
                 ):
+            
                     st.write(f"**Resultado:** {row['resultado']}")
-                    st.write(f"**Valor:** {row['valor']} {valor2}")
-                    st.write(f"**Unidad:** {row['unidad']}")
-                    st.write(f"**Operario:** {row['operario']}")
-                    st.write(f"**Observaciones:** {row['observaciones']}")
-                    
-            with st.expander("📷 Ver fotos controles", expanded=False):
-
-                for _, row in df_filtrado.iterrows():
-
+            
+                    if row["tarea"] == "Control punto terminal completo":
+            
+                        st.write(f"🌡️ **Temperatura AFS:** {row['valor']} ºC")
+                        st.write(f"🧪 **Cloro residual:** {row['valor_2']} mg/L")
+            
+                        if pd.notna(row["valor_3"]):
+                            st.write(f"🔥 **Temperatura ACS terminal:** {row['valor_3']} ºC")
+                        else:
+                            st.write("🔥 **Temperatura ACS terminal:** No registrada")
+            
+                    elif row["tarea"] == "Control AFS":
+            
+                        st.write(f"🌡️ **Temperatura AFS:** {row['valor']} ºC")
+                        st.write(f"🧪 **Cloro residual:** {row['valor_2']} mg/L")
+            
+                    elif row["tarea"] == "Control ACS terminal":
+            
+                        st.write(f"🔥 **Temperatura ACS terminal:** {row['valor']} ºC")
+            
+                    else:
+            
+                        valor2 = "" if pd.isna(row["valor_2"]) else row["valor_2"]
+            
+                        st.write(f"**Valor:** {row['valor']} {valor2}")
+                        st.write(f"**Unidad:** {row['unidad']}")
+            
+                    st.write(f"👷 **Operario:** {row['operario']}")
+            
+                    if row["observaciones"]:
+                        st.write(f"📝 **Observaciones:** {row['observaciones']}")
+            
                     if row.get("foto"):
-
                         try:
                             st.image(
                                 row["foto"],
                                 caption=f"{row['fecha']} · {row['punto']} · {row['tarea']}",
-                                width=260
+                                width=300
                             )
-
                         except Exception:
-                            pass
+                            pass              
 
             csv = df_filtrado.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
