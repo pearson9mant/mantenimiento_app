@@ -2080,10 +2080,13 @@ def pantalla_legionella():
                 checklist.append(
                     "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
                 )
+                
                 if tarea == "Control punto terminal completo":
                     checklist.append(
                         f"Temperatura ACS terminal: {temperatura_acs} ºC"
                     )
+                st.write(checklist)    
+                
                 observaciones_finales = (
                     observaciones_finales
                     + "\nChecklist: "
