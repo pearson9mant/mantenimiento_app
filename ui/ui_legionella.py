@@ -1138,6 +1138,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         tipo_control,
         valor,
         valor_2,
+        valor_3,
         consigna_minima,
         controla_consigna
     )
@@ -1146,7 +1147,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         """
         INSERT INTO legionella_registros
         (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
-         valor, valor_2, unidad, estado, resultado, operario, observaciones,foto)
+         valor, valor_2, valor_3, unidad, estado, resultado, operario, observaciones,foto)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -1161,6 +1162,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
             tipo_control,
             valor,
             valor_2,
+            valor_3,
             unidad,
             estado,
             resultado,
