@@ -3312,6 +3312,21 @@ def pantalla_legionella():
                 df_filtrado = df_filtrado[df_filtrado["estado"] == estado_f]
 
             st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
+            st.markdown("### Detalle de controles")
+
+            for _, row in df_filtrado.iterrows():
+
+                valor2 = "" if pd.isna(row["valor_2"]) else row["valor_2"]
+            
+                with st.expander(
+                    f"{row['fecha']} · {row['punto']} · {row['tarea']} · {row['estado']}"
+                ):
+                    st.write(f"**Resultado:** {row['resultado']}")
+                    st.write(f"**Valor:** {row['valor']} {valor2}")
+                    st.write(f"**Unidad:** {row['unidad']}")
+                    st.write(f"**Operario:** {row['operario']}")
+                    st.write(f"**Observaciones:** {row['observaciones']}")
+                    
             with st.expander("📷 Ver fotos controles", expanded=False):
 
                 for _, row in df_filtrado.iterrows():
