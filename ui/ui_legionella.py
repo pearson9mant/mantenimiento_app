@@ -594,6 +594,9 @@ def unidad_por_tarea(tarea):
 
     if tarea == "Control ACS terminal":
         return "ºC"
+        
+    if tarea == "Control punto terminal completo":
+        return "ºC / mg/L" 
 
     if tarea == "Revisión visual":
         return "OK/KO"
