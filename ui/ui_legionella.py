@@ -559,8 +559,7 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         tareas.insert(0, "Control ACS terminal")
 
     elif tipo_control_punto == "ACS + AFS":
-        tareas.insert(0, "Control AFS")
-        tareas.insert(1, "Control ACS terminal")
+        tareas = ["Control punto terminal completo"]
 
     else:
         # Compatibilidad con puntos antiguos
