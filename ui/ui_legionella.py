@@ -1243,7 +1243,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         return texto
 
     df = leer_df("""
-        SELECT fecha, centro, edificio, instalacion, punto, tarea, valor, valor_2,
+        SELECT fecha, centro, edificio, instalacion, punto, tarea, valor, valor_2, valor_3,
                unidad, estado, resultado, operario, observaciones
         FROM legionella_registros
         WHERE date(fecha) BETWEEN ? AND ?
