@@ -1874,7 +1874,9 @@ def pantalla_legionella():
         )
 
         tarea = st.selectbox("Tarea", tareas)
-
+        
+        valor_3 = None
+        
         if tarea == "Temperatura acumulador":
             tipo_control = "Temperatura acumulador"
             unidad = "ºC"
