@@ -1981,8 +1981,8 @@ def pantalla_legionella():
             if foto_error:
                 st.error("La foto es demasiado grande.")
                 return
-            if foto_bytes is not None:
 
+            if foto_bytes is not None:
                 try:
                     carpeta = Path("uploads/legionella")
                     carpeta.mkdir(parents=True, exist_ok=True)
@@ -2009,58 +2009,59 @@ def pantalla_legionella():
 
                 except Exception as e:
                     st.error(f"Error guardando foto: {e}")
-                    return 
-                observaciones_finales = observaciones or ""
+                    return
 
-                if tarea in ["Control AFS", "Control ACS terminal"]:
-                    checklist = []
-                
-                    checklist.append(
-                        "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
-                    )
-                
-                    checklist.append(
-                        "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No"
-                    )
-                
-                    checklist.append(
-                        "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
-                    )
-                
-                    observaciones_finales = (
-                        observaciones_finales
-                        + "\nChecklist: "
-                        + " | ".join(checklist)
-                    ).strip()
-        estado, resultado = registrar_control(
-            fecha_registro.strftime("%Y-%m-%d"),
-            punto,
-            tarea,
-            tipo_control,
-            valor,
-            valor_2,
-            unidad,
-            operario,
-            observaciones_finales,
-            ruta_foto,
-        )
+            observaciones_finales = observaciones or ""
+
+            if tarea in ["Control AFS", "Control ACS terminal"]:
+                checklist = []
+
+                checklist.append(
+                    "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
+                )
+
+                checklist.append(
+                    "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No"
+                )
+
+                checklist.append(
+                    "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
+                )
+
+                observaciones_finales = (
+                    observaciones_finales
+                    + "\nChecklist: "
+                    + " | ".join(checklist)
+                ).strip()
+
+            estado, resultado = registrar_control(
+                fecha_registro.strftime("%Y-%m-%d"),
+                punto,
+                tarea,
+                tipo_control,
+                valor,
+                valor_2,
+                unidad,
+                operario,
+                observaciones_finales,
+                ruta_foto,
+            )
 
             if estado == "OK":
                 st.success(f"✅ Control guardado correctamente: {resultado}")
-            
+
             elif estado == "RIESGO":
                 st.error(f"🚨 RIESGO LEGIONELLA: {resultado}")
                 st.warning("⚠️ Se ha registrado en incidencias y se ha generado una OT automática.")
                 st.toast("🚨 Riesgo Legionella detectado", icon="🚨")
-            
+
             elif estado == "ERROR":
                 st.error(resultado)
-            
+
             else:
                 st.warning(f"⚠️ INCIDENCIA LEGIONELLA: {resultado}")
                 st.warning("Se ha registrado en incidencias y se ha generado una OT automática.")
                 st.toast("⚠️ Incidencia Legionella registrada", icon="⚠️")
-
     with tab2:
         st.markdown("### 🗓️ Planificación Legionella")
 
