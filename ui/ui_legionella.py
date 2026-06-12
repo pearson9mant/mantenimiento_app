@@ -2064,32 +2064,32 @@ def pantalla_legionella():
             observaciones_finales = observaciones or ""
 
             if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
-                
+            
                 checklist = []
-
+            
                 checklist.append(
                     "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
                 )
-
+            
                 checklist.append(
                     "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No"
                 )
-
+            
                 checklist.append(
                     "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
                 )
-
+            
                 if tarea == "Control punto terminal completo":
                     checklist.append(
                         f"Temperatura ACS terminal: {temperatura_acs} ºC"
                     )
-
+            
                 observaciones_finales = (
                     observaciones_finales
                     + "\nChecklist: "
                     + " | ".join(checklist)
                 ).strip()
-
+            
             estado, resultado = registrar_control(
                 fecha_registro.strftime("%Y-%m-%d"),
                 punto,
@@ -2102,7 +2102,7 @@ def pantalla_legionella():
                 observaciones_finales,
                 ruta_foto,
             )
-
+            
             if estado == "OK":
                 st.success(f"✅ Control guardado correctamente: {resultado}")
 
