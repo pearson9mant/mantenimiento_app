@@ -2112,6 +2112,7 @@ def pantalla_legionella():
                 tipo_control,
                 valor,
                 valor_2,
+                valor_3,
                 unidad,
                 operario,
                 observaciones_finales,
