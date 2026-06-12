@@ -1148,7 +1148,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         INSERT INTO legionella_registros
         (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
          valor, valor_2, valor_3, unidad, estado, resultado, operario, observaciones,foto)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             fecha_registro,
