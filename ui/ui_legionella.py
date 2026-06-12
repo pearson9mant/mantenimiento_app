@@ -375,7 +375,7 @@ def sembrar_puntos_si_vacio():
         conn.close()
 
 
-def evaluar_resultado(tipo_control, valor, valor_2=None, consigna_minima=None, controla_consigna=1):
+def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_minima=None, controla_consigna=1):
     try:
         valor = float(valor)
     except Exception:
