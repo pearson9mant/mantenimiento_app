@@ -119,6 +119,15 @@ def asegurar_columna_foto_legionella():
         """)
     except Exception:
         pass
+        
+def asegurar_columna_valor3_legionella():
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_registros
+            ADD COLUMN valor_3 REAL
+        """)
+    except Exception:
+        pass        
 
 def asegurar_tabla_correctivos_legionella():
     if os.getenv("DATABASE_URL"):
