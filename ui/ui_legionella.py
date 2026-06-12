@@ -1769,6 +1769,7 @@ def pantalla_legionella():
     asegurar_columna_foto_legionella()
     asegurar_tabla_correctivos_legionella()
     asegurar_columnas_plano_legionella()
+    asegurar_columna_valor3_legionella()
 
     # puntos_creados = sembrar_puntos_si_vacio()
 
