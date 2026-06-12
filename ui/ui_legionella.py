@@ -2099,8 +2099,7 @@ def pantalla_legionella():
                 if tarea == "Control punto terminal completo":
                     checklist.append(
                         f"Temperatura ACS terminal: {temperatura_acs} ºC"
-                    )
-                st.write(checklist)    
+                    )   
                 
                 observaciones_finales = (
                     observaciones_finales
