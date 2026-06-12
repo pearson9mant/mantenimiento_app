@@ -3301,7 +3301,7 @@ def pantalla_legionella():
 
         df = leer_df("""
             SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
-                   valor, valor_2, unidad, estado, resultado, operario, observaciones, foto
+                   valor, valor_2, valor_3, unidad, estado, resultado, operario, observaciones, foto
             FROM legionella_registros
             WHERE centro IS NOT NULL
               AND edificio IS NOT NULL
