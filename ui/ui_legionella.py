@@ -1956,7 +1956,8 @@ def pantalla_legionella():
             revision_visual_ok = st.checkbox("Revisión visual correcta")
         
             valor = temperatura_afs
-            valor_2 = cloro_residual    
+            valor_2 = cloro_residual
+            valor_3 = temperatura_acs
         
         elif tarea == "Control ACS terminal":
             tipo_control = "Control ACS terminal"
