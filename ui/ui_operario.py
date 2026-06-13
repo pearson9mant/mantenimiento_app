@@ -218,6 +218,7 @@ def mostrar_ejecucion_legionella_operario(
 
     valor = None
     valor_2 = None
+    valor_3 = None
     unidad = ""
 
     if tarea == "Temperatura acumulador":
@@ -268,6 +269,7 @@ def mostrar_ejecucion_legionella_operario(
             key=f"leg_valor_{id_orden}"
         )
         valor_2 = None
+        valor_3 = None
         
     elif tarea == "Control AFS":
         tipo_control = "Control AFS"
@@ -328,6 +330,7 @@ def mostrar_ejecucion_legionella_operario(
         )
     
         valor_2 = None
+        valor_3 = None
     
         purga_realizada = st.checkbox(
             "Purga realizada",
