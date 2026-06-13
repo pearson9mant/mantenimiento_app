@@ -437,6 +437,7 @@ def mostrar_ejecucion_legionella_operario(
             tipo_control,
             valor,
             valor_2,
+            valor_3,
             unidad,
             operario,
             observaciones_finales,
