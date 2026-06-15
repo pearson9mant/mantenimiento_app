@@ -451,6 +451,22 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
         return "INCIDENCIA", "Purga no realizada"
 
     return "OK", "Registrado"
+    if tipo_control == "Control sala ACS":
+
+    acumulador = valor
+    impulsion = valor_2
+    retorno = valor_3
+
+    if acumulador < 60:
+        return "RIESGO", "Acumulador inferior a 60 ºC"
+
+    if impulsion < 50:
+        return "RIESGO", "Impulsión ACS inferior a 50 ºC"
+
+    if retorno < 50:
+        return "RIESGO", "Retorno ACS inferior a 50 ºC"
+
+     return "OK", "Sala ACS correcta"
 
 
 def operario_por_centro(centro):
