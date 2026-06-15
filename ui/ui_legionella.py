@@ -2728,6 +2728,13 @@ def pantalla_legionella():
                             value=str(row["ubicacion"] or ""),
                             key=f"edit_ubicacion_punto_{row['id']}"
                         )
+                        numero_terminales_edit = st.number_input(
+                            "Número de terminales",
+                            min_value=1,
+                            value=int(row.get("numero_terminales", 1) or 1),
+                            step=1,
+                            key=f"terminales_{row['id']}"
+                        )
                     
                         ubicacion_exacta_edit = st.text_input(
                             "📍 Ubicación exacta",
