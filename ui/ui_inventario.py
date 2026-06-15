@@ -66,6 +66,24 @@ def limpiar_formulario_crear_material():
     st.session_state["inventario_abrir_crear_material"] = True
 
 
+def limpiar_formulario_pedido_abel():
+    claves = [
+        "abel_pedido_operario",
+        "abel_pedido_centro",
+        "abel_pedido_material",
+        "abel_pedido_cantidad",
+        "abel_pedido_prioridad",
+        "abel_pedido_estado",
+        "abel_pedido_observaciones",
+    ]
+
+    for clave in claves:
+        if clave in st.session_state:
+            del st.session_state[clave]
+
+    st.session_state["abel_pedido_creado_ok"] = True
+
+
 def mostrar_historial_material(codigo):
     movimientos = obtener_movimientos_por_material(codigo)
 
@@ -232,17 +250,20 @@ def pantalla_inventario():
         pass
 
     operario = st.session_state.get("operario_activo", "")
-    if operario == "Abel Vasquez":
-
-    tab_crear_material, tab_crear_pedido = st.tabs([
-        "➕ Crear material",
-        "📦 Crear pedido"
-    ])
 
     if operario == "Abel Vasquez":
-        abrir_crear_material = st.session_state.pop("inventario_abrir_crear_material", False)
 
-      with tab_crear_material:
+        tab_crear_material, tab_crear_pedido = st.tabs([
+            "➕ Crear material",
+            "📦 Crear pedido"
+        ])
+
+        abrir_crear_material = st.session_state.pop(
+            "inventario_abrir_crear_material",
+            False
+        )
+
+        with tab_crear_material:
 
             if st.session_state.pop("inventario_material_creado_ok", False):
                 st.success("Material creado correctamente. Formulario limpio para crear otro.")
@@ -289,8 +310,19 @@ def pantalla_inventario():
                             f"Coincide: {p.get('coincidencias', '-')}"
                         )
 
-            stock_actual = st.number_input("Stock inicial", min_value=0.0, step=1.0, key="crear_material_stock_actual")
-            stock_minimo = st.number_input("Stock mínimo", min_value=0.0, step=1.0, key="crear_material_stock_minimo")
+            stock_actual = st.number_input(
+                "Stock inicial",
+                min_value=0.0,
+                step=1.0,
+                key="crear_material_stock_actual"
+            )
+
+            stock_minimo = st.number_input(
+                "Stock mínimo",
+                min_value=0.0,
+                step=1.0,
+                key="crear_material_stock_minimo"
+            )
 
             st.markdown("#### 💶 Coste del material")
 
@@ -405,6 +437,86 @@ def pantalla_inventario():
                         st.rerun()
                     else:
                         st.error(mensaje)
+
+        with tab_crear_pedido:
+
+            st.subheader("📦 Crear pedido de material")
+
+            if st.session_state.pop("abel_pedido_creado_ok", False):
+                st.success("Pedido creado correctamente. Formulario limpio para crear otro.")
+
+            operario_destino = st.selectbox(
+                "Pedido para",
+                ["J.A. Almeda", "Luis Lozano", "Abel Vasquez", "Otro"],
+                key="abel_pedido_operario"
+            )
+
+            centro_pedido = st.selectbox(
+                "Centro",
+                CENTROS,
+                key="abel_pedido_centro"
+            )
+
+            material_pedido = st.text_input(
+                "Material solicitado",
+                key="abel_pedido_material"
+            )
+
+            cantidad_pedido = st.number_input(
+                "Cantidad",
+                min_value=1,
+                step=1,
+                key="abel_pedido_cantidad"
+            )
+
+            prioridad_pedido = st.selectbox(
+                "Prioridad",
+                ["Baja", "Media", "Alta", "Urgente"],
+                index=1,
+                key="abel_pedido_prioridad"
+            )
+
+            estado_pedido = st.selectbox(
+                "Estado inicial",
+                ["Pendiente", "Preparado", "Sin stock"],
+                key="abel_pedido_estado"
+            )
+
+            observaciones_pedido = st.text_area(
+                "Observaciones",
+                placeholder="Ejemplo: pedido recibido por teléfono",
+                key="abel_pedido_observaciones"
+            )
+
+            if st.button("💾 Crear pedido", use_container_width=True, key="abel_btn_crear_pedido"):
+
+                if not material_pedido.strip():
+                    st.warning("Indica el material solicitado.")
+
+                else:
+                    try:
+                        crear_pedido_material(
+                            operario=operario_destino,
+                            centro=centro_pedido,
+                            material=material_pedido,
+                            cantidad=cantidad_pedido,
+                            prioridad=prioridad_pedido,
+                            estado=estado_pedido,
+                            observaciones=observaciones_pedido,
+                            creado_por="Abel Vasquez"
+                        )
+                    except TypeError:
+                        crear_pedido_material(
+                            operario=operario_destino,
+                            centro=centro_pedido,
+                            material=material_pedido,
+                            cantidad=cantidad_pedido,
+                            prioridad=prioridad_pedido,
+                            observaciones=f"{observaciones_pedido} | Estado inicial: {estado_pedido} | Creado por: Abel Vasquez"
+                        )
+
+                    limpiar_formulario_pedido_abel()
+                    st.rerun()
 
     st.markdown("### 🔎 Buscar material")
 
@@ -595,35 +707,33 @@ def pantalla_inventario():
                         st.caption(f"📷 {foto_nombre}")
                 except Exception:
                     st.caption("Foto no disponible.")
-            # -------------------------
-            # EDITAR MATERIAL - ABEL
-            # -------------------------
+
             with st.expander("✏️ Editar material"):
-            
+
                 nuevo_material = st.text_input(
                     "Material",
                     value=str(material or ""),
                     key=f"abel_edit_material_{codigo}"
                 )
-            
+
                 nueva_categoria = st.text_input(
                     "Categoría",
                     value=str(categoria or ""),
                     key=f"abel_edit_categoria_{codigo}"
                 )
-            
+
                 nueva_ubicacion = st.text_input(
                     "Ubicación",
                     value=str(ubicacion or ""),
                     key=f"abel_edit_ubicacion_{codigo}"
                 )
-            
+
                 nuevo_proveedor = st.text_input(
                     "Proveedor",
                     value=str(proveedor or ""),
                     key=f"abel_edit_proveedor_{codigo}"
                 )
-            
+
                 nuevo_stock_minimo = st.number_input(
                     "Stock mínimo",
                     min_value=0.0,
@@ -631,7 +741,7 @@ def pantalla_inventario():
                     step=1.0,
                     key=f"abel_edit_stock_minimo_{codigo}"
                 )
-            
+
                 nuevo_precio_unitario = st.number_input(
                     "Precio unitario €",
                     min_value=0.0,
@@ -639,31 +749,31 @@ def pantalla_inventario():
                     step=0.10,
                     key=f"abel_edit_precio_{codigo}"
                 )
-            
+
                 nuevas_observaciones = st.text_area(
                     "Observaciones",
                     value=str(observaciones or ""),
                     key=f"abel_edit_obs_{codigo}"
                 )
-            
+
                 nueva_foto = st.file_uploader(
                     "Cambiar foto",
                     type=["jpg", "jpeg", "png"],
                     key=f"abel_edit_foto_{codigo}"
                 )
-            
+
                 col_guardar, col_cancelar = st.columns(2)
-            
+
                 with col_guardar:
                     if st.button("💾 Guardar cambios", key=f"abel_guardar_{codigo}"):
-            
+
                         foto_nombre_nueva = None
                         foto_data_nueva = None
-            
+
                         if nueva_foto is not None:
                             foto_nombre_nueva = nueva_foto.name
                             foto_data_nueva = nueva_foto.getvalue()
-            
+
                         actualizar_material_abel(
                             codigo=codigo,
                             material=nuevo_material,
@@ -676,11 +786,10 @@ def pantalla_inventario():
                             foto_nombre=foto_nombre_nueva,
                             foto_data=foto_data_nueva
                         )
-            
+
                         st.success("Material actualizado correctamente.")
                         st.rerun()
 
-            
             if puede_borrar_inventario():
                 if activo == 1:
                     confirmar = st.checkbox(
