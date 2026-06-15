@@ -720,6 +720,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 "Purga",
                 "Control AFS",
                 "Control ACS terminal"
+                "Control sala ACS"
             ]:
                 consigna_minima = 0
                 controla_consigna = 0
