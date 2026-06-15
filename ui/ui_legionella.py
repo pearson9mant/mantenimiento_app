@@ -2798,6 +2798,7 @@ def pantalla_legionella():
                             tipo_control_punto_edit,
                             nombre_edit,
                             ubicacion_edit,
+                            numero_terminales_edit,
                             ubicacion_exacta_edit,
                             observaciones_edit,
                             activo_edit,
