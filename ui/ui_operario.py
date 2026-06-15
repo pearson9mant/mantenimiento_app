@@ -479,6 +479,7 @@ def mostrar_ejecucion_legionella_operario(
             fecha_control.strftime("%Y-%m-%d"),
             punto,
             tarea,
+            "Control sala ACS",
             tipo_control,
             valor,
             valor_2,
