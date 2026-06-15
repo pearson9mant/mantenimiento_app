@@ -570,6 +570,10 @@ def dias_frecuencia(tarea):
 
 
 def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
+    
+    if tipo_control_punto == "Sala ACS completa":
+    return ["Control sala ACS"]
+    
     if tipo_control_punto == "Choque térmico":
         return ["Choque térmico"]
     
