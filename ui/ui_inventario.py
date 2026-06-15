@@ -232,6 +232,12 @@ def pantalla_inventario():
         pass
 
     operario = st.session_state.get("operario_activo", "")
+    if operario == "Abel Vasquez":
+
+    tab_crear_material, tab_crear_pedido = st.tabs([
+        "➕ Crear material",
+        "📦 Crear pedido"
+    ])
 
     if operario == "Abel Vasquez":
         abrir_crear_material = st.session_state.pop("inventario_abrir_crear_material", False)
