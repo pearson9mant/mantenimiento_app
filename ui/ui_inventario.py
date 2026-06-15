@@ -14,6 +14,7 @@ from modules.inventario import (
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 from modules.alertas_empresas import obtener_alertas_empresas_externas
+from modules.pedidos_material import crear_pedido_material
 
 
 def rol_actual():
