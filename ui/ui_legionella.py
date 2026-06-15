@@ -381,92 +381,26 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
     except Exception:
         return "INCIDENCIA", "Valor no válido o vacío"
 
+    if tipo_control == "Control sala ACS":
+        acumulador = float(valor)
+        impulsion = float(valor_2)
+        retorno = float(valor_3)
+
+        if acumulador < 60:
+            return "RIESGO", "Acumulador inferior a 60 ºC"
+        if impulsion < 50:
+            return "RIESGO", "Impulsión ACS inferior a 50 ºC"
+        if retorno < 50:
+            return "RIESGO", "Retorno ACS inferior a 50 ºC"
+
+        return "OK", "Sala ACS correcta"
+
     try:
         consigna_minima = float(consigna_minima)
     except Exception:
         consigna_minima = None
 
     controla_consigna = int(controla_consigna or 0)
-
-    if tipo_control in [
-        "Temperatura acumulador",
-        "Temperatura retorno",
-        "Temperatura impulsión ACS",
-        "Temperatura punto terminal",
-    ]:
-        if controla_consigna == 0 or consigna_minima is None or consigna_minima <= 0:
-            return "OK", "Registrado sin consigna automática"
-
-        if valor >= consigna_minima:
-            return "OK", "Correcto"
-
-        return "RIESGO", f"{tipo_control} por debajo de {consigna_minima:g} ºC"
-    if tipo_control == "Control AFS":
-        temperatura = valor
-        cloro = valor_2
-    
-        if temperatura > 25:
-            return "RIESGO", "Temperatura AFS elevada"
-    
-        if cloro is not None and not (0.2 <= float(cloro) <= 1.0):
-            return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
-    
-        return "OK", "Control AFS correcto"
-    
-    if tipo_control == "Control ACS terminal":
-        if valor >= 50:
-            return "OK", "Temperatura ACS terminal correcta"
-    
-        return "RIESGO", "Temperatura ACS terminal inferior a 50 ºC"
-        
-    if tipo_control == "Control punto terminal completo":
-        temperatura_afs = valor
-        cloro = valor_2
-        temperatura_acs = valor_3
-    
-        if temperatura_afs > 25:
-            return "RIESGO", "Temperatura AFS elevada"
-    
-        if cloro is not None and not (0.2 <= float(cloro) <= 1.0):
-            return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
-    
-        if temperatura_acs is not None and float(temperatura_acs) < 50:
-            return "RIESGO", "Temperatura ACS terminal inferior a 50 ºC"
-    
-        return "OK", "Control punto terminal completo correcto" 
-          
-    if tipo_control == "Cloro residual":
-        if 0.2 <= valor <= 1.0:
-            return "OK", "Correcto"
-        return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
-
-    if tipo_control == "Revisión visual":
-        if valor == 1:
-            return "OK", "Correcto"
-        return "INCIDENCIA", "Revisión visual desfavorable"
-
-    if tipo_control == "Purga":
-        if valor == 1:
-            return "OK", "Correcto"
-        return "INCIDENCIA", "Purga no realizada"
-
-    return "OK", "Registrado"
-    if tipo_control == "Control sala ACS":
-
-    acumulador = valor
-    impulsion = valor_2
-    retorno = valor_3
-
-    if acumulador < 60:
-        return "RIESGO", "Acumulador inferior a 60 ºC"
-
-    if impulsion < 50:
-        return "RIESGO", "Impulsión ACS inferior a 50 ºC"
-
-    if retorno < 50:
-        return "RIESGO", "Retorno ACS inferior a 50 ºC"
-
-     return "OK", "Sala ACS correcta"
 
 
 def operario_por_centro(centro):
