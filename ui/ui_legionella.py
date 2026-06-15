@@ -1925,6 +1925,14 @@ def pantalla_legionella():
             unidad = "ºC"
             valor = st.number_input("Temperatura ºC", min_value=0.0, max_value=100.0, value=45.0, step=0.1)
             valor_2 = None
+            
+        elif tarea == "Control sala ACS":
+            tipo_control = "Control sala ACS"
+            unidad = "ºC"
+        
+            valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
+            valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
+            valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)  
 
         elif tarea == "Control AFS":
             tipo_control = "Control AFS"
