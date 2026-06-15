@@ -2740,6 +2740,7 @@ def pantalla_legionella():
                             "Retorno",
                             "Muestra",
                             "Sala ACS completa",
+                            "Choque térmico",
                         ]
                         
                         valor_tipo_control = row.get("tipo_control_punto") or ""
