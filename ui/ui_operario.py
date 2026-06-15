@@ -411,25 +411,35 @@ def mostrar_ejecucion_legionella_operario(
         use_container_width=True
     ):
         observaciones_finales = observaciones_leg or ""
-    
-        incidencias_checklist = []
-    
-        if tarea in ["Control AFS", "Control ACS terminal"]:
-    
-            if not purga_realizada:
-                incidencias_checklist.append("Purga no realizada")
-    
-            if not aireador_limpio:
-                incidencias_checklist.append("Aireador pendiente de limpieza/desinfección")
-    
-            if not revision_visual_ok:
-                incidencias_checklist.append("Revisión visual desfavorable")
-    
-        if incidencias_checklist:
+        
+        if tarea in [
+            "Control AFS",
+            "Control ACS terminal",
+            "Control punto terminal completo"
+        ]:
+        
+            checklist = []
+        
+            checklist.append(
+                "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
+            )
+        
+            checklist.append(
+                "Aireador limpio/desinfectado: Sí"
+                if aireador_limpio
+                else "Aireador limpio/desinfectado: No"
+            )
+        
+            checklist.append(
+                "Revisión visual correcta: Sí"
+                if revision_visual_ok
+                else "Revisión visual correcta: No"
+            )
+        
             observaciones_finales = (
                 observaciones_finales
                 + "\nChecklist: "
-                + " | ".join(incidencias_checklist)
+                + " | ".join(checklist)
             ).strip()
             
     
@@ -449,10 +459,6 @@ def mostrar_ejecucion_legionella_operario(
         if estado == "ERROR":
             st.error(resultado)
             return False
-    
-        if incidencias_checklist and estado == "OK":
-            estado = "INCIDENCIA"
-            resultado = " | ".join(incidencias_checklist)
     
         st.session_state[f"legionella_guardada_{id_orden}"] = True
     
