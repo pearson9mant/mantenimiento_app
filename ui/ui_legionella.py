@@ -2446,6 +2446,14 @@ def pantalla_legionella():
                     placeholder="Ejemplo: Cuarto calderas",
                     key="nuevo_punto_ubicacion"
                 )
+
+                numero_terminales_nuevo = st.number_input(
+                    "Número de terminales",
+                    min_value=1,
+                    value=1,
+                    step=1,
+                    key="nuevo_punto_terminales"
+                )
                 if centro_nuevo == "Pearson 9":
                     pdf_ref = Path(
                         "assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"
