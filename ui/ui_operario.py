@@ -215,6 +215,15 @@ def mostrar_ejecucion_legionella_operario(
 
     st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
     st.caption(f"🧪 Tarea: {tarea}")
+    
+    terminales = int(
+        punto.get("numero_terminales", 1) or 1
+    )
+        
+    if terminales > 1:
+        st.info(
+            f"🚿 Terminales incluidos en este punto: {terminales}"
+        )
 
     valor = None
     valor_2 = None
