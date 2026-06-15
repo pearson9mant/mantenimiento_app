@@ -2496,6 +2496,7 @@ def pantalla_legionella():
                         tipo_control_punto_nuevo,
                         nombre_punto_nuevo,
                         ubicacion_nueva,
+                        numero_terminales_nuevo,
                         observaciones_nueva
                     )
 
