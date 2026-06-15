@@ -3358,7 +3358,6 @@ def pantalla_legionella():
                     elif row["tarea"] == "Control ACS terminal":
             
                         st.write(f"🔥 **Temperatura ACS terminal:** {row['valor']} ºC")
-                            st.write(f"🔥 **Temperatura ACS terminal:** {row['valor']} ºC")
 
                     elif row["tarea"] == "Control sala ACS":
                     
