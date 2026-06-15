@@ -2401,9 +2401,9 @@ def pantalla_legionella():
                         "ACS + AFS",
                         "Acumulador",
                         "Retorno",
-                        "Muestra"
-                        "Choque térmico"
-                        "Sala ACS completa"
+                        "Muestra",
+                        "Choque térmico",
+                        "Sala ACS completa",
                     ],
                     key="nuevo_punto_tipo_control"
                 )
@@ -2677,8 +2677,8 @@ def pantalla_legionella():
                             "ACS + AFS",
                             "Acumulador",
                             "Retorno",
-                            "Muestra"
-                            "Sala ACS completa"
+                            "Muestra",
+                            "Sala ACS completa",
                         ]
                         
                         valor_tipo_control = row.get("tipo_control_punto") or ""
