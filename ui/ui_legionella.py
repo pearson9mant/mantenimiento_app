@@ -799,6 +799,7 @@ def crear_punto_legionella(
     tipo_control_punto,
     nombre_punto,
     ubicacion,
+    numero_terminales,
     observaciones
 ):
     ejecutar("""
@@ -811,10 +812,11 @@ def crear_punto_legionella(
             tipo_control_punto,
             nombre_punto,
             ubicacion,
+            numero_terminales,
             activo,
             observaciones
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     """, (
         centro,
         edificio,
@@ -823,6 +825,7 @@ def crear_punto_legionella(
         tipo_control_punto,
         nombre_punto,
         ubicacion,
+        numero_terminales,
         observaciones
     ))
 
