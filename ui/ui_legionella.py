@@ -402,6 +402,64 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
 
     controla_consigna = int(controla_consigna or 0)
 
+    if tipo_control in [
+        "Temperatura acumulador",
+        "Temperatura retorno",
+        "Temperatura impulsión ACS",
+        "Temperatura punto terminal",
+    ]:
+        if controla_consigna == 0 or consigna_minima is None or consigna_minima <= 0:
+            return "OK", "Registrado sin consigna automática"
+
+        if valor >= consigna_minima:
+            return "OK", "Correcto"
+
+        return "RIESGO", f"{tipo_control} por debajo de {consigna_minima:g} ºC"
+
+    if tipo_control == "Control AFS":
+        if valor > 25:
+            return "RIESGO", "Temperatura AFS elevada"
+
+        if valor_2 is not None and not (0.2 <= float(valor_2) <= 1.0):
+            return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
+
+        return "OK", "Control AFS correcto"
+
+    if tipo_control == "Control ACS terminal":
+        if valor >= 50:
+            return "OK", "Temperatura ACS terminal correcta"
+
+        return "RIESGO", "Temperatura ACS terminal inferior a 50 ºC"
+
+    if tipo_control == "Control punto terminal completo":
+        if valor > 25:
+            return "RIESGO", "Temperatura AFS elevada"
+
+        if valor_2 is not None and not (0.2 <= float(valor_2) <= 1.0):
+            return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
+
+        if valor_3 is not None and float(valor_3) < 50:
+            return "RIESGO", "Temperatura ACS terminal inferior a 50 ºC"
+
+        return "OK", "Control punto terminal completo correcto"
+
+    if tipo_control == "Cloro residual":
+        if 0.2 <= valor <= 1.0:
+            return "OK", "Correcto"
+        return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
+
+    if tipo_control == "Revisión visual":
+        if valor == 1:
+            return "OK", "Correcto"
+        return "INCIDENCIA", "Revisión visual desfavorable"
+
+    if tipo_control == "Purga":
+        if valor == 1:
+            return "OK", "Correcto"
+        return "INCIDENCIA", "Purga no realizada"
+
+    return "OK", "Registrado"
+
 
 def operario_por_centro(centro):
     if centro == "Pearson 9":
