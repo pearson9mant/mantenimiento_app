@@ -242,7 +242,7 @@ def pantalla_inventario():
     if operario == "Abel Vasquez":
         abrir_crear_material = st.session_state.pop("inventario_abrir_crear_material", False)
 
-        with st.expander("➕ Crear material nuevo", expanded=abrir_crear_material):
+      with tab_crear_material:
 
             if st.session_state.pop("inventario_material_creado_ok", False):
                 st.success("Material creado correctamente. Formulario limpio para crear otro.")
