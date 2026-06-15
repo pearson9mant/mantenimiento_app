@@ -242,6 +242,29 @@ def mostrar_ejecucion_legionella_operario(
             key=f"leg_valor_{id_orden}"
         )
 
+    elif tarea == "Control sala ACS":
+    
+        valor = st.number_input(
+            "Temperatura acumulador ºC",
+            value=60.0,
+            step=0.1,
+            key=f"acum_{num_ot}"
+        )
+    
+        valor_2 = st.number_input(
+            "Temperatura impulsión ACS ºC",
+            value=50.0,
+            step=0.1,
+            key=f"imp_{num_ot}"
+        )
+    
+        valor_3 = st.number_input(
+            "Temperatura retorno ACS ºC",
+            value=50.0,
+            step=0.1,
+            key=f"ret_{num_ot}"
+        )
+
     elif tarea == "Temperatura retorno":
         tipo_control = "Temperatura retorno"
         unidad = "ºC"
