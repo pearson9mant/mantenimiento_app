@@ -646,7 +646,7 @@ def unidad_por_tarea(tarea):
     if tarea == "Purga":
         return "Sí/No"
         
-     if tarea == "Control sala ACS":
+    if tarea == "Control sala ACS":
         return "ºC"   
 
     return ""
