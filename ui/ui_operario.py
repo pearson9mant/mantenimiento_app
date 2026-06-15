@@ -191,6 +191,12 @@ def mostrar_ejecucion_legionella_operario(
         st.warning("No se ha podido identificar la tarea de Legionella desde la OT.")
         return False
 
+    # Normalizar tarea para que la OT "Sala ACS completa" abra el formulario correcto
+    tarea_txt = str(tarea or "").strip()
+
+    if tarea_txt.lower() in ["sala acs completa", "control sala acs"]:
+        tarea = "Control sala ACS"
+
     puntos_df = leer_df(
         """
         SELECT *
@@ -215,20 +221,21 @@ def mostrar_ejecucion_legionella_operario(
 
     st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
     st.caption(f"🧪 Tarea: {tarea}")
-    
-    terminales = int(
-        punto.get("numero_terminales", 1) or 1
-    )
-        
+
+    terminales = int(punto.get("numero_terminales", 1) or 1)
+
     if terminales > 1:
-        st.info(
-            f"🚿 Terminales incluidos en este punto: {terminales}"
-        )
+        st.info(f"🚿 Terminales incluidos en este punto: {terminales}")
 
     valor = None
     valor_2 = None
     valor_3 = None
     unidad = ""
+    tipo_control = tarea
+
+    purga_realizada = False
+    aireador_limpio = False
+    revision_visual_ok = False
 
     if tarea == "Temperatura acumulador":
         tipo_control = "Temperatura acumulador"
@@ -245,32 +252,34 @@ def mostrar_ejecucion_legionella_operario(
     elif tarea == "Control sala ACS":
         tipo_control = "Control sala ACS"
         unidad = "ºC"
-    
+
+        st.info("Control conjunto de sala ACS: acumulador, impulsión y retorno.")
+
         valor = st.number_input(
             "Temperatura acumulador ºC",
             min_value=0.0,
             max_value=100.0,
             value=60.0,
             step=0.1,
-            key=f"acum_{id_orden}"
+            key=f"leg_acum_{id_orden}"
         )
-    
+
         valor_2 = st.number_input(
             "Temperatura impulsión ACS ºC",
             min_value=0.0,
             max_value=100.0,
             value=50.0,
             step=0.1,
-            key=f"imp_{id_orden}"
+            key=f"leg_impulsion_{id_orden}"
         )
-    
+
         valor_3 = st.number_input(
             "Temperatura retorno ACS ºC",
             min_value=0.0,
             max_value=100.0,
             value=50.0,
             step=0.1,
-            key=f"ret_{id_orden}"
+            key=f"leg_retorno_{id_orden}"
         )
 
     elif tarea == "Temperatura retorno":
@@ -308,13 +317,11 @@ def mostrar_ejecucion_legionella_operario(
             step=0.01,
             key=f"leg_valor_{id_orden}"
         )
-        valor_2 = None
-        valor_3 = None
-        
+
     elif tarea == "Control AFS":
         tipo_control = "Control AFS"
         unidad = "ºC / mg/L"
-    
+
         valor = st.number_input(
             "Temperatura AFS ºC",
             min_value=0.0,
@@ -323,7 +330,7 @@ def mostrar_ejecucion_legionella_operario(
             step=0.1,
             key=f"leg_temp_afs_{id_orden}"
         )
-    
+
         valor_2 = st.number_input(
             "Cloro residual libre mg/L",
             min_value=0.0,
@@ -332,34 +339,26 @@ def mostrar_ejecucion_legionella_operario(
             step=0.01,
             key=f"leg_cloro_afs_{id_orden}"
         )
-    
+
         purga_realizada = st.checkbox(
             "Purga realizada",
             key=f"leg_purga_afs_{id_orden}"
         )
-    
+
         aireador_limpio = st.checkbox(
             "Aireador limpio/desinfectado",
             key=f"leg_aireador_afs_{id_orden}"
         )
-    
+
         revision_visual_ok = st.checkbox(
             "Revisión visual correcta",
             key=f"leg_revision_afs_{id_orden}"
         )
-        if not purga_realizada:
-            st.warning("Purga pendiente")
-        
-        if not aireador_limpio:
-            st.warning("Aireador pendiente de limpieza/desinfección")
-        
-        if not revision_visual_ok:
-            st.warning("Revisión visual desfavorable")
 
     elif tarea == "Control ACS terminal":
         tipo_control = "Control ACS terminal"
         unidad = "ºC"
-    
+
         valor = st.number_input(
             "Temperatura ACS terminal ºC",
             min_value=0.0,
@@ -368,32 +367,21 @@ def mostrar_ejecucion_legionella_operario(
             step=0.1,
             key=f"leg_temp_acs_{id_orden}"
         )
-    
-        valor_2 = None
-        valor_3 = None
-    
+
         purga_realizada = st.checkbox(
             "Purga realizada",
             key=f"leg_purga_acs_{id_orden}"
         )
-    
+
         aireador_limpio = st.checkbox(
             "Aireador limpio/desinfectado",
             key=f"leg_aireador_acs_{id_orden}"
         )
-    
+
         revision_visual_ok = st.checkbox(
             "Revisión visual correcta",
             key=f"leg_revision_acs_{id_orden}"
         )
-        if not purga_realizada:
-            st.warning("Purga pendiente")
-        
-        if not aireador_limpio:
-            st.warning("Aireador pendiente de limpieza/desinfección")
-        
-        if not revision_visual_ok:
-            st.warning("Revisión visual desfavorable")
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
@@ -431,6 +419,7 @@ def mostrar_ejecucion_legionella_operario(
 
     fecha_control = st.date_input(
         "Fecha del control",
+        value=date.today(),
         key=f"leg_fecha_{id_orden}"
     )
 
@@ -451,38 +440,48 @@ def mostrar_ejecucion_legionella_operario(
         use_container_width=True
     ):
         observaciones_finales = observaciones_leg or ""
-        
+
+        if tarea == "Control sala ACS":
+            observaciones_finales = (
+                observaciones_finales
+                + f"\nControl sala ACS: "
+                + f"Acumulador: {valor} ºC | "
+                + f"Impulsión: {valor_2} ºC | "
+                + f"Retorno: {valor_3} ºC"
+            ).strip()
+
         if tarea in [
             "Control AFS",
             "Control ACS terminal",
             "Control punto terminal completo"
         ]:
-        
             checklist = []
-        
+
             checklist.append(
                 "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
             )
-        
+
             checklist.append(
                 "Aireador limpio/desinfectado: Sí"
                 if aireador_limpio
                 else "Aireador limpio/desinfectado: No"
             )
-        
+
             checklist.append(
                 "Revisión visual correcta: Sí"
                 if revision_visual_ok
                 else "Revisión visual correcta: No"
             )
-        
+
+            if terminales > 1:
+                checklist.append(f"Terminales revisados/desinfectados: {terminales}")
+
             observaciones_finales = (
                 observaciones_finales
                 + "\nChecklist: "
                 + " | ".join(checklist)
             ).strip()
-            
-    
+
         estado, resultado = registrar_control(
             fecha_control.strftime("%Y-%m-%d"),
             punto,
@@ -495,22 +494,22 @@ def mostrar_ejecucion_legionella_operario(
             operario,
             observaciones_finales,
         )
-    
+
         if estado == "ERROR":
             st.error(resultado)
             return False
-    
+
         st.session_state[f"legionella_guardada_{id_orden}"] = True
-    
+
         if estado == "OK":
             st.success(f"Control guardado correctamente: {resultado}")
         elif estado == "RIESGO":
             st.error(f"Control guardado con RIESGO: {resultado}")
         else:
             st.warning(f"Control guardado con incidencia: {resultado}")
-    
+
         st.rerun()
-    
+
     st.info("Guarda el control de Legionella antes de finalizar esta OT.")
     return False
 
