@@ -851,6 +851,7 @@ def obtener_puntos_legionella_admin():
                tipo_control_punto,
                nombre_punto,
                ubicacion,
+               numero_terminales,
                ubicacion_exacta,
                plano_nombre,
                plano_data,
