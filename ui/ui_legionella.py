@@ -2440,6 +2440,7 @@ def pantalla_legionella():
                         "Acumulador",
                         "Retorno",
                         "Muestra"
+                        "Choque térmico"
                     ],
                     key="nuevo_punto_tipo_control"
                 )
