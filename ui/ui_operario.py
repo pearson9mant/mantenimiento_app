@@ -499,6 +499,9 @@ if terminales_revisados < terminales:
                 if revision_visual_ok
                 else "Revisión visual correcta: No"
             )
+            checklist.append(
+                f"Terminales revisados: {terminales_revisados}/{terminales}"
+            )
 
             if terminales > 1:
                 checklist.append(f"Terminales revisados/desinfectados: {terminales}")
