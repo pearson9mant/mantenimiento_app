@@ -136,6 +136,8 @@ def es_ot_legionella(area, origen, descripcion):
         area_txt == "legionella"
         or origen_txt == "legionella"
         or desc_txt.startswith("control legionella")
+        or desc_txt.startswith("correctivo legionella")
+        or "correctivo legionella" in desc_txt
     )
 
 
