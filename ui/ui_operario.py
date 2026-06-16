@@ -355,7 +355,7 @@ def mostrar_ejecucion_legionella_operario(
             key=f"leg_revision_afs_{id_orden}"
         )
 
-            terminales_revisados = st.number_input(
+        terminales_revisados = st.number_input(
             "Terminales revisados",
             min_value=0,
             max_value=terminales,
@@ -396,6 +396,19 @@ def mostrar_ejecucion_legionella_operario(
             "Revisión visual correcta",
             key=f"leg_revision_acs_{id_orden}"
         )
+        terminales_revisados = st.number_input(
+            "Terminales revisados",
+            min_value=0,
+            max_value=terminales,
+            value=terminales,
+            step=1,
+            key=f"terminales_rev_acs_{id_orden}"
+        )
+
+if terminales_revisados < terminales:
+    st.warning(
+        f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
+    )
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
