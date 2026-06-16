@@ -2465,6 +2465,7 @@ def pantalla_legionella():
                         "Retorno",
                         "Muestra",
                         "Choque térmico",
+                        "Solo temperatura",
                         "Sala ACS completa",
                     ],
                     key="nuevo_punto_tipo_control"
@@ -2741,6 +2742,7 @@ def pantalla_legionella():
                             "Retorno",
                             "Muestra",
                             "Sala ACS completa",
+                            "Solo temperatura",
                             "Choque térmico",
                         ]
                         
