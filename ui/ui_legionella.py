@@ -602,6 +602,9 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
 
     elif tipo_control_punto == "ACS + AFS":
         tareas = ["Control punto terminal completo"]
+        
+     elif tipo_control_punto == "Solo temperatura":
+         return ["Temperatura acumulador"]   
 
     else:
         # Compatibilidad con puntos antiguos
