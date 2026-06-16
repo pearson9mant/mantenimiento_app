@@ -167,6 +167,175 @@ def extraer_datos_ot_legionella(descripcion, espacio):
     return tarea, punto
 
 
+import streamlit as st
+from datetime import date
+from pathlib import Path
+
+from modules.ordenes import (
+    obtener_ordenes_operario,
+    obtener_historico,
+    actualizar_estado,
+    actualizar_observaciones_estado,
+    finalizar_orden,
+    obtener_fotos_ot,
+    guardar_foto_ot,
+    crear_correctiva_desde_ot
+)
+
+from modules.inventario import (
+    obtener_materiales_para_select,
+    obtener_material_por_codigo,
+    registrar_movimiento_inventario
+)
+
+from modules.preventivo import (
+    obtener_checklist_preventivo,
+    actualizar_checklist_preventivo,
+    checklist_preventivo_completo,
+    crear_checklist_preventivo,
+)
+
+from ui.ui_legionella import (
+    obtener_checklist_correctivo_legionella,
+    guardar_checklist_correctivo_legionella,
+    borrar_checklist_correctivo_legionella,
+)
+
+
+def rol_actual():
+    return str(st.session_state.get("rol", "")).strip().lower()
+
+
+def usuario_actual():
+    return str(st.session_state.get("usuario", "")).strip()
+
+
+def nombre_operario_actual():
+    return str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("nombre")
+        or usuario_actual()
+    ).strip()
+
+
+def es_admin():
+    return rol_actual() == "admin"
+
+
+def es_gerencia():
+    return rol_actual() == "gerencia"
+
+
+def es_operario():
+    return rol_actual() == "operario"
+
+
+def normalizar_txt(valor):
+    return str(valor or "").strip().lower()
+
+
+def normalizar_operario_nombre(nombre):
+    texto = normalizar_txt(nombre)
+    limpio = (
+        texto.replace(".", "")
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+    if limpio in [
+        "jaalmeda",
+        "jalmeda",
+        "juanantonio",
+        "juanantonioalmeda",
+        "jalmedac",
+        "jalmedaabatolibaedu"
+    ]:
+        return "j.a. almeda"
+
+    if limpio in [
+        "luislozano",
+        "llozano",
+        "luis"
+    ]:
+        return "luis lozano"
+
+    if limpio in [
+        "abelvasquez",
+        "abel",
+        "avasquez"
+    ]:
+        return "abel vasquez"
+
+    return texto
+
+
+def puede_ver_legionella_operario(operario):
+    operario_txt = normalizar_txt(operario)
+    operario_txt = operario_txt.replace(".", "")
+    operario_txt = operario_txt.replace(" ", "")
+    operario_txt = operario_txt.replace("-", "")
+    operario_txt = operario_txt.replace("_", "")
+
+    return (
+        "almeda" in operario_txt
+        or operario_txt in ["ja", "jalmeda", "jaalmeda", "juanantonio"]
+    )
+
+
+def obtener_operario_fila(fila):
+    try:
+        return fila[10]
+    except Exception:
+        return ""
+
+
+def es_ot_preventiva(origen, descripcion):
+    origen_txt = str(origen or "").strip().upper()
+    desc_txt = str(descripcion or "").strip().upper()
+    return origen_txt == "PREVENTIVO" or desc_txt.startswith("[PREVENTIVO]")
+
+
+def es_ot_legionella(area, origen, descripcion):
+    area_txt = normalizar_txt(area)
+    origen_txt = normalizar_txt(origen)
+    desc_txt = normalizar_txt(descripcion)
+
+    return (
+        area_txt == "legionella"
+        or origen_txt == "legionella"
+        or desc_txt.startswith("control legionella")
+    )
+
+
+def limpiar_tarea_preventiva(descripcion):
+    texto = str(descripcion or "").strip()
+    return texto.replace("[PREVENTIVO]", "").strip()
+
+
+def extraer_datos_ot_legionella(descripcion, espacio):
+    texto = str(descripcion or "").strip()
+    partes = [p.strip() for p in texto.split(" - ")]
+
+    tarea = ""
+    punto = str(espacio or "").strip()
+
+    if texto.upper().startswith("CORRECTIVO LEGIONELLA"):
+        if len(partes) >= 2:
+            tarea = partes[1].strip()
+        if len(partes) >= 4:
+            punto = partes[-1].strip()
+        return tarea, punto
+
+    if len(partes) >= 3:
+        tarea = partes[1].strip()
+        punto = partes[2].strip()
+    elif len(partes) == 2:
+        tarea = partes[1].strip()
+
+    return tarea, punto
+
+
 def mostrar_ejecucion_legionella_operario(
     id_orden,
     num_ot,
@@ -191,7 +360,6 @@ def mostrar_ejecucion_legionella_operario(
         st.warning("No se ha podido identificar la tarea de Legionella desde la OT.")
         return False
 
-    # Normalizar tarea para que la OT "Sala ACS completa" abra el formulario correcto
     tarea_txt = str(tarea or "").strip()
 
     if tarea_txt.lower() in ["sala acs completa", "control sala acs"]:
@@ -236,6 +404,7 @@ def mostrar_ejecucion_legionella_operario(
     purga_realizada = False
     aireador_limpio = False
     revision_visual_ok = False
+    terminales_revisados = terminales
 
     if tarea == "Temperatura acumulador":
         tipo_control = "Temperatura acumulador"
@@ -363,7 +532,7 @@ def mostrar_ejecucion_legionella_operario(
             step=1,
             key=f"terminales_rev_afs_{id_orden}"
         )
-        
+
         if terminales_revisados < terminales:
             st.warning(
                 f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
@@ -396,6 +565,7 @@ def mostrar_ejecucion_legionella_operario(
             "Revisión visual correcta",
             key=f"leg_revision_acs_{id_orden}"
         )
+
         terminales_revisados = st.number_input(
             "Terminales revisados",
             min_value=0,
@@ -405,10 +575,70 @@ def mostrar_ejecucion_legionella_operario(
             key=f"terminales_rev_acs_{id_orden}"
         )
 
-if terminales_revisados < terminales:
-    st.warning(
-        f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
-    )
+        if terminales_revisados < terminales:
+            st.warning(
+                f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
+            )
+
+    elif tarea == "Control punto terminal completo":
+        tipo_control = "Control punto terminal completo"
+        unidad = "Control completo"
+
+        valor = st.number_input(
+            "Temperatura AFS ºC",
+            min_value=0.0,
+            max_value=50.0,
+            value=18.0,
+            step=0.1,
+            key=f"leg_temp_afs_completo_{id_orden}"
+        )
+
+        valor_2 = st.number_input(
+            "Cloro residual libre mg/L",
+            min_value=0.0,
+            max_value=5.0,
+            value=0.5,
+            step=0.01,
+            key=f"leg_cloro_completo_{id_orden}"
+        )
+
+        valor_3 = st.number_input(
+            "Temperatura ACS terminal ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=50.0,
+            step=0.1,
+            key=f"leg_temp_acs_completo_{id_orden}"
+        )
+
+        purga_realizada = st.checkbox(
+            "Purga realizada",
+            key=f"leg_purga_completo_{id_orden}"
+        )
+
+        aireador_limpio = st.checkbox(
+            "Aireador limpio/desinfectado",
+            key=f"leg_aireador_completo_{id_orden}"
+        )
+
+        revision_visual_ok = st.checkbox(
+            "Revisión visual correcta",
+            key=f"leg_revision_completo_{id_orden}"
+        )
+
+        terminales_revisados = st.number_input(
+            "Terminales revisados",
+            min_value=0,
+            max_value=terminales,
+            value=terminales,
+            step=1,
+            key=f"terminales_rev_completo_{id_orden}"
+        )
+
+        if terminales_revisados < terminales:
+            st.warning(
+                f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
+            )
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
@@ -499,12 +729,10 @@ if terminales_revisados < terminales:
                 if revision_visual_ok
                 else "Revisión visual correcta: No"
             )
+
             checklist.append(
                 f"Terminales revisados: {terminales_revisados}/{terminales}"
             )
-
-            if terminales > 1:
-                checklist.append(f"Terminales revisados/desinfectados: {terminales}")
 
             observaciones_finales = (
                 observaciones_finales
