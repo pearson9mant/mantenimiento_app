@@ -740,6 +740,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 "Control AFS",
                 "Control ACS terminal",
                 "Control sala ACS",
+                "Control válvula termostática",
             ]:
                 consigna_minima = 0
                 controla_consigna = 0
