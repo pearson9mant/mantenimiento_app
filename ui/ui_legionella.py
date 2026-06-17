@@ -2816,6 +2816,7 @@ def pantalla_legionella():
                             "Retorno",
                             "Muestra",
                             "Sala ACS completa",
+                            "Válvula termostática",
                             "Solo temperatura",
                             "Choque térmico",
                         ]
