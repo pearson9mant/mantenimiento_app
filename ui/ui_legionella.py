@@ -2016,7 +2016,33 @@ def pantalla_legionella():
         
             valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
             valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
-            valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)  
+            valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)
+                elif tarea == "Control válvula termostática":
+            tipo_control = "Control válvula termostática"
+            unidad = "ºC"
+
+            valor = st.number_input(
+                "Temperatura entrada ACS a válvula ºC",
+                min_value=0.0,
+                max_value=100.0,
+                value=60.0,
+                step=0.1
+            )
+
+            valor_2 = st.number_input(
+                "Temperatura salida mezclada ºC",
+                min_value=0.0,
+                max_value=100.0,
+                value=45.0,
+                step=0.1
+            )
+
+            valor_3 = None
+
+            fuga_ok = st.checkbox("Sin fugas")
+            cabezal_ok = st.checkbox("Cabezal termostático correcto")
+            regulacion_ok = st.checkbox("Regulación estable")
+            accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")    
 
         elif tarea == "Control AFS":
             tipo_control = "Control AFS"
