@@ -2523,6 +2523,7 @@ def pantalla_legionella():
                         "muestra",
                         "fuente",
                         "lavamanos",
+                        "Válvulas",
                         "otro",
                     ],
                     key="nuevo_punto_tipo"
@@ -2539,6 +2540,7 @@ def pantalla_legionella():
                         "Choque térmico",
                         "Solo temperatura",
                         "Sala ACS completa",
+                        "Válvula termostática",
                     ],
                     key="nuevo_punto_tipo_control"
                 )
