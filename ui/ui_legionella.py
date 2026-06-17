@@ -395,6 +395,21 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
 
         return "OK", "Sala ACS correcta"
 
+    if tipo_control == "Control válvula termostática":
+        try:
+            entrada = float(valor)
+            salida = float(valor_2)
+        except Exception:
+            return "INCIDENCIA", "Temperaturas de válvula no válidas"
+
+        if entrada < 60:
+            return "RIESGO", "Entrada ACS a válvula inferior a 60 ºC"
+
+        if salida < 38 or salida > 50:
+            return "RIESGO", "Salida mezclada de válvula fuera de rango 38-50 ºC"
+
+        return "OK", "Válvula termostática correcta"
+
     try:
         consigna_minima = float(consigna_minima)
     except Exception:
@@ -459,7 +474,6 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
         return "INCIDENCIA", "Purga no realizada"
 
     return "OK", "Registrado"
-
 
 def operario_por_centro(centro):
     if centro == "Pearson 9":
