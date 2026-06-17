@@ -569,14 +569,7 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
 
 
 def dias_frecuencia(tarea):
-    if tarea in [
-        "Purga",
-        "Revisión visual",
-        "Temperatura punto terminal",
-        "Control AFS",
-        "Control ACS terminal",
-        "Control punto terminal completo"
-    ]:
+    if tarea == "Control válvula termostática":
         return 30
 
     if tarea in [
@@ -584,7 +577,8 @@ def dias_frecuencia(tarea):
         "Revisión visual",
         "Temperatura punto terminal",
         "Control AFS",
-        "Control ACS terminal"
+        "Control ACS terminal",
+        "Control punto terminal completo"
     ]:
         return 30
 
