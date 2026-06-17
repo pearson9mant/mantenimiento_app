@@ -663,6 +663,9 @@ def unidad_por_tarea(tarea):
         return "Sí/No"
         
     if tarea == "Control sala ACS":
+        return "ºC"
+        
+    if tarea == "Control válvula termostática":
         return "ºC"   
 
     return ""
