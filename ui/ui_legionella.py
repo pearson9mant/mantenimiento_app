@@ -589,6 +589,9 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
     
     if tipo_control_punto == "Sala ACS completa":
         return ["Control sala ACS"]
+
+    if tipo_control_punto == "Válvula termostática":
+        return ["Control válvula termostática"]
     
     if tipo_control_punto == "Choque térmico":
         return ["Choque térmico"]
@@ -615,7 +618,6 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         return ["Temperatura acumulador"]   
 
     else:
-        # Compatibilidad con puntos antiguos
         if tipo_punto in ["acumulador", "acumulador_solar"]:
             tareas.insert(0, "Temperatura acumulador")
             tareas.insert(1, "Temperatura impulsión ACS")
@@ -626,6 +628,9 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         elif tipo_punto in ["grifo", "ducha", "lavamanos", "fuente"]:
             tareas.insert(0, "Control AFS")
             tareas.insert(1, "Control ACS terminal")
+
+        elif tipo_punto in ["Válvulas", "valvulas", "válvulas"]:
+            return ["Control válvula termostática"]
 
     return tareas
 
