@@ -1463,6 +1463,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ["Temperatura AFCH", "Según planificación", "Preferentemente ≤ 25 ºC"],
         ["Cloro residual libre", "Según planificación", "0,2 - 1,0 mg/L"],
         ["Purga / revisión visual", "Según planificación", "Realizada / correcta"],
+        ["Control válvula termostática", "Según planificación", "Entrada ≥ 60 ºC / salida 38-50 ºC"],
     ]
 
     tabla_programa = Table(programa, colWidths=[180, 135, 185])
