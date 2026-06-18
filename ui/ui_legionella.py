@@ -3557,6 +3557,11 @@ def pantalla_legionella():
                         st.write(f"🔥 **Acumulador:** {row['valor']} ºC")
                         st.write(f"➡️ **Impulsión ACS:** {row['valor_2']} ºC")
                         st.write(f"🔄 **Retorno ACS:** {row['valor_3']} ºC")
+
+                    elif row["tarea"] == "Control válvula termostática":
+                    
+                        st.write(f"🔥 **Entrada ACS válvula:** {row['valor']} ºC")
+                        st.write(f"🚿 **Salida mezclada:** {row['valor_2']} ºC")
             
                     else:
             
