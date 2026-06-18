@@ -2223,7 +2223,7 @@ def pantalla_legionella():
 
             observaciones_finales = observaciones or ""
 
-            if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
+            if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo", "Control válvula termostática"]:
             
                 checklist = []
             
@@ -2242,7 +2242,27 @@ def pantalla_legionella():
                 if tarea == "Control punto terminal completo":
                     checklist.append(
                         f"Temperatura ACS terminal: {temperatura_acs} ºC"
-                    )   
+                    ) 
+
+                if tarea == "Control válvula termostática":
+                    checklist.append(
+                        "Sin fugas: Sí" if fuga_ok else "Sin fugas: No"
+                    )
+                    checklist.append(
+                        "Cabezal correcto: Sí" if cabezal_ok else "Cabezal correcto: No"
+                    )
+                    checklist.append(
+                        "Regulación estable: Sí" if regulacion_ok else "Regulación estable: No"
+                    )
+                    checklist.append(
+                        "Acceso revisado: Sí" if accesible_ok else "Acceso revisado: No"
+                    )
+                    checklist.append(
+                        f"Entrada ACS válvula: {valor} ºC"
+                    )
+                    checklist.append(
+                        f"Salida mezclada: {valor_2} ºC"
+                    )
                 
                 observaciones_finales = (
                     observaciones_finales
