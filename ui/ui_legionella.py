@@ -1311,6 +1311,12 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 f"Ret.: {row.get('valor_3', '')} ºC"
             )
 
+        if tarea == "Control válvula termostática":
+            return (
+                f"Entrada ACS: {row.get('valor', '')} ºC / "
+                f"Salida mezclada: {row.get('valor_2', '')} ºC"
+            )
+
         unidad = "" if pd.isna(row.get("unidad", "")) else str(row.get("unidad", ""))
         valor = "" if pd.isna(row.get("valor", "")) else str(row.get("valor", ""))
         return f"{valor} {unidad}".strip()
