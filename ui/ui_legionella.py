@@ -79,7 +79,49 @@ def leer_df(sql, params=()):
     finally:
         conn.close()
     return df
-
+def asegurar_tabla_informes_legionella():
+    if os.getenv("DATABASE_URL"):
+        ejecutar("""
+            CREATE TABLE IF NOT EXISTS legionella_informes (
+                id SERIAL PRIMARY KEY,
+                tipo_informe TEXT,
+                empresa TEXT,
+                centro TEXT,
+                edificio TEXT,
+                instalacion TEXT,
+                punto TEXT,
+                fecha_actuacion TEXT,
+                fecha_informe TEXT,
+                resultado TEXT,
+                numero_informe TEXT,
+                pdf TEXT,
+                pdf_nombre TEXT,
+                pdf_data BYTEA,
+                proxima_fecha TEXT,
+                observaciones TEXT
+            )
+        """)
+    else:
+        ejecutar("""
+            CREATE TABLE IF NOT EXISTS legionella_informes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo_informe TEXT,
+                empresa TEXT,
+                centro TEXT,
+                edificio TEXT,
+                instalacion TEXT,
+                punto TEXT,
+                fecha_actuacion TEXT,
+                fecha_informe TEXT,
+                resultado TEXT,
+                numero_informe TEXT,
+                pdf TEXT,
+                pdf_nombre TEXT,
+                pdf_data BLOB,
+                proxima_fecha TEXT,
+                observaciones TEXT
+            )
+        """)
 def asegurar_columnas_planificacion_legionella():
     columnas = [
         ("punto_id", "INTEGER"),
