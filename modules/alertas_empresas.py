@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date
 
 from database.db import conectar
+from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 
 
 def adaptar_sql(sql):
@@ -11,7 +12,67 @@ def adaptar_sql(sql):
     return sql
 
 
+def asegurar_tabla_legionella_informes():
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        if os.getenv("DATABASE_URL"):
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS legionella_informes (
+                    id SERIAL PRIMARY KEY,
+                    tipo_informe TEXT,
+                    empresa TEXT,
+                    centro TEXT,
+                    edificio TEXT,
+                    instalacion TEXT,
+                    punto TEXT,
+                    fecha_actuacion TEXT,
+                    fecha_informe TEXT,
+                    resultado TEXT,
+                    numero_informe TEXT,
+                    pdf TEXT,
+                    pdf_nombre TEXT,
+                    pdf_data BYTEA,
+                    proxima_fecha TEXT,
+                    observaciones TEXT
+                )
+            """)
+        else:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS legionella_informes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tipo_informe TEXT,
+                    empresa TEXT,
+                    centro TEXT,
+                    edificio TEXT,
+                    instalacion TEXT,
+                    punto TEXT,
+                    fecha_actuacion TEXT,
+                    fecha_informe TEXT,
+                    resultado TEXT,
+                    numero_informe TEXT,
+                    pdf TEXT,
+                    pdf_nombre TEXT,
+                    pdf_data BLOB,
+                    proxima_fecha TEXT,
+                    observaciones TEXT
+                )
+            """)
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
 def obtener_alertas_empresas_externas():
+    asegurar_tabla_legionella_informes()
+
     conn = conectar()
 
     try:
@@ -28,10 +89,7 @@ def obtener_alertas_empresas_externas():
         conn.close()
 
     if df.empty:
-        return {
-            "toca": [],
-            "proximo": []
-        }
+        return {"toca": [], "proximo": []}
 
     hoy = pd.Timestamp(date.today())
     margen = hoy + pd.Timedelta(days=30)
@@ -59,12 +117,7 @@ def obtener_alertas_empresas_externas():
         elif fecha <= margen:
             proximo.append(item)
 
-    return {
-        "toca": toca,
-        "proximo": proximo
-    }
-
-from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
+    return {"toca": toca, "proximo": proximo}
 
 
 def existe_ot_externa_abierta(centro, descripcion):
@@ -92,7 +145,6 @@ def existe_ot_externa_abierta(centro, descripcion):
 
 
 def crear_ots_empresas_externas_si_toca():
-
     alertas = obtener_alertas_empresas_externas()
 
     toca = alertas.get("toca", [])
@@ -101,9 +153,7 @@ def crear_ots_empresas_externas_si_toca():
     ya_existian = 0
 
     for item in toca:
-
         try:
-
             centro = item.get("centro", "")
             tipo = item.get("tipo", "")
             empresa = item.get("empresa", "")
@@ -119,43 +169,36 @@ def crear_ots_empresas_externas_si_toca():
                 ya_existian += 1
                 continue
 
-            numero_ot = obtener_siguiente_numero_ot(
-                centro,
-                "EXT"
-            )
+            numero_ot = obtener_siguiente_numero_ot(centro, "EXT")
 
             datos_orden = (
-                numero_ot,                     # numero_ot
-                descripcion,                  # descripcion
-                "Abierta",                    # estado
-                centro,                       # centro
-                "",                           # edificio
-                punto,                        # espacio
-                "Legionella",                 # area
-                "Alta",                       # prioridad
-                "Abel Vasquez",               # operario
-                "EXTERNA",                    # origen
-                "", "", "",                   # solicitante etc
-                "Operarios",                  # tipo_solicitante
-                "Externa",                    # tipo_orden
-                empresa,                      # empresa_externa
-                "", "", "",                   # contacto
-                "", "",                       # telefonos
-                fecha,                        # fecha_programada
-                "", "", "",                   # resto
+                numero_ot,
+                descripcion,
+                "Abierta",
+                centro,
+                "",
+                punto,
+                "Legionella",
+                "Alta",
+                "Abel Vasquez",
+                "EXTERNA",
+                "", "", "",
+                "Operarios",
+                "Externa",
+                empresa,
+                "", "", "",
+                "", "",
+                fecha,
+                "", "", "",
                 0,
                 0,
                 ""
             )
 
             crear_orden(datos_orden)
-
             creadas += 1
 
         except Exception as e:
-
-            print(
-                f"ERROR creando OT externa automática: {e}"
-            )
+            print(f"ERROR creando OT externa automática: {e}")
 
     return creadas, ya_existian
