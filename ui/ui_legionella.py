@@ -2024,7 +2024,7 @@ def pantalla_legionella():
             valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
             valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
             valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)
-                elif tarea == "Control válvula termostática":
+        elif tarea == "Control válvula termostática":
             tipo_control = "Control válvula termostática"
             unidad = "ºC"
 
