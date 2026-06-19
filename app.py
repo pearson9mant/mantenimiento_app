@@ -557,6 +557,11 @@ def mostrar_menu_admin():
         if st.button("🗺️\nPlanos Legionella", key="btn_planos_legionella", use_container_width=True):
             st.session_state["seccion_actual"] = "Planos Legionella"
             st.rerun()
+            
+        if st.button("📖\nManual app", key="btn_manual_app", use_container_width=True):
+            st.session_state["seccion_actual"] = "Manual app"
+            st.rerun()   
+            
         if st.button("🏢\nEmpresas externas", key="btn_empresas_externas", use_container_width=True):
             st.session_state["seccion_actual"] = "Empresas externas"
             st.rerun()
