@@ -31,7 +31,7 @@ from ui.ui_recordatorios import (
     obtener_resumen_recordatorios
 )
 from ui.ui_pedidos_material import ui_pedidos_material
-from ui_manual_app import pantalla_manual_app
+from ui.ui_manual_app import pantalla_manual_app
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
