@@ -823,6 +823,9 @@ if perfil == "admin":
     elif seccion == "Pedidos material":
         ui_pedidos_material()
 
+    elif seccion == "Manual app":
+        pantalla_manual_app()
+
 
 elif perfil == "gerencia":
 
