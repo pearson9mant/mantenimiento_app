@@ -78,6 +78,119 @@ def pantalla_panel_legionella():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    st.markdown("## 🏢 Estado de las instalaciones")
+    
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        st.success("""
+    🔥 ACS
+    
+    Acumuladores: 3
+    
+    🌡️ Temperaturas: 30
+    🚰 Purgas: 12
+    🔥 Choques térmicos: 2
+    
+    Cumplimiento: 98%
+    """)
+    
+    with c2:
+        st.success("""
+    💧 AFCH
+    
+    Puntos terminales: 19
+    
+    🌡️ Temperaturas: 19
+    🧪 Cloro residual: 19
+    
+    Cumplimiento: 99%
+    """)
+    
+    with c3:
+        st.success("""
+    🚿 DUCHAS
+    
+    Puntos: 8
+    
+    🚿 Controles realizados: 48
+    
+    Cumplimiento: 97%
+    """)
+    
+    c4, c5, c6 = st.columns(3)
+    
+    with c4:
+        st.success("""
+    🎛️ VTM
+    
+    Válvulas: 2
+    
+    🔍 Revisiones: 12
+    
+    Cumplimiento: 100%
+    """)
+    
+    with c5:
+        st.success("""
+    ☀️ SOLAR
+    
+    Depósitos: 2
+    
+    🌡️ Lecturas realizadas: 730
+    
+    Cumplimiento: 100%
+    """)
+    
+    with c6:
+        st.success("""
+    🔄 RETORNOS
+    
+    Puntos: 2
+    
+    🌡️ Mediciones: 365
+    
+    Cumplimiento: 100%
+    """)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    st.markdown("## 🗺️ Estado de los puntos de control")
+    
+    puntos_html = """
+    <div style="
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:20px;
+    ">
+    
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">ACS-01 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">ACS-02 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">RTC-01 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">RTC-02 🟢</div>
+    
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-01 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-02 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-03 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-04 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-05 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-06 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">PT-07 🟢</div>
+    
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">M01 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">M02 🟢</div>
+    
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">VTM-01 🟢</div>
+    <div style="background:#dcfce7;padding:10px 14px;border-radius:10px;">VTM-02 🟢</div>
+    
+    </div>
+    """
+    
+    st.markdown(puntos_html, unsafe_allow_html=True)
+    
     st.info(
-        "🚧 Fase 1 completada. Próximo paso: tarjetas ACS, AFCH, Duchas, VTM, Solar y Retornos."
+        "🚀 Fase 2 completada. Próximo paso: incidencias, próximos controles y dossier de inspección."
     )
