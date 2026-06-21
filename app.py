@@ -528,6 +528,14 @@ def mostrar_menu_admin():
         if st.button("💧\nLegionella", key="btn_leg", use_container_width=True):
             st.session_state["seccion_actual"] = "Legionella"
             st.rerun()
+            
+        if st.button(
+            "🛡️\nCentro Control",
+            key="btn_centro_control",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Panel Legionella"
+            st.rerun()    
 
         if st.button("🔧\nPreventivo", key="btn_preventivo", use_container_width=True):
             st.session_state["seccion_actual"] = "Preventivo"
