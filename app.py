@@ -835,6 +835,9 @@ if perfil == "admin":
     elif seccion == "Manual app":
         pantalla_manual_app()
 
+    elif seccion == "Panel Legionella":
+        pantalla_panel_legionella()
+
 
 elif perfil == "gerencia":
 
