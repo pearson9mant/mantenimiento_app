@@ -1,8 +1,10 @@
 import os
+import html
+import math
 import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
-from datetime import date
+from datetime import date, timedelta
 from database.db import conectar
 
 
@@ -29,6 +31,26 @@ def escalar(valor):
         return str(valor)
 
 
+def porcentaje(ok, total):
+    try:
+        total = int(total or 0)
+        ok = int(ok or 0)
+        if total <= 0:
+            return 0
+        return round((ok / total) * 100, 1)
+    except Exception:
+        return 0
+
+
+def valor_unico(df, columna="total", defecto=0):
+    try:
+        if df.empty or columna not in df.columns:
+            return defecto
+        return int(df.loc[0, columna] or 0)
+    except Exception:
+        return defecto
+
+
 def tarjeta_kpi(titulo, valor, icono):
     st.markdown(
         f"""
@@ -52,7 +74,10 @@ def tarjeta_kpi(titulo, valor, icono):
 
 def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
     lineas_html = "".join(
-        [f"<div style='margin:6px 0;font-size:15px;color:#0f172a;'>{linea}</div>" for linea in lineas]
+        [
+            f"<div style='margin:6px 0;font-size:15px;color:#0f172a;'>{html.escape(str(linea))}</div>"
+            for linea in lineas
+        ]
     )
 
     st.markdown(
@@ -62,11 +87,11 @@ def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
             border:1px solid #bbf7d0;
             border-radius:16px;
             padding:14px 16px;
-            min-height:145px;
+            min-height:165px;
             box-shadow:0 2px 8px rgba(0,0,0,0.04);
         ">
             <div style="font-size:17px;font-weight:900;color:#047857;margin-bottom:8px;">
-                {icono} {titulo}
+                {icono} {html.escape(str(titulo))}
             </div>
             {lineas_html}
             <div style="
@@ -75,7 +100,7 @@ def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
                 font-weight:900;
                 color:#047857;
             ">
-                🟢 Cumplimiento: {cumplimiento}
+                🟢 Cumplimiento: {html.escape(str(cumplimiento))}
             </div>
         </div>
         """,
@@ -84,6 +109,8 @@ def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
 
 
 def punto_control(codigo, estado="ok"):
+    codigo = html.escape(str(codigo or ""))
+
     if estado == "riesgo":
         fondo = "#fee2e2"
         color = "#991b1b"
@@ -110,23 +137,70 @@ def punto_control(codigo, estado="ok"):
         min-width:82px;
         text-align:center;
         border:1px solid rgba(0,0,0,0.05);
+        white-space:nowrap;
     ">
         {codigo} {icono}
     </div>
     """
 
 
-def valor_unico(df, columna="total", defecto=0):
-    try:
-        if df.empty:
-            return defecto
-        return int(df.loc[0, columna] or 0)
-    except Exception:
-        return defecto
+def contar_registros_por_tarea(textos):
+    if isinstance(textos, str):
+        textos = [textos]
+
+    condiciones = []
+    params = []
+
+    for texto in textos:
+        condiciones.append("""
+            LOWER(COALESCE(tarea, '')) LIKE ?
+            OR LOWER(COALESCE(tipo_control, '')) LIKE ?
+        """)
+        params.extend([
+            f"%{texto.lower()}%",
+            f"%{texto.lower()}%",
+        ])
+
+    df = leer_df(f"""
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
+        WHERE {' OR '.join(condiciones)}
+    """, tuple(params))
+
+    return valor_unico(df)
+
+
+def contar_puntos_por_tipo(textos):
+    condiciones = []
+    params = []
+
+    for texto in textos:
+        condiciones.append("""
+            LOWER(COALESCE(tipo_punto, '')) LIKE ?
+            OR LOWER(COALESCE(tipo_control_punto, '')) LIKE ?
+            OR LOWER(COALESCE(instalacion, '')) LIKE ?
+            OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
+        """)
+        params.extend([
+            f"%{texto.lower()}%",
+            f"%{texto.lower()}%",
+            f"%{texto.lower()}%",
+            f"%{texto.lower()}%",
+        ])
+
+    df = leer_df(f"""
+        SELECT COUNT(*) AS total
+        FROM legionella_puntos
+        WHERE activo = 1
+          AND ({' OR '.join(condiciones)})
+    """, tuple(params))
+
+    return valor_unico(df)
 
 
 def obtener_kpis_legionella():
-    hoy = date.today().strftime("%Y-%m-%d")
+    hoy = date.today()
+    limite = hoy + timedelta(days=30)
 
     df_puntos = leer_df("""
         SELECT COUNT(*) AS total
@@ -156,13 +230,25 @@ def obtener_kpis_legionella():
         WHERE LOWER(COALESCE(estado, '')) NOT IN ('cerrada', 'cerrado', 'finalizada', 'finalizado')
     """)
 
-    df_proximos = leer_df("""
-        SELECT COUNT(*) AS total
+    df_tareas = leer_df("""
+        SELECT proxima_fecha
         FROM legionella_tareas
         WHERE activo = 1
           AND proxima_fecha IS NOT NULL
-          AND date(proxima_fecha) <= date(?, '+30 days')
-    """, (hoy,))
+          AND TRIM(COALESCE(proxima_fecha, '')) <> ''
+    """)
+
+    proximos = 0
+
+    if not df_tareas.empty:
+        df_tareas["proxima_fecha_dt"] = pd.to_datetime(df_tareas["proxima_fecha"], errors="coerce")
+        proximos = len(
+            df_tareas[
+                (df_tareas["proxima_fecha_dt"].dt.date >= hoy)
+                &
+                (df_tareas["proxima_fecha_dt"].dt.date <= limite)
+            ]
+        )
 
     df_ok = leer_df("""
         SELECT
@@ -182,76 +268,36 @@ def obtener_kpis_legionella():
         total_reg = int(df_ok.loc[0, "total"] or 0)
         total_ok = int(df_ok.loc[0, "ok"] or 0)
 
-    cumplimiento = round((total_ok / total_reg) * 100, 1) if total_reg else 0
+    cumplimiento = porcentaje(total_ok, total_reg)
 
     return {
         "puntos": valor_unico(df_puntos),
         "controles": valor_unico(df_controles),
         "ot": valor_unico(df_ot),
         "incidencias": valor_unico(df_incidencias),
-        "proximos": valor_unico(df_proximos),
+        "proximos": proximos,
         "cumplimiento": cumplimiento,
     }
 
 
-def contar_registros_por_tarea(texto):
-    df = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
-        WHERE LOWER(COALESCE(tarea, '')) LIKE ?
-           OR LOWER(COALESCE(tipo_control, '')) LIKE ?
-    """, (f"%{texto.lower()}%", f"%{texto.lower()}%"))
-
-    return valor_unico(df)
-
-
-def contar_puntos_por_tipo(textos):
-    condiciones = []
-    params = []
-
-    for texto in textos:
-        condiciones.append("""
-            LOWER(COALESCE(tipo_punto, '')) LIKE ?
-            OR LOWER(COALESCE(tipo_control_punto, '')) LIKE ?
-            OR LOWER(COALESCE(instalacion, '')) LIKE ?
-            OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
-        """)
-        params.extend([
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-        ])
-
-    sql = f"""
-        SELECT COUNT(*) AS total
-        FROM legionella_puntos
-        WHERE activo = 1
-          AND ({' OR '.join(condiciones)})
-    """
-
-    df = leer_df(sql, tuple(params))
-    return valor_unico(df)
-
-
 def obtener_estado_instalaciones():
-    acumuladores = contar_puntos_por_tipo(["acumulador"])
+    acumuladores = contar_puntos_por_tipo(["acumulador", "acs"])
     afch = contar_puntos_por_tipo(["afch", "afs", "grifo", "fuente", "lavamanos"])
     duchas = contar_puntos_por_tipo(["ducha"])
     vtm = contar_puntos_por_tipo(["válvula", "valvula", "vtm"])
     solar = contar_puntos_por_tipo(["solar"])
     retornos = contar_puntos_por_tipo(["retorno", "rtc"])
 
-    temp_acum = contar_registros_por_tarea("acumulador")
-    temp_impulsion = contar_registros_por_tarea("impulsión")
-    temp_retorno = contar_registros_por_tarea("retorno")
-    purgas = contar_registros_por_tarea("purga")
-    choques = contar_registros_por_tarea("choque")
-    afs = contar_registros_por_tarea("AFS")
-    cloro = contar_registros_por_tarea("cloro")
-    acs_terminal = contar_registros_por_tarea("ACS terminal")
-    vtm_rev = contar_registros_por_tarea("válvula")
-    solar_lecturas = contar_registros_por_tarea("solar")
+    temp_acum = contar_registros_por_tarea(["acumulador"])
+    temp_impulsion = contar_registros_por_tarea(["impulsión", "impulsion"])
+    temp_retorno = contar_registros_por_tarea(["retorno"])
+    purgas = contar_registros_por_tarea(["purga"])
+    choques = contar_registros_por_tarea(["choque"])
+    afs = contar_registros_por_tarea(["afs", "afch"])
+    cloro = contar_registros_por_tarea(["cloro"])
+    acs_terminal = contar_registros_por_tarea(["acs terminal", "punto terminal completo"])
+    vtm_rev = contar_registros_por_tarea(["válvula", "valvula", "vtm"])
+    solar_lecturas = contar_registros_por_tarea(["solar"])
 
     return {
         "acumuladores": acumuladores,
@@ -277,8 +323,8 @@ def obtener_puntos_control():
     df = leer_df("""
         SELECT
             p.nombre_punto,
-            p.tipo_punto,
-            p.tipo_control_punto,
+            p.centro,
+            p.edificio,
             COALESCE(MAX(r.estado), 'OK') AS estado
         FROM legionella_puntos p
         LEFT JOIN legionella_registros r
@@ -286,8 +332,8 @@ def obtener_puntos_control():
            AND p.centro = r.centro
            AND p.edificio = r.edificio
         WHERE p.activo = 1
-        GROUP BY p.nombre_punto, p.tipo_punto, p.tipo_control_punto
-        ORDER BY p.nombre_punto
+        GROUP BY p.nombre_punto, p.centro, p.edificio
+        ORDER BY p.centro, p.edificio, p.nombre_punto
     """)
 
     if df.empty:
@@ -323,17 +369,30 @@ def obtener_incidencias_abiertas():
 
 
 def obtener_proximos_controles():
-    hoy = date.today().strftime("%Y-%m-%d")
+    hoy = date.today()
+    limite = hoy + timedelta(days=30)
 
-    return leer_df("""
+    df = leer_df("""
         SELECT centro, edificio, punto, tarea, proxima_fecha
         FROM legionella_tareas
         WHERE activo = 1
           AND proxima_fecha IS NOT NULL
-          AND date(proxima_fecha) <= date(?, '+30 days')
-        ORDER BY date(proxima_fecha) ASC
-        LIMIT 5
-    """, (hoy,))
+          AND TRIM(COALESCE(proxima_fecha, '')) <> ''
+        ORDER BY proxima_fecha ASC
+    """)
+
+    if df.empty:
+        return df
+
+    df["proxima_fecha_dt"] = pd.to_datetime(df["proxima_fecha"], errors="coerce")
+
+    df = df[
+        (df["proxima_fecha_dt"].dt.date >= hoy)
+        &
+        (df["proxima_fecha_dt"].dt.date <= limite)
+    ].copy()
+
+    return df.head(5)
 
 
 def obtener_actividad_anual():
@@ -348,6 +407,7 @@ def obtener_actividad_anual():
               OR LOWER(COALESCE(tipo_control, '')) LIKE '%temperatura%'
               OR LOWER(COALESCE(tarea, '')) LIKE '%acs%'
               OR LOWER(COALESCE(tarea, '')) LIKE '%afs%'
+              OR LOWER(COALESCE(tarea, '')) LIKE '%afch%'
           )
     """, (anio,))
 
@@ -369,7 +429,10 @@ def obtener_actividad_anual():
         SELECT COUNT(*) AS total
         FROM legionella_informes
         WHERE substr(fecha_informe, 1, 4) = ?
-          AND LOWER(COALESCE(tipo_informe, '')) LIKE '%analítica%'
+          AND (
+              LOWER(COALESCE(tipo_informe, '')) LIKE '%analítica%'
+              OR LOWER(COALESCE(tipo_informe, '')) LIKE '%analitica%'
+          )
     """, (anio,))
 
     return {
@@ -381,9 +444,22 @@ def obtener_actividad_anual():
 
 
 def obtener_dossier_estado():
-    plan = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_tareas WHERE activo = 1"))
-    registros = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_registros"))
-    informes = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_informes"))
+    plan = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_tareas
+        WHERE activo = 1
+    """))
+
+    registros = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
+    """))
+
+    informes = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_informes
+    """))
+
     abiertas = valor_unico(leer_df("""
         SELECT COUNT(*) AS total
         FROM legionella_incidencias
@@ -406,6 +482,8 @@ def pantalla_panel_legionella():
     incidencias = obtener_incidencias_abiertas()
     proximos = obtener_proximos_controles()
     puntos = obtener_puntos_control()
+
+    cumplimiento_txt = f"{str(kpis['cumplimiento']).replace('.', ',')}%"
 
     st.markdown(
         """
@@ -446,7 +524,7 @@ def pantalla_panel_legionella():
     with c5:
         tarjeta_kpi("Próximos", escalar(kpis["proximos"]), "📅")
     with c6:
-        tarjeta_kpi("Cumplimiento", f"{str(kpis['cumplimiento']).replace('.', ',')}%", "🏆")
+        tarjeta_kpi("Cumplimiento", cumplimiento_txt, "🏆")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -460,12 +538,12 @@ def pantalla_panel_legionella():
             "🔥",
             [
                 f"Acumuladores: {datos['acumuladores']}",
-                f"🌡️ Temperaturas acumulador: {datos['temp_acum']}",
-                f"➡️ Impulsión: {datos['temp_impulsion']}",
-                f"🚰 Purgas: {datos['purgas']}",
-                f"🔥 Choques térmicos: {datos['choques']}",
+                f"Temperaturas acumulador: {datos['temp_acum']}",
+                f"Impulsión: {datos['temp_impulsion']}",
+                f"Purgas: {datos['purgas']}",
+                f"Choques térmicos: {datos['choques']}",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     with c2:
@@ -474,11 +552,11 @@ def pantalla_panel_legionella():
             "💧",
             [
                 f"Puntos terminales: {datos['afch']}",
-                f"🌡️ Controles AFS: {datos['afs']}",
-                f"🧪 Cloro residual: {datos['cloro']}",
+                f"Controles AFS: {datos['afs']}",
+                f"Cloro residual: {datos['cloro']}",
                 "Control de temperatura y desinfectante",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     with c3:
@@ -487,11 +565,11 @@ def pantalla_panel_legionella():
             "🚿",
             [
                 f"Puntos: {datos['duchas']}",
-                f"🚿 Controles ACS terminal: {datos['acs_terminal']}",
-                f"🚰 Purgas: {datos['purgas']}",
+                f"Controles ACS terminal: {datos['acs_terminal']}",
+                f"Purgas: {datos['purgas']}",
                 "Duchas incluidas en control",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -504,11 +582,11 @@ def pantalla_panel_legionella():
             "🎛️",
             [
                 f"Válvulas termostáticas: {datos['vtm']}",
-                f"🔍 Revisiones: {datos['vtm_rev']}",
-                "🌡️ Entrada / salida controlada",
+                f"Revisiones: {datos['vtm_rev']}",
+                "Entrada / salida controlada",
                 "Accesos revisados",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     with c5:
@@ -517,11 +595,11 @@ def pantalla_panel_legionella():
             "☀️",
             [
                 f"Depósitos solares: {datos['solar']}",
-                f"🌡️ Lecturas realizadas: {datos['solar_lecturas']}",
+                f"Lecturas realizadas: {datos['solar_lecturas']}",
                 "Registro sin consigna automática",
                 "Seguimiento de temperatura",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     with c6:
@@ -530,11 +608,11 @@ def pantalla_panel_legionella():
             "🔄",
             [
                 f"Puntos: {datos['retornos']}",
-                f"🌡️ Mediciones retorno: {datos['temp_retorno']}",
+                f"Mediciones retorno: {datos['temp_retorno']}",
                 "Temperatura mínima: ≥ 50 ºC",
                 "Recirculación controlada",
             ],
-            f"{str(kpis['cumplimiento']).replace('.', ',')}%"
+            cumplimiento_txt
         )
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -543,13 +621,18 @@ def pantalla_panel_legionella():
 
     if puntos:
         puntos_html = "<div style='margin-bottom:10px;'>"
+
         for nombre, estado in puntos:
             puntos_html += punto_control(nombre, estado)
+
         puntos_html += "</div>"
+
+        filas = max(1, math.ceil(len(puntos) / 8))
+        alto = min(260, max(90, filas * 58))
 
         components.html(
             puntos_html,
-            height=110,
+            height=alto,
             scrolling=False
         )
     else:
@@ -568,7 +651,7 @@ def pantalla_panel_legionella():
             texto = "🔴 Incidencias abiertas\n\n"
             for _, row in incidencias.iterrows():
                 texto += f"• {row.get('punto', '')} · {row.get('tarea', '')}\n"
-            texto += f"\nTotal: {len(incidencias)}"
+            texto += f"\nTotal visible: {len(incidencias)}"
             st.error(texto)
 
     with c2:
