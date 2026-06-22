@@ -55,13 +55,9 @@ def tarjeta_kpi(titulo, valor, icono):
     st.markdown(
         f"""
         <div style="
-            background:#ffffff;
-            border-radius:18px;
-            padding:16px;
-            text-align:center;
+            background:#ffffff;border-radius:18px;padding:16px;text-align:center;
             box-shadow:0 3px 10px rgba(0,0,0,0.08);
-            border:1px solid #e5e7eb;
-            min-height:125px;
+            border:1px solid #e5e7eb;min-height:125px;
         ">
             <div style="font-size:30px;">{icono}</div>
             <div style="font-size:14px;color:#64748b;">{titulo}</div>
@@ -72,7 +68,23 @@ def tarjeta_kpi(titulo, valor, icono):
     )
 
 
-def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
+def tarjeta_instalacion(titulo, icono, lineas, cumplimiento, estado="ok"):
+    if estado == "riesgo":
+        fondo = "#fee2e2"
+        borde = "#fecaca"
+        color = "#991b1b"
+        semaforo = "🔴"
+    elif estado == "proximo":
+        fondo = "#fef3c7"
+        borde = "#fde68a"
+        color = "#92400e"
+        semaforo = "🟠"
+    else:
+        fondo = "#ecfdf5"
+        borde = "#bbf7d0"
+        color = "#047857"
+        semaforo = "🟢"
+
     lineas_html = "".join(
         [
             f"<div style='margin:6px 0;font-size:15px;color:#0f172a;'>{html.escape(str(linea))}</div>"
@@ -83,24 +95,16 @@ def tarjeta_instalacion(titulo, icono, lineas, cumplimiento):
     st.markdown(
         f"""
         <div style="
-            background:#ecfdf5;
-            border:1px solid #bbf7d0;
-            border-radius:16px;
-            padding:14px 16px;
-            min-height:165px;
+            background:{fondo};border:1px solid {borde};border-radius:16px;
+            padding:14px 16px;min-height:165px;
             box-shadow:0 2px 8px rgba(0,0,0,0.04);
         ">
-            <div style="font-size:17px;font-weight:900;color:#047857;margin-bottom:8px;">
+            <div style="font-size:17px;font-weight:900;color:{color};margin-bottom:8px;">
                 {icono} {html.escape(str(titulo))}
             </div>
             {lineas_html}
-            <div style="
-                margin-top:10px;
-                font-size:16px;
-                font-weight:900;
-                color:#047857;
-            ">
-                🟢 Cumplimiento: {html.escape(str(cumplimiento))}
+            <div style="margin-top:10px;font-size:16px;font-weight:900;color:{color};">
+                {semaforo} Cumplimiento: {html.escape(str(cumplimiento))}
             </div>
         </div>
         """,
@@ -126,17 +130,9 @@ def punto_control(codigo, estado="ok"):
 
     return f"""
     <div style="
-        background:{fondo};
-        color:{color};
-        padding:10px 14px;
-        border-radius:12px;
-        font-weight:800;
-        font-size:14px;
-        display:inline-block;
-        margin:5px;
-        min-width:82px;
-        text-align:center;
-        border:1px solid rgba(0,0,0,0.05);
+        background:{fondo};color:{color};padding:10px 14px;border-radius:12px;
+        font-weight:800;font-size:14px;display:inline-block;margin:5px;
+        min-width:82px;text-align:center;border:1px solid rgba(0,0,0,0.05);
         white-space:nowrap;
     ">
         {codigo} {icono}
@@ -156,10 +152,7 @@ def contar_registros_por_tarea(textos):
             LOWER(COALESCE(tarea, '')) LIKE ?
             OR LOWER(COALESCE(tipo_control, '')) LIKE ?
         """)
-        params.extend([
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-        ])
+        params.extend([f"%{texto.lower()}%", f"%{texto.lower()}%"])
 
     df = leer_df(f"""
         SELECT COUNT(*) AS total
@@ -181,12 +174,7 @@ def contar_puntos_por_tipo(textos):
             OR LOWER(COALESCE(instalacion, '')) LIKE ?
             OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
         """)
-        params.extend([
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-            f"%{texto.lower()}%",
-        ])
+        params.extend([f"%{texto.lower()}%"] * 4)
 
     df = leer_df(f"""
         SELECT COUNT(*) AS total
@@ -202,19 +190,12 @@ def obtener_kpis_legionella():
     hoy = date.today()
     limite = hoy + timedelta(days=30)
 
-    df_puntos = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_puntos
-        WHERE activo = 1
-    """)
+    df_puntos = leer_df("SELECT COUNT(*) AS total FROM legionella_puntos WHERE activo = 1")
 
     df_controles = leer_df("""
         SELECT COUNT(*) AS total
         FROM legionella_registros
-        WHERE centro IS NOT NULL
-          AND edificio IS NOT NULL
-          AND punto IS NOT NULL
-          AND tarea IS NOT NULL
+        WHERE centro IS NOT NULL AND edificio IS NOT NULL AND punto IS NOT NULL AND tarea IS NOT NULL
     """)
 
     df_ot = leer_df("""
@@ -239,36 +220,24 @@ def obtener_kpis_legionella():
     """)
 
     proximos = 0
-
     if not df_tareas.empty:
         df_tareas["proxima_fecha_dt"] = pd.to_datetime(df_tareas["proxima_fecha"], errors="coerce")
         proximos = len(
             df_tareas[
                 (df_tareas["proxima_fecha_dt"].dt.date >= hoy)
-                &
-                (df_tareas["proxima_fecha_dt"].dt.date <= limite)
+                & (df_tareas["proxima_fecha_dt"].dt.date <= limite)
             ]
         )
 
     df_ok = leer_df("""
-        SELECT
-            COUNT(*) AS total,
-            SUM(CASE WHEN estado = 'OK' THEN 1 ELSE 0 END) AS ok
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN estado = 'OK' THEN 1 ELSE 0 END) AS ok
         FROM legionella_registros
-        WHERE centro IS NOT NULL
-          AND edificio IS NOT NULL
-          AND punto IS NOT NULL
-          AND tarea IS NOT NULL
+        WHERE centro IS NOT NULL AND edificio IS NOT NULL AND punto IS NOT NULL AND tarea IS NOT NULL
     """)
 
-    total_reg = 0
-    total_ok = 0
-
-    if not df_ok.empty:
-        total_reg = int(df_ok.loc[0, "total"] or 0)
-        total_ok = int(df_ok.loc[0, "ok"] or 0)
-
-    cumplimiento = porcentaje(total_ok, total_reg)
+    total_reg = int(df_ok.loc[0, "total"] or 0) if not df_ok.empty else 0
+    total_ok = int(df_ok.loc[0, "ok"] or 0) if not df_ok.empty else 0
 
     return {
         "puntos": valor_unico(df_puntos),
@@ -276,46 +245,28 @@ def obtener_kpis_legionella():
         "ot": valor_unico(df_ot),
         "incidencias": valor_unico(df_incidencias),
         "proximos": proximos,
-        "cumplimiento": cumplimiento,
+        "cumplimiento": porcentaje(total_ok, total_reg),
     }
 
 
 def obtener_estado_instalaciones():
-    acumuladores = contar_puntos_por_tipo(["acumulador", "acs"])
-    afch = contar_puntos_por_tipo(["afch", "afs", "grifo", "fuente", "lavamanos"])
-    duchas = contar_puntos_por_tipo(["ducha"])
-    vtm = contar_puntos_por_tipo(["válvula", "valvula", "vtm"])
-    solar = contar_puntos_por_tipo(["solar"])
-    retornos = contar_puntos_por_tipo(["retorno", "rtc"])
-
-    temp_acum = contar_registros_por_tarea(["acumulador"])
-    temp_impulsion = contar_registros_por_tarea(["impulsión", "impulsion"])
-    temp_retorno = contar_registros_por_tarea(["retorno"])
-    purgas = contar_registros_por_tarea(["purga"])
-    choques = contar_registros_por_tarea(["choque"])
-    afs = contar_registros_por_tarea(["afs", "afch"])
-    cloro = contar_registros_por_tarea(["cloro"])
-    acs_terminal = contar_registros_por_tarea(["acs terminal", "punto terminal completo"])
-    vtm_rev = contar_registros_por_tarea(["válvula", "valvula", "vtm"])
-    solar_lecturas = contar_registros_por_tarea(["solar"])
-
     return {
-        "acumuladores": acumuladores,
-        "afch": afch,
-        "duchas": duchas,
-        "vtm": vtm,
-        "solar": solar,
-        "retornos": retornos,
-        "temp_acum": temp_acum,
-        "temp_impulsion": temp_impulsion,
-        "temp_retorno": temp_retorno,
-        "purgas": purgas,
-        "choques": choques,
-        "afs": afs,
-        "cloro": cloro,
-        "acs_terminal": acs_terminal,
-        "vtm_rev": vtm_rev,
-        "solar_lecturas": solar_lecturas,
+        "acumuladores": contar_puntos_por_tipo(["acumulador"]),
+        "afch": contar_puntos_por_tipo(["afch", "afs", "grifo", "fuente", "lavamanos"]),
+        "duchas": contar_puntos_por_tipo(["ducha"]),
+        "vtm": contar_puntos_por_tipo(["válvula", "valvula", "vtm"]),
+        "solar": contar_puntos_por_tipo(["solar"]),
+        "retornos": contar_puntos_por_tipo(["retorno", "rtc"]),
+        "temp_acum": contar_registros_por_tarea(["acumulador"]),
+        "temp_impulsion": contar_registros_por_tarea(["impulsión", "impulsion"]),
+        "temp_retorno": contar_registros_por_tarea(["retorno"]),
+        "purgas": contar_registros_por_tarea(["purga"]),
+        "choques": contar_registros_por_tarea(["choque"]),
+        "afs": contar_registros_por_tarea(["afs", "afch"]),
+        "cloro": contar_registros_por_tarea(["cloro"]),
+        "acs_terminal": contar_registros_por_tarea(["acs terminal", "punto terminal completo"]),
+        "vtm_rev": contar_registros_por_tarea(["válvula", "valvula", "vtm"]),
+        "solar_lecturas": contar_registros_por_tarea(["solar"]),
     }
 
 
@@ -325,14 +276,17 @@ def obtener_puntos_control():
             p.nombre_punto,
             p.centro,
             p.edificio,
-            COALESCE(MAX(r.estado), 'OK') AS estado
+            (
+                SELECT r.estado
+                FROM legionella_registros r
+                WHERE r.punto = p.nombre_punto
+                  AND r.centro = p.centro
+                  AND r.edificio = p.edificio
+                ORDER BY r.fecha DESC, r.id DESC
+                LIMIT 1
+            ) AS ultimo_estado
         FROM legionella_puntos p
-        LEFT JOIN legionella_registros r
-            ON p.nombre_punto = r.punto
-           AND p.centro = r.centro
-           AND p.edificio = r.edificio
         WHERE p.activo = 1
-        GROUP BY p.nombre_punto, p.centro, p.edificio
         ORDER BY p.centro, p.edificio, p.nombre_punto
     """)
 
@@ -340,10 +294,9 @@ def obtener_puntos_control():
         return []
 
     puntos = []
-
     for _, row in df.iterrows():
         nombre = str(row.get("nombre_punto") or "").strip()
-        estado = str(row.get("estado") or "OK").upper()
+        estado = str(row.get("ultimo_estado") or "OK").upper()
 
         if not nombre:
             continue
@@ -385,11 +338,9 @@ def obtener_proximos_controles():
         return df
 
     df["proxima_fecha_dt"] = pd.to_datetime(df["proxima_fecha"], errors="coerce")
-
     df = df[
         (df["proxima_fecha_dt"].dt.date >= hoy)
-        &
-        (df["proxima_fecha_dt"].dt.date <= limite)
+        & (df["proxima_fecha_dt"].dt.date <= limite)
     ].copy()
 
     return df.head(5)
@@ -399,8 +350,7 @@ def obtener_actividad_anual():
     anio = str(date.today().year)
 
     temperaturas = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
+        SELECT COUNT(*) AS total FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
           AND (
               LOWER(COALESCE(tarea, '')) LIKE '%temperatura%'
@@ -412,22 +362,19 @@ def obtener_actividad_anual():
     """, (anio,))
 
     purgas = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
+        SELECT COUNT(*) AS total FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
           AND LOWER(COALESCE(tarea, '')) LIKE '%purga%'
     """, (anio,))
 
     choques = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
+        SELECT COUNT(*) AS total FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
           AND LOWER(COALESCE(tarea, '')) LIKE '%choque%'
     """, (anio,))
 
     analiticas = leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_informes
+        SELECT COUNT(*) AS total FROM legionella_informes
         WHERE substr(fecha_informe, 1, 4) = ?
           AND (
               LOWER(COALESCE(tipo_informe, '')) LIKE '%analítica%'
@@ -444,22 +391,10 @@ def obtener_actividad_anual():
 
 
 def obtener_dossier_estado():
-    plan = valor_unico(leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_tareas
-        WHERE activo = 1
-    """))
-
-    registros = valor_unico(leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
-    """))
-
-    informes = valor_unico(leer_df("""
-        SELECT COUNT(*) AS total
-        FROM legionella_informes
-    """))
-
+    plan = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_tareas WHERE activo = 1"))
+    registros = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_registros"))
+    informes = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_informes"))
+    puntos = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_puntos WHERE activo = 1"))
     abiertas = valor_unico(leer_df("""
         SELECT COUNT(*) AS total
         FROM legionella_incidencias
@@ -467,11 +402,100 @@ def obtener_dossier_estado():
     """))
 
     return {
+        "puntos": puntos > 0,
         "plan": plan > 0,
         "registros": registros > 0,
         "informes": informes > 0,
         "correctivos": abiertas == 0,
     }
+
+
+def estado_general_instalacion(kpis):
+    if kpis["incidencias"] > 0:
+        return "proximo"
+    return "ok"
+
+
+def pintar_semaforo_general(kpis, datos):
+    estado_global = estado_general_instalacion(kpis)
+
+    solar_estado = "riesgo" if datos["solar"] > 0 and datos["solar_lecturas"] == 0 else "ok"
+
+    items = [
+        ("🔥 ACS", "ok"),
+        ("💧 AFCH", "ok"),
+        ("🚿 Duchas", "ok"),
+        ("🔄 Retornos", "ok"),
+        ("🎛️ VTM", "ok"),
+        ("☀️ Solar", solar_estado),
+        ("🏫 Global", estado_global),
+    ]
+
+    html_items = ""
+
+    for texto, estado in items:
+        if estado == "riesgo":
+            fondo = "#fee2e2"
+            color = "#991b1b"
+            icono = "🔴"
+        elif estado == "proximo":
+            fondo = "#fef3c7"
+            color = "#92400e"
+            icono = "🟠"
+        else:
+            fondo = "#dcfce7"
+            color = "#166534"
+            icono = "🟢"
+
+        html_items += f"""
+        <div style="
+            background:{fondo};color:{color};border-radius:14px;
+            padding:12px 18px;margin:6px;display:inline-block;
+            font-weight:900;border:1px solid rgba(0,0,0,0.06);
+        ">
+            {icono} {html.escape(texto)}
+        </div>
+        """
+
+    components.html(
+        f"""
+        <div style="
+            background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;
+            padding:14px;box-shadow:0 3px 10px rgba(0,0,0,0.06);
+        ">
+            {html_items}
+        </div>
+        """,
+        height=92,
+        scrolling=False
+    )
+
+
+def pintar_dossier_inspeccion(dossier):
+    total_ok = sum(1 for v in dossier.values() if v)
+    total = len(dossier)
+
+    if total_ok == total:
+        st.success("🟢 INSPECCIÓN PREPARADA")
+    else:
+        st.warning(f"🟠 Dossier parcialmente preparado: {total_ok}/{total}")
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    with c1:
+        st.success("✔ Puntos identificados") if dossier["puntos"] else st.error("✖ Faltan puntos")
+
+    with c2:
+        st.success("✔ Plan actualizado") if dossier["plan"] else st.error("✖ Falta planificación")
+
+    with c3:
+        st.success("✔ Registros completos") if dossier["registros"] else st.error("✖ Sin registros")
+
+    with c4:
+        st.success("✔ Informes archivados") if dossier["informes"] else st.warning("⚠ Sin informes externos")
+
+    with c5:
+        st.success("✔ Correctivos cerrados") if dossier["correctivos"] else st.warning("⚠ Correctivos pendientes")
 
 
 def pantalla_panel_legionella():
@@ -489,15 +513,10 @@ def pantalla_panel_legionella():
         """
         <div style="
             background:linear-gradient(135deg,#0f172a,#1d4ed8);
-            padding:25px;
-            border-radius:22px;
-            color:white;
-            margin-bottom:18px;
+            padding:25px;border-radius:22px;color:white;margin-bottom:18px;
             box-shadow:0 8px 24px rgba(15,23,42,0.18);
         ">
-            <h1 style="margin:0;font-size:38px;">
-                🛡️ Centro de Control Legionella
-            </h1>
+            <h1 style="margin:0;font-size:38px;">🛡️ Centro de Control Legionella</h1>
             <p style="margin-top:10px;font-size:16px;font-weight:700;">
                 Colegio Abat Oliba Loreto
             </p>
@@ -528,96 +547,72 @@ def pantalla_panel_legionella():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    st.markdown("## 🚦 Semáforo general")
+    pintar_semaforo_general(kpis, datos)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     st.markdown("## 🏢 Estado de las instalaciones")
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        tarjeta_instalacion(
-            "ACS",
-            "🔥",
-            [
-                f"Acumuladores: {datos['acumuladores']}",
-                f"Temperaturas acumulador: {datos['temp_acum']}",
-                f"Impulsión: {datos['temp_impulsion']}",
-                f"Purgas: {datos['purgas']}",
-                f"Choques térmicos: {datos['choques']}",
-            ],
-            cumplimiento_txt
-        )
+        tarjeta_instalacion("ACS", "🔥", [
+            f"Acumuladores: {datos['acumuladores']}",
+            f"Temperaturas acumulador: {datos['temp_acum']}",
+            f"Impulsión: {datos['temp_impulsion']}",
+            f"Purgas: {datos['purgas']}",
+            f"Choques térmicos: {datos['choques']}",
+        ], cumplimiento_txt)
 
     with c2:
-        tarjeta_instalacion(
-            "AFCH",
-            "💧",
-            [
-                f"Puntos terminales: {datos['afch']}",
-                f"Controles AFS: {datos['afs']}",
-                f"Cloro residual: {datos['cloro']}",
-                "Control de temperatura y desinfectante",
-            ],
-            cumplimiento_txt
-        )
+        tarjeta_instalacion("AFCH", "💧", [
+            f"Puntos terminales: {datos['afch']}",
+            f"Controles AFS: {datos['afs']}",
+            f"Cloro residual: {datos['cloro']}",
+            "Control de temperatura y desinfectante",
+        ], cumplimiento_txt)
 
     with c3:
-        tarjeta_instalacion(
-            "DUCHAS",
-            "🚿",
-            [
-                f"Puntos: {datos['duchas']}",
-                f"Controles ACS terminal: {datos['acs_terminal']}",
-                f"Purgas: {datos['purgas']}",
-                "Duchas incluidas en control",
-            ],
-            cumplimiento_txt
-        )
+        tarjeta_instalacion("DUCHAS", "🚿", [
+            f"Puntos: {datos['duchas']}",
+            f"Controles ACS terminal: {datos['acs_terminal']}",
+            f"Purgas: {datos['purgas']}",
+            "Duchas incluidas en control",
+        ], cumplimiento_txt)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     c4, c5, c6 = st.columns(3)
 
     with c4:
-        tarjeta_instalacion(
-            "VTM",
-            "🎛️",
-            [
-                f"Válvulas termostáticas: {datos['vtm']}",
-                f"Revisiones: {datos['vtm_rev']}",
-                "Entrada / salida controlada",
-                "Accesos revisados",
-            ],
-            cumplimiento_txt
-        )
+        tarjeta_instalacion("VTM", "🎛️", [
+            f"Válvulas termostáticas: {datos['vtm']}",
+            f"Revisiones: {datos['vtm_rev']}",
+            "Entrada / salida controlada",
+            "Accesos revisados",
+        ], cumplimiento_txt)
 
     with c5:
-        tarjeta_instalacion(
-            "SOLAR",
-            "☀️",
-            [
-                f"Depósitos solares: {datos['solar']}",
-                f"Lecturas realizadas: {datos['solar_lecturas']}",
-                "Registro sin consigna automática",
-                "Seguimiento de temperatura",
-            ],
-            cumplimiento_txt
-        )
+        solar_estado = "riesgo" if datos["solar"] > 0 and datos["solar_lecturas"] == 0 else "ok"
+        tarjeta_instalacion("SOLAR", "☀️", [
+            f"Depósitos solares: {datos['solar']}",
+            f"Lecturas realizadas: {datos['solar_lecturas']}",
+            "Registro sin consigna automática",
+            "Seguimiento de temperatura",
+        ], cumplimiento_txt, solar_estado)
 
     with c6:
-        tarjeta_instalacion(
-            "RETORNOS",
-            "🔄",
-            [
-                f"Puntos: {datos['retornos']}",
-                f"Mediciones retorno: {datos['temp_retorno']}",
-                "Temperatura mínima: ≥ 50 ºC",
-                "Recirculación controlada",
-            ],
-            cumplimiento_txt
-        )
+        tarjeta_instalacion("RETORNOS", "🔄", [
+            f"Puntos: {datos['retornos']}",
+            f"Mediciones retorno: {datos['temp_retorno']}",
+            "Temperatura mínima: ≥ 50 ºC",
+            "Recirculación controlada",
+        ], cumplimiento_txt)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    st.markdown("## 🗺️ Estado de los puntos de control")
+    st.markdown("## 🗺️ Puntos físicos de control")
 
     if puntos:
         puntos_html = "<div style='margin-bottom:10px;'>"
@@ -628,13 +623,9 @@ def pantalla_panel_legionella():
         puntos_html += "</div>"
 
         filas = max(1, math.ceil(len(puntos) / 8))
-        alto = min(260, max(90, filas * 58))
+        alto = min(300, max(90, filas * 58))
 
-        components.html(
-            puntos_html,
-            height=alto,
-            scrolling=False
-        )
+        components.html(puntos_html, height=alto, scrolling=False)
     else:
         st.info("Todavía no hay puntos activos registrados.")
 
@@ -678,33 +669,17 @@ def pantalla_panel_legionella():
 
     with col1:
         st.metric("Temperaturas", escalar(actividad["temperaturas"]))
-
     with col2:
         st.metric("Purgas", escalar(actividad["purgas"]))
-
     with col3:
         st.metric("Choques térmicos", escalar(actividad["choques"]))
-
     with col4:
         st.metric("Analíticas", escalar(actividad["analiticas"]))
 
     st.markdown("---")
 
     st.markdown("## 🏆 Dossier de inspección")
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        st.success("✔ Plan actualizado") if dossier["plan"] else st.error("✖ Falta planificación")
-
-    with c2:
-        st.success("✔ Registros completos") if dossier["registros"] else st.error("✖ Sin registros")
-
-    with c3:
-        st.success("✔ Informes archivados") if dossier["informes"] else st.warning("⚠ Sin informes externos")
-
-    with c4:
-        st.success("✔ Correctivos cerrados") if dossier["correctivos"] else st.warning("⚠ Correctivos pendientes")
+    pintar_dossier_inspeccion(dossier)
 
     st.info(
         "✅ Panel conectado a datos reales de Legionella: puntos, registros, planificación, incidencias, informes y órdenes."
