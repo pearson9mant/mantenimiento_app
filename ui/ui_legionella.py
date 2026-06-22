@@ -3106,7 +3106,10 @@ def pantalla_legionella():
                             observaciones_edit,
                             activo_edit,
                             plano_nombre,
-                            plano_data
+                            plano_data,
+                           categoria_panel_edit,
+                            subcategoria_panel_edit,
+                            codigo_panel_edit 
                         )
 
                         st.success("Punto actualizado correctamente.")
