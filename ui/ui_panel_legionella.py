@@ -163,6 +163,32 @@ def contar_registros_por_tarea(textos):
     return valor_unico(df)
 
 
+def contar_registros_por_tarea_y_centro(textos, centro):
+    if isinstance(textos, str):
+        textos = [textos]
+
+    condiciones = []
+    params = []
+
+    for texto in textos:
+        condiciones.append("""
+            LOWER(COALESCE(tarea, '')) LIKE ?
+            OR LOWER(COALESCE(tipo_control, '')) LIKE ?
+        """)
+        params.extend([f"%{texto.lower()}%", f"%{texto.lower()}%"])
+
+    params.append(centro)
+
+    df = leer_df(f"""
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
+        WHERE ({' OR '.join(condiciones)})
+          AND centro = ?
+    """, tuple(params))
+
+    return valor_unico(df)
+
+
 def contar_puntos_por_tipo(textos):
     condiciones = []
     params = []
@@ -181,6 +207,32 @@ def contar_puntos_por_tipo(textos):
         FROM legionella_puntos
         WHERE activo = 1
           AND ({' OR '.join(condiciones)})
+    """, tuple(params))
+
+    return valor_unico(df)
+
+
+def contar_puntos_por_tipo_y_centro(textos, centro):
+    condiciones = []
+    params = []
+
+    for texto in textos:
+        condiciones.append("""
+            LOWER(COALESCE(tipo_punto, '')) LIKE ?
+            OR LOWER(COALESCE(tipo_control_punto, '')) LIKE ?
+            OR LOWER(COALESCE(instalacion, '')) LIKE ?
+            OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
+        """)
+        params.extend([f"%{texto.lower()}%"] * 4)
+
+    params.append(centro)
+
+    df = leer_df(f"""
+        SELECT COUNT(*) AS total
+        FROM legionella_puntos
+        WHERE activo = 1
+          AND ({' OR '.join(condiciones)})
+          AND centro = ?
     """, tuple(params))
 
     return valor_unico(df)
@@ -270,6 +322,119 @@ def obtener_estado_instalaciones():
     }
 
 
+def obtener_estado_instalaciones_centro(centro):
+    return {
+        "acumuladores": contar_puntos_por_tipo_y_centro(["acumulador"], centro),
+        "afch": contar_puntos_por_tipo_y_centro(["afch", "afs", "grifo", "fuente", "lavamanos"], centro),
+        "duchas": contar_puntos_por_tipo_y_centro(["ducha"], centro),
+        "vtm": contar_puntos_por_tipo_y_centro(["válvula", "valvula", "vtm"], centro),
+        "solar": contar_puntos_por_tipo_y_centro(["solar"], centro),
+        "retornos": contar_puntos_por_tipo_y_centro(["retorno", "rtc"], centro),
+
+        "temp_acum": contar_registros_por_tarea_y_centro(["acumulador"], centro),
+        "temp_impulsion": contar_registros_por_tarea_y_centro(["impulsión", "impulsion"], centro),
+        "temp_retorno": contar_registros_por_tarea_y_centro(["retorno"], centro),
+        "purgas": contar_registros_por_tarea_y_centro(["purga"], centro),
+        "choques": contar_registros_por_tarea_y_centro(["choque"], centro),
+        "afs": contar_registros_por_tarea_y_centro(["afs", "afch"], centro),
+        "cloro": contar_registros_por_tarea_y_centro(["cloro"], centro),
+        "acs_terminal": contar_registros_por_tarea_y_centro(["acs terminal", "punto terminal completo"], centro),
+        "vtm_rev": contar_registros_por_tarea_y_centro(["válvula", "valvula", "vtm"], centro),
+        "solar_lecturas": contar_registros_por_tarea_y_centro(["solar"], centro),
+    }
+
+
+def bloque_centro_legionella(nombre_centro, datos_centro, cumplimiento_txt):
+    st.markdown(f"### 🏫 {nombre_centro}")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        tarjeta_instalacion(
+            "ACS",
+            "🔥",
+            [
+                f"Acumuladores: {datos_centro['acumuladores']}",
+                f"Temperaturas acumulador: {datos_centro['temp_acum']}",
+                f"Impulsión: {datos_centro['temp_impulsion']}",
+                f"Purgas: {datos_centro['purgas']}",
+            ],
+            cumplimiento_txt
+        )
+
+    with c2:
+        solar_estado = "riesgo" if datos_centro["solar"] > 0 and datos_centro["solar_lecturas"] == 0 else "ok"
+
+        tarjeta_instalacion(
+            "SOLAR",
+            "☀️",
+            [
+                f"Depósitos solares: {datos_centro['solar']}",
+                f"Lecturas realizadas: {datos_centro['solar_lecturas']}",
+                "Registro sin consigna automática",
+                "Seguimiento de temperatura",
+            ],
+            cumplimiento_txt,
+            solar_estado
+        )
+
+    with c3:
+        tarjeta_instalacion(
+            "AFCH / AFS",
+            "💧",
+            [
+                f"Puntos agua fría: {datos_centro['afch']}",
+                f"Controles AFS: {datos_centro['afs']}",
+                f"Cloro residual: {datos_centro['cloro']}",
+                "Control de temperatura y desinfectante",
+            ],
+            cumplimiento_txt
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    c4, c5, c6 = st.columns(3)
+
+    with c4:
+        tarjeta_instalacion(
+            "DUCHAS",
+            "🚿",
+            [
+                f"Puntos ducha: {datos_centro['duchas']}",
+                f"ACS terminal: {datos_centro['acs_terminal']}",
+                f"Purgas: {datos_centro['purgas']}",
+                "Duchas incluidas en control",
+            ],
+            cumplimiento_txt
+        )
+
+    with c5:
+        tarjeta_instalacion(
+            "RETORNOS",
+            "🔄",
+            [
+                f"Puntos retorno: {datos_centro['retornos']}",
+                f"Mediciones retorno: {datos_centro['temp_retorno']}",
+                "Temperatura mínima: ≥ 50 ºC",
+                "Recirculación controlada",
+            ],
+            cumplimiento_txt
+        )
+
+    with c6:
+        tarjeta_instalacion(
+            "VTM",
+            "🎛️",
+            [
+                f"Válvulas termostáticas: {datos_centro['vtm']}",
+                f"Revisiones: {datos_centro['vtm_rev']}",
+                "Entrada / salida controlada",
+                "Accesos revisados",
+            ],
+            cumplimiento_txt
+        )
+
+
 def obtener_puntos_control():
     df = leer_df("""
         SELECT
@@ -301,11 +466,7 @@ def obtener_puntos_control():
         if not nombre:
             continue
 
-        if estado in ["RIESGO", "INCIDENCIA"]:
-            estado_visual = "riesgo"
-        else:
-            estado_visual = "ok"
-
+        estado_visual = "riesgo" if estado in ["RIESGO", "INCIDENCIA"] else "ok"
         puntos.append((nombre, estado_visual))
 
     return puntos
@@ -411,14 +572,11 @@ def obtener_dossier_estado():
 
 
 def estado_general_instalacion(kpis):
-    if kpis["incidencias"] > 0:
-        return "proximo"
-    return "ok"
+    return "proximo" if kpis["incidencias"] > 0 else "ok"
 
 
 def pintar_semaforo_general(kpis, datos):
     estado_global = estado_general_instalacion(kpis)
-
     solar_estado = "riesgo" if datos["solar"] > 0 and datos["solar_lecturas"] == 0 else "ok"
 
     items = [
@@ -435,17 +593,11 @@ def pintar_semaforo_general(kpis, datos):
 
     for texto, estado in items:
         if estado == "riesgo":
-            fondo = "#fee2e2"
-            color = "#991b1b"
-            icono = "🔴"
+            fondo, color, icono = "#fee2e2", "#991b1b", "🔴"
         elif estado == "proximo":
-            fondo = "#fef3c7"
-            color = "#92400e"
-            icono = "🟠"
+            fondo, color, icono = "#fef3c7", "#92400e", "🟠"
         else:
-            fondo = "#dcfce7"
-            color = "#166534"
-            icono = "🟢"
+            fondo, color, icono = "#dcfce7", "#166534", "🟢"
 
         html_items += f"""
         <div style="
@@ -484,16 +636,12 @@ def pintar_dossier_inspeccion(dossier):
 
     with c1:
         st.success("✔ Puntos identificados") if dossier["puntos"] else st.error("✖ Faltan puntos")
-
     with c2:
         st.success("✔ Plan actualizado") if dossier["plan"] else st.error("✖ Falta planificación")
-
     with c3:
         st.success("✔ Registros completos") if dossier["registros"] else st.error("✖ Sin registros")
-
     with c4:
         st.success("✔ Informes archivados") if dossier["informes"] else st.warning("⚠ Sin informes externos")
-
     with c5:
         st.success("✔ Correctivos cerrados") if dossier["correctivos"] else st.warning("⚠ Correctivos pendientes")
 
@@ -501,6 +649,8 @@ def pintar_dossier_inspeccion(dossier):
 def pantalla_panel_legionella():
     kpis = obtener_kpis_legionella()
     datos = obtener_estado_instalaciones()
+    datos_p22 = obtener_estado_instalaciones_centro("Pearson 22")
+    datos_p9 = obtener_estado_instalaciones_centro("Pearson 9")
     actividad = obtener_actividad_anual()
     dossier = obtener_dossier_estado()
     incidencias = obtener_incidencias_abiertas()
@@ -610,16 +760,23 @@ def pantalla_panel_legionella():
             "Recirculación controlada",
         ], cumplimiento_txt)
 
+    st.markdown("---")
+    st.markdown("## 🏫 Estado por centro")
+
+    bloque_centro_legionella("Pearson 22", datos_p22, cumplimiento_txt)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    bloque_centro_legionella("Pearson 9", datos_p9, cumplimiento_txt)
+
     st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown("## 🗺️ Puntos físicos de control")
 
     if puntos:
         puntos_html = "<div style='margin-bottom:10px;'>"
-
         for nombre, estado in puntos:
             puntos_html += punto_control(nombre, estado)
-
         puntos_html += "</div>"
 
         filas = max(1, math.ceil(len(puntos) / 8))
@@ -682,5 +839,5 @@ def pantalla_panel_legionella():
     pintar_dossier_inspeccion(dossier)
 
     st.info(
-        "✅ Panel conectado a datos reales de Legionella: puntos, registros, planificación, incidencias, informes y órdenes."
+        "✅ Panel conectado a datos reales de Legionella: puntos, registros, planificación, incidencias, informes, órdenes y separación por centro."
     )
