@@ -2974,6 +2974,58 @@ def pantalla_legionella():
                             if valor_tipo_control in opciones_tipo_control else 0,
                             key=f"edit_tipo_control_{row['id']}"
                         )
+                        st.markdown("#### 🧭 Clasificación panel")
+
+                        opciones_categoria_panel = [
+                            "",
+                            "ACS",
+                            "AFS",
+                            "SOLAR",
+                            "RETORNO",
+                            "VTM",
+                            "DUCHA",
+                            "MUESTRA",
+                            "OTRO",
+                        ]
+
+                        valor_categoria_panel = row.get("categoria_panel") or ""
+
+                        categoria_panel_edit = st.selectbox(
+                            "Categoría panel",
+                            opciones_categoria_panel,
+                            index=opciones_categoria_panel.index(valor_categoria_panel)
+                            if valor_categoria_panel in opciones_categoria_panel else 0,
+                            key=f"edit_categoria_panel_{row['id']}"
+                        )
+
+                        opciones_subcategoria_panel = [
+                            "",
+                            "ACUMULADOR",
+                            "DEPOSITO",
+                            "TERMINAL",
+                            "RETORNO",
+                            "VALVULA",
+                            "PUNTO_MUESTRA",
+                            "BAJO_USO",
+                            "OTRO",
+                        ]
+
+                        valor_subcategoria_panel = row.get("subcategoria_panel") or ""
+
+                        subcategoria_panel_edit = st.selectbox(
+                            "Subcategoría panel",
+                            opciones_subcategoria_panel,
+                            index=opciones_subcategoria_panel.index(valor_subcategoria_panel)
+                            if valor_subcategoria_panel in opciones_subcategoria_panel else 0,
+                            key=f"edit_subcategoria_panel_{row['id']}"
+                        )
+
+                        codigo_panel_edit = st.text_input(
+                            "Código panel",
+                            value=str(row.get("codigo_panel") or ""),
+                            placeholder="Ej: ACS-01, AFS-01, PT-01, VTM-01",
+                            key=f"edit_codigo_panel_{row['id']}"
+                        ) 
 
                     with col2:
                         nombre_edit = st.text_input(
