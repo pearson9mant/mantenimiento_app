@@ -547,7 +547,11 @@ def pantalla_panel_legionella():
             puntos_html += punto_control(nombre, estado)
         puntos_html += "</div>"
 
-        st.markdown(puntos_html, unsafe_allow_html=True)
+        components.html(
+            puntos_html,
+            height=110,
+            scrolling=False
+        )
     else:
         st.info("Todavía no hay puntos activos registrados.")
 
