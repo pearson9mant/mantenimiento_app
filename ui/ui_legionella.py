@@ -2032,7 +2032,7 @@ def pantalla_legionella():
        ]
     )
 
-    with tab1:
+       with tab1:
         st.markdown("### Nuevo control")
 
         centros = list(CENTROS.keys())
@@ -2052,352 +2052,244 @@ def pantalla_legionella():
 
         if puntos_df.empty:
             st.warning("No hay puntos de control dados de alta. Ve a la pestaña ⚙️ Puntos y crea el primero.")
+
         else:
             punto_nombre = st.selectbox(
                 "Punto de control",
                 puntos_df["nombre_punto"].dropna().astype(str).tolist()
             )
-        
+
             df_filtrado = puntos_df[
                 puntos_df["nombre_punto"].astype(str) == str(punto_nombre)
             ]
-        
+
             if df_filtrado.empty:
                 st.error("No se ha encontrado el punto de control. Revisa configuración.")
+
             else:
                 punto = df_filtrado.iloc[0].to_dict()
                 tipo_punto = punto["tipo_punto"]
                 tipo_control_punto = punto.get("tipo_control_punto", "")
-        
+
                 tareas = tareas_por_tipo_punto(tipo_punto, tipo_control_punto)
-        
+
                 tarea = st.selectbox("Tarea", tareas)
-        
-        valor_3 = None
-        
-        if tarea == "Temperatura acumulador":
-            tipo_control = "Temperatura acumulador"
-            unidad = "ºC"
-            valor = st.number_input("Temperatura acumulador ºC", min_value=0.0, max_value=100.0, value=60.0, step=0.1)
-            valor_2 = None
 
-        elif tarea == "Temperatura impulsión ACS":
-            tipo_control = "Temperatura impulsión ACS"
-            unidad = "ºC"
-            valor = st.number_input("Temperatura impulsión ACS ºC", min_value=0.0, max_value=100.0, value=55.0, step=0.1)
-            valor_2 = None
+                valor_3 = None
+                valor_2 = None
+                purga_realizada = False
+                aireador_limpio = False
+                revision_visual_ok = False
+                fuga_ok = False
+                cabezal_ok = False
+                regulacion_ok = False
+                accesible_ok = False
+                temperatura_acs = None
 
-        elif tarea == "Temperatura retorno":
-            tipo_control = "Temperatura retorno"
-            unidad = "ºC"
-            valor = st.number_input("Temperatura retorno ºC", min_value=0.0, max_value=100.0, value=50.0, step=0.1)
-            valor_2 = None
+                if tarea == "Temperatura acumulador":
+                    tipo_control = "Temperatura acumulador"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura acumulador ºC", min_value=0.0, max_value=100.0, value=60.0, step=0.1)
 
-        elif tarea == "Temperatura punto terminal":
-            tipo_control = "Temperatura punto terminal"
-            unidad = "ºC"
-            valor = st.number_input("Temperatura ºC", min_value=0.0, max_value=100.0, value=45.0, step=0.1)
-            valor_2 = None
-            
-        elif tarea == "Control sala ACS":
-            tipo_control = "Control sala ACS"
-            unidad = "ºC"
-        
-            valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
-            valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
-            valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)
-            
-        elif tarea == "Control válvula termostática":
-            tipo_control = "Control válvula termostática"
-            unidad = "ºC"
+                elif tarea == "Temperatura impulsión ACS":
+                    tipo_control = "Temperatura impulsión ACS"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura impulsión ACS ºC", min_value=0.0, max_value=100.0, value=55.0, step=0.1)
 
-            valor = st.number_input(
-                "Temperatura entrada ACS a válvula ºC",
-                min_value=0.0,
-                max_value=100.0,
-                value=60.0,
-                step=0.1
-            )
+                elif tarea == "Temperatura retorno":
+                    tipo_control = "Temperatura retorno"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura retorno ºC", min_value=0.0, max_value=100.0, value=50.0, step=0.1)
 
-            valor_2 = st.number_input(
-                "Temperatura salida mezclada ºC",
-                min_value=0.0,
-                max_value=100.0,
-                value=45.0,
-                step=0.1
-            )
+                elif tarea == "Temperatura punto terminal":
+                    tipo_control = "Temperatura punto terminal"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura ºC", min_value=0.0, max_value=100.0, value=45.0, step=0.1)
 
-            valor_3 = None
+                elif tarea == "Control sala ACS":
+                    tipo_control = "Control sala ACS"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
+                    valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
+                    valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)
 
-            fuga_ok = st.checkbox("Sin fugas")
-            cabezal_ok = st.checkbox("Cabezal termostático correcto")
-            regulacion_ok = st.checkbox("Regulación estable")
-            accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")    
+                elif tarea == "Control válvula termostática":
+                    tipo_control = "Control válvula termostática"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura entrada ACS a válvula ºC", min_value=0.0, max_value=100.0, value=60.0, step=0.1)
+                    valor_2 = st.number_input("Temperatura salida mezclada ºC", min_value=0.0, max_value=100.0, value=45.0, step=0.1)
 
-        elif tarea == "Control AFS":
-            tipo_control = "Control AFS"
-            unidad = "ºC / mg/L"
-        
-            valor = st.number_input(
-                "Temperatura AFS ºC",
-                min_value=0.0,
-                max_value=50.0,
-                value=18.0,
-                step=0.1
-            )
-        
-            valor_2 = st.number_input(
-                "Cloro residual libre mg/L",
-                min_value=0.0,
-                max_value=5.0,
-                value=0.5,
-                step=0.01
-            )
-        
-            purga_realizada = st.checkbox("Purga realizada")
-            aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
-            revision_visual_ok = st.checkbox("Revisión visual correcta")
-        elif tarea == "Control punto terminal completo":
+                    fuga_ok = st.checkbox("Sin fugas")
+                    cabezal_ok = st.checkbox("Cabezal termostático correcto")
+                    regulacion_ok = st.checkbox("Regulación estable")
+                    accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")
 
-            tipo_control = "Control punto terminal completo"
-            unidad = "Control completo"
-        
-            temperatura_afs = st.number_input(
-                "Temperatura AFS ºC",
-                min_value=0.0,
-                max_value=50.0,
-                value=18.0,
-                step=0.1
-            )
-        
-            cloro_residual = st.number_input(
-                "Cloro residual libre mg/L",
-                min_value=0.0,
-                max_value=5.0,
-                value=0.5,
-                step=0.01
-            )
-        
-            temperatura_acs = st.number_input(
-                "Temperatura ACS terminal ºC",
-                min_value=0.0,
-                max_value=100.0,
-                value=50.0,
-                step=0.1
-            )
-        
-            purga_realizada = st.checkbox("Purga realizada")
-            aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
-            revision_visual_ok = st.checkbox("Revisión visual correcta")
-        
-            valor = temperatura_afs
-            valor_2 = cloro_residual
-            valor_3 = temperatura_acs
-        
-        elif tarea == "Control ACS terminal":
-            tipo_control = "Control ACS terminal"
-            unidad = "ºC"
-        
-            valor = st.number_input(
-                "Temperatura ACS terminal ºC",
-                min_value=0.0,
-                max_value=100.0,
-                value=50.0,
-                step=0.1
-            )
-        
-            valor_2 = None
-        
-            purga_realizada = st.checkbox("Purga realizada")
-            aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
-            revision_visual_ok = st.checkbox("Revisión visual correcta")
+                elif tarea == "Control AFS":
+                    tipo_control = "Control AFS"
+                    unidad = "ºC / mg/L"
+                    valor = st.number_input("Temperatura AFS ºC", min_value=0.0, max_value=50.0, value=18.0, step=0.1)
+                    valor_2 = st.number_input("Cloro residual libre mg/L", min_value=0.0, max_value=5.0, value=0.5, step=0.01)
 
-        elif tarea == "Cloro residual":
-            tipo_control = "Cloro residual"
-            unidad = "mg/L"
-            valor = st.number_input("Cloro residual libre mg/L", min_value=0.0, max_value=5.0, value=0.5, step=0.01)
-            valor_2 = None
+                    purga_realizada = st.checkbox("Purga realizada")
+                    aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
+                    revision_visual_ok = st.checkbox("Revisión visual correcta")
 
-        elif tarea == "Revisión visual":
-            tipo_control = "Revisión visual"
-            unidad = "OK/KO"
-            correcto = st.radio("Resultado revisión visual", ["Correcto", "Deficiente"], horizontal=True)
-            valor = 1 if correcto == "Correcto" else 0
-            valor_2 = None
+                elif tarea == "Control punto terminal completo":
+                    tipo_control = "Control punto terminal completo"
+                    unidad = "Control completo"
 
-        else:
-            tipo_control = tarea
-            unidad = "Realizado/No realizado"
-            realizado = st.radio("Resultado", ["Realizado", "No realizado"], horizontal=True)
-            valor = 1 if realizado == "Realizado" else 0
-            valor_2 = None
+                    temperatura_afs = st.number_input("Temperatura AFS ºC", min_value=0.0, max_value=50.0, value=18.0, step=0.1)
+                    cloro_residual = st.number_input("Cloro residual libre mg/L", min_value=0.0, max_value=5.0, value=0.5, step=0.01)
+                    temperatura_acs = st.number_input("Temperatura ACS terminal ºC", min_value=0.0, max_value=100.0, value=50.0, step=0.1)
 
-        fecha_registro = st.date_input("Fecha del control", value=date.today())
-        operario_auto = operario_por_centro(centro)
+                    purga_realizada = st.checkbox("Purga realizada")
+                    aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
+                    revision_visual_ok = st.checkbox("Revisión visual correcta")
 
-        if operario_auto in OPERARIOS:
-            indice_operario = OPERARIOS.index(operario_auto)
-        else:
-            indice_operario = 0
+                    valor = temperatura_afs
+                    valor_2 = cloro_residual
+                    valor_3 = temperatura_acs
 
-        operario = st.selectbox(
-            "Operario",
-            OPERARIOS,
-            index=indice_operario,
-            key=f"legionella_operario_{centro}"
-        )
+                elif tarea == "Control ACS terminal":
+                    tipo_control = "Control ACS terminal"
+                    unidad = "ºC"
+                    valor = st.number_input("Temperatura ACS terminal ºC", min_value=0.0, max_value=100.0, value=50.0, step=0.1)
 
-        if operario == "Otro":
-            operario = st.text_input("Nombre operario")
+                    purga_realizada = st.checkbox("Purga realizada")
+                    aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
+                    revision_visual_ok = st.checkbox("Revisión visual correcta")
 
-        observaciones = st.text_area("Observaciones")
-        foto = st.file_uploader(
-            "Foto control Legionella",
-            type=["jpg", "jpeg", "png"],
-            key="foto_legionella"
-        )
+                elif tarea == "Cloro residual":
+                    tipo_control = "Cloro residual"
+                    unidad = "mg/L"
+                    valor = st.number_input("Cloro residual libre mg/L", min_value=0.0, max_value=5.0, value=0.5, step=0.01)
 
-        foto_bytes = None
-        foto_error = False
-        ruta_foto = ""
+                elif tarea == "Revisión visual":
+                    tipo_control = "Revisión visual"
+                    unidad = "OK/KO"
+                    correcto = st.radio("Resultado revisión visual", ["Correcto", "Deficiente"], horizontal=True)
+                    valor = 1 if correcto == "Correcto" else 0
 
-        if foto is not None:
+                else:
+                    tipo_control = tarea
+                    unidad = "Realizado/No realizado"
+                    realizado = st.radio("Resultado", ["Realizado", "No realizado"], horizontal=True)
+                    valor = 1 if realizado == "Realizado" else 0
 
-            if foto.size > 5 * 1024 * 1024:
-                st.warning("La foto supera 5 MB")
-                foto_error = True
+                fecha_registro = st.date_input("Fecha del control", value=date.today())
+                operario_auto = operario_por_centro(centro)
+                indice_operario = OPERARIOS.index(operario_auto) if operario_auto in OPERARIOS else 0
 
-            else:
-                foto_bytes = foto.getvalue()
-
-                st.image(
-                    foto_bytes,
-                    caption="Foto control Legionella",
-                    use_container_width=True
-                )
-        
-
-        if st.button("Guardar control Legionella", type="primary"):
-            if foto_error:
-                st.error("La foto es demasiado grande.")
-                return
-
-            if foto_bytes is not None:
-                try:
-                    carpeta = Path("uploads/legionella")
-                    carpeta.mkdir(parents=True, exist_ok=True)
-
-                    extension = foto.name.split(".")[-1].lower()
-
-                    nombre_foto = (
-                        f"{centro}_{edificio}_{punto_nombre}_{tarea}"
-                    )
-
-                    nombre_foto = (
-                        nombre_foto
-                        .replace("/", "_")
-                        .replace("\\", "_")
-                        .replace(" ", "_")
-                    )
-
-                    ruta_foto = str(
-                        carpeta / f"{nombre_foto}.{extension}"
-                    )
-
-                    with open(ruta_foto, "wb") as f:
-                        f.write(foto_bytes)
-
-                except Exception as e:
-                    st.error(f"Error guardando foto: {e}")
-                    return
-
-            observaciones_finales = observaciones or ""
-
-            if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
-            
-                checklist = []
-            
-                checklist.append(
-                    "Purga realizada: Sí" if purga_realizada else "Purga realizada: No"
-                )
-            
-                checklist.append(
-                    "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No"
-                )
-            
-                checklist.append(
-                    "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No"
-                )
-                
-                if tarea == "Control punto terminal completo":
-                    checklist.append(
-                        f"Temperatura ACS terminal: {temperatura_acs} ºC"
-                    )
-                
-                observaciones_finales = (
-                    observaciones_finales
-                    + "\nChecklist: "
-                    + " | ".join(checklist)
-                ).strip()
-
-            if tarea == "Control válvula termostática":
-
-                checklist = []
-
-                checklist.append(
-                    "Sin fugas: Sí" if fuga_ok else "Sin fugas: No"
-                )
-                checklist.append(
-                    "Cabezal correcto: Sí" if cabezal_ok else "Cabezal correcto: No"
-                )
-                checklist.append(
-                    "Regulación estable: Sí" if regulacion_ok else "Regulación estable: No"
-                )
-                checklist.append(
-                    "Acceso revisado: Sí" if accesible_ok else "Acceso revisado: No"
-                )
-                checklist.append(
-                    f"Entrada ACS válvula: {valor} ºC"
-                )
-                checklist.append(
-                    f"Salida mezclada: {valor_2} ºC"
+                operario = st.selectbox(
+                    "Operario",
+                    OPERARIOS,
+                    index=indice_operario,
+                    key=f"legionella_operario_{centro}"
                 )
 
-                observaciones_finales = (
-                    observaciones_finales
-                    + "\nChecklist válvula termostática: "
-                    + " | ".join(checklist)
-                ).strip()
-            
-            estado, resultado = registrar_control(
-                fecha_registro.strftime("%Y-%m-%d"),
-                punto,
-                tarea,
-                tipo_control,
-                valor,
-                valor_2,
-                valor_3,
-                unidad,
-                operario,
-                observaciones_finales,
-                ruta_foto,
-            )
-            
-            if estado == "OK":
-                st.success(f"✅ Control guardado correctamente: {resultado}")
+                if operario == "Otro":
+                    operario = st.text_input("Nombre operario")
 
-            elif estado == "RIESGO":
-                st.error(f"🚨 RIESGO LEGIONELLA: {resultado}")
-                st.warning("⚠️ Se ha registrado en incidencias y se ha generado una OT automática.")
-                st.toast("🚨 Riesgo Legionella detectado", icon="🚨")
+                observaciones = st.text_area("Observaciones")
 
-            elif estado == "ERROR":
-                st.error(resultado)
+                foto = st.file_uploader(
+                    "Foto control Legionella",
+                    type=["jpg", "jpeg", "png"],
+                    key="foto_legionella"
+                )
 
-            else:
-                st.warning(f"⚠️ INCIDENCIA LEGIONELLA: {resultado}")
-                st.warning("Se ha registrado en incidencias y se ha generado una OT automática.")
-                st.toast("⚠️ Incidencia Legionella registrada", icon="⚠️")
+                foto_bytes = None
+                foto_error = False
+                ruta_foto = ""
+
+                if foto is not None:
+                    if foto.size > 5 * 1024 * 1024:
+                        st.warning("La foto supera 5 MB")
+                        foto_error = True
+                    else:
+                        foto_bytes = foto.getvalue()
+                        st.image(foto_bytes, caption="Foto control Legionella", use_container_width=True)
+
+                if st.button("Guardar control Legionella", type="primary"):
+                    if foto_error:
+                        st.error("La foto es demasiado grande.")
+                    else:
+                        if foto_bytes is not None:
+                            try:
+                                carpeta = Path("uploads/legionella")
+                                carpeta.mkdir(parents=True, exist_ok=True)
+
+                                extension = foto.name.split(".")[-1].lower()
+                                nombre_foto = f"{centro}_{edificio}_{punto_nombre}_{tarea}"
+                                nombre_foto = nombre_foto.replace("/", "_").replace("\\", "_").replace(" ", "_")
+                                ruta_foto = str(carpeta / f"{nombre_foto}.{extension}")
+
+                                with open(ruta_foto, "wb") as f:
+                                    f.write(foto_bytes)
+
+                            except Exception as e:
+                                st.error(f"Error guardando foto: {e}")
+                                ruta_foto = ""
+
+                        observaciones_finales = observaciones or ""
+
+                        if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
+                            checklist = [
+                                "Purga realizada: Sí" if purga_realizada else "Purga realizada: No",
+                                "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No",
+                                "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No",
+                            ]
+
+                            if tarea == "Control punto terminal completo":
+                                checklist.append(f"Temperatura ACS terminal: {temperatura_acs} ºC")
+
+                            observaciones_finales = (
+                                observaciones_finales + "\nChecklist: " + " | ".join(checklist)
+                            ).strip()
+
+                        if tarea == "Control válvula termostática":
+                            checklist = [
+                                "Sin fugas: Sí" if fuga_ok else "Sin fugas: No",
+                                "Cabezal correcto: Sí" if cabezal_ok else "Cabezal correcto: No",
+                                "Regulación estable: Sí" if regulacion_ok else "Regulación estable: No",
+                                "Acceso revisado: Sí" if accesible_ok else "Acceso revisado: No",
+                                f"Entrada ACS válvula: {valor} ºC",
+                                f"Salida mezclada: {valor_2} ºC",
+                            ]
+
+                            observaciones_finales = (
+                                observaciones_finales + "\nChecklist válvula termostática: " + " | ".join(checklist)
+                            ).strip()
+
+                        estado, resultado = registrar_control(
+                            fecha_registro.strftime("%Y-%m-%d"),
+                            punto,
+                            tarea,
+                            tipo_control,
+                            valor,
+                            valor_2,
+                            valor_3,
+                            unidad,
+                            operario,
+                            observaciones_finales,
+                            ruta_foto,
+                        )
+
+                        if estado == "OK":
+                            st.success(f"✅ Control guardado correctamente: {resultado}")
+
+                        elif estado == "RIESGO":
+                            st.error(f"🚨 RIESGO LEGIONELLA: {resultado}")
+                            st.warning("⚠️ Se ha registrado en incidencias y se ha generado una OT automática.")
+                            st.toast("🚨 Riesgo Legionella detectado", icon="🚨")
+
+                        elif estado == "ERROR":
+                            st.error(resultado)
+
+                        else:
+                            st.warning(f"⚠️ INCIDENCIA LEGIONELLA: {resultado}")
+                            st.warning("Se ha registrado en incidencias y se ha generado una OT automática.")
+                            st.toast("⚠️ Incidencia Legionella registrada", icon="⚠️")
                 
     with tab2:
         st.markdown("### 🗓️ Planificación Legionella")
