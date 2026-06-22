@@ -1878,7 +1878,10 @@ def actualizar_punto_legionella(
     observaciones,
     activo,
     plano_nombre=None,
-    plano_data=None
+    plano_data=None,
+    categoria_panel=None,
+    subcategoria_panel=None,
+    codigo_panel=None
 ):
     ejecutar("""
         UPDATE legionella_puntos
@@ -1894,7 +1897,10 @@ def actualizar_punto_legionella(
             observaciones = ?,
             activo = ?,
             plano_nombre = COALESCE(?, plano_nombre),
-            plano_data = COALESCE(?, plano_data)
+            plano_data = COALESCE(?, plano_data),
+            categoria_panel = ?,
+            subcategoria_panel = ?,
+            codigo_panel = ?
         WHERE id = ?
     """, (
         centro,
@@ -1910,6 +1916,9 @@ def actualizar_punto_legionella(
         1 if activo else 0,
         plano_nombre,
         plano_data,
+        categoria_panel,
+        subcategoria_panel,
+        codigo_panel,
         int(punto_id)
     ))
 
