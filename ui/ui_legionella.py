@@ -1950,6 +1950,7 @@ def limpiar_puntos_duplicados_legionella():
 
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
+    asegurar_columnas_clasificacion_legionella()
     asegurar_tabla_informes_legionella()
     corregir_consignas_solares()
     asegurar_columna_foto_legionella()
