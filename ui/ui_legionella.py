@@ -2631,11 +2631,278 @@ def pantalla_legionella():
         if puntos_admin.empty:
             st.info("No hay puntos registrados. Crea el primer punto arriba.")
         else:
-            st.dataframe(
-                puntos_admin,
-                use_container_width=True,
-                hide_index=True
+            centro_filtro_puntos = st.selectbox(
+                "Filtrar centro",
+                ["Todos"] + sorted(puntos_admin["centro"].dropna().astype(str).unique().tolist()),
+                key="filtro_admin_puntos_leg"
             )
+
+            df_puntos_admin = puntos_admin.copy()
+
+            if centro_filtro_puntos != "Todos":
+                df_puntos_admin = df_puntos_admin[df_puntos_admin["centro"] == centro_filtro_puntos]
+
+            for _, row in df_puntos_admin.iterrows():
+                estado_txt = "Activo" if int(row["activo"] or 0) == 1 else "Inactivo"
+
+                titulo = (
+                    f"{estado_txt} · {row['centro']} · {row['edificio']} · "
+                    f"{row['instalacion']} · {row['nombre_punto']}"
+                )
+
+                with st.expander(titulo, expanded=False):
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        centro_edit = st.selectbox(
+                            "Centro",
+                            list(CENTROS.keys()),
+                            index=list(CENTROS.keys()).index(row["centro"])
+                            if row["centro"] in list(CENTROS.keys()) else 0,
+                            key=f"edit_centro_punto_{row['id']}"
+                        )
+
+                        edificios_edit = list(CENTROS.get(centro_edit, {}).keys())
+
+                        edificio_edit = st.selectbox(
+                            "Edificio / zona",
+                            edificios_edit + ["Otro"],
+                            index=(edificios_edit + ["Otro"]).index(row["edificio"])
+                            if row["edificio"] in edificios_edit + ["Otro"] else len(edificios_edit),
+                            key=f"edit_edificio_punto_{row['id']}"
+                        )
+
+                        if edificio_edit == "Otro":
+                            edificio_edit = st.text_input(
+                                "Nombre edificio / zona",
+                                value=str(row["edificio"] or ""),
+                                key=f"edit_edificio_otro_punto_{row['id']}"
+                            )
+
+                        instalacion_edit = st.text_input(
+                            "Instalación",
+                            value=str(row["instalacion"] or ""),
+                            key=f"edit_instalacion_punto_{row['id']}"
+                        )
+
+                        opciones_tipo_punto = [
+                            "acumulador",
+                            "acumulador_solar",
+                            "retorno",
+                            "grifo",
+                            "ducha",
+                            "deposito",
+                            "muestra",
+                            "fuente",
+                            "lavamanos",
+                            "Válvulas",
+                            "otro",
+                        ]
+
+                        valor_tipo_punto = row.get("tipo_punto") or ""
+
+                        tipo_edit = st.selectbox(
+                            "Tipo de punto",
+                            opciones_tipo_punto,
+                            index=opciones_tipo_punto.index(valor_tipo_punto)
+                            if valor_tipo_punto in opciones_tipo_punto else 0,
+                            key=f"edit_tipo_punto_{row['id']}"
+                        )
+
+                        opciones_tipo_control = [
+                            "Solo AFS",
+                            "Solo ACS",
+                            "ACS + AFS",
+                            "Acumulador",
+                            "Retorno",
+                            "Muestra",
+                            "Sala ACS completa",
+                            "Válvula termostática",
+                            "Solo temperatura",
+                            "Choque térmico",
+                        ]
+
+                        valor_tipo_control = row.get("tipo_control_punto") or ""
+
+                        tipo_control_punto_edit = st.selectbox(
+                            "Tipo de control",
+                            opciones_tipo_control,
+                            index=opciones_tipo_control.index(valor_tipo_control)
+                            if valor_tipo_control in opciones_tipo_control else 0,
+                            key=f"edit_tipo_control_{row['id']}"
+                        )
+
+                        st.markdown("#### 🧭 Clasificación panel")
+
+                        opciones_categoria_panel = [
+                            "",
+                            "ACS",
+                            "AFS",
+                            "SOLAR",
+                            "RETORNO",
+                            "VTM",
+                            "DUCHA",
+                            "MUESTRA",
+                            "OTRO",
+                        ]
+
+                        valor_categoria_panel = row.get("categoria_panel") or ""
+
+                        categoria_panel_edit = st.selectbox(
+                            "Categoría panel",
+                            opciones_categoria_panel,
+                            index=opciones_categoria_panel.index(valor_categoria_panel)
+                            if valor_categoria_panel in opciones_categoria_panel else 0,
+                            key=f"edit_categoria_panel_{row['id']}"
+                        )
+
+                        opciones_subcategoria_panel = [
+                            "",
+                            "ACUMULADOR",
+                            "DEPOSITO",
+                            "TERMINAL",
+                            "RETORNO",
+                            "VALVULA",
+                            "PUNTO_MUESTRA",
+                            "BAJO_USO",
+                            "OTRO",
+                        ]
+
+                        valor_subcategoria_panel = row.get("subcategoria_panel") or ""
+
+                        subcategoria_panel_edit = st.selectbox(
+                            "Subcategoría panel",
+                            opciones_subcategoria_panel,
+                            index=opciones_subcategoria_panel.index(valor_subcategoria_panel)
+                            if valor_subcategoria_panel in opciones_subcategoria_panel else 0,
+                            key=f"edit_subcategoria_panel_{row['id']}"
+                        )
+
+                        codigo_panel_edit = st.text_input(
+                            "Código panel",
+                            value=str(row.get("codigo_panel") or ""),
+                            placeholder="Ej: ACS-01, AFS-01, PT-01, VTM-01",
+                            key=f"edit_codigo_panel_{row['id']}"
+                        )
+
+                    with col2:
+                        nombre_edit = st.text_input(
+                            "Nombre punto",
+                            value=str(row["nombre_punto"] or ""),
+                            key=f"edit_nombre_punto_{row['id']}"
+                        )
+
+                        ubicacion_edit = st.text_input(
+                            "Ubicación",
+                            value=str(row["ubicacion"] or ""),
+                            key=f"edit_ubicacion_punto_{row['id']}"
+                        )
+
+                        numero_terminales_edit = st.number_input(
+                            "Número de terminales",
+                            min_value=1,
+                            value=int(row.get("numero_terminales", 1) or 1),
+                            step=1,
+                            key=f"terminales_{row['id']}"
+                        )
+
+                        ubicacion_exacta_edit = st.text_input(
+                            "📍 Ubicación exacta",
+                            value=str(row.get("ubicacion_exacta", "") or ""),
+                            placeholder="Ej: Planta baja · WC profesores · Grifo lavabo derecha",
+                            key=f"ubicacion_exacta_{row['id']}"
+                        )
+
+                        plano_pdf = st.file_uploader(
+                            "🗺️ Plano ubicación punto",
+                            type=["pdf"],
+                            key=f"plano_leg_{row['id']}"
+                        )
+
+                        if row.get("plano_data") is not None and row.get("plano_data") != b"":
+                            st.download_button(
+                                "🗺️ Ver / descargar plano actual",
+                                data=bytes(row["plano_data"]),
+                                file_name=row.get("plano_nombre") or f"plano_punto_{row['id']}.pdf",
+                                mime="application/pdf",
+                                key=f"descargar_plano_punto_{row['id']}"
+                            )
+
+                        observaciones_edit = st.text_area(
+                            "Observaciones",
+                            value=str(row["observaciones"] or ""),
+                            key=f"edit_observaciones_punto_{row['id']}"
+                        )
+
+                        activo_edit = st.checkbox(
+                            "Punto activo",
+                            value=bool(row["activo"]),
+                            key=f"edit_activo_punto_{row['id']}"
+                        )
+
+                    if st.button(
+                        "💾 Guardar cambios del punto",
+                        key=f"guardar_edicion_punto_{row['id']}",
+                        use_container_width=True
+                    ):
+                        plano_nombre = None
+                        plano_data = None
+
+                        if plano_pdf is not None:
+                            plano_nombre = plano_pdf.name
+                            plano_data = plano_pdf.getvalue()
+
+                        actualizar_punto_legionella(
+                            row["id"],
+                            centro_edit,
+                            edificio_edit,
+                            instalacion_edit,
+                            tipo_edit,
+                            tipo_control_punto_edit,
+                            nombre_edit,
+                            ubicacion_edit,
+                            numero_terminales_edit,
+                            ubicacion_exacta_edit,
+                            observaciones_edit,
+                            activo_edit,
+                            plano_nombre,
+                            plano_data,
+                            categoria_panel_edit,
+                            subcategoria_panel_edit,
+                            codigo_panel_edit
+                        )
+
+                        st.success("Punto actualizado correctamente.")
+                        st.rerun()
+
+                    st.markdown("---")
+
+                    confirmar_borrar_punto = st.checkbox(
+                        "Confirmo borrar definitivamente este punto",
+                        key=f"confirmar_borrar_punto_{row['id']}"
+                    )
+
+                    if st.button(
+                        "🗑️ Borrar punto Legionella",
+                        key=f"borrar_punto_legionella_{row['id']}",
+                        use_container_width=True
+                    ):
+                        if not confirmar_borrar_punto:
+                            st.error("Marca primero la casilla de confirmación.")
+                        else:
+                            if borrar_punto_legionella(row["id"]):
+                                st.cache_data.clear()
+                                st.success("Punto Legionella borrado correctamente.")
+                                st.rerun()
+                            else:
+                                st.error("No se ha podido borrar el punto Legionella.")
+
+            with st.expander("📋 Vista rápida de puntos", expanded=False):
+                st.dataframe(
+                    df_puntos_admin,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
     with tab4:
         st.markdown("### 📁 Informes externos Legionella")
