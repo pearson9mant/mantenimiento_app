@@ -153,6 +153,31 @@ def asegurar_columnas_planificacion_legionella():
         except Exception:
             pass
 
+def asegurar_columnas_clasificacion_legionella():
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN categoria_panel TEXT
+        """)
+    except Exception:
+        pass
+
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN subcategoria_panel TEXT
+        """)
+    except Exception:
+        pass
+
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_puntos
+            ADD COLUMN codigo_panel TEXT
+        """)
+    except Exception:
+        pass
+
 def asegurar_columna_foto_legionella():
     try:
         ejecutar("""
