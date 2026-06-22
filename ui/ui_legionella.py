@@ -2051,8 +2051,9 @@ def pantalla_legionella():
         )
 
         if puntos_df.empty:
-            st.warning("No hay puntos de control dados de alta.")
-            return
+            st.warning("No hay puntos de control dados de alta. Ve a la pestaña ⚙️ Puntos y crea el primero.")
+        else:
+            punto_nombre = st.selectbox("Punto de control", puntos_df["nombre_punto"].tolist())
 
         punto_nombre = st.selectbox("Punto de control", puntos_df["nombre_punto"].tolist())
         df_filtrado = puntos_df[puntos_df["nombre_punto"] == punto_nombre]
