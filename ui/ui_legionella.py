@@ -2032,7 +2032,7 @@ def pantalla_legionella():
        ]
     )
 
-       with tab1:
+    with tab1:
         st.markdown("### Nuevo control")
 
         centros = list(CENTROS.keys())
