@@ -2052,17 +2052,21 @@ def pantalla_legionella():
 
         if puntos_df.empty:
             st.warning("No hay puntos de control dados de alta. Ve a la pestaña ⚙️ Puntos y crea el primero.")
-        else:
-            punto_nombre = st.selectbox("Punto de control", puntos_df["nombre_punto"].tolist())
-
-        punto_nombre = st.selectbox("Punto de control", puntos_df["nombre_punto"].tolist())
-        df_filtrado = puntos_df[puntos_df["nombre_punto"] == punto_nombre]
-
+            st.stop()
+        
+        punto_nombre = st.selectbox(
+            "Punto de control",
+            puntos_df["nombre_punto"].dropna().astype(str).tolist()
+        )
+        
+        df_filtrado = puntos_df[
+            puntos_df["nombre_punto"].astype(str) == str(punto_nombre)
+        ]
+        
         if df_filtrado.empty:
             st.error("No se ha encontrado el punto de control. Revisa configuración.")
-        else:
-            punto = df_filtrado.iloc[0].to_dict()
-
+            st.stop()
+        
         punto = df_filtrado.iloc[0].to_dict()
         tipo_punto = punto["tipo_punto"]
         tipo_control_punto = punto.get("tipo_control_punto", "")
