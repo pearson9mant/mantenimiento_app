@@ -961,7 +961,10 @@ def obtener_puntos_legionella_admin():
                plano_nombre,
                plano_data,
                activo,
-               observaciones
+               observaciones,
+               categoria_panel,
+               subcategoria_panel,
+               codigo_panel
         FROM legionella_puntos
         ORDER BY centro, edificio, instalacion, nombre_punto
     """)
