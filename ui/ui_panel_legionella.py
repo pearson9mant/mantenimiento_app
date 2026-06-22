@@ -60,8 +60,8 @@ def tarjeta_kpi(titulo, valor, icono):
             border:1px solid #e5e7eb;min-height:125px;
         ">
             <div style="font-size:30px;">{icono}</div>
-            <div style="font-size:14px;color:#64748b;">{titulo}</div>
-            <div style="font-size:30px;font-weight:900;color:#0f172a;">{valor}</div>
+            <div style="font-size:14px;color:#64748b;">{html.escape(str(titulo))}</div>
+            <div style="font-size:30px;font-weight:900;color:#0f172a;">{html.escape(str(valor))}</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -140,114 +140,120 @@ def punto_control(codigo, estado="ok"):
     """
 
 
-def contar_registros_por_tarea(textos):
-    if isinstance(textos, str):
-        textos = [textos]
+# =====================================================
+# CONTADORES REALES
+# =====================================================
 
-    condiciones = []
+def _placeholders(lista):
+    return ",".join(["?"] * len(lista))
+
+
+def contar_puntos_exactos(centro=None, tipos=None, tipos_control=None, instalacion=None):
+    condiciones = ["activo = 1"]
     params = []
 
-    for texto in textos:
-        condiciones.append("""
-            LOWER(COALESCE(tarea, '')) LIKE ?
-            OR LOWER(COALESCE(tipo_control, '')) LIKE ?
-        """)
-        params.extend([f"%{texto.lower()}%", f"%{texto.lower()}%"])
+    if centro:
+        condiciones.append("centro = ?")
+        params.append(centro)
 
-    df = leer_df(f"""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
-        WHERE {' OR '.join(condiciones)}
-    """, tuple(params))
+    if tipos:
+        condiciones.append(
+            "LOWER(COALESCE(tipo_punto, '')) IN (" + _placeholders(tipos) + ")"
+        )
+        params.extend([str(t).lower() for t in tipos])
 
-    return valor_unico(df)
+    if tipos_control:
+        condiciones.append(
+            "LOWER(COALESCE(tipo_control_punto, '')) IN (" + _placeholders(tipos_control) + ")"
+        )
+        params.extend([str(t).lower() for t in tipos_control])
 
-
-def contar_registros_por_tarea_y_centro(textos, centro):
-    if isinstance(textos, str):
-        textos = [textos]
-
-    condiciones = []
-    params = []
-
-    for texto in textos:
-        condiciones.append("""
-            LOWER(COALESCE(tarea, '')) LIKE ?
-            OR LOWER(COALESCE(tipo_control, '')) LIKE ?
-        """)
-        params.extend([f"%{texto.lower()}%", f"%{texto.lower()}%"])
-
-    params.append(centro)
-
-    df = leer_df(f"""
-        SELECT COUNT(*) AS total
-        FROM legionella_registros
-        WHERE ({' OR '.join(condiciones)})
-          AND centro = ?
-    """, tuple(params))
-
-    return valor_unico(df)
-
-
-def contar_puntos_por_tipo(textos):
-    condiciones = []
-    params = []
-
-    for texto in textos:
-        condiciones.append("""
-            LOWER(COALESCE(tipo_punto, '')) LIKE ?
-            OR LOWER(COALESCE(tipo_control_punto, '')) LIKE ?
-            OR LOWER(COALESCE(instalacion, '')) LIKE ?
-            OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
-        """)
-        params.extend([f"%{texto.lower()}%"] * 4)
+    if instalacion:
+        condiciones.append("LOWER(COALESCE(instalacion, '')) = ?")
+        params.append(str(instalacion).lower())
 
     df = leer_df(f"""
         SELECT COUNT(*) AS total
         FROM legionella_puntos
-        WHERE activo = 1
-          AND ({' OR '.join(condiciones)})
+        WHERE {' AND '.join(condiciones)}
     """, tuple(params))
 
     return valor_unico(df)
 
 
-def contar_puntos_por_tipo_y_centro(textos, centro):
-    condiciones = []
+def contar_registros_por_puntos(centro=None, tipos=None, tipos_control=None, tareas=None):
+    condiciones = ["p.activo = 1"]
     params = []
 
-    for texto in textos:
-        condiciones.append("""
-            LOWER(COALESCE(tipo_punto, '')) LIKE ?
-            OR LOWER(COALESCE(tipo_control_punto, '')) LIKE ?
-            OR LOWER(COALESCE(instalacion, '')) LIKE ?
-            OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
-        """)
-        params.extend([f"%{texto.lower()}%"] * 4)
+    if centro:
+        condiciones.append("p.centro = ?")
+        params.append(centro)
 
-    params.append(centro)
+    if tipos:
+        condiciones.append(
+            "LOWER(COALESCE(p.tipo_punto, '')) IN (" + _placeholders(tipos) + ")"
+        )
+        params.extend([str(t).lower() for t in tipos])
+
+    if tipos_control:
+        condiciones.append(
+            "LOWER(COALESCE(p.tipo_control_punto, '')) IN (" + _placeholders(tipos_control) + ")"
+        )
+        params.extend([str(t).lower() for t in tipos_control])
+
+    if tareas:
+        condiciones.append(
+            "LOWER(COALESCE(r.tarea, '')) IN (" + _placeholders(tareas) + ")"
+        )
+        params.extend([str(t).lower() for t in tareas])
+
+    df = leer_df(f"""
+        SELECT COUNT(r.id) AS total
+        FROM legionella_puntos p
+        LEFT JOIN legionella_registros r
+          ON r.centro = p.centro
+         AND r.edificio = p.edificio
+         AND r.punto = p.nombre_punto
+        WHERE {' AND '.join(condiciones)}
+    """, tuple(params))
+
+    return valor_unico(df)
+
+
+def contar_registros_tarea_global(tareas):
+    if isinstance(tareas, str):
+        tareas = [tareas]
 
     df = leer_df(f"""
         SELECT COUNT(*) AS total
-        FROM legionella_puntos
-        WHERE activo = 1
-          AND ({' OR '.join(condiciones)})
-          AND centro = ?
-    """, tuple(params))
+        FROM legionella_registros
+        WHERE LOWER(COALESCE(tarea, '')) IN ({_placeholders(tareas)})
+    """, tuple([str(t).lower() for t in tareas]))
 
     return valor_unico(df)
 
+
+# =====================================================
+# KPIS GENERALES
+# =====================================================
 
 def obtener_kpis_legionella():
     hoy = date.today()
     limite = hoy + timedelta(days=30)
 
-    df_puntos = leer_df("SELECT COUNT(*) AS total FROM legionella_puntos WHERE activo = 1")
+    df_puntos = leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_puntos
+        WHERE activo = 1
+    """)
 
     df_controles = leer_df("""
         SELECT COUNT(*) AS total
         FROM legionella_registros
-        WHERE centro IS NOT NULL AND edificio IS NOT NULL AND punto IS NOT NULL AND tarea IS NOT NULL
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
     """)
 
     df_ot = leer_df("""
@@ -272,6 +278,7 @@ def obtener_kpis_legionella():
     """)
 
     proximos = 0
+
     if not df_tareas.empty:
         df_tareas["proxima_fecha_dt"] = pd.to_datetime(df_tareas["proxima_fecha"], errors="coerce")
         proximos = len(
@@ -285,7 +292,10 @@ def obtener_kpis_legionella():
         SELECT COUNT(*) AS total,
                SUM(CASE WHEN estado = 'OK' THEN 1 ELSE 0 END) AS ok
         FROM legionella_registros
-        WHERE centro IS NOT NULL AND edificio IS NOT NULL AND punto IS NOT NULL AND tarea IS NOT NULL
+        WHERE centro IS NOT NULL
+          AND edificio IS NOT NULL
+          AND punto IS NOT NULL
+          AND tarea IS NOT NULL
     """)
 
     total_reg = int(df_ok.loc[0, "total"] or 0) if not df_ok.empty else 0
@@ -303,44 +313,139 @@ def obtener_kpis_legionella():
 
 def obtener_estado_instalaciones():
     return {
-        "acumuladores": contar_puntos_por_tipo(["acumulador"]),
-        "afch": contar_puntos_por_tipo(["afch", "afs", "grifo", "fuente", "lavamanos"]),
-        "duchas": contar_puntos_por_tipo(["ducha"]),
-        "vtm": contar_puntos_por_tipo(["válvula", "valvula", "vtm"]),
-        "solar": contar_puntos_por_tipo(["solar"]),
-        "retornos": contar_puntos_por_tipo(["retorno", "rtc"]),
-        "temp_acum": contar_registros_por_tarea(["acumulador"]),
-        "temp_impulsion": contar_registros_por_tarea(["impulsión", "impulsion"]),
-        "temp_retorno": contar_registros_por_tarea(["retorno"]),
-        "purgas": contar_registros_por_tarea(["purga"]),
-        "choques": contar_registros_por_tarea(["choque"]),
-        "afs": contar_registros_por_tarea(["afs", "afch"]),
-        "cloro": contar_registros_por_tarea(["cloro"]),
-        "acs_terminal": contar_registros_por_tarea(["acs terminal", "punto terminal completo"]),
-        "vtm_rev": contar_registros_por_tarea(["válvula", "valvula", "vtm"]),
-        "solar_lecturas": contar_registros_por_tarea(["solar"]),
+        "acumuladores": contar_puntos_exactos(tipos=["acumulador"]),
+        "afch": contar_puntos_exactos(tipos=["grifo", "fuente", "lavamanos", "muestra"]),
+        "duchas": contar_puntos_exactos(tipos=["ducha"]),
+        "vtm": contar_puntos_exactos(tipos=["Válvulas", "valvulas", "válvulas"]),
+        "solar": contar_puntos_exactos(tipos=["acumulador_solar"]),
+        "retornos": contar_puntos_exactos(tipos=["retorno"]),
+
+        "temp_acum": contar_registros_por_puntos(
+            tipos=["acumulador"],
+            tareas=["Temperatura acumulador", "Control sala ACS"]
+        ),
+        "temp_impulsion": contar_registros_por_puntos(
+            tipos=["acumulador"],
+            tareas=["Temperatura impulsión ACS", "Control sala ACS"]
+        ),
+        "temp_retorno": contar_registros_por_puntos(
+            tipos=["retorno"],
+            tareas=["Temperatura retorno", "Control sala ACS"]
+        ),
+        "purgas": contar_registros_tarea_global(["Purga"]),
+        "choques": contar_registros_tarea_global(["Choque térmico"]),
+        "afs": contar_registros_por_puntos(
+            tipos=["grifo", "fuente", "lavamanos", "muestra", "ducha"],
+            tareas=["Control AFS", "Control punto terminal completo"]
+        ),
+        "cloro": contar_registros_por_puntos(
+            tipos=["grifo", "fuente", "lavamanos", "muestra", "ducha"],
+            tareas=["Control AFS", "Control punto terminal completo", "Cloro residual"]
+        ),
+        "acs_terminal": contar_registros_por_puntos(
+            tipos=["ducha", "grifo", "lavamanos"],
+            tareas=["Control ACS terminal", "Control punto terminal completo"]
+        ),
+        "vtm_rev": contar_registros_por_puntos(
+            tipos=["Válvulas", "valvulas", "válvulas"],
+            tareas=["Control válvula termostática"]
+        ),
+        "solar_lecturas": contar_registros_por_puntos(
+            tipos=["acumulador_solar"],
+            tareas=["Temperatura acumulador", "Solo temperatura"]
+        ),
     }
 
 
 def obtener_estado_instalaciones_centro(centro):
     return {
-        "acumuladores": contar_puntos_por_tipo_y_centro(["acumulador"], centro),
-        "afch": contar_puntos_por_tipo_y_centro(["afch", "afs", "grifo", "fuente", "lavamanos"], centro),
-        "duchas": contar_puntos_por_tipo_y_centro(["ducha"], centro),
-        "vtm": contar_puntos_por_tipo_y_centro(["válvula", "valvula", "vtm"], centro),
-        "solar": contar_puntos_por_tipo_y_centro(["solar"], centro),
-        "retornos": contar_puntos_por_tipo_y_centro(["retorno", "rtc"], centro),
+        "acumuladores": contar_puntos_exactos(
+            centro=centro,
+            tipos=["acumulador"]
+        ),
 
-        "temp_acum": contar_registros_por_tarea_y_centro(["acumulador"], centro),
-        "temp_impulsion": contar_registros_por_tarea_y_centro(["impulsión", "impulsion"], centro),
-        "temp_retorno": contar_registros_por_tarea_y_centro(["retorno"], centro),
-        "purgas": contar_registros_por_tarea_y_centro(["purga"], centro),
-        "choques": contar_registros_por_tarea_y_centro(["choque"], centro),
-        "afs": contar_registros_por_tarea_y_centro(["afs", "afch"], centro),
-        "cloro": contar_registros_por_tarea_y_centro(["cloro"], centro),
-        "acs_terminal": contar_registros_por_tarea_y_centro(["acs terminal", "punto terminal completo"], centro),
-        "vtm_rev": contar_registros_por_tarea_y_centro(["válvula", "valvula", "vtm"], centro),
-        "solar_lecturas": contar_registros_por_tarea_y_centro(["solar"], centro),
+        "afch": contar_puntos_exactos(
+            centro=centro,
+            tipos=["grifo", "fuente", "lavamanos", "muestra"]
+        ),
+
+        "duchas": contar_puntos_exactos(
+            centro=centro,
+            tipos=["ducha"]
+        ),
+
+        "vtm": contar_puntos_exactos(
+            centro=centro,
+            tipos=["Válvulas", "valvulas", "válvulas"]
+        ),
+
+        "solar": contar_puntos_exactos(
+            centro=centro,
+            tipos=["acumulador_solar"]
+        ),
+
+        "retornos": contar_puntos_exactos(
+            centro=centro,
+            tipos=["retorno"]
+        ),
+
+        "temp_acum": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["acumulador"],
+            tareas=["Temperatura acumulador", "Control sala ACS"]
+        ),
+
+        "temp_impulsion": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["acumulador"],
+            tareas=["Temperatura impulsión ACS", "Control sala ACS"]
+        ),
+
+        "temp_retorno": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["retorno"],
+            tareas=["Temperatura retorno", "Control sala ACS"]
+        ),
+
+        "purgas": contar_registros_por_puntos(
+            centro=centro,
+            tareas=["Purga"]
+        ),
+
+        "choques": contar_registros_por_puntos(
+            centro=centro,
+            tareas=["Choque térmico"]
+        ),
+
+        "afs": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["grifo", "fuente", "lavamanos", "muestra", "ducha"],
+            tareas=["Control AFS", "Control punto terminal completo"]
+        ),
+
+        "cloro": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["grifo", "fuente", "lavamanos", "muestra", "ducha"],
+            tareas=["Control AFS", "Control punto terminal completo", "Cloro residual"]
+        ),
+
+        "acs_terminal": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["ducha", "grifo", "lavamanos"],
+            tareas=["Control ACS terminal", "Control punto terminal completo"]
+        ),
+
+        "vtm_rev": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["Válvulas", "valvulas", "válvulas"],
+            tareas=["Control válvula termostática"]
+        ),
+
+        "solar_lecturas": contar_registros_por_puntos(
+            centro=centro,
+            tipos=["acumulador_solar"],
+            tareas=["Temperatura acumulador", "Solo temperatura"]
+        ),
     }
 
 
@@ -459,6 +564,7 @@ def obtener_puntos_control():
         return []
 
     puntos = []
+
     for _, row in df.iterrows():
         nombre = str(row.get("nombre_punto") or "").strip()
         estado = str(row.get("ultimo_estado") or "OK").upper()
@@ -499,6 +605,7 @@ def obtener_proximos_controles():
         return df
 
     df["proxima_fecha_dt"] = pd.to_datetime(df["proxima_fecha"], errors="coerce")
+
     df = df[
         (df["proxima_fecha_dt"].dt.date >= hoy)
         & (df["proxima_fecha_dt"].dt.date <= limite)
@@ -511,7 +618,8 @@ def obtener_actividad_anual():
     anio = str(date.today().year)
 
     temperaturas = leer_df("""
-        SELECT COUNT(*) AS total FROM legionella_registros
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
           AND (
               LOWER(COALESCE(tarea, '')) LIKE '%temperatura%'
@@ -523,19 +631,22 @@ def obtener_actividad_anual():
     """, (anio,))
 
     purgas = leer_df("""
-        SELECT COUNT(*) AS total FROM legionella_registros
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
-          AND LOWER(COALESCE(tarea, '')) LIKE '%purga%'
+          AND LOWER(COALESCE(tarea, '')) = 'purga'
     """, (anio,))
 
     choques = leer_df("""
-        SELECT COUNT(*) AS total FROM legionella_registros
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
         WHERE substr(fecha, 1, 4) = ?
-          AND LOWER(COALESCE(tarea, '')) LIKE '%choque%'
+          AND LOWER(COALESCE(tarea, '')) = 'choque térmico'
     """, (anio,))
 
     analiticas = leer_df("""
-        SELECT COUNT(*) AS total FROM legionella_informes
+        SELECT COUNT(*) AS total
+        FROM legionella_informes
         WHERE substr(fecha_informe, 1, 4) = ?
           AND (
               LOWER(COALESCE(tipo_informe, '')) LIKE '%analítica%'
@@ -552,10 +663,28 @@ def obtener_actividad_anual():
 
 
 def obtener_dossier_estado():
-    plan = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_tareas WHERE activo = 1"))
-    registros = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_registros"))
-    informes = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_informes"))
-    puntos = valor_unico(leer_df("SELECT COUNT(*) AS total FROM legionella_puntos WHERE activo = 1"))
+    plan = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_tareas
+        WHERE activo = 1
+    """))
+
+    registros = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_registros
+    """))
+
+    informes = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_informes
+    """))
+
+    puntos = valor_unico(leer_df("""
+        SELECT COUNT(*) AS total
+        FROM legionella_puntos
+        WHERE activo = 1
+    """))
+
     abiertas = valor_unico(leer_df("""
         SELECT COUNT(*) AS total
         FROM legionella_incidencias
@@ -636,12 +765,16 @@ def pintar_dossier_inspeccion(dossier):
 
     with c1:
         st.success("✔ Puntos identificados") if dossier["puntos"] else st.error("✖ Faltan puntos")
+
     with c2:
         st.success("✔ Plan actualizado") if dossier["plan"] else st.error("✖ Falta planificación")
+
     with c3:
         st.success("✔ Registros completos") if dossier["registros"] else st.error("✖ Sin registros")
+
     with c4:
         st.success("✔ Informes archivados") if dossier["informes"] else st.warning("⚠ Sin informes externos")
+
     with c5:
         st.success("✔ Correctivos cerrados") if dossier["correctivos"] else st.warning("⚠ Correctivos pendientes")
 
@@ -745,6 +878,7 @@ def pantalla_panel_legionella():
 
     with c5:
         solar_estado = "riesgo" if datos["solar"] > 0 and datos["solar_lecturas"] == 0 else "ok"
+
         tarjeta_instalacion("SOLAR", "☀️", [
             f"Depósitos solares: {datos['solar']}",
             f"Lecturas realizadas: {datos['solar_lecturas']}",
@@ -775,8 +909,10 @@ def pantalla_panel_legionella():
 
     if puntos:
         puntos_html = "<div style='margin-bottom:10px;'>"
+
         for nombre, estado in puntos:
             puntos_html += punto_control(nombre, estado)
+
         puntos_html += "</div>"
 
         filas = max(1, math.ceil(len(puntos) / 8))
