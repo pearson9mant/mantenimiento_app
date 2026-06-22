@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
+import streamlit.components.v1 as components
 from datetime import date
 from database.db import conectar
 
