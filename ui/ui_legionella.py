@@ -2060,7 +2060,8 @@ def pantalla_legionella():
 
         if df_filtrado.empty:
             st.error("No se ha encontrado el punto de control. Revisa configuración.")
-            return
+        else:
+            punto = df_filtrado.iloc[0].to_dict()
 
         punto = df_filtrado.iloc[0].to_dict()
         tipo_punto = punto["tipo_punto"]
