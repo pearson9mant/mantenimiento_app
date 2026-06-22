@@ -3107,7 +3107,7 @@ def pantalla_legionella():
                             activo_edit,
                             plano_nombre,
                             plano_data,
-                           categoria_panel_edit,
+                            categoria_panel_edit,
                             subcategoria_panel_edit,
                             codigo_panel_edit 
                         )
