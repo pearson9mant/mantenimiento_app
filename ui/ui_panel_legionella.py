@@ -594,6 +594,58 @@ def obtener_puntos_control():
 
     return puntos
 
+def obtener_ficha_punto_control(nombre_punto):
+    df = leer_df("""
+        SELECT
+            p.id,
+            p.nombre_punto,
+            p.centro,
+            p.edificio,
+            p.instalacion,
+            p.tipo_punto,
+            p.tipo_control_punto,
+            p.ubicacion,
+            p.ubicacion_exacta,
+            p.numero_terminales,
+            p.observaciones,
+            (
+                SELECT r.fecha
+                FROM legionella_registros r
+                WHERE r.punto = p.nombre_punto
+                  AND r.centro = p.centro
+                  AND r.edificio = p.edificio
+                ORDER BY r.fecha DESC, r.id DESC
+                LIMIT 1
+            ) AS ultima_fecha,
+            (
+                SELECT r.estado
+                FROM legionella_registros r
+                WHERE r.punto = p.nombre_punto
+                  AND r.centro = p.centro
+                  AND r.edificio = p.edificio
+                ORDER BY r.fecha DESC, r.id DESC
+                LIMIT 1
+            ) AS ultimo_estado,
+            (
+                SELECT r.resultado
+                FROM legionella_registros r
+                WHERE r.punto = p.nombre_punto
+                  AND r.centro = p.centro
+                  AND r.edificio = p.edificio
+                ORDER BY r.fecha DESC, r.id DESC
+                LIMIT 1
+            ) AS ultimo_resultado
+        FROM legionella_puntos p
+        WHERE p.activo = 1
+          AND p.nombre_punto = ?
+        LIMIT 1
+    """, (nombre_punto,))
+
+    if df.empty:
+        return None
+
+    return df.iloc[0].to_dict()
+
 
 def obtener_incidencias_abiertas():
     return leer_df("""
