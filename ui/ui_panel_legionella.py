@@ -978,16 +978,60 @@ def pantalla_panel_legionella():
 
     if puntos:
         puntos_html = "<div style='margin-bottom:10px;'>"
-
         for nombre, estado in puntos:
             puntos_html += punto_control(nombre, estado)
-
         puntos_html += "</div>"
 
         filas = max(1, math.ceil(len(puntos) / 8))
         alto = min(300, max(90, filas * 58))
 
         components.html(puntos_html, height=alto, scrolling=False)
+
+        nombres_puntos = [nombre for nombre, _ in puntos]
+
+        punto_sel = st.selectbox(
+            "Ver ficha de punto",
+            ["Selecciona un punto"] + nombres_puntos,
+            key="panel_legionella_ficha_punto"
+        )
+
+        if punto_sel != "Selecciona un punto":
+            ficha = obtener_ficha_punto_control(punto_sel)
+
+            if ficha is None:
+                st.warning("No se ha encontrado la ficha del punto.")
+            else:
+                st.markdown("### 📌 Ficha del punto")
+
+                c1, c2, c3 = st.columns(3)
+
+                with c1:
+                    st.write(f"**Punto:** {ficha.get('nombre_punto', '')}")
+                    st.write(f"**Centro:** {ficha.get('centro', '')}")
+                    st.write(f"**Edificio:** {ficha.get('edificio', '')}")
+
+                with c2:
+                    st.write(f"**Instalación:** {ficha.get('instalacion', '')}")
+                    st.write(f"**Tipo punto:** {ficha.get('tipo_punto', '')}")
+                    st.write(f"**Tipo control:** {ficha.get('tipo_control_punto', '')}")
+
+                with c3:
+                    st.write(f"**Ubicación:** {ficha.get('ubicacion', '')}")
+                    st.write(f"**Ubicación exacta:** {ficha.get('ubicacion_exacta', '')}")
+                    st.write(f"**Terminales:** {ficha.get('numero_terminales', '')}")
+
+                st.markdown("#### Último control")
+
+                estado = ficha.get("ultimo_estado") or "Sin registros"
+                resultado = ficha.get("ultimo_resultado") or ""
+                fecha = ficha.get("ultima_fecha") or ""
+
+                st.write(f"**Fecha:** {fecha}")
+                st.write(f"**Estado:** {estado}")
+                st.write(f"**Resultado:** {resultado}")
+
+                if ficha.get("observaciones"):
+                    st.info(f"Observaciones: {ficha.get('observaciones')}")
     else:
         st.info("Todavía no hay puntos activos registrados.")
 
