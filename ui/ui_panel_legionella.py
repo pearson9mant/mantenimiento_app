@@ -546,6 +546,8 @@ def obtener_puntos_control():
             p.nombre_punto,
             p.centro,
             p.edificio,
+            p.tipo_punto,
+            p.tipo_control_punto,
             (
                 SELECT r.estado
                 FROM legionella_registros r
@@ -563,6 +565,16 @@ def obtener_puntos_control():
     if df.empty:
         return []
 
+    palabras_antiguas = [
+        "choque térmico",
+        "choque termico",
+        "control temperatura",
+        "temperatura/",
+        "acs-02-duchas",
+        "acs-03-ducha",
+        "acumulador acs-01-m-02",
+    ]
+
     puntos = []
 
     for _, row in df.iterrows():
@@ -570,6 +582,11 @@ def obtener_puntos_control():
         estado = str(row.get("ultimo_estado") or "OK").upper()
 
         if not nombre:
+            continue
+
+        nombre_lower = nombre.lower()
+
+        if any(palabra in nombre_lower for palabra in palabras_antiguas):
             continue
 
         estado_visual = "riesgo" if estado in ["RIESGO", "INCIDENCIA"] else "ok"
