@@ -329,8 +329,8 @@ def obtener_estado_instalaciones():
             tareas=["Temperatura impulsión ACS", "Control sala ACS"]
         ),
         "temp_retorno": contar_registros_por_puntos(
-            tipos=["retorno"],
-            tareas=["Temperatura retorno", "Control sala ACS"]
+            tipos=["acumulador"],
+            tareas=["Control sala ACS"]
         ),
         "purgas": contar_registros_tarea_global(["Purga"]),
         "choques": contar_registros_tarea_global(["Choque térmico"]),
