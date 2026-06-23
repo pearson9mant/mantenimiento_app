@@ -518,8 +518,8 @@ def bloque_centro_legionella(nombre_centro, datos_centro, cumplimiento_txt):
             "RETORNOS",
             "🔄",
             [
-                f"Puntos retorno: {datos_centro['retornos']}",
                 f"Mediciones retorno: {datos_centro['temp_retorno']}",
+                "Integrado en Control sala ACS",
                 "Temperatura mínima: ≥ 50 ºC",
                 "Recirculación controlada",
             ],
