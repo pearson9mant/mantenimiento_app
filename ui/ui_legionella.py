@@ -2619,6 +2619,111 @@ def pantalla_legionella():
                     st.success("Punto creado correctamente.")
                     st.rerun()
 
+        with st.expander("📋 Crear tarea sobre un punto existente", expanded=False):
+            puntos_tarea = obtener_puntos_legionella_admin()
+
+            if puntos_tarea.empty:
+                st.info("Primero debes crear algún punto.")
+            else:
+                centro_tarea = st.selectbox(
+                    "Centro",
+                    sorted(puntos_tarea["centro"].dropna().astype(str).unique().tolist()),
+                    key="tarea_manual_centro"
+                )
+
+                df_centro = puntos_tarea[puntos_tarea["centro"] == centro_tarea]
+
+                edificio_tarea = st.selectbox(
+                    "Edificio / zona",
+                    sorted(df_centro["edificio"].dropna().astype(str).unique().tolist()),
+                    key="tarea_manual_edificio"
+                )
+
+                df_edificio = df_centro[df_centro["edificio"] == edificio_tarea]
+
+                punto_tarea = st.selectbox(
+                    "Punto",
+                    sorted(df_edificio["nombre_punto"].dropna().astype(str).unique().tolist()),
+                    key="tarea_manual_punto"
+                )
+
+                fila_punto = df_edificio[df_edificio["nombre_punto"] == punto_tarea].iloc[0]
+
+                tarea_manual = st.selectbox(
+                    "Control / tarea",
+                    [
+                        "Control sala ACS",
+                        "Control punto terminal completo",
+                        "Control AFS",
+                        "Control ACS terminal",
+                        "Temperatura acumulador",
+                        "Temperatura impulsión ACS",
+                        "Temperatura retorno",
+                        "Control válvula termostática",
+                        "Choque térmico",
+                        "Purga",
+                        "Revisión visual",
+                        "Limpieza interior acumulador",
+                    ],
+                    key="tarea_manual_nombre"
+                )
+
+                frecuencia_manual = st.number_input(
+                    "Frecuencia en días",
+                    min_value=1,
+                    max_value=730,
+                    value=30,
+                    step=1,
+                    key="tarea_manual_frecuencia"
+                )
+
+                unidad_manual = unidad_por_tarea(tarea_manual)
+
+                if not unidad_manual:
+                    unidad_manual = st.selectbox(
+                        "Unidad",
+                        ["Realizado/No realizado", "OK/KO", "ºC", "mg/L", "Otra"],
+                        key="tarea_manual_unidad"
+                    )
+                else:
+                    st.info(f"Unidad: {unidad_manual}")
+
+                operario_manual = st.selectbox(
+                    "Operario",
+                    OPERARIOS,
+                    index=OPERARIOS.index(operario_por_centro(centro_tarea))
+                    if operario_por_centro(centro_tarea) in OPERARIOS else 0,
+                    key="tarea_manual_operario"
+                )
+
+                if operario_manual == "Otro":
+                    operario_manual = st.text_input(
+                        "Nombre operario",
+                        key="tarea_manual_operario_otro"
+                    )
+
+                generar_ot_manual = st.checkbox(
+                    "Generar OT cuando toque",
+                    value=True,
+                    key="tarea_manual_generar_ot"
+                )
+
+                if st.button("💾 Crear tarea sobre este punto", use_container_width=True):
+                    crear_tarea_legionella_manual(
+                        centro_tarea,
+                        edificio_tarea,
+                        fila_punto["instalacion"],
+                        punto_tarea,
+                        tarea_manual,
+                        frecuencia_manual,
+                        unidad_manual,
+                        operario_manual,
+                        generar_ot_manual
+                    )
+
+                    st.success("Tarea creada correctamente sobre el punto seleccionado.")
+                    st.rerun()
+
         st.markdown("---")
         st.markdown("### Puntos existentes")
 
