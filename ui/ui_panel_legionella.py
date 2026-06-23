@@ -888,8 +888,8 @@ def pantalla_panel_legionella():
 
     with c6:
         tarjeta_instalacion("RETORNOS", "🔄", [
-            f"Puntos: {datos['retornos']}",
             f"Mediciones retorno: {datos['temp_retorno']}",
+            "Integrado en Control sala ACS",
             "Temperatura mínima: ≥ 50 ºC",
             "Recirculación controlada",
         ], cumplimiento_txt)
