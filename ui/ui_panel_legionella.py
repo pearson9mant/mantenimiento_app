@@ -403,8 +403,8 @@ def obtener_estado_instalaciones_centro(centro):
 
         "temp_retorno": contar_registros_por_puntos(
             centro=centro,
-            tipos=["retorno"],
-            tareas=["Temperatura retorno", "Control sala ACS"]
+            tipos=["acumulador"],
+            tareas=["Control sala ACS"]
         ),
 
         "purgas": contar_registros_por_puntos(
