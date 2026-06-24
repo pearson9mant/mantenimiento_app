@@ -3366,9 +3366,10 @@ def pantalla_legionella():
                     fecha_actuacion + timedelta(days=dias)
                 ).strftime("%Y-%m-%d")
 
-            pdf_file = st.file_uploader(
-                "Subir PDF informe",
+            pdf_files = st.file_uploader(
+                "Subir PDF informe(s)",
                 type=["pdf"],
+                accept_multiple_files=True,
                 key="leg_pdf"
             )
 
@@ -3387,20 +3388,24 @@ def pantalla_legionella():
                 pdf_nombre = ""
                 pdf_data = None
 
-                if pdf_file is not None:
-                    pdf_nombre = (
-                        f"{tipo_informe}_{centro}_{fecha_informe}.pdf"
-                    )
+                if pdf_files:
+                    nombres_pdf = []
+                    datos_pdf = []
 
-                    pdf_nombre = (
-                        pdf_nombre
-                        .replace(" ", "_")
-                        .replace("/", "_")
-                        .replace("\\", "_")
-                        .replace(":", "_")
-                    )
+                    for pdf_file in pdf_files:
+                        nombre_limpio = (
+                            pdf_file.name
+                            .replace(" ", "_")
+                            .replace("/", "_")
+                            .replace("\\", "_")
+                            .replace(":", "_")
+                        )
 
-                    pdf_data = pdf_file.getvalue()
+                        nombres_pdf.append(nombre_limpio)
+                        datos_pdf.append(pdf_file.getvalue())
+
+                    pdf_nombre = "|".join(nombres_pdf)
+                    pdf_data = b"|||PDF_SEPARADOR|||".join(datos_pdf)
 
                 ejecutar("""
                     INSERT INTO legionella_informes
