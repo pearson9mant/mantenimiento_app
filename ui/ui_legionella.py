@@ -736,7 +736,7 @@ def unidad_por_tarea(tarea):
         return "ºC" 
 
     if tarea == "Limpieza y desinfección acumulador":
-    return "Sí/No"
+        return "Sí/No"
 
     if tarea == "Limpieza y desinfección depósito AFCH":
         return "Sí/No"
