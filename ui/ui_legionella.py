@@ -3549,19 +3549,25 @@ def pantalla_legionella():
 
                     if pdf_data is not None and pdf_data != b"":
 
-                        nombre_descarga = (
-                            row["pdf_nombre"]
-                            if row.get("pdf_nombre")
-                            else f"informe_legionella_{row['id']}.pdf"
-                        )
-
-                        st.download_button(
-                            label=titulo_pdf,
-                            data=bytes(pdf_data),
-                            file_name=nombre_descarga,
-                            mime="application/pdf",
-                            key=f"pdf_leg_db_{row['id']}"
-                        )
+                        nombres = str(row.get("pdf_nombre") or "").split("|")
+                        archivos = bytes(pdf_data).split(b"|||PDF_SEPARADOR|||")
+                    
+                        st.markdown(f"**{titulo_pdf}**")
+                    
+                        for i, archivo_pdf in enumerate(archivos):
+                            nombre_descarga = (
+                                nombres[i]
+                                if i < len(nombres) and nombres[i]
+                                else f"informe_legionella_{row['id']}_{i + 1}.pdf"
+                            )
+                    
+                            st.download_button(
+                                label=f"📄 Descargar {nombre_descarga}",
+                                data=archivo_pdf,
+                                file_name=nombre_descarga,
+                                mime="application/pdf",
+                                key=f"pdf_leg_db_{row['id']}_{i}"
+                            )
 
                     elif row.get("pdf") and Path(str(row["pdf"])).exists():
                         with open(row["pdf"], "rb") as f:
