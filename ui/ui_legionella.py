@@ -2857,7 +2857,8 @@ def pantalla_legionella():
                         "Choque térmico",
                         "Purga",
                         "Revisión visual",
-                        "Limpieza interior acumulador",
+                        "Limpieza y desinfección acumulador",
+                        "Limpieza y desinfección depósito AFCH",
                     ],
                     key="tarea_manual_nombre"
                 )
