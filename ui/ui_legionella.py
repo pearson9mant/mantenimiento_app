@@ -3288,7 +3288,9 @@ def pantalla_legionella():
                     "Tipo informe",
                     [
                         "Analítica laboratorio",
-                        "Limpieza depósito",
+                        "Limpieza y desinfección acumulador ACS",
+                        "Limpieza y desinfección depósito AFCH",
+                        "Limpieza y desinfección red AFCH"
                         "Desinfección",
                         "Revisión externa",
                         "Certificado",
