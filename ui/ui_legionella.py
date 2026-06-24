@@ -2492,39 +2492,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         use_container_width=True
     )
 
-    def texto_valores(row):
-        tarea = str(row.get("tarea", ""))
-
-        if tarea == "Control AFS":
-            return f"AFS: {row.get('valor', '')} ºC / Cloro: {row.get('valor_2', '')} mg/L"
-
-        if tarea == "Control ACS terminal":
-            return f"ACS terminal: {row.get('valor', '')} ºC"
-
-        if tarea == "Control punto terminal completo":
-            return (
-                f"AFS: {row.get('valor', '')} ºC / "
-                f"Cloro: {row.get('valor_2', '')} mg/L / "
-                f"ACS: {row.get('valor_3', '')} ºC"
-            )
-
-        if tarea == "Control sala ACS":
-            return (
-                f"Acum.: {row.get('valor', '')} ºC / "
-                f"Imp.: {row.get('valor_2', '')} ºC / "
-                f"Ret.: {row.get('valor_3', '')} ºC"
-            )
-
-        if tarea == "Control válvula termostática":
-            return (
-                f"Entrada ACS: {row.get('valor', '')} ºC / "
-                f"Salida mezclada: {row.get('valor_2', '')} ºC"
-            )
-
-        unidad = "" if pd.isna(row.get("unidad", "")) else str(row.get("unidad", ""))
-        valor = "" if pd.isna(row.get("valor", "")) else str(row.get("valor", ""))
-        return f"{valor} {unidad}".strip()
-
     def contar_puntos(tipo_punto=None, instalacion=None, tipo_control=None):
         if df_puntos.empty:
             return 0
