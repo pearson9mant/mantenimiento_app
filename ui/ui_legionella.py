@@ -2459,38 +2459,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         use_container_width=True
     )
 
-    def contar_puntos(tipo_punto=None, instalacion=None, tipo_control=None):
-        if df_puntos.empty:
-            return 0
-
-        df_tmp = df_puntos.copy()
-
-        if tipo_punto:
-            df_tmp = df_tmp[
-                df_tmp["tipo_punto"].astype(str).str.lower().str.contains(
-                    str(tipo_punto).lower(),
-                    na=False
-                )
-            ]
-
-        if instalacion:
-            df_tmp = df_tmp[
-                df_tmp["instalacion"].astype(str).str.lower().str.contains(
-                    str(instalacion).lower(),
-                    na=False
-                )
-            ]
-
-        if tipo_control:
-            df_tmp = df_tmp[
-                df_tmp["tipo_control_punto"].astype(str).str.lower().str.contains(
-                    str(tipo_control).lower(),
-                    na=False
-                )
-            ]
-
-        return len(df_tmp)
-
     def contar_tareas(texto):
         if df_plan.empty:
             return 0
