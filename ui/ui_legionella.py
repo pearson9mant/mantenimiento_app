@@ -1941,13 +1941,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         use_container_width=True
     )
 
-    def limpiar_pdf(texto, max_len=None):
-        texto = "" if pd.isna(texto) else str(texto)
-        texto = texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        if max_len:
-            texto = texto[:max_len]
-        return texto
-
     def texto_valores(row):
         tarea = str(row.get("tarea", ""))
 
