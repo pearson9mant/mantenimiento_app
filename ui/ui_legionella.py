@@ -1686,6 +1686,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ["Control punto terminal completo", "Según planificación", "AFCH + cloro + ACS terminal"],
         ["Depósitos solares", "Según planificación", "Registro de temperatura sin consigna automática"],
         ["Purga / revisión visual", "Según planificación", "Realizada / correcta"],
+        ["Limpieza y desinfección acumulador", "Anual",
+         "Limpieza, desinfección y revisión interior del acumulador ACS"],
+        ["Limpieza y desinfección depósito AFCH", "Anual",
+         "Según certificado empresa mantenedora"],
         ["Control válvula termostática", "Según planificación", "Entrada ≥ 60 ºC / salida 38-50 ºC"],
     ]
 
