@@ -260,8 +260,17 @@ def pantalla_preventivo_aulas():
                                 foto=ruta_foto,
                                 crear_correctivo=crear_corr_nuevo,
                             )
-
-                            st.success("Elemento guardado")
+                            
+                            creadas = 0
+                            
+                            if estado_nuevo == "Avería" and crear_corr_nuevo:
+                                creadas = crear_correctivos_desde_revision(revision_id)
+                            
+                            if creadas > 0:
+                                st.success(f"Elemento guardado y se ha creado {creadas} OT correctiva.")
+                            else:
+                                st.success("Elemento guardado")
+                            
                             st.rerun()
 
                     st.markdown("---")
