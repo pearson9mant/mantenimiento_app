@@ -175,6 +175,40 @@ def pantalla_preventivo():
 
         with st.form("form_preventivo", clear_on_submit=True):
             area = st.selectbox("Área", AREAS, key="prev_area")
+            tipo = st.selectbox(
+                "Tipo de preventivo",
+                ["Preventivo", "Normativo", "Inspección", "Limpieza", "Calibración", "Lubricación"],
+                key="prev_tipo"
+            )
+            
+            prioridad = st.selectbox(
+                "Prioridad",
+                ["Baja", "Media", "Alta"],
+                index=1,
+                key="prev_prioridad"
+            )
+            
+            duracion_prevista = st.selectbox(
+                "Duración prevista",
+                ["15 min", "30 min", "45 min", "1 h", "2 h", "Más de 2 h"],
+                key="prev_duracion"
+            )
+            
+            material_necesario = st.text_area(
+                "Material necesario",
+                key="prev_material_necesario"
+            )
+            
+            empresa_externa = st.text_input(
+                "Empresa externa / mantenedor",
+                key="prev_empresa_externa"
+            )
+            
+            fecha_limite = st.date_input(
+                "Fecha límite",
+                value=proxima_fecha,
+                key="prev_fecha_limite"
+            ) 
 
             tarea_sel = st.selectbox(
                 "Tarea preventiva",
