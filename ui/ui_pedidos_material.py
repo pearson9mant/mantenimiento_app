@@ -1,10 +1,13 @@
 import streamlit as st
 
 from config import CENTROS
+
 from modules.pedidos_material import (
-    crear_pedido_material,
+    crear_pedido_material_multiple,
     obtener_pedidos_material,
+    obtener_lineas_pedido,
     cambiar_estado_pedido,
+    cambiar_estado_linea_pedido,
     guardar_fotos_pedido_material,
     borrar_pedido_material,
     ESTADOS_PEDIDO
@@ -61,14 +64,56 @@ def referencia_pedido(id_pedido):
     return f"PED-MAT-{int(id_pedido):04d}"
 
 
+def inicializar_lineas_pedido():
+    if "pedido_material_lineas_ui" not in st.session_state:
+        st.session_state["pedido_material_lineas_ui"] = [
+            {
+                "material": "",
+                "cantidad": 1.0,
+                "observaciones": "",
+                "link_material": ""
+            }
+        ]
+
+
+def añadir_linea_pedido():
+    inicializar_lineas_pedido()
+
+    st.session_state["pedido_material_lineas_ui"].append(
+        {
+            "material": "",
+            "cantidad": 1.0,
+            "observaciones": "",
+            "link_material": ""
+        }
+    )
+
+
+def eliminar_linea_pedido(indice):
+    inicializar_lineas_pedido()
+
+    lineas = st.session_state["pedido_material_lineas_ui"]
+
+    if len(lineas) > 1:
+        lineas.pop(indice)
+
+    st.session_state["pedido_material_lineas_ui"] = lineas
+
+
+def limpiar_lineas_pedido():
+    st.session_state["pedido_material_lineas_ui"] = [
+        {
+            "material": "",
+            "cantidad": 1.0,
+            "observaciones": "",
+            "link_material": ""
+        }
+    ]
+
+
 def leer_pedido(p):
     """
-    Compatible con tabla antigua y nueva.
-    Antigua:
-    id, fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, foto...
-    
-    Nueva:
-    id, numero_pedido, fecha, operario, centro, material, cantidad, prioridad, estado, observaciones, link_material, foto...
+    Compatible con el formato devuelto por obtener_pedidos_material().
     """
 
     if len(p) >= 14:
@@ -99,6 +144,16 @@ def leer_pedido(p):
         "observaciones": p[8],
         "link_material": "",
     }
+
+
+def icono_estado(estado):
+    return {
+        "Pendiente": "🟡",
+        "Preparado": "🔵",
+        "Entregado": "🟢",
+        "Sin stock": "🔴",
+        "Cancelado": "⚫"
+    }.get(estado, "⚪")
 
 
 def mostrar_fotos_pedido(id_pedido):
@@ -132,6 +187,66 @@ def mostrar_link_material(link_material):
         st.info(f"🔗 Enlace / referencia: {link_material}")
 
 
+def mostrar_lineas_pedido(id_pedido, modo_abel=False):
+    try:
+        lineas = obtener_lineas_pedido(id_pedido)
+    except Exception as e:
+        st.error(f"No se pudieron cargar las líneas del pedido: {e}")
+        return
+
+    if not lineas:
+        st.info("Este pedido no tiene líneas de material.")
+        return
+
+    st.markdown("### 📋 Materiales solicitados")
+
+    for linea in lineas:
+        id_linea = linea[0]
+        material = linea[3]
+        cantidad = linea[4]
+        estado = linea[5] or "Pendiente"
+        observaciones = linea[6] or ""
+        link_material = linea[7] or ""
+
+        icono = icono_estado(estado)
+
+        with st.container(border=True):
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                st.markdown(f"**{icono} {material}**")
+                st.caption(f"Estado: {estado}")
+
+                if observaciones:
+                    st.write(f"**Obs.:** {observaciones}")
+
+                mostrar_link_material(link_material)
+
+            with col2:
+                st.metric("Cantidad", cantidad)
+
+            if modo_abel:
+                nuevo_estado_linea = st.selectbox(
+                    "Estado línea",
+                    ESTADOS_PEDIDO,
+                    index=ESTADOS_PEDIDO.index(estado)
+                    if estado in ESTADOS_PEDIDO else 0,
+                    key=f"estado_linea_pedido_{id_linea}"
+                )
+
+                if st.button(
+                    "💾 Guardar línea",
+                    key=f"guardar_linea_pedido_{id_linea}"
+                ):
+                    cambiar_estado_linea_pedido(
+                        id_linea,
+                        nuevo_estado_linea
+                    )
+
+                    st.success("Línea actualizada.")
+                    st.rerun()
+
+
 def ui_pedidos_material():
     st.title("📦 Pedidos de material")
 
@@ -163,6 +278,8 @@ def ui_pedidos_material():
 def ui_pedidos_operario(operario):
     st.subheader("➕ Nuevo pedido")
 
+    inicializar_lineas_pedido()
+
     fotos_pedido = st.file_uploader(
         "📷 Fotos del material o referencia",
         type=["jpg", "jpeg", "png"],
@@ -180,79 +297,129 @@ def ui_pedidos_operario(operario):
                 width=180
             )
 
-    with st.form(
-        "form_pedido_material",
-        clear_on_submit=True
-    ):
-        centro = st.selectbox(
-            "Centro",
-            list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS
-        )
+    centro = st.selectbox(
+        "Centro",
+        list(CENTROS.keys()) if isinstance(CENTROS, dict) else CENTROS,
+        key="pedido_material_centro"
+    )
 
-        material = st.text_input(
-            "Material solicitado"
-        )
+    prioridad = st.selectbox(
+        "Prioridad",
+        PRIORIDADES,
+        index=1,
+        key="pedido_material_prioridad"
+    )
 
-        cantidad = st.number_input(
-            "Cantidad",
-            min_value=1.0,
-            step=1.0
-        )
+    observaciones_generales = st.text_area(
+        "Observaciones generales del pedido",
+        key="pedido_material_observaciones_generales"
+    )
 
-        prioridad = st.selectbox(
-            "Prioridad",
-            PRIORIDADES,
-            index=1
-        )
+    st.markdown("### 📋 Materiales")
 
-        observaciones = st.text_area(
-            "Observaciones"
-        )
+    lineas = st.session_state["pedido_material_lineas_ui"]
 
-        link_material = st.text_input(
-            "🔗 Enlace referencia material",
-            placeholder="Pega aquí un enlace de Amazon, Leroy, proveedor, catálogo..."
-        )
+    for i, linea in enumerate(lineas):
+        with st.container(border=True):
+            st.markdown(f"**Material {i + 1}**")
 
-        enviar = st.form_submit_button(
-            "📨 Enviar pedido"
-        )
+            material = st.text_input(
+                "Material solicitado",
+                value=linea.get("material", ""),
+                key=f"pedido_material_nombre_{i}"
+            )
 
-        if enviar:
-            if not material.strip():
-                st.warning(
-                    "Indica el material solicitado."
+            cantidad = st.number_input(
+                "Cantidad",
+                min_value=1.0,
+                step=1.0,
+                value=float(linea.get("cantidad", 1.0) or 1.0),
+                key=f"pedido_material_cantidad_{i}"
+            )
+
+            obs_linea = st.text_input(
+                "Observaciones de esta línea",
+                value=linea.get("observaciones", ""),
+                key=f"pedido_material_obs_linea_{i}"
+            )
+
+            link_linea = st.text_input(
+                "🔗 Enlace / referencia de este material",
+                value=linea.get("link_material", ""),
+                placeholder="Amazon, Leroy, proveedor, referencia...",
+                key=f"pedido_material_link_linea_{i}"
+            )
+
+            st.session_state["pedido_material_lineas_ui"][i] = {
+                "material": material,
+                "cantidad": cantidad,
+                "observaciones": obs_linea,
+                "link_material": link_linea
+            }
+
+            if len(lineas) > 1:
+                if st.button(
+                    "🗑️ Eliminar este material",
+                    key=f"eliminar_linea_pedido_material_{i}"
+                ):
+                    eliminar_linea_pedido(i)
+                    st.rerun()
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        if st.button("➕ Añadir otro material"):
+            añadir_linea_pedido()
+            st.rerun()
+
+    with col2:
+        enviar = st.button("📨 Enviar pedido", type="primary")
+
+    if enviar:
+        lineas_validas = []
+
+        for linea in st.session_state["pedido_material_lineas_ui"]:
+            material = str(linea.get("material") or "").strip()
+
+            if material:
+                lineas_validas.append(
+                    {
+                        "codigo_material": "",
+                        "material": material,
+                        "cantidad": float(linea.get("cantidad") or 1),
+                        "observaciones": linea.get("observaciones", ""),
+                        "link_material": linea.get("link_material", "")
+                    }
                 )
 
-            else:
-                id_pedido = crear_pedido_material(
-                    operario=operario,
-                    centro=centro,
-                    material=material,
-                    cantidad=cantidad,
-                    prioridad=prioridad,
-                    observaciones=observaciones,
-                    link_material=link_material,
-                    foto="postgres_fotos"
+        if not lineas_validas:
+            st.warning("Añade al menos un material al pedido.")
+            return
+
+        id_pedido = crear_pedido_material_multiple(
+            operario=operario,
+            centro=centro,
+            edificio="",
+            prioridad=prioridad,
+            observaciones=observaciones_generales,
+            lineas=lineas_validas,
+            foto="postgres_fotos"
+        )
+
+        if fotos_pedido and id_pedido:
+            try:
+                guardar_fotos_pedido_material(
+                    id_pedido,
+                    fotos_pedido
                 )
 
-                if fotos_pedido and id_pedido:
-                    try:
-                        guardar_fotos_pedido_material(
-                            id_pedido,
-                            fotos_pedido
-                        )
+            except Exception as e:
+                st.error(f"Error guardando fotos: {e}")
 
-                    except Exception as e:
-                        st.error(
-                            f"Error guardando fotos: {e}"
-                        )
+        limpiar_lineas_pedido()
 
-                st.success(
-                    "Pedido enviado a almacén."
-                )
-
-                st.rerun()
+        st.success("Pedido enviado a almacén.")
+        st.rerun()
 
     st.divider()
 
@@ -274,29 +441,22 @@ def ui_pedidos_operario(operario):
         fecha = datos["fecha"]
         centro = datos["centro"]
         material = datos["material"]
-        cantidad = datos["cantidad"]
         prioridad = datos["prioridad"]
         estado = datos["estado"]
         observaciones = datos["observaciones"]
-        link_material = datos["link_material"]
 
-        icono = {
-            "Pendiente": "🟡",
-            "Preparado": "🔵",
-            "Entregado": "🟢",
-            "Sin stock": "🔴",
-            "Cancelado": "⚫"
-        }.get(estado, "⚪")
+        icono = icono_estado(estado)
 
-        with st.expander(
-            f"{icono} {numero_pedido} · {material} · {cantidad} uds · {estado}"
-        ):
+        titulo = f"{icono} {numero_pedido} · {material or 'Pedido material'} · {estado}"
+
+        with st.expander(titulo):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
+            st.write(f"**Estado general:** {estado}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
-            mostrar_link_material(link_material)
+            mostrar_lineas_pedido(id_pedido, modo_abel=False)
             mostrar_fotos_pedido(id_pedido)
 
 
@@ -333,34 +493,31 @@ def ui_pedidos_abel():
         operario = datos["operario"]
         centro = datos["centro"]
         material = datos["material"]
-        cantidad = datos["cantidad"]
         prioridad = datos["prioridad"]
         estado = datos["estado"]
         observaciones = datos["observaciones"]
-        link_material = datos["link_material"]
 
-        icono = {
-            "Pendiente": "🟡",
-            "Preparado": "🔵",
-            "Entregado": "🟢",
-            "Sin stock": "🔴",
-            "Cancelado": "⚫"
-        }.get(estado, "⚪")
+        icono = icono_estado(estado)
 
-        with st.expander(
-            f"{icono} {numero_pedido} · {material} · {cantidad} uds · {operario} · {estado}"
-        ):
+        titulo = f"{icono} {numero_pedido} · {material or 'Pedido material'} · {operario} · {estado}"
+
+        with st.expander(titulo):
             st.write(f"**Fecha:** {fecha}")
             st.write(f"**Operario:** {operario}")
             st.write(f"**Centro:** {centro}")
             st.write(f"**Prioridad:** {prioridad}")
+            st.write(f"**Estado general:** {estado}")
             st.write(f"**Observaciones:** {observaciones or '-'}")
 
-            mostrar_link_material(link_material)
+            mostrar_lineas_pedido(id_pedido, modo_abel=True)
             mostrar_fotos_pedido(id_pedido)
 
+            st.divider()
+
+            st.markdown("### Cambiar estado de todo el pedido")
+
             nuevo_estado = st.selectbox(
-                "Estado del pedido",
+                "Estado general del pedido",
                 ESTADOS_PEDIDO,
                 index=ESTADOS_PEDIDO.index(estado)
                 if estado in ESTADOS_PEDIDO else 0,
@@ -368,7 +525,7 @@ def ui_pedidos_abel():
             )
 
             if st.button(
-                "💾 Guardar estado",
+                "💾 Guardar estado general",
                 key=f"guardar_estado_pedido_{id_pedido}"
             ):
                 cambiar_estado_pedido(
@@ -376,11 +533,10 @@ def ui_pedidos_abel():
                     nuevo_estado
                 )
 
-                st.success(
-                    "Estado actualizado."
-                )
-
+                st.success("Estado general actualizado.")
                 st.rerun()
+
+            st.divider()
 
             confirmar_borrado = st.checkbox(
                 "Confirmar borrado",
@@ -396,14 +552,9 @@ def ui_pedidos_abel():
                         id_pedido
                     )
 
-                    st.warning(
-                        "Pedido eliminado."
-                    )
-
+                    st.warning("Pedido eliminado.")
                     st.rerun()
 
                 else:
-                    st.error(
-                        "Debes confirmar el borrado."
-                    )
+                    st.error("Debes confirmar el borrado.")
 
