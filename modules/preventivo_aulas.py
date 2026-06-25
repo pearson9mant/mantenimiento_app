@@ -2,6 +2,11 @@ from datetime import datetime
 from database.db import conectar, _sql
 from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
 
+try:
+    from modules.inventario_aulas import obtener_elementos_aula_para_revision
+except Exception:
+    obtener_elementos_aula_para_revision = None
+
 
 ELEMENTOS_REVISION_AULA = [
     "Mesas",
@@ -26,6 +31,79 @@ ESTADOS_REVISION_AULA = [
 
 def hoy_str():
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def normalizar_texto(texto):
+    texto = str(texto or "").strip().lower()
+
+    cambios = {
+        "á": "a",
+        "é": "e",
+        "í": "i",
+        "ó": "o",
+        "ú": "u",
+        "ñ": "n",
+    }
+
+    for a, b in cambios.items():
+        texto = texto.replace(a, b)
+
+    return texto
+
+
+def area_por_elemento_aula(elemento):
+    elemento_txt = normalizar_texto(elemento)
+
+    if any(x in elemento_txt for x in [
+        "luz", "ilumin", "enchufe", "interruptor", "canaleta",
+        "cable", "toma corriente", "emergencia"
+    ]):
+        return "Electricidad"
+
+    if any(x in elemento_txt for x in [
+        "proyector", "pantalla", "hdmi", "altavoz", "ordenador",
+        "pc", "monitor", "informat", "red", "switch", "wifi",
+        "mando", "pizarra digital"
+    ]):
+        return "Informática"
+
+    if any(x in elemento_txt for x in [
+        "puerta", "maneta", "cerradura", "cierrapuertas",
+        "ventana", "persiana", "carpinter", "bisagra"
+    ]):
+        return "Carpintería"
+
+    if any(x in elemento_txt for x in [
+        "grifo", "lavabo", "agua", "desague", "cisterna",
+        "wc", "inodoro", "fregadero", "fontaner"
+    ]):
+        return "Fontanería"
+
+    if any(x in elemento_txt for x in [
+        "split", "aire", "clima", "climatizacion", "radiador",
+        "termostato"
+    ]):
+        return "Climatización"
+
+    if any(x in elemento_txt for x in [
+        "mesa", "silla", "pizarra", "papelera", "estanteria",
+        "armario", "mueble", "corcho", "mobiliario"
+    ]):
+        return "Equipamiento"
+
+    return "Equipamiento"
+
+
+def elementos_para_revision_aula(centro, edificio, espacio):
+    if obtener_elementos_aula_para_revision:
+        try:
+            elementos = obtener_elementos_aula_para_revision(centro, edificio, espacio)
+            if elementos:
+                return elementos
+        except Exception:
+            pass
+
+    return ELEMENTOS_REVISION_AULA
 
 
 def crear_tablas_preventivo_aulas():
@@ -103,7 +181,9 @@ def crear_revision_aula(
 
     revision_id = cur.fetchone()[0]
 
-    for elemento in ELEMENTOS_REVISION_AULA:
+    elementos_revision = elementos_para_revision_aula(centro, edificio, espacio)
+
+    for elemento in elementos_revision:
         cur.execute(_sql("""
             INSERT INTO preventivo_aulas_items
             (
@@ -342,6 +422,8 @@ def crear_correctivos_desde_revision(revision_id):
 
         numero = obtener_siguiente_numero_ot(centro, "CORR")
 
+        area = area_por_elemento_aula(elemento)
+
         descripcion = f"[CORRECTIVO AULA] {elemento} - {espacio}"
 
         observaciones_ot = f"""
@@ -349,6 +431,7 @@ Correctivo generado desde revisión preventiva de aula.
 
 Aula/Espacio: {espacio}
 Elemento: {elemento}
+Área asignada automáticamente: {area}
 Observación: {observaciones_item or "-"}
 Fecha revisión: {fecha or hoy_str()}
 OT preventiva origen: {numero_ot_preventiva or "-"}
@@ -361,7 +444,7 @@ OT preventiva origen: {numero_ot_preventiva or "-"}
             centro,
             edificio,
             espacio,
-            "Equipamiento",
+            area,
             "Media",
             operario,
             "PREVENTIVO_AULA",
