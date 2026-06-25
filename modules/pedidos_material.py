@@ -80,6 +80,7 @@ def crear_tabla_pedidos_material():
             fecha_entrega TEXT
         )
     """))
+    conn.commit()
 
     # Por compatibilidad con pedidos antiguos
     columnas_cabecera = [
