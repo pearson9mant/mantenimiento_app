@@ -21,14 +21,39 @@ def _id_sql(conn):
     return "SERIAL PRIMARY KEY" if _es_postgres_conn(conn) else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
 
+def _column_exists(cur, tabla, columna):
+    try:
+        if "psycopg2" in cur.connection.__class__.__module__.lower():
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = %s
+                AND column_name = %s
+            """, (tabla, columna))
+            return cur.fetchone() is not None
+
+        cur.execute(f"PRAGMA table_info({tabla})")
+        return columna in [fila[1] for fila in cur.fetchall()]
+
+    except Exception:
+        return False
+
+
 def _add_column(cur, tabla, columna, tipo):
     try:
-        cur.execute(_sql(f"""
+        if _column_exists(cur, tabla, columna):
+            return
+
+        cur.execute(f"""
             ALTER TABLE {tabla}
             ADD COLUMN {columna} {tipo}
-        """))
+        """)
+
     except Exception:
-        pass
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
 
 
 def crear_tabla_pedidos_material():
