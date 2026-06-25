@@ -62,6 +62,26 @@ def asegurar_columnas_preventivo():
         conn.close()
 
 
+def ejecutar_preventivos_automaticos():
+    """
+    Ejecuta la generación automática de OTs preventivas al entrar en la pantalla.
+    Solo se ejecuta una vez por sesión para no repetir procesos en cada rerun.
+    """
+    if st.session_state.get("preventivos_auto_ejecutados"):
+        return
+
+    try:
+        n = generar_ots_preventivo_si_toca()
+        st.session_state["preventivos_auto_ejecutados"] = True
+
+        if n > 0:
+            st.toast(f"🔧 Se han generado {n} OTs preventivas automáticamente")
+
+    except Exception as e:
+        st.session_state["preventivos_auto_ejecutados"] = True
+        st.warning(f"No se pudieron generar preventivos automáticos: {e}")
+
+
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "")
     caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
@@ -129,6 +149,7 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
 
 def pantalla_preventivo():
     asegurar_columnas_preventivo()
+    ejecutar_preventivos_automaticos()
 
     st.subheader("🔧 Mantenimiento preventivo")
 
@@ -175,40 +196,41 @@ def pantalla_preventivo():
 
         with st.form("form_preventivo", clear_on_submit=True):
             area = st.selectbox("Área", AREAS, key="prev_area")
+
             tipo = st.selectbox(
                 "Tipo de preventivo",
                 ["Preventivo", "Normativo", "Inspección", "Limpieza", "Calibración", "Lubricación"],
                 key="prev_tipo"
             )
-            
+
             prioridad = st.selectbox(
                 "Prioridad",
                 ["Baja", "Media", "Alta"],
                 index=1,
                 key="prev_prioridad"
             )
-            
+
             duracion_prevista = st.selectbox(
                 "Duración prevista",
                 ["15 min", "30 min", "45 min", "1 h", "2 h", "Más de 2 h"],
                 key="prev_duracion"
             )
-            
+
             material_necesario = st.text_area(
                 "Material necesario",
                 key="prev_material_necesario"
             )
-            
+
             empresa_externa = st.text_input(
                 "Empresa externa / mantenedor",
                 key="prev_empresa_externa"
             )
-            
+
             fecha_limite = st.date_input(
                 "Fecha límite",
                 value=proxima_fecha,
                 key="prev_fecha_limite"
-            ) 
+            )
 
             tarea_sel = st.selectbox(
                 "Tarea preventiva",
@@ -373,7 +395,9 @@ def pantalla_preventivo():
 
         cursor.execute("""
             SELECT id, centro, edificio, espacio, area, tarea,
-                   frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto
+                   frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto,
+                   tipo, prioridad, duracion_prevista, material_necesario,
+                   empresa_externa, fecha_limite
             FROM preventivo_tareas
             ORDER BY id DESC
         """)
@@ -387,7 +411,9 @@ def pantalla_preventivo():
             for t in tareas:
                 (
                     id_tarea, centro, edificio, espacio, area,
-                    tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto
+                    tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto,
+                    tipo, prioridad, duracion_prevista, material_necesario,
+                    empresa_externa, fecha_limite
                 ) = t
 
                 estado = "🟢 Activa" if activo else "🔴 Inactiva"
@@ -399,11 +425,20 @@ def pantalla_preventivo():
                         f"""
                         🏢 {centro} · {edificio} · {espacio}  
                         🔧 Área: {area}  
+                        🧩 Tipo: {tipo or 'Preventivo'}  
+                        🚦 Prioridad: {prioridad or 'Media'}  
+                        ⏱️ Duración prevista: {duracion_prevista or '-'}  
                         👷 Operario: {operario or '-'}  
+                        🏢 Empresa externa: {empresa_externa or '-'}  
                         📅 Última revisión: {ultima_fecha or '-'}  
-                        📅 Próxima revisión: **{proxima_fecha or '-'}**
+                        📅 Próxima revisión: **{proxima_fecha or '-'}**  
+                        📅 Fecha límite: **{fecha_limite or '-'}**
                         """
                     )
+
+                    if material_necesario:
+                        st.markdown("**📦 Material necesario:**")
+                        st.write(material_necesario)
 
                     if foto:
                         try:
@@ -448,6 +483,11 @@ def pantalla_preventivo():
         st.markdown("---")
 
         st.markdown("### ⚙️ Generación automática")
+
+        st.info(
+            "La generación preventiva se comprueba automáticamente al entrar en esta pantalla. "
+            "Este botón queda como comprobación manual."
+        )
 
         if st.button("🔄 Generar OTs preventivas que tocan", use_container_width=True):
             n = generar_ots_preventivo_si_toca()
