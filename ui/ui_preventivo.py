@@ -154,7 +154,13 @@ def pantalla_preventivo():
 
     st.subheader("🔧 Mantenimiento preventivo")
 
-    tab1, tab2 = st.tabs(["➕ Crear tarea", "📋 Tareas"])
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "➕ Crear tarea",
+            "📋 Tareas",
+            "🏫 Preventivo aulas",
+        ]
+    )
 
     with tab1:
         centro = st.selectbox("Centro", CENTROS, key="prev_centro")
