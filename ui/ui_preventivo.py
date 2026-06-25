@@ -6,6 +6,7 @@ from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from database.db import conectar, _sql
 from modules.preventivo import generar_ots_preventivo_si_toca
 from modules.ubicaciones import obtener_espacios
+from ui.preventivo_aulas import pantalla_preventivo_aulas
 
 
 TAREAS_PREVENTIVAS = [
