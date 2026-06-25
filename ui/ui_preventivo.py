@@ -128,7 +128,7 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
 
 
 def pantalla_preventivo():
-    asegurar_columna_foto_preventivo()
+    asegurar_columnas_preventivo()
 
     st.subheader("🔧 Mantenimiento preventivo")
 
