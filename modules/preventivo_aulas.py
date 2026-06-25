@@ -390,17 +390,80 @@ OT preventiva origen: {numero_ot_preventiva or "-"}
     return creadas
 
 
+def obtener_estado_ot(numero_ot):
+    if not numero_ot:
+        return ""
+
+    posibles_columnas = ["numero_ot", "numero", "codigo"]
+
+    for columna in posibles_columnas:
+        conn = conectar()
+        cur = conn.cursor()
+
+        try:
+            cur.execute(_sql(f"""
+                SELECT estado
+                FROM ordenes_trabajo
+                WHERE {columna} = ?
+                LIMIT 1
+            """), (numero_ot,))
+
+            fila = cur.fetchone()
+            conn.close()
+
+            if fila:
+                return str(fila[0] or "")
+
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            conn.close()
+
+    return ""
+
+
+def ot_correctiva_cerrada(numero_ot):
+    estado = obtener_estado_ot(numero_ot).lower()
+
+    return estado in [
+        "finalizada",
+        "cerrado",
+        "cerrada",
+        "cancelada",
+    ]
+
+
 def resumen_revision_aula(revision_id):
     items = obtener_items_revision_aula(revision_id)
 
     total = len(items)
     correctos = len([i for i in items if str(i[3]) == "Correcto"])
     revisar = len([i for i in items if str(i[3]) == "Revisar"])
-    averias = len([i for i in items if str(i[3]) == "Avería"])
+
+    averias_detectadas = 0
+    averias_pendientes = 0
+    averias_resueltas = 0
+
+    for i in items:
+        estado_item = str(i[3] or "")
+        numero_ot_correctiva = str(i[7] or "")
+
+        if estado_item == "Avería":
+            averias_detectadas += 1
+
+            if numero_ot_correctiva and ot_correctiva_cerrada(numero_ot_correctiva):
+                averias_resueltas += 1
+            else:
+                averias_pendientes += 1
 
     return {
         "total": total,
         "correctos": correctos,
         "revisar": revisar,
-        "averias": averias,
+        "averias": averias_detectadas,
+        "averias_detectadas": averias_detectadas,
+        "averias_pendientes": averias_pendientes,
+        "averias_resueltas": averias_resueltas,
     }
