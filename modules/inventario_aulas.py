@@ -175,14 +175,30 @@ def obtener_elementos_aula_para_revision(centro, edificio, espacio):
             cantidad = item[6]
 
             if elemento:
-                if cantidad and int(cantidad) > 1:
-                    elementos.append(f"{elemento} ({cantidad})")
+                try:
+                    cantidad_num = int(float(cantidad or 0))
+                except Exception:
+                    cantidad_num = 0
+
+                if cantidad_num > 1:
+                    elementos.append(f"{elemento} ({cantidad_num})")
                 else:
                     elementos.append(elemento)
 
         return elementos
 
     return [
+        "Mesas",
+        "Sillas",
+        "Pantalla / proyector",
+        "Pizarra",
+        "Iluminación",
+        "Enchufes visibles",
+        "Puerta / maneta",
+        "Ventanas / persianas",
+        "Papeleras",
+        "Estado general del aula",
+    ]
         "Mesas",
         "Sillas",
         "Pantalla / proyector",
