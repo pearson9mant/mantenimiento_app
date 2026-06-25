@@ -93,13 +93,11 @@ def obtener_items_checklist_configurado(tarea):
 
 
 def obtener_items_checklist_por_tarea(tarea):
-    # 1) Primero mira si hay modelos configurados desde Configuración
     items_configurados = obtener_items_checklist_configurado(tarea)
 
     if items_configurados:
         return items_configurados
 
-    # 2) Si no hay modelo configurado, usa checklist automático por defecto
     tarea_txt = normalizar_tarea(tarea)
 
     if "cuadro" in tarea_txt and "electric" in tarea_txt:
@@ -152,6 +150,7 @@ def obtener_items_checklist_por_tarea(tarea):
             "Comprobar desagües",
             "Comprobar malos olores",
         ]
+
     if "limpieza" in tarea_txt:
         return [
             "Preparar zona de trabajo",
@@ -183,6 +182,7 @@ def existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
           AND centro = ?
           AND edificio = ?
           AND espacio = ?
+          AND estado NOT IN ('Finalizada', 'Cerrado', 'Cancelada')
     """), (
         "PREVENTIVO",
         texto_buscar,
@@ -290,7 +290,9 @@ def generar_ots_preventivo_si_toca():
 
     cursor.execute("""
         SELECT id, centro, edificio, espacio, area, tarea,
-               frecuencia, ultima_fecha, proxima_fecha, operario
+               frecuencia, ultima_fecha, proxima_fecha, operario,
+               tipo, prioridad, duracion_prevista,
+               material_necesario, empresa_externa, fecha_limite
         FROM preventivo_tareas
         WHERE activo = 1
     """)
@@ -300,7 +302,9 @@ def generar_ots_preventivo_si_toca():
     for t in tareas:
         (
             tarea_id, centro, edificio, espacio, area, tarea,
-            frecuencia, ultima_fecha, proxima_fecha, operario
+            frecuencia, ultima_fecha, proxima_fecha, operario,
+            tipo, prioridad, duracion_prevista,
+            material_necesario, empresa_externa, fecha_limite
         ) = t
 
         operario = operario_por_centro_preventivo(centro, operario)
@@ -316,6 +320,15 @@ def generar_ots_preventivo_si_toca():
 
             descripcion = f"[PREVENTIVO] {tarea}"
 
+            observaciones_ot = f"""
+Tipo preventivo: {tipo or 'Preventivo'}
+Frecuencia: {frecuencia or '-'}
+Duración prevista: {duracion_prevista or '-'}
+Material necesario: {material_necesario or '-'}
+Empresa externa / mantenedor: {empresa_externa or '-'}
+Fecha límite: {fecha_limite or '-'}
+""".strip()
+
             datos_orden = (
                 numero,
                 descripcion,
@@ -324,10 +337,10 @@ def generar_ots_preventivo_si_toca():
                 edificio,
                 espacio,
                 area,
-                "Media",
+                prioridad or "Media",
                 operario,
                 "PREVENTIVO",
-                "",
+                observaciones_ot,
                 "",
                 "",
                 "Operarios"
