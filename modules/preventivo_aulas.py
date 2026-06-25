@@ -34,7 +34,7 @@ def crear_tablas_preventivo_aulas():
 
     cur.execute(_sql("""
         CREATE TABLE IF NOT EXISTS preventivo_aulas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             fecha TEXT,
             centro TEXT,
             edificio TEXT,
@@ -48,15 +48,14 @@ def crear_tablas_preventivo_aulas():
 
     cur.execute(_sql("""
         CREATE TABLE IF NOT EXISTS preventivo_aulas_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             revision_id INTEGER,
             elemento TEXT,
             estado TEXT,
             observaciones TEXT,
             foto TEXT,
             crear_correctivo INTEGER DEFAULT 0,
-            numero_ot_correctiva TEXT,
-            FOREIGN KEY (revision_id) REFERENCES preventivo_aulas(id)
+            numero_ot_correctiva TEXT
         )
     """))
 
@@ -90,6 +89,7 @@ def crear_revision_aula(
             numero_ot_preventiva
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
     """), (
         hoy_str(),
         centro,
@@ -101,7 +101,7 @@ def crear_revision_aula(
         numero_ot_preventiva
     ))
 
-    revision_id = cur.lastrowid
+    revision_id = cur.fetchone()[0]
 
     for elemento in ELEMENTOS_REVISION_AULA:
         cur.execute(_sql("""
@@ -297,11 +297,6 @@ def obtener_items_a_revisar(revision_id):
 
 
 def crear_correctivos_desde_revision(revision_id):
-    """
-    Crea OTs correctivas solo para los elementos marcados como Avería
-    y con crear_correctivo = 1.
-    No duplica si el item ya tiene numero_ot_correctiva.
-    """
     crear_tablas_preventivo_aulas()
 
     revision = obtener_revision_aula(revision_id)
