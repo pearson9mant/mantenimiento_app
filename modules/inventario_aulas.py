@@ -1,5 +1,27 @@
-from database.db import conectar
 from datetime import datetime
+from database.db import conectar
+
+
+ELEMENTOS_BASE_AULA = [
+    "Mesas",
+    "Sillas",
+    "Pantalla / proyector",
+    "Pizarra",
+    "Iluminación",
+    "Enchufes visibles",
+    "Puerta / maneta",
+    "Ventanas / persianas",
+    "Papeleras",
+    "Estado general del aula",
+]
+
+
+def hoy():
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def ahora():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def crear_tabla_inventario_aulas():
@@ -71,7 +93,7 @@ def guardar_inventario_aula(
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
-        datetime.now().strftime("%Y-%m-%d"),
+        hoy(),
         centro,
         edificio,
         espacio,
@@ -85,11 +107,12 @@ def guardar_inventario_aula(
         observaciones,
         foto,
         operario,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ahora()
     ))
 
     conn.commit()
     conn.close()
+    return True
 
 
 def obtener_inventario_aulas():
@@ -124,6 +147,7 @@ def obtener_inventario_aulas():
     conn.close()
     return datos
 
+
 def obtener_inventario_por_aula(centro, edificio, espacio):
     crear_tabla_inventario_aulas()
 
@@ -152,7 +176,7 @@ def obtener_inventario_por_aula(centro, edificio, espacio):
         WHERE centro = %s
           AND edificio = %s
           AND espacio = %s
-        ORDER BY elemento ASC
+        ORDER BY elemento ASC, fecha_creacion DESC
     """, (
         centro,
         edificio,
@@ -174,39 +198,37 @@ def obtener_elementos_aula_para_revision(centro, edificio, espacio):
             elemento = str(item[5] or "").strip()
             cantidad = item[6]
 
-            if elemento:
-                try:
-                    cantidad_num = int(float(cantidad or 0))
-                except Exception:
-                    cantidad_num = 0
+            if not elemento:
+                continue
 
-                if cantidad_num > 1:
-                    elementos.append(f"{elemento} ({cantidad_num})")
-                else:
-                    elementos.append(elemento)
+            try:
+                cantidad_num = int(float(cantidad or 0))
+            except Exception:
+                cantidad_num = 0
 
-        return elementos
+            if cantidad_num > 1:
+                texto = f"{elemento} ({cantidad_num})"
+            else:
+                texto = elemento
 
-    return [
-        "Mesas",
-        "Sillas",
-        "Pantalla / proyector",
-        "Pizarra",
-        "Iluminación",
-        "Enchufes visibles",
-        "Puerta / maneta",
-        "Ventanas / persianas",
-        "Papeleras",
-        "Estado general del aula",
-    ]
-        "Mesas",
-        "Sillas",
-        "Pantalla / proyector",
-        "Pizarra",
-        "Iluminación",
-        "Enchufes visibles",
-        "Puerta / maneta",
-        "Ventanas / persianas",
-        "Papeleras",
-        "Estado general del aula",
-    ]
+            if texto not in elementos:
+                elementos.append(texto)
+
+        if elementos:
+            return elementos
+
+    return ELEMENTOS_BASE_AULA
+
+
+def eliminar_elemento_inventario_aula(id_elemento):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM inventario_aulas
+        WHERE id = %s
+    """, (id_elemento,))
+
+    conn.commit()
+    conn.close()
+    return True
