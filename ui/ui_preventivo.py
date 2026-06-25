@@ -23,24 +23,35 @@ TAREAS_PREVENTIVAS = [
 ]
 
 
-def asegurar_columna_foto_preventivo():
+def asegurar_columnas_preventivo():
     conn = conectar()
     cursor = conn.cursor()
 
+    columnas = {
+        "foto": "TEXT",
+        "tipo": "TEXT DEFAULT 'Preventivo'",
+        "prioridad": "TEXT DEFAULT 'Media'",
+        "duracion_prevista": "TEXT",
+        "material_necesario": "TEXT",
+        "empresa_externa": "TEXT",
+        "fecha_limite": "TEXT"
+    }
+
     try:
-        try:
-            cursor.execute("""
-                ALTER TABLE preventivo_tareas
-                ADD COLUMN IF NOT EXISTS foto TEXT
-            """)
-        except Exception:
+        for columna, tipo in columnas.items():
             try:
-                cursor.execute("""
+                cursor.execute(f"""
                     ALTER TABLE preventivo_tareas
-                    ADD COLUMN foto TEXT
+                    ADD COLUMN IF NOT EXISTS {columna} {tipo}
                 """)
             except Exception:
-                pass
+                try:
+                    cursor.execute(f"""
+                        ALTER TABLE preventivo_tareas
+                        ADD COLUMN {columna} {tipo}
+                    """)
+                except Exception:
+                    pass
 
         conn.commit()
 
