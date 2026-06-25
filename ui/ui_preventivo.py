@@ -335,9 +335,11 @@ def pantalla_preventivo():
                                 centro, edificio, espacio, area,
                                 tarea, frecuencia,
                                 ultima_fecha, proxima_fecha,
-                                operario, activo, observaciones, foto
+                                operario, activo, observaciones, foto,
+                                tipo, prioridad, duracion_prevista,
+                                material_necesario, empresa_externa, fecha_limite
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """), (
                             centro,
                             edificio,
@@ -350,7 +352,13 @@ def pantalla_preventivo():
                             operario,
                             1,
                             observaciones,
-                            ruta_foto
+                            ruta_foto,
+                            tipo,
+                            prioridad,
+                            duracion_prevista,
+                            material_necesario,
+                            empresa_externa,
+                            str(fecha_limite)
                         ))
 
                         conn.commit()
