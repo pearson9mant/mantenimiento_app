@@ -503,3 +503,6 @@ def pantalla_preventivo():
                 st.success(f"Se han generado {n} órdenes preventivas")
             else:
                 st.info("No hay preventivos pendientes")
+
+    with tab3:
+        pantalla_preventivo_aulas()
