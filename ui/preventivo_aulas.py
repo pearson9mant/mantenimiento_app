@@ -7,7 +7,6 @@ from modules.preventivo_aulas import (
     crear_tablas_preventivo_aulas,
     crear_revision_aula,
     obtener_revisiones_aulas,
-    obtener_revision_aula,
     obtener_items_revision_aula,
     actualizar_item_revision_aula,
     cerrar_revision_aula,
@@ -79,7 +78,10 @@ def pantalla_preventivo_aulas():
         )
 
         if espacio_sel == "Otro":
-            espacio = st.text_input("Especificar aula / espacio", key="prev_aula_espacio_otro")
+            espacio = st.text_input(
+                "Especificar aula / espacio",
+                key="prev_aula_espacio_otro"
+            )
         else:
             espacio = espacio_sel
 
@@ -98,7 +100,10 @@ def pantalla_preventivo_aulas():
         )
 
         if operario_sel == "Otro":
-            operario = st.text_input("Nombre operario", key="prev_aula_operario_otro")
+            operario = st.text_input(
+                "Nombre operario",
+                key="prev_aula_operario_otro"
+            )
         else:
             operario = operario_sel
 
@@ -146,9 +151,14 @@ def pantalla_preventivo_aulas():
 
                 resumen = resumen_revision_aula(revision_id)
 
+                averias_detectadas = resumen.get("averias_detectadas", resumen.get("averias", 0))
+                averias_pendientes = resumen.get("averias_pendientes", averias_detectadas)
+                averias_resueltas = resumen.get("averias_resueltas", 0)
+
                 titulo = (
                     f"{fecha or '-'} | {centro} · {edificio} · {espacio} | "
-                    f"{estado} | Averías: {resumen['averias']} | Revisar: {resumen['revisar']}"
+                    f"{estado} | Detectadas: {averias_detectadas} | "
+                    f"Pendientes: {averias_pendientes} | Resueltas: {averias_resueltas}"
                 )
 
                 with st.expander(titulo):
@@ -170,6 +180,7 @@ def pantalla_preventivo_aulas():
                     items = obtener_items_revision_aula(revision_id)
 
                     st.markdown("### Revisión de elementos")
+                    st.info("Marca todos los elementos y pulsa abajo **💾 Guardar revisión completa**.")
 
                     for item in items:
                         (
@@ -186,7 +197,7 @@ def pantalla_preventivo_aulas():
                         st.markdown("---")
                         st.markdown(f"#### {elemento}")
 
-                        col1, col2 = st.columns([2, 1])
+                        col1, col2, col3 = st.columns([2, 3, 2])
 
                         with col1:
                             estado_nuevo = st.radio(
@@ -199,47 +210,88 @@ def pantalla_preventivo_aulas():
                                 key=f"estado_aula_item_{item_id}",
                             )
 
-                            obs_nueva = st.text_area(
+                            if numero_ot_correctiva:
+                                st.success(f"OT correctiva: {numero_ot_correctiva}")
+
+                        with col2:
+                            st.text_area(
                                 "Observaciones",
                                 value=obs_item or "",
                                 key=f"obs_aula_item_{item_id}",
                             )
 
-                            crear_corr_nuevo = False
+                            if estado_nuevo == "Revisar":
+                                st.info("Quedará registrado como pendiente de revisar.")
 
                             if estado_nuevo == "Avería":
-                                crear_corr_nuevo = st.checkbox(
-                                    "Crear OT correctiva al cerrar/guardar",
+                                st.checkbox(
+                                    "Crear OT correctiva",
                                     value=True if not numero_ot_correctiva else False,
                                     disabled=True if numero_ot_correctiva else False,
                                     key=f"crear_corr_aula_item_{item_id}",
                                 )
+                            else:
+                                st.session_state[f"crear_corr_aula_item_{item_id}"] = False
 
-                                if numero_ot_correctiva:
-                                    st.success(f"OT correctiva creada: {numero_ot_correctiva}")
-
-                            elif estado_nuevo == "Revisar":
-                                st.info("Quedará registrado como pendiente de revisar, sin crear correctivo automático.")
-
-                        with col2:
+                        with col3:
                             if foto:
                                 try:
-                                    st.image(foto, caption="Foto", use_container_width=True)
+                                    st.image(foto, caption="Foto actual", use_container_width=True)
                                 except Exception:
                                     st.caption("Foto no disponible.")
 
-                            foto_nueva = st.file_uploader(
+                            st.file_uploader(
                                 "Foto",
                                 type=["jpg", "jpeg", "png"],
                                 key=f"foto_aula_item_{item_id}",
                             )
 
-                        if st.button("💾 Guardar elemento", key=f"guardar_aula_item_{item_id}"):
+                    st.markdown("---")
+
+                    if st.button(
+                        "💾 Guardar revisión completa",
+                        key=f"guardar_revision_completa_{revision_id}",
+                        use_container_width=True
+                    ):
+                        total_guardados = 0
+
+                        for item in items:
+                            (
+                                item_id,
+                                _revision_id,
+                                elemento,
+                                estado_item,
+                                obs_item,
+                                foto,
+                                crear_correctivo,
+                                numero_ot_correctiva,
+                            ) = item
+
+                            estado_nuevo = st.session_state.get(
+                                f"estado_aula_item_{item_id}",
+                                estado_item or "Correcto"
+                            )
+
+                            obs_nueva = st.session_state.get(
+                                f"obs_aula_item_{item_id}",
+                                obs_item or ""
+                            )
+
+                            crear_corr_nuevo = st.session_state.get(
+                                f"crear_corr_aula_item_{item_id}",
+                                False
+                            )
+
+                            foto_nueva = st.session_state.get(
+                                f"foto_aula_item_{item_id}",
+                                None
+                            )
+
                             ruta_foto = foto or ""
 
                             if foto_nueva is not None:
                                 if foto_nueva.size > 5 * 1024 * 1024:
-                                    st.error("La foto supera 5 MB.")
+                                    st.error(f"La foto de {elemento} supera 5 MB.")
                                     return
 
                                 try:
@@ -250,7 +302,7 @@ def pantalla_preventivo_aulas():
                                         elemento,
                                     )
                                 except Exception as e:
-                                    st.error(f"Error guardando foto: {e}")
+                                    st.error(f"Error guardando foto de {elemento}: {e}")
                                     return
 
                             actualizar_item_revision_aula(
@@ -260,28 +312,33 @@ def pantalla_preventivo_aulas():
                                 foto=ruta_foto,
                                 crear_correctivo=crear_corr_nuevo,
                             )
-                            
-                            creadas = 0
-                            
-                            if estado_nuevo == "Avería" and crear_corr_nuevo:
-                                creadas = crear_correctivos_desde_revision(revision_id)
-                            
-                            if creadas > 0:
-                                st.success(f"Elemento guardado y se ha creado {creadas} OT correctiva.")
-                            else:
-                                st.success("Elemento guardado")
-                            
-                            st.rerun()
+
+                            total_guardados += 1
+
+                        creadas = crear_correctivos_desde_revision(revision_id)
+
+                        if creadas > 0:
+                            st.success(
+                                f"Revisión guardada. Se han creado {creadas} OTs correctivas."
+                            )
+                        else:
+                            st.success(
+                                f"Revisión guardada. Elementos guardados: {total_guardados}"
+                            )
+
+                        st.rerun()
 
                     st.markdown("---")
                     st.markdown("### Cierre de revisión")
 
                     resumen = resumen_revision_aula(revision_id)
 
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Correctos", resumen["correctos"])
-                    c2.metric("Revisar", resumen["revisar"])
-                    c3.metric("Averías", resumen["averias"])
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    c1.metric("Correctos", resumen.get("correctos", 0))
+                    c2.metric("Revisar", resumen.get("revisar", 0))
+                    c3.metric("Detectadas", resumen.get("averias_detectadas", resumen.get("averias", 0)))
+                    c4.metric("Pendientes", resumen.get("averias_pendientes", resumen.get("averias", 0)))
+                    c5.metric("Resueltas", resumen.get("averias_resueltas", 0))
 
                     observaciones_cierre = st.text_area(
                         "Observaciones de cierre",
@@ -292,7 +349,10 @@ def pantalla_preventivo_aulas():
                     col_a, col_b = st.columns(2)
 
                     with col_a:
-                        if st.button("🔧 Crear correctivos de averías", key=f"crear_corr_revision_{revision_id}"):
+                        if st.button(
+                            "🔧 Crear correctivos de averías",
+                            key=f"crear_corr_revision_{revision_id}"
+                        ):
                             creadas = crear_correctivos_desde_revision(revision_id)
 
                             if creadas > 0:
@@ -303,7 +363,10 @@ def pantalla_preventivo_aulas():
                             st.rerun()
 
                     with col_b:
-                        if st.button("✅ Cerrar revisión", key=f"cerrar_revision_aula_{revision_id}"):
+                        if st.button(
+                            "✅ Cerrar revisión",
+                            key=f"cerrar_revision_aula_{revision_id}"
+                        ):
                             cerrar_revision_aula(
                                 revision_id=revision_id,
                                 observaciones=observaciones_cierre,
