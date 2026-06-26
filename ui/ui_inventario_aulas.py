@@ -281,7 +281,7 @@ def pantalla_inventario_aulas():
         key="inv_aula_num_elementos"
     )
 
-    with st.form("form_inventario_aula_rapido"):
+    with st.container():
         registros_a_guardar = []
 
         for i in range(int(num_elementos)):
