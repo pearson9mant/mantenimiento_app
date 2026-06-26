@@ -211,54 +211,73 @@ def pantalla_historico_espacios():
         st.info("Todavía no hay inspecciones registradas.")
         return
 
-        total_inspecciones = len(historico)
-        total_pendientes = 0
-        total_resueltas = 0
-        total_revisar = 0
-    
-        espacios_estado = {}
-    
-        for h in historico:
-            revision_id = h[0]
-            espacio = str(h[4] or "")
-            resumen = resumen_revision_aula(revision_id)
-    
-            pendientes = resumen.get("averias_pendientes", 0)
-            resueltas = resumen.get("averias_resueltas", 0)
-            revisar = resumen.get("revisar", 0)
-    
-            total_pendientes += pendientes
-            total_resueltas += resueltas
-            total_revisar += revisar
-    
-            if espacio:
-                if pendientes > 0:
-                    espacios_estado[espacio] = "rojo"
-                elif revisar > 0 and espacios_estado.get(espacio) != "rojo":
-                    espacios_estado[espacio] = "amarillo"
-                elif espacio not in espacios_estado:
-                    espacios_estado[espacio] = "verde"
-    
-        espacios_rojos = len([e for e in espacios_estado.values() if e == "rojo"])
-        espacios_amarillos = len([e for e in espacios_estado.values() if e == "amarillo"])
-        espacios_verdes = len([e for e in espacios_estado.values() if e == "verde"])
-    
-        st.markdown("### Resumen general")
-    
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Inspecciones", total_inspecciones)
-        m2.metric("Averías pendientes", total_pendientes)
-        m3.metric("Averías resueltas", total_resueltas)
-        m4.metric("A revisar", total_revisar)
-    
-        st.markdown("### Estado de espacios")
-    
-        s1, s2, s3 = st.columns(3)
-        s1.metric("🟢 Correctos", espacios_verdes)
-        s2.metric("🟡 Con revisar", espacios_amarillos)
-        s3.metric("🔴 Con averías", espacios_rojos)
-    
-        st.markdown("---")
+    # =====================================
+    # RESUMEN GENERAL + SEMÁFORO
+    # =====================================
+
+    total_inspecciones = len(historico)
+    total_pendientes = 0
+    total_resueltas = 0
+    total_revisar = 0
+
+    espacios_estado = {}
+
+    for h in historico:
+        revision_id = h[0]
+        espacio = str(h[4] or "")
+
+        resumen = resumen_revision_aula(revision_id)
+
+        pendientes = resumen.get("averias_pendientes", 0)
+        resueltas = resumen.get("averias_resueltas", 0)
+        revisar = resumen.get("revisar", 0)
+
+        total_pendientes += pendientes
+        total_resueltas += resueltas
+        total_revisar += revisar
+
+        if espacio:
+            if pendientes > 0:
+                espacios_estado[espacio] = "rojo"
+            elif revisar > 0 and espacios_estado.get(espacio) != "rojo":
+                espacios_estado[espacio] = "amarillo"
+            elif espacio not in espacios_estado:
+                espacios_estado[espacio] = "verde"
+
+    espacios_verdes = len([x for x in espacios_estado.values() if x == "verde"])
+    espacios_amarillos = len([x for x in espacios_estado.values() if x == "amarillo"])
+    espacios_rojos = len([x for x in espacios_estado.values() if x == "rojo"])
+
+    st.markdown("### 📊 Resumen general")
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Inspecciones", total_inspecciones)
+    m2.metric("Averías pendientes", total_pendientes)
+    m3.metric("Averías resueltas", total_resueltas)
+    m4.metric("A revisar", total_revisar)
+
+    st.markdown("### 🚦 Estado de espacios")
+
+    s1, s2, s3 = st.columns(3)
+    s1.metric("🟢 Correctos", espacios_verdes)
+    s2.metric("🟡 Revisar", espacios_amarillos)
+    s3.metric("🔴 Avería", espacios_rojos)
+
+    st.markdown("### Semáforo por espacio")
+
+    for espacio, estado_espacio in sorted(espacios_estado.items()):
+        if estado_espacio == "rojo":
+            st.error(f"🔴 {espacio} · Averías pendientes")
+        elif estado_espacio == "amarillo":
+            st.warning(f"🟡 {espacio} · Elementos a revisar")
+        else:
+            st.success(f"🟢 {espacio} · Correcto")
+
+    st.markdown("---")
+
+    # =====================================
+    # FILTROS
+    # =====================================
 
     centros = sorted(list(set([str(h[2]) for h in historico if h[2]])))
     espacios = sorted(list(set([str(h[4]) for h in historico if h[4]])))
