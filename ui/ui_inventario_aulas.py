@@ -340,7 +340,7 @@ def pantalla_inventario_aulas():
 
             st.markdown("---")
 
-        guardar = st.form_submit_button(
+        guardar = st.button(
             "💾 Guardar inventario del aula",
             use_container_width=True
         )
