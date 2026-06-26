@@ -664,7 +664,7 @@ def mostrar_menu_operario():
             key="btn_gestion_espacios_operario",
             use_container_width=True
         ):
-            st.session_state["seccion_actual"] = "Gestión aulas"
+            st.session_state["seccion_actual"] = "Gestión espacios"
             st.rerun()
 
 
