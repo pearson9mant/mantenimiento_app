@@ -660,7 +660,7 @@ def mostrar_menu_operario():
 
     with col4:
         if st.button(
-            "🏫\nGestión aulas",
+            "🏫\nGestión espacios"
             key="btn_gestion_espacios_operario",
             use_container_width=True
         ):
