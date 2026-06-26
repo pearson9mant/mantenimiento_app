@@ -19,26 +19,18 @@ def pantalla_gestion_aulas():
         "📋 Histórico",
     ])
 
-    # ----------------------------------
-    # INVENTARIO
-    # ----------------------------------
     with tab1:
         pantalla_inventario_aulas()
 
-    # ----------------------------------
-    # INSPECCIONES
-    # ----------------------------------
     with tab2:
         pantalla_preventivo_aulas()
 
-    # ----------------------------------
-    # CORRECTIVOS
-    # ----------------------------------
     with tab3:
-        st.info("Próximamente se mostrarán aquí todas las averías detectadas en los espacios y su estado.")
+        st.info(
+            "Próximamente se mostrarán aquí las correctivas generadas desde las inspecciones de espacios."
+        )
 
-    # ----------------------------------
-    # HISTÓRICO
-    # ----------------------------------
     with tab4:
-        st.info("Próximamente se mostrará el histórico completo de inspecciones.")
+        st.info(
+            "Próximamente se mostrará aquí el histórico completo de inspecciones por espacio."
+        )
