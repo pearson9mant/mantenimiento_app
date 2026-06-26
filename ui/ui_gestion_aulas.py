@@ -403,11 +403,29 @@ def pantalla_historico_espacios():
 
 def pantalla_gestion_aulas():
 
-    st.subheader("🏫 Gestión de espacios")
+       st.markdown("## 🏫 Panel Gestión de Espacios")
 
-    st.caption(
-        "Inventario, inspecciones, correctivos e histórico de todos los espacios del centro."
-    )
+        st.caption(
+            "Control centralizado de inventario, inspecciones, correctivos e histórico de aulas y espacios."
+        )
+    
+        st.markdown("---")
+    
+        col1, col2, col3, col4 = st.columns(4)
+    
+        with col1:
+            st.metric("📦 Inventario", "Espacios")
+    
+        with col2:
+            st.metric("🔎 Inspecciones", "Histórico")
+    
+        with col3:
+            st.metric("🔧 Correctivos", "Activos")
+    
+        with col4:
+            st.metric("🚦 Estado", "Semáforo")
+    
+        st.markdown("---")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "📦 Inventario",
