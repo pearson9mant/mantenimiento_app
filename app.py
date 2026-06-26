@@ -647,7 +647,29 @@ def mostrar_menu_operario():
             st.rerun()
         if st.button("📩\nPedidos material", key="btn_pedidos_material", use_container_width=True):
             st.session_state["seccion_actual"] = "Pedidos material"
-            st.rerun()  
+            st.rerun() 
+
+    st.markdown("---")
+
+    col4, col5 = st.columns(2)
+
+    with col4:
+        if st.button(
+            "🏫\nInventario aulas",
+            key="btn_inventario_aulas_operario",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Inventario aulas"
+            st.rerun()
+
+    with col5:
+        if st.button(
+            "🔎\nPreventivo aulas",
+            key="btn_preventivo_aulas_operario",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Preventivo aulas"
+            st.rerun()
 
 
 # =====================================================
@@ -871,6 +893,9 @@ else:
 
     elif seccion == "Inventario aulas":
         pantalla_inventario_aulas()
+
+    elif seccion == "Preventivo aulas":
+        pantalla_preventivo_aulas()
         
     elif seccion == "Pedidos material":
         ui_pedidos_material()
