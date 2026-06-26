@@ -594,6 +594,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
 
+        if st.button("🏫\nInventario aulas", key="btn_inventario_aulas_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario aulas"
+            st.rerun()
+
+        if st.button("🔎\nPreventivo aulas", key="btn_preventivo_aulas_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Preventivo aulas"
+            st.rerun()
+
 
 def mostrar_menu_operario():
     perfil = st.session_state.get("perfil", "")
