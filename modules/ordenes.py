@@ -823,6 +823,23 @@ def finalizar_orden(id_orden, observaciones=""):
             coste_final,
             observaciones_estado
         ))
+        if registrar_historial_espacio is not None:
+            try:
+                registrar_historial_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    elemento=area,
+                    tipo="OT finalizada",
+                    numero_ot=numero_ot,
+                    descripcion=descripcion,
+                    area=area,
+                    estado="Finalizada",
+                    operario=operario,
+                    observaciones=observaciones
+                )
+            except Exception:
+                pass
 
         cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
 
