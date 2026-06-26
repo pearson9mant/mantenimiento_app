@@ -27,6 +27,7 @@ from ui.ui_empresas_externas import pantalla_empresas_externas
 from modules.alertas_empresas import obtener_alertas_empresas_externas, crear_ots_empresas_externas_si_toca
 from ui.ui_estado_aulas import ui_estado_aulas
 from ui.ui_recordatorios import pantalla_recordatorios
+from ui.ui_gestion_aulas import pantalla_gestion_aulas
 from ui.ui_recordatorios import (
     pantalla_recordatorios,
     obtener_resumen_recordatorios
@@ -594,12 +595,8 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
 
-        if st.button("🏫\nInventario aulas", key="btn_inventario_aulas_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario aulas"
-            st.rerun()
-
-        if st.button("🔎\nPreventivo aulas", key="btn_preventivo_aulas_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Preventivo aulas"
+        if st.button("🏫\nGestión espacios", key="btn_gestion_espacios_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Gestión espacios"
             st.rerun()
 
 
@@ -663,20 +660,11 @@ def mostrar_menu_operario():
 
     with col4:
         if st.button(
-            "🏫\nInventario aulas",
-            key="btn_inventario_aulas_operario",
+            "🏫\nGestión aulas",
+            key="btn_gestion_espacios_operario",
             use_container_width=True
         ):
-            st.session_state["seccion_actual"] = "Inventario aulas"
-            st.rerun()
-
-    with col5:
-        if st.button(
-            "🔎\nPreventivo aulas",
-            key="btn_preventivo_aulas_operario",
-            use_container_width=True
-        ):
-            st.session_state["seccion_actual"] = "Preventivo aulas"
+            st.session_state["seccion_actual"] = "Gestión aulas"
             st.rerun()
 
 
@@ -871,6 +859,9 @@ if perfil == "admin":
 
     elif seccion == "Panel Legionella":
         pantalla_panel_legionella()
+        
+    elif seccion == "Gestión espacios":
+        pantalla_gestion_aulas() 
 
 
 elif perfil == "gerencia":
