@@ -880,6 +880,7 @@ else:
         "Inventario",
         "Inventario aulas",
         "Preventivo aulas",
+        "Gestión espacios",
         "Pedidos material"
     ]:
         st.warning("Este usuario solo tiene acceso a Inventario.")
@@ -902,6 +903,9 @@ else:
         
     elif seccion == "Pedidos material":
         ui_pedidos_material()
+
+    elif seccion == "Gestión espacios":
+        pantalla_gestion_aulas()
 
 
 pintar_footer()
