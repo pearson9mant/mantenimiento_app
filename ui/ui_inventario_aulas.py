@@ -11,28 +11,8 @@ from modules.inventario_aulas import (
     obtener_inventario_aulas
 )
 
-
 ELEMENTOS_RAPIDOS_AULA = obtener_elementos_catalogo_aulas()
-    "Silla",
-    "Mesa alumno",
-    "Mesa profesor",
-    "Armario",
-    "Pizarra",
-    "Proyector",
-    "Pantalla eléctrica",
-    "Estantería",
-    "Perchero",
-    "Papelera",
-    "Altavoz",
-    "Monitor",
-    "Ordenador",
-    "Router / Switch",
-    "Cortina",
-    "Persiana",
-    "Otro"
-]
-
-
+    
 def centro_por_operario():
     operario = str(st.session_state.get("operario_activo", "")).strip()
 
