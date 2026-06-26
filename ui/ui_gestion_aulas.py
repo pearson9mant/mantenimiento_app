@@ -11,6 +11,15 @@ from modules.preventivo_aulas import (
 )
 
 
+def es_ot_resuelta(estado_ot):
+    return str(estado_ot or "").lower() in [
+        "finalizada",
+        "cerrado",
+        "cerrada",
+        "cancelada"
+    ]
+
+
 def obtener_correctivos_espacios():
     conn = conectar()
     cur = conn.cursor()
@@ -85,11 +94,7 @@ def pantalla_correctivos_espacios():
         st.info("No hay correctivos generados desde inspecciones de espacios.")
         return
 
-    filtro_estado = st.selectbox(
-        "Filtrar estado",
-        ["Todos", "Pendientes", "Resueltos"],
-        key="filtro_correctivos_espacios_estado"
-    )
+    enriquecidos = []
 
     for c in correctivos:
         (
@@ -105,38 +110,96 @@ def pantalla_correctivos_espacios():
         ) = c
 
         estado_ot = obtener_estado_ot(numero_ot)
+        resuelta = es_ot_resuelta(estado_ot)
 
-        resuelta = str(estado_ot).lower() in [
-            "finalizada",
-            "cerrado",
-            "cerrada",
-            "cancelada"
-        ]
+        enriquecidos.append({
+            "fecha": fecha,
+            "centro": centro,
+            "edificio": edificio,
+            "espacio": espacio,
+            "operario": operario,
+            "elemento": elemento,
+            "estado_item": estado_item,
+            "observaciones": observaciones,
+            "numero_ot": numero_ot,
+            "estado_ot": estado_ot,
+            "resuelta": resuelta,
+        })
 
-        if filtro_estado == "Pendientes" and resuelta:
+    total = len(enriquecidos)
+    pendientes_total = len([x for x in enriquecidos if not x["resuelta"]])
+    resueltas_total = len([x for x in enriquecidos if x["resuelta"]])
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total correctivos", total)
+    c2.metric("Pendientes", pendientes_total)
+    c3.metric("Resueltos", resueltas_total)
+
+    centros = sorted(list(set([str(x["centro"]) for x in enriquecidos if x["centro"]])))
+    espacios = sorted(list(set([str(x["espacio"]) for x in enriquecidos if x["espacio"]])))
+
+    f1, f2, f3 = st.columns(3)
+
+    with f1:
+        filtro_estado = st.selectbox(
+            "Filtrar estado",
+            ["Todos", "Pendientes", "Resueltos"],
+            key="filtro_correctivos_espacios_estado"
+        )
+
+    with f2:
+        filtro_centro = st.selectbox(
+            "Filtrar centro",
+            ["Todos"] + centros,
+            key="filtro_correctivos_espacios_centro"
+        )
+
+    with f3:
+        filtro_espacio = st.selectbox(
+            "Filtrar espacio",
+            ["Todos"] + espacios,
+            key="filtro_correctivos_espacios_espacio"
+        )
+
+    mostrados = 0
+
+    for x in enriquecidos:
+
+        if filtro_estado == "Pendientes" and x["resuelta"]:
             continue
 
-        if filtro_estado == "Resueltos" and not resuelta:
+        if filtro_estado == "Resueltos" and not x["resuelta"]:
             continue
 
-        icono = "🟢" if resuelta else "🔴"
-        estado_visible = "Resuelta" if resuelta else (estado_ot or "Pendiente")
+        if filtro_centro != "Todos" and str(x["centro"]) != filtro_centro:
+            continue
+
+        if filtro_espacio != "Todos" and str(x["espacio"]) != filtro_espacio:
+            continue
+
+        mostrados += 1
+
+        icono = "🟢" if x["resuelta"] else "🔴"
+        estado_visible = "Resuelta" if x["resuelta"] else (x["estado_ot"] or "Pendiente")
 
         with st.expander(
-            f"{icono} {espacio} · {elemento} · OT {numero_ot} · {estado_visible}",
+            f"{icono} {x['espacio']} · {x['elemento']} · OT {x['numero_ot']} · {estado_visible}",
             expanded=False
         ):
-            st.markdown(f"**Fecha inspección:** {fecha or '-'}")
-            st.markdown(f"**Centro:** {centro or '-'}")
-            st.markdown(f"**Edificio:** {edificio or '-'}")
-            st.markdown(f"**Espacio:** {espacio or '-'}")
-            st.markdown(f"**Elemento:** {elemento or '-'}")
-            st.markdown(f"**OT correctiva:** {numero_ot or '-'}")
+            st.markdown(f"**Fecha inspección:** {x['fecha'] or '-'}")
+            st.markdown(f"**Centro:** {x['centro'] or '-'}")
+            st.markdown(f"**Edificio:** {x['edificio'] or '-'}")
+            st.markdown(f"**Espacio:** {x['espacio'] or '-'}")
+            st.markdown(f"**Elemento:** {x['elemento'] or '-'}")
+            st.markdown(f"**OT correctiva:** {x['numero_ot'] or '-'}")
             st.markdown(f"**Estado OT:** {estado_visible}")
-            st.markdown(f"**Operario:** {operario or '-'}")
+            st.markdown(f"**Operario:** {x['operario'] or '-'}")
 
-            if observaciones:
-                st.info(observaciones)
+            if x["observaciones"]:
+                st.info(x["observaciones"])
+
+    if mostrados == 0:
+        st.info("No hay correctivos con esos filtros.")
 
 
 def pantalla_historico_espacios():
