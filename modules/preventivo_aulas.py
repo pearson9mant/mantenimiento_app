@@ -480,6 +480,8 @@ def obtener_estado_ot(numero_ot):
     posibles_columnas = ["numero_ot", "numero", "codigo"]
 
     for columna in posibles_columnas:
+
+        # Buscar en OTs activas
         conn = conectar()
         cur = conn.cursor()
 
@@ -487,6 +489,31 @@ def obtener_estado_ot(numero_ot):
             cur.execute(_sql(f"""
                 SELECT estado
                 FROM ordenes_trabajo
+                WHERE {columna} = ?
+                LIMIT 1
+            """), (numero_ot,))
+
+            fila = cur.fetchone()
+            conn.close()
+
+            if fila:
+                return str(fila[0] or "")
+
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            conn.close()
+
+        # Buscar en histórico
+        conn = conectar()
+        cur = conn.cursor()
+
+        try:
+            cur.execute(_sql(f"""
+                SELECT estado
+                FROM historico_ordenes
                 WHERE {columna} = ?
                 LIMIT 1
             """), (numero_ot,))
