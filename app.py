@@ -838,6 +838,9 @@ if perfil == "admin":
 
     elif seccion == "Preventivo":
         pantalla_preventivo()
+        
+    elif seccion == "Preventivo aulas":
+        pantalla_preventivo_aulas()
 
     elif seccion == "Operario":
         pantalla_operario()
