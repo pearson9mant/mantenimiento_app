@@ -16,6 +16,7 @@ from ui.ui_legionella import pantalla_legionella
 from ui.ui_preventivo import pantalla_preventivo
 from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
+from ui.preventivo_aulas import pantalla_preventivo_aulas
 from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_configuracion import pantalla_configuracion
 from ui.ui_gerencia import pantalla_gerencia
