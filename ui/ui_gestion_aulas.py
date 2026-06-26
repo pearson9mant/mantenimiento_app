@@ -4,7 +4,11 @@ from database.db import conectar, _sql
 
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.preventivo_aulas import pantalla_preventivo_aulas
-from modules.preventivo_aulas import obtener_estado_ot, resumen_revision_aula
+from modules.preventivo_aulas import (
+    obtener_estado_ot,
+    resumen_revision_aula,
+    obtener_items_revision_aula,
+)
 
 
 def obtener_correctivos_espacios():
@@ -58,6 +62,18 @@ def obtener_historico_inspecciones_espacios():
     datos = cur.fetchall()
     conn.close()
     return datos
+
+
+def icono_estado_item(estado):
+    estado = str(estado or "")
+
+    if estado == "Avería":
+        return "🔴"
+
+    if estado == "Revisar":
+        return "🟡"
+
+    return "✅"
 
 
 def pantalla_correctivos_espacios():
@@ -212,6 +228,46 @@ def pantalla_historico_espacios():
 
             if observaciones:
                 st.info(observaciones)
+
+            st.markdown("---")
+            st.markdown("### Detalle de elementos revisados")
+
+            items = obtener_items_revision_aula(revision_id)
+
+            if not items:
+                st.info("Esta inspección no tiene elementos registrados.")
+            else:
+                for item in items:
+                    (
+                        item_id,
+                        _revision_id,
+                        elemento,
+                        estado_item,
+                        obs_item,
+                        foto,
+                        crear_correctivo,
+                        numero_ot_correctiva,
+                    ) = item
+
+                    icono_item = icono_estado_item(estado_item)
+
+                    linea = f"{icono_item} **{elemento}** · {estado_item or '-'}"
+
+                    if numero_ot_correctiva:
+                        estado_ot = obtener_estado_ot(numero_ot_correctiva)
+                        estado_ot_visible = estado_ot or "Pendiente"
+                        linea += f" · OT: `{numero_ot_correctiva}` · {estado_ot_visible}"
+
+                    st.markdown(linea)
+
+                    if obs_item:
+                        st.caption(obs_item)
+
+                    if foto:
+                        try:
+                            st.image(foto, width=220)
+                        except Exception:
+                            st.caption("Foto no disponible.")
 
 
 def pantalla_gestion_aulas():
