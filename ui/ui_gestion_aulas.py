@@ -399,33 +399,65 @@ def pantalla_historico_espacios():
                             st.image(foto, width=220)
                         except Exception:
                             st.caption("Foto no disponible.")
+def obtener_metricas_gestion_espacios():
+    historico = obtener_historico_inspecciones_espacios()
+    correctivos = obtener_correctivos_espacios()
 
+    espacios = set()
+    inspecciones = len(historico)
+    correctivos_pendientes = 0
+    espacios_con_averia = set()
+
+    for h in historico:
+        espacio = str(h[4] or "").strip()
+        if espacio:
+            espacios.add(espacio)
+
+        resumen = resumen_revision_aula(h[0])
+        if resumen.get("averias_pendientes", 0) > 0 and espacio:
+            espacios_con_averia.add(espacio)
+
+    for c in correctivos:
+        numero_ot = c[8]
+        estado_ot = obtener_estado_ot(numero_ot)
+
+        if not es_ot_resuelta(estado_ot):
+            correctivos_pendientes += 1
+
+    return {
+        "espacios": len(espacios),
+        "inspecciones": inspecciones,
+        "correctivos_pendientes": correctivos_pendientes,
+        "espacios_con_averia": len(espacios_con_averia),
+    }
 
 def pantalla_gestion_aulas():
 
-       st.markdown("## 🏫 Panel Gestión de Espacios")
+    st.markdown("## 🏫 Panel Gestión de Espacios")
 
-        st.caption(
-            "Control centralizado de inventario, inspecciones, correctivos e histórico de aulas y espacios."
-        )
-    
-        st.markdown("---")
-    
-        col1, col2, col3, col4 = st.columns(4)
-    
-        with col1:
-            st.metric("📦 Inventario", "Espacios")
-    
-        with col2:
-            st.metric("🔎 Inspecciones", "Histórico")
-    
-        with col3:
-            st.metric("🔧 Correctivos", "Activos")
-    
-        with col4:
-            st.metric("🚦 Estado", "Semáforo")
-    
-        st.markdown("---")
+    st.caption(
+        "Control centralizado de inventario, inspecciones, correctivos e histórico de aulas y espacios."
+    )
+
+    metricas = obtener_metricas_gestion_espacios()
+
+    st.markdown("---")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("🏫 Espacios", metricas["espacios"])
+
+    with col2:
+        st.metric("🔎 Inspecciones", metricas["inspecciones"])
+
+    with col3:
+        st.metric("🔧 Correctivos", metricas["correctivos_pendientes"])
+
+    with col4:
+        st.metric("🔴 Con avería", metricas["espacios_con_averia"])
+
+    st.markdown("---")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "📦 Inventario",
