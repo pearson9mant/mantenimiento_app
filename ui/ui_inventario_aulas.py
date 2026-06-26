@@ -11,8 +11,10 @@ from modules.inventario_aulas import (
     obtener_inventario_aulas
 )
 
+
 ELEMENTOS_RAPIDOS_AULA = obtener_elementos_catalogo_aulas()
-    
+
+
 def centro_por_operario():
     operario = str(st.session_state.get("operario_activo", "")).strip()
 
@@ -40,6 +42,34 @@ def borrar_inventario_aula(id_reg):
     except Exception as e:
         conn.rollback()
         st.error(f"Error al borrar registro: {e}")
+        return False
+
+    finally:
+        conn.close()
+
+
+def borrar_inventario_aula_completo(centro, edificio, espacio):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            DELETE FROM inventario_aulas
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+        """), (
+            centro,
+            edificio,
+            espacio
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error al borrar inventario del aula: {e}")
         return False
 
     finally:
@@ -269,6 +299,7 @@ def pantalla_inventario_aulas():
                 if elemento == "Otro":
                     elemento = st.text_input(
                         "Especificar elemento",
+                        placeholder="Ejemplo: ventilador, reloj, cámara, micrófono...",
                         key=f"inv_rapido_elemento_otro_{i}"
                     )
 
@@ -387,6 +418,28 @@ def pantalla_inventario_aulas():
 
     st.markdown(f"### 🏫 {centro} | {edificio} | {espacio}")
     st.caption(f"{len(registros_filtrados)} registros · {total_unidades} unidades")
+
+    st.markdown("---")
+    st.warning("Zona de borrado del aula")
+
+    confirmar_borrar_aula = st.checkbox(
+        "Confirmo borrar todo el inventario de esta aula",
+        key=f"confirmar_borrar_aula_{centro}_{edificio}_{espacio}"
+    )
+
+    if st.button(
+        "🗑️ Borrar inventario completo de esta aula",
+        key=f"borrar_aula_completa_{centro}_{edificio}_{espacio}",
+        use_container_width=True
+    ):
+        if not confirmar_borrar_aula:
+            st.error("Marca primero la confirmación.")
+        else:
+            if borrar_inventario_aula_completo(centro, edificio, espacio):
+                st.warning("Inventario del aula borrado correctamente.")
+                st.rerun()
+
+    st.markdown("---")
 
     for r in registros_filtrados:
         (
