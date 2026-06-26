@@ -12,6 +12,33 @@ from modules.inventario_aulas import (
 )
 
 
+ELEMENTOS_RAPIDOS_AULA = [
+    "Silla",
+    "Mesa alumno",
+    "Mesa profesor",
+    "Armario",
+    "Pizarra",
+    "Proyector",
+    "Pantalla eléctrica",
+    "Estantería",
+    "Perchero",
+    "Papelera",
+    "Otro"
+]
+
+
+def centro_por_operario():
+    operario = str(st.session_state.get("operario_activo", "")).strip()
+
+    if operario == "Luis Lozano":
+        return "Pearson 9"
+
+    if operario == "J.A. Almeda":
+        return "Pearson 22"
+
+    return ""
+
+
 def borrar_inventario_aula(id_reg):
     conn = conectar()
     cursor = conn.cursor()
@@ -33,269 +60,391 @@ def borrar_inventario_aula(id_reg):
         conn.close()
 
 
+def existe_registro_aula(centro, edificio, espacio, elemento):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT id
+            FROM inventario_aulas
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+              AND elemento = ?
+            ORDER BY id DESC
+            LIMIT 1
+        """), (
+            centro,
+            edificio,
+            espacio,
+            elemento
+        ))
+
+        fila = cursor.fetchone()
+        return fila[0] if fila else None
+
+    except Exception:
+        return None
+
+    finally:
+        conn.close()
+
+
+def actualizar_inventario_aula(
+    id_reg,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET fecha_revision = ?,
+                cantidad = ?,
+                estado = ?,
+                ancho = ?,
+                alto = ?,
+                fondo = ?,
+                unidad = ?,
+                observaciones = ?,
+                foto = ?,
+                operario = ?
+            WHERE id = ?
+        """), (
+            __import__("datetime").datetime.now().strftime("%Y-%m-%d"),
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario,
+            id_reg
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error actualizando inventario: {e}")
+        return False
+
+    finally:
+        conn.close()
+
+
+def guardar_o_actualizar_aula(
+    centro,
+    edificio,
+    espacio,
+    elemento,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    id_existente = existe_registro_aula(centro, edificio, espacio, elemento)
+
+    if id_existente:
+        return actualizar_inventario_aula(
+            id_existente,
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario
+        )
+
+    guardar_inventario_aula(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento,
+        cantidad=cantidad,
+        estado=estado,
+        ancho=ancho,
+        alto=alto,
+        fondo=fondo,
+        unidad=unidad,
+        observaciones=observaciones,
+        foto=foto,
+        operario=operario
+    )
+
+    return True
+
+
+def guardar_foto_aula(foto_subida, centro, edificio, espacio, elemento):
+    if foto_subida is None:
+        return ""
+
+    carpeta = Path("data/fotos_aulas")
+    carpeta.mkdir(parents=True, exist_ok=True)
+
+    nombre_foto = f"{centro}_{edificio}_{espacio}_{elemento}_{foto_subida.name}"
+    nombre_foto = nombre_foto.replace(" ", "_").replace("/", "_").replace("\\", "_")
+
+    ruta_foto = str(carpeta / nombre_foto)
+
+    with open(ruta_foto, "wb") as f:
+        f.write(foto_subida.getbuffer())
+
+    return ruta_foto
+
+
 def pantalla_inventario_aulas():
     crear_tabla_inventario_aulas()
 
-    st.subheader("🏫 Inventario aulas")
+    st.subheader("🏫 Inventario rápido de aulas")
 
     operario = st.session_state.get("operario_activo", "")
+    perfil = st.session_state.get("perfil", "")
+    centro_fijo = centro_por_operario() if perfil != "admin" else ""
 
-    with st.expander("➕ Nuevo registro", expanded=False):
+    if centro_fijo:
+        st.info(f"Centro asignado: **{centro_fijo}**")
+        centro = centro_fijo
+    else:
+        centro = st.selectbox("Centro", CENTROS, key="inv_aula_centro")
 
-        centro = st.selectbox(
-            "Centro",
-            CENTROS,
-            key="inv_aula_centro"
-        )
+    edificios = obtener_edificios(centro)
 
-        edificios = obtener_edificios(centro)
+    edificio = st.selectbox(
+        "Edificio",
+        edificios,
+        key="inv_aula_edificio"
+    )
 
-        edificio = st.selectbox(
-            "Edificio",
-            edificios,
-            key="inv_aula_edificio"
-        )
+    espacios = obtener_espacios(edificio)
 
-        espacios = obtener_espacios(edificio)
+    espacio = st.selectbox(
+        "Aula / espacio",
+        espacios,
+        key="inv_aula_espacio"
+    )
 
-        espacio = st.selectbox(
-            "Aula / Espacio",
-            espacios,
-            key="inv_aula_espacio"
-        )
+    st.markdown("---")
+    st.markdown("### 📦 Inventario del aula")
 
-        elemento = st.selectbox(
-            "Elemento",
-            [
-                "Silla",
-                "Mesa alumno",
-                "Mesa profesor",
-                "Armario",
-                "Pizarra",
-                "Proyector",
-                "Estantería",
-                "Pantalla eléctrica",
-                "Perchero",
-                "Otro"
-            ],
-            key="inv_aula_elemento"
-        )
+    with st.form("form_inventario_aula_rapido"):
+        registros_a_guardar = []
 
-        if elemento == "Otro":
-            elemento = st.text_input(
-                "Especificar elemento",
-                placeholder="Ejemplo: ventilador, altavoz, cortina...",
-                key="inv_aula_elemento_otro"
+        for i in range(6):
+            st.markdown(f"#### Elemento {i + 1}")
+
+            c1, c2, c3 = st.columns([2, 1, 1])
+
+            with c1:
+                elemento = st.selectbox(
+                    "Elemento",
+                    ELEMENTOS_RAPIDOS_AULA,
+                    key=f"inv_rapido_elemento_{i}"
+                )
+
+                if elemento == "Otro":
+                    elemento = st.text_input(
+                        "Especificar elemento",
+                        key=f"inv_rapido_elemento_otro_{i}"
+                    )
+
+            with c2:
+                cantidad = st.number_input(
+                    "Cantidad",
+                    min_value=0,
+                    step=1,
+                    key=f"inv_rapido_cantidad_{i}"
+                )
+
+            with c3:
+                estado = st.selectbox(
+                    "Estado",
+                    ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
+                    key=f"inv_rapido_estado_{i}"
+                )
+
+            observaciones = st.text_input(
+                "Observaciones",
+                key=f"inv_rapido_obs_{i}"
             )
 
-        cantidad = st.number_input(
-            "Cantidad",
-            min_value=0,
-            step=1,
-            key="inv_aula_cantidad"
+            foto_subida = st.file_uploader(
+                "Foto",
+                type=["jpg", "jpeg", "png"],
+                key=f"inv_rapido_foto_{i}"
+            )
+
+            registros_a_guardar.append(
+                (elemento, cantidad, estado, observaciones, foto_subida)
+            )
+
+            st.markdown("---")
+
+        guardar = st.form_submit_button(
+            "💾 Guardar inventario del aula",
+            use_container_width=True
         )
 
-        estado = st.selectbox(
-            "Estado",
-            ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
-            key="inv_aula_estado"
-        )
+        if guardar:
+            guardados = 0
 
-        st.markdown("### 📏 Medidas")
+            for elemento, cantidad, estado, observaciones, foto_subida in registros_a_guardar:
+                elemento = str(elemento or "").strip()
 
-        m1, m2, m3, m4 = st.columns(4)
+                if not elemento or cantidad <= 0:
+                    continue
 
-        with m1:
-            ancho = st.number_input("Ancho", min_value=0.0, step=1.0, key="inv_aula_ancho")
+                ruta_foto = guardar_foto_aula(
+                    foto_subida,
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento
+                )
 
-        with m2:
-            alto = st.number_input("Alto", min_value=0.0, step=1.0, key="inv_aula_alto")
-
-        with m3:
-            fondo = st.number_input("Fondo", min_value=0.0, step=1.0, key="inv_aula_fondo")
-
-        with m4:
-            unidad = st.selectbox("Unidad", ["cm", "m", "mm"], key="inv_aula_unidad")
-
-        observaciones = st.text_area(
-            "Observaciones",
-            key="inv_aula_observaciones"
-        )
-
-        foto_subida = st.file_uploader(
-            "Foto",
-            type=["jpg", "jpeg", "png"],
-            key="inv_aula_foto"
-        )
-
-        ruta_foto = ""
-
-        if foto_subida is not None:
-            carpeta = Path("data/fotos_aulas")
-            carpeta.mkdir(parents=True, exist_ok=True)
-
-            nombre_foto = f"{centro}_{edificio}_{espacio}_{elemento}_{foto_subida.name}".replace(" ", "_")
-            ruta_foto = str(carpeta / nombre_foto)
-
-            with open(ruta_foto, "wb") as f:
-                f.write(foto_subida.getbuffer())
-
-            st.image(ruta_foto, width=250)
-
-        if st.button("💾 Guardar registro", use_container_width=True):
-            if not edificio or not espacio or not elemento:
-                st.warning("Rellena edificio, aula/espacio y elemento.")
-            else:
-                guardar_inventario_aula(
+                ok = guardar_o_actualizar_aula(
                     centro=centro,
                     edificio=edificio,
                     espacio=espacio,
                     elemento=elemento,
                     cantidad=cantidad,
                     estado=estado,
-                    ancho=ancho,
-                    alto=alto,
-                    fondo=fondo,
-                    unidad=unidad,
+                    ancho=0,
+                    alto=0,
+                    fondo=0,
+                    unidad="cm",
                     observaciones=observaciones,
                     foto=ruta_foto,
                     operario=operario
                 )
 
-                st.success("Registro guardado correctamente.")
+                if ok:
+                    guardados += 1
+
+            if guardados > 0:
+                st.success(f"Inventario guardado. Elementos actualizados: {guardados}")
                 st.rerun()
+            else:
+                st.warning("No hay elementos con cantidad para guardar.")
 
     st.markdown("---")
-    st.markdown("### 🏫 Aulas inventariadas")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        if st.button("🔎 Pasar revisión preventiva de esta aula", use_container_width=True):
+            st.session_state["seccion_actual"] = "Preventivo aulas"
+            st.session_state["prev_aula_centro_preseleccionado"] = centro
+            st.session_state["prev_aula_edificio_preseleccionado"] = edificio
+            st.session_state["prev_aula_espacio_preseleccionado"] = espacio
+            st.rerun()
+
+    with c2:
+        if st.button("🔄 Actualizar listado", use_container_width=True):
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 📋 Inventario actual")
 
     registros = obtener_inventario_aulas()
 
-    if not registros:
-        st.info("Todavía no hay registros de inventario de aulas.")
+    registros_filtrados = [
+        r for r in registros
+        if str(r[2]) == str(centro)
+        and str(r[3]) == str(edificio)
+        and str(r[4]) == str(espacio)
+    ]
+
+    if not registros_filtrados:
+        st.info("Esta aula todavía no tiene inventario.")
         return
 
-    filtro_centro = st.selectbox(
-        "Filtrar centro",
-        ["Todos"] + sorted(list(set([str(r[2]) for r in registros if r[2]]))),
-        key="filtro_inv_aulas_centro"
+    total_unidades = sum(int(r[6] or 0) for r in registros_filtrados)
+
+    st.markdown(
+        f"### 🏫 {centro} | {edificio} | {espacio}"
     )
-
-    registros_filtrados = registros
-
-    if filtro_centro != "Todos":
-        registros_filtrados = [
-            r for r in registros_filtrados
-            if str(r[2]) == filtro_centro
-        ]
-
-    aulas = defaultdict(list)
+    st.caption(f"{len(registros_filtrados)} registros · {total_unidades} unidades")
 
     for r in registros_filtrados:
-        centro = r[2]
-        edificio = r[3]
-        espacio = r[4]
+        (
+            id_reg,
+            fecha_revision,
+            centro_r,
+            edificio_r,
+            espacio_r,
+            elemento,
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario_reg,
+            fecha_creacion
+        ) = r
 
-        clave_aula = f"{centro} | {edificio} | {espacio}"
-        aulas[clave_aula].append(r)
-
-    if not aulas:
-        st.info("No hay aulas con ese filtro.")
-        return
-
-    for aula, elementos in aulas.items():
-
-        total_elementos = sum(int(e[6] or 0) for e in elementos)
-
-        estados = [e[7] for e in elementos]
-
-        if any(e in ["Dañado", "Falta", "Retirar"] for e in estados):
-            icono_aula = "🔴"
-        elif any(e == "Regular" for e in estados):
-            icono_aula = "🟡"
+        if estado in ["Dañado", "Falta", "Retirar"]:
+            icono = "🔴"
+        elif estado == "Regular":
+            icono = "🟡"
         else:
-            icono_aula = "✅"
+            icono = "✅"
 
-        titulo_aula = f"{icono_aula} {aula} · {len(elementos)} registros · {total_elementos} uds."
+        with st.expander(
+            f"{icono} {elemento} · {cantidad} uds · {estado}",
+            expanded=False
+        ):
+            st.markdown(f"**Elemento:** {elemento}")
+            st.markdown(f"**Cantidad:** {cantidad}")
+            st.markdown(f"**Estado:** {estado}")
+            st.caption(f"Revisado por {operario_reg or '-'} · {fecha_revision or '-'}")
 
-        with st.expander(titulo_aula, expanded=False):
+            if observaciones:
+                st.info(observaciones)
 
-            st.markdown(f"### 🏫 {aula}")
+            if foto:
+                try:
+                    st.image(foto, width=250)
+                except Exception:
+                    st.caption("Foto no disponible.")
 
-            resumen = defaultdict(int)
+            confirmar = st.checkbox(
+                "Confirmo borrar este registro",
+                key=f"confirmar_borrar_inv_aula_{id_reg}"
+            )
 
-            for e in elementos:
-                elemento = e[5]
-                cantidad = int(e[6] or 0)
-                resumen[elemento] += cantidad
-
-            st.markdown("#### Resumen del aula")
-
-            for elemento, cantidad in resumen.items():
-                st.write(f"• **{cantidad} x {elemento}**")
-
-            st.markdown("---")
-            st.markdown("#### Detalle")
-
-            for r in elementos:
-                (
-                    id_reg,
-                    fecha_revision,
-                    centro,
-                    edificio,
-                    espacio,
-                    elemento,
-                    cantidad,
-                    estado,
-                    ancho,
-                    alto,
-                    fondo,
-                    unidad,
-                    observaciones,
-                    foto,
-                    operario,
-                    fecha_creacion
-                ) = r
-
-                if estado in ["Dañado", "Falta", "Retirar"]:
-                    icono = "🔴"
-                elif estado == "Regular":
-                    icono = "🟡"
+            if st.button(
+                f"🗑️ Borrar {elemento}",
+                key=f"borrar_inv_aula_{id_reg}",
+                use_container_width=True
+            ):
+                if not confirmar:
+                    st.error("Marca primero la confirmación.")
                 else:
-                    icono = "✅"
-
-                with st.expander(
-                    f"{icono} {elemento} · Cantidad: {cantidad} · {estado}",
-                    expanded=False
-                ):
-
-                    st.markdown(f"### {elemento}")
-                    st.markdown(f"**Cantidad:** {cantidad} · **Estado:** {estado}")
-                    st.markdown(f"📏 {ancho} x {alto} x {fondo} {unidad}")
-                    st.markdown(f"🏢 {centro} · {edificio} · {espacio}")
-                    st.caption(f"Revisado por {operario or '-'} · {fecha_revision}")
-
-                    if observaciones:
-                        st.info(observaciones)
-
-                    if foto:
-                        try:
-                            st.image(foto, width=250)
-                        except Exception:
-                            st.caption("Foto no disponible.")
-
-                    confirmar = st.checkbox(
-                        "Confirmo borrar este registro",
-                        key=f"confirmar_borrar_inv_aula_{id_reg}"
-                    )
-
-                    if st.button(
-                        f"🗑️ Borrar {elemento}",
-                        key=f"borrar_inv_aula_{id_reg}",
-                        use_container_width=True
-                    ):
-                        if not confirmar:
-                            st.error("Marca primero la confirmación.")
-                        else:
-                            if borrar_inventario_aula(id_reg):
-                                st.warning("Registro borrado correctamente.")
-                                st.rerun()
+                    if borrar_inventario_aula(id_reg):
+                        st.warning("Registro borrado correctamente.")
+                        st.rerun()
