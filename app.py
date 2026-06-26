@@ -877,6 +877,7 @@ else:
     if perfil == "inventario" and seccion not in [
         "Inventario",
         "Inventario aulas",
+        "Preventivo aulas",
         "Pedidos material"
     ]:
         st.warning("Este usuario solo tiene acceso a Inventario.")
