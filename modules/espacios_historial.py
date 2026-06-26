@@ -20,9 +20,29 @@ def crear_tabla_espacios_historial():
             area TEXT,
             estado TEXT,
             operario TEXT,
-            observaciones TEXT
+            observaciones TEXT,
+            origen TEXT,
+            tipo_orden TEXT,
+            coste REAL DEFAULT 0,
+            foto TEXT,
+            fecha_reparacion TEXT
         )
     """))
+
+    for columna, tipo in [
+        ("origen", "TEXT"),
+        ("tipo_orden", "TEXT"),
+        ("coste", "REAL DEFAULT 0"),
+        ("foto", "TEXT"),
+        ("fecha_reparacion", "TEXT"),
+    ]:
+        try:
+            cur.execute(_sql(f"""
+                ALTER TABLE espacios_historial
+                ADD COLUMN IF NOT EXISTS {columna} {tipo}
+            """))
+        except Exception:
+            pass
 
     conn.commit()
     conn.close()
@@ -39,12 +59,25 @@ def registrar_historial_espacio(
     area="",
     estado="",
     operario="",
-    observaciones=""
+    observaciones="",
+    origen="",
+    tipo_orden="",
+    coste=0,
+    foto="",
+    fecha_reparacion=""
 ):
     crear_tabla_espacios_historial()
 
     if not str(espacio or "").strip():
         return False
+
+    if not fecha_reparacion:
+        fecha_reparacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        coste = float(coste or 0)
+    except Exception:
+        coste = 0
 
     conn = conectar()
     cur = conn.cursor()
@@ -62,9 +95,14 @@ def registrar_historial_espacio(
             area,
             estado,
             operario,
-            observaciones
+            observaciones,
+            origen,
+            tipo_orden,
+            coste,
+            foto,
+            fecha_reparacion
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         centro,
@@ -77,7 +115,12 @@ def registrar_historial_espacio(
         area,
         estado,
         operario,
-        observaciones
+        observaciones,
+        origen,
+        tipo_orden,
+        coste,
+        foto,
+        fecha_reparacion
     ))
 
     conn.commit()
@@ -93,9 +136,25 @@ def obtener_historial_espacios(centro="", edificio="", espacio=""):
     cur = conn.cursor()
 
     sql = """
-        SELECT id, fecha, centro, edificio, espacio, elemento,
-               tipo, numero_ot, descripcion, area, estado,
-               operario, observaciones
+        SELECT
+            id,
+            fecha,
+            centro,
+            edificio,
+            espacio,
+            elemento,
+            tipo,
+            numero_ot,
+            descripcion,
+            area,
+            estado,
+            operario,
+            observaciones,
+            origen,
+            tipo_orden,
+            coste,
+            foto,
+            fecha_reparacion
         FROM espacios_historial
         WHERE 1 = 1
     """
