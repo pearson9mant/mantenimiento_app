@@ -333,6 +333,12 @@ def pantalla_inventario_aulas():
                 type=["jpg", "jpeg", "png"],
                 key=f"inv_rapido_foto_{i}"
             )
+            if foto_subida is not None:
+                st.image(
+                    foto_subida,
+                    caption="Foto seleccionada",
+                    width=250
+                )
 
             registros_a_guardar.append(
                 (elemento, cantidad, estado, observaciones, foto_subida)
