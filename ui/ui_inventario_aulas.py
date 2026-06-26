@@ -290,9 +290,14 @@ def pantalla_inventario_aulas():
             c1, c2, c3 = st.columns([2, 1, 1])
 
             with c1:
+                opciones_elementos = list(ELEMENTOS_RAPIDOS_AULA)
+
+                if "Otro" not in opciones_elementos:
+                    opciones_elementos.append("Otro")
+                
                 elemento = st.selectbox(
                     "Elemento",
-                    ELEMENTOS_RAPIDOS_AULA,
+                    opciones_elementos,
                     key=f"inv_rapido_elemento_{i}"
                 )
 
