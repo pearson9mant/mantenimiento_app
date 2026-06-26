@@ -400,6 +400,47 @@ def pantalla_historico_espacios():
                             st.image(foto, width=220)
                         except Exception:
                             st.caption("Foto no disponible.")
+
+            st.markdown("---")
+            st.markdown("### Historial de OTs del espacio")
+
+            historial_ot = obtener_historial_espacios(
+                centro=centro,
+                edificio=edificio,
+                espacio=espacio
+            )
+
+            if not historial_ot:
+                st.info("Este espacio no tiene OTs finalizadas registradas.")
+            else:
+                for h_ot in historial_ot[:10]:
+                    (
+                        id_hist,
+                        fecha_hist,
+                        centro_hist,
+                        edificio_hist,
+                        espacio_hist,
+                        elemento_hist,
+                        tipo_hist,
+                        numero_ot_hist,
+                        descripcion_hist,
+                        area_hist,
+                        estado_hist,
+                        operario_hist,
+                        observaciones_hist
+                    ) = h_ot
+
+                    st.markdown(
+                        f"✅ **{fecha_hist or '-'}** · "
+                        f"OT `{numero_ot_hist or '-'}` · "
+                        f"{area_hist or '-'} · "
+                        f"{operario_hist or '-'}"
+                    )
+
+                    st.caption(descripcion_hist or "")
+
+                    if observaciones_hist:
+                        st.info(observaciones_hist)
 def obtener_metricas_gestion_espacios():
     historico = obtener_historico_inspecciones_espacios()
     correctivos = obtener_correctivos_espacios()
