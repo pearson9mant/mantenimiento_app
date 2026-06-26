@@ -4,6 +4,7 @@ from database.db import conectar, _sql
 
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.preventivo_aulas import pantalla_preventivo_aulas
+from modules.espacios_historial import obtener_historial_espacios
 from modules.preventivo_aulas import (
     obtener_estado_ot,
     resumen_revision_aula,
