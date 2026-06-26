@@ -12,7 +12,7 @@ from modules.inventario_aulas import (
 )
 
 
-ELEMENTOS_RAPIDOS_AULA = [
+ELEMENTOS_RAPIDOS_AULA = obtener_elementos_catalogo_aulas()
     "Silla",
     "Mesa alumno",
     "Mesa profesor",
