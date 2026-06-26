@@ -3,6 +3,7 @@ from pathlib import Path
 
 from database.db import conectar, _sql
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
+from modules.catalogo_aulas import obtener_elementos_catalogo_aulas
 
 from modules.inventario_aulas import (
     crear_tabla_inventario_aulas,
