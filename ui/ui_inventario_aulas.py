@@ -1,6 +1,5 @@
 import streamlit as st
 from pathlib import Path
-from collections import defaultdict
 
 from database.db import conectar, _sql
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -23,6 +22,12 @@ ELEMENTOS_RAPIDOS_AULA = [
     "Estantería",
     "Perchero",
     "Papelera",
+    "Altavoz",
+    "Monitor",
+    "Ordenador",
+    "Router / Switch",
+    "Cortina",
+    "Persiana",
     "Otro"
 ]
 
@@ -103,6 +108,8 @@ def actualizar_inventario_aula(
     foto,
     operario
 ):
+    from datetime import datetime
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -121,7 +128,7 @@ def actualizar_inventario_aula(
                 operario = ?
             WHERE id = ?
         """), (
-            __import__("datetime").datetime.now().strftime("%Y-%m-%d"),
+            datetime.now().strftime("%Y-%m-%d"),
             cantidad,
             estado,
             ancho,
@@ -204,7 +211,13 @@ def guardar_foto_aula(foto_subida, centro, edificio, espacio, elemento):
     carpeta.mkdir(parents=True, exist_ok=True)
 
     nombre_foto = f"{centro}_{edificio}_{espacio}_{elemento}_{foto_subida.name}"
-    nombre_foto = nombre_foto.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    nombre_foto = (
+        nombre_foto
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(":", "_")
+    )
 
     ruta_foto = str(carpeta / nombre_foto)
 
@@ -248,10 +261,19 @@ def pantalla_inventario_aulas():
     st.markdown("---")
     st.markdown("### 📦 Inventario del aula")
 
+    num_elementos = st.number_input(
+        "Número de elementos a introducir",
+        min_value=1,
+        max_value=30,
+        value=10,
+        step=1,
+        key="inv_aula_num_elementos"
+    )
+
     with st.form("form_inventario_aula_rapido"):
         registros_a_guardar = []
 
-        for i in range(6):
+        for i in range(int(num_elementos)):
             st.markdown(f"#### Elemento {i + 1}")
 
             c1, c2, c3 = st.columns([2, 1, 1])
@@ -382,9 +404,7 @@ def pantalla_inventario_aulas():
 
     total_unidades = sum(int(r[6] or 0) for r in registros_filtrados)
 
-    st.markdown(
-        f"### 🏫 {centro} | {edificio} | {espacio}"
-    )
+    st.markdown(f"### 🏫 {centro} | {edificio} | {espacio}")
     st.caption(f"{len(registros_filtrados)} registros · {total_unidades} unidades")
 
     for r in registros_filtrados:
