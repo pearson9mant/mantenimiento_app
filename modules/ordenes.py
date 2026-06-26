@@ -5,6 +5,10 @@ try:
     from modules.telegram_alertas import enviar_telegram
 except Exception:
     enviar_telegram = None
+try:
+    from modules.espacios_historial import registrar_historial_espacio
+except Exception:
+    registrar_historial_espacio = None
 
 
 ESTADOS_VALIDOS = [
