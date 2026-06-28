@@ -2,6 +2,16 @@ import streamlit as st
 
 from database.db import conectar, _sql, _es_postgres
 
+from modules.ubicaciones import (
+    CENTROS,
+    obtener_edificios,
+    obtener_espacios,
+    obtener_ubicaciones_personalizadas,
+    crear_espacio_personalizado,
+    activar_desactivar_espacio,
+    borrar_espacio_personalizado
+)
+
 from modules.espacios import (
     crear_tabla_espacios,
     crear_espacio,
