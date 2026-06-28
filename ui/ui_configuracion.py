@@ -1,6 +1,7 @@
 import streamlit as st
 
 from database.db import conectar, _sql, _es_postgres
+from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 
 from modules.ubicaciones import (
     CENTROS,
