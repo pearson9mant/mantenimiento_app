@@ -17,6 +17,7 @@ from modules.espacios import (
     crear_espacio,
     obtener_espacios as obtener_espacios_catalogo,
     desactivar_espacio,
+    actualizar_espacio,
     obtener_arbol_espacios,
     PLANTAS_BASE,
 )
