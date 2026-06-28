@@ -19,7 +19,7 @@ from modules.espacios import (
     desactivar_espacio,
     actualizar_espacio,
     obtener_arbol_espacios,
-    icono_tipo_espacio
+    icono_tipo_espacio,
     PLANTAS_BASE,
 )
 
