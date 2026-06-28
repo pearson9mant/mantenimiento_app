@@ -427,7 +427,12 @@ def pantalla_historico_espacios():
                         area_hist,
                         estado_hist,
                         operario_hist,
-                        observaciones_hist
+                        observaciones_hist,
+                        origen_hist,
+                        tipo_orden_hist,
+                        coste_hist,
+                        foto_hist,
+                        fecha_reparacion_hist,
                     ) = h_ot
 
                     st.markdown(
