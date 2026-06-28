@@ -1,37 +1,44 @@
 from database.db import conectar, _sql
 
 
-ESPACIOS_BASE = [
-    # Pearson 22 - Infantil / Primaria
-    ("Pearson 22", "Infantil / Primaria", "Terrado", "Terrado Infantil / Primaria", "Terrado"),
-    ("Pearson 22", "Infantil / Primaria", "Planta 5", "Planta 5", "Planta"),
-    ("Pearson 22", "Infantil / Primaria", "Planta 4", "Planta 4", "Planta"),
-    ("Pearson 22", "Infantil / Primaria", "Planta 3", "Planta 3", "Planta"),
-    ("Pearson 22", "Infantil / Primaria", "Planta 2", "Planta 2", "Planta"),
-    ("Pearson 22", "Infantil / Primaria", "Planta 1", "Planta 1", "Planta"),
-
-    # Pearson 22 - Llar
-    ("Pearson 22", "Llar", "Terrado", "Terrado Llar", "Terrado"),
-    ("Pearson 22", "Llar", "Planta 2", "Planta 2", "Planta"),
-    ("Pearson 22", "Llar", "Planta 1", "Planta 1", "Planta"),
-    ("Pearson 22", "Llar", "Planta 0", "Planta 0", "Planta"),
-
-    # Pearson 9
-    ("Pearson 9", "Edificio A", "Terrado", "Terrado Edificio A", "Terrado"),
-    ("Pearson 9", "Edificio A", "Planta 2", "Planta 2", "Planta"),
-    ("Pearson 9", "Edificio A", "Planta 1", "Planta 1", "Planta"),
-    ("Pearson 9", "Edificio A", "Planta 0", "Planta 0", "Planta"),
-
-    ("Pearson 9", "Edificio B", "Terrado", "Terrado Edificio B", "Terrado"),
-    ("Pearson 9", "Edificio B", "Planta 2", "Planta 2", "Planta"),
-    ("Pearson 9", "Edificio B", "Planta 1", "Planta 1", "Planta"),
-    ("Pearson 9", "Edificio B", "Planta 0", "Planta 0", "Planta"),
-
-    ("Pearson 9", "Edificio C", "Terrado", "Terrado Edificio C", "Terrado"),
-    ("Pearson 9", "Edificio C", "Planta 2", "Planta 2", "Planta"),
-    ("Pearson 9", "Edificio C", "Planta 1", "Planta 1", "Planta"),
-    ("Pearson 9", "Edificio C", "Planta 0", "Planta 0", "Planta"),
-]
+PLANTAS_BASE = {
+    "Pearson 22": {
+        "Infantil / Primaria": [
+            "Terrado",
+            "Planta 5",
+            "Planta 4",
+            "Planta 3",
+            "Planta 2",
+            "Planta 1",
+        ],
+        "Llar": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+    },
+    "Pearson 9": {
+        "Edificio A": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+        "Edificio B": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+        "Edificio C": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+    },
+}
 
 
 def crear_tabla_espacios():
@@ -70,55 +77,33 @@ def crear_tabla_espacios():
     conn.close()
 
 
-def sembrar_espacios_base():
+def limpiar_plantas_guardadas_como_espacios():
+    """
+    Elimina registros incorrectos tipo:
+    planta='Planta 1' y espacio='Planta 1'
+    porque una planta no debe ser un espacio.
+    """
     crear_tabla_espacios()
 
     conn = conectar()
     cur = conn.cursor()
 
-    for centro, edificio, planta, espacio, tipo in ESPACIOS_BASE:
+    try:
         cur.execute(_sql("""
-            SELECT COUNT(*)
-            FROM espacios
-            WHERE centro = ?
-              AND edificio = ?
-              AND planta = ?
-              AND espacio = ?
-        """), (
-            centro,
-            edificio,
-            planta,
-            espacio
-        ))
+            DELETE FROM espacios
+            WHERE espacio = planta
+              AND tipo = 'Planta'
+        """))
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
-        existe = int(cur.fetchone()[0] or 0)
-
-        if existe == 0:
-            cur.execute(_sql("""
-                INSERT INTO espacios (
-                    centro,
-                    edificio,
-                    planta,
-                    espacio,
-                    tipo,
-                    activo
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-            """), (
-                centro,
-                edificio,
-                planta,
-                espacio,
-                tipo,
-                1
-            ))
-
-    conn.commit()
     conn.close()
 
 
 def obtener_espacios(activos=True):
-    sembrar_espacios_base()
+    crear_tabla_espacios()
+    limpiar_plantas_guardadas_como_espacios()
 
     conn = conectar()
     cur = conn.cursor()
@@ -143,9 +128,23 @@ def obtener_espacios(activos=True):
 
 
 def obtener_arbol_espacios():
-    datos = obtener_espacios(True)
+    crear_tabla_espacios()
+    limpiar_plantas_guardadas_como_espacios()
 
     arbol = {}
+
+    # Primero creamos centros / edificios / plantas aunque estén vacías
+    for centro, edificios in PLANTAS_BASE.items():
+        arbol[centro] = {}
+
+        for edificio, plantas in edificios.items():
+            arbol[centro][edificio] = {}
+
+            for planta in plantas:
+                arbol[centro][edificio][planta] = []
+
+    # Después metemos espacios reales
+    datos = obtener_espacios(True)
 
     for fila in datos:
         _id, centro, edificio, planta, espacio, tipo, activo = fila
@@ -168,7 +167,9 @@ def obtener_arbol_espacios():
     for centro in arbol:
         for edificio in arbol[centro]:
             for planta in arbol[centro][edificio]:
-                arbol[centro][edificio][planta] = sorted(arbol[centro][edificio][planta])
+                arbol[centro][edificio][planta] = sorted(
+                    arbol[centro][edificio][planta]
+                )
 
     return arbol
 
@@ -183,6 +184,9 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
     tipo = str(tipo or "Espacio").strip()
 
     if not centro or not edificio or not planta or not espacio:
+        return False
+
+    if espacio == planta:
         return False
 
     conn = conectar()
@@ -239,6 +243,23 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
             planta,
             espacio
         ))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def desactivar_espacio(id_espacio):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        UPDATE espacios
+        SET activo = 0
+        WHERE id = ?
+    """), (id_espacio,))
 
     conn.commit()
     conn.close()
