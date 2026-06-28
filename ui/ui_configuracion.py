@@ -811,9 +811,18 @@ def pantalla_configuracion_espacios():
                                     for item_espacio in espacios:
                                         nombre_espacio = item_espacio.get("espacio", "")
                                         tipo_espacio = item_espacio.get("tipo", "")
-                                        icono = icono_tipo_espacio(tipo_espacio)
-                                
-                                        with st.expander(f"{icono} {nombre_espacio}", expanded=False):
+                                        
+                                        icono_tipo = icono_tipo_espacio(tipo_espacio)
+                                        
+                                        estado_espacio = obtener_estado_espacio(
+                                            centro=centro,
+                                            edificio=edificio,
+                                            espacio=nombre_espacio
+                                        )
+                                        
+                                        icono_estado = icono_estado_espacio(estado_espacio)
+                                        
+                                        with st.expander(f"{icono_estado} {icono_tipo} {nombre_espacio}", expanded=False):
                                             from ui.ui_colegio import ficha_espacio_basica
                                 
                                             ficha_espacio_basica(
