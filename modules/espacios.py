@@ -362,6 +362,44 @@ def icono_tipo_espacio(tipo):
 
     return "📍"
 
+def prioridad_tipo_espacio(tipo):
+    tipo = str(tipo or "").strip().lower()
+
+    if "aula" in tipo:
+        return 1
+    if "biblioteca" in tipo:
+        return 2
+    if "laboratorio" in tipo:
+        return 3
+    if "wc" in tipo or "aseo" in tipo or "baño" in tipo:
+        return 4
+    if "cocina" in tipo or "comedor" in tipo:
+        return 5
+    if "despacho" in tipo:
+        return 6
+    if "sala técnica" in tipo or "sala tecnica" in tipo:
+        return 7
+    if "almacén" in tipo or "almacen" in tipo:
+        return 8
+    if "pasillo" in tipo:
+        return 9
+    if "patio" in tipo:
+        return 10
+    if "terrado" in tipo or "cubierta" in tipo:
+        return 11
+
+    return 99
+
+
+def ordenar_items_espacios(items):
+    return sorted(
+        items,
+        key=lambda x: (
+            prioridad_tipo_espacio(x.get("tipo", "")),
+            str(x.get("espacio", "")).lower()
+        )
+    )
+
     conn.commit()
     conn.close()
     return True
