@@ -264,3 +264,42 @@ def desactivar_espacio(id_espacio):
     conn.commit()
     conn.close()
     return True
+
+def actualizar_espacio(id_espacio, centro, edificio, planta, espacio, tipo):
+    crear_tabla_espacios()
+
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
+    planta = str(planta or "").strip()
+    espacio = str(espacio or "").strip()
+    tipo = str(tipo or "Espacio").strip()
+
+    if not id_espacio or not centro or not edificio or not planta or not espacio:
+        return False
+
+    if espacio == planta:
+        return False
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        UPDATE espacios
+        SET centro = ?,
+            edificio = ?,
+            planta = ?,
+            espacio = ?,
+            tipo = ?
+        WHERE id = ?
+    """), (
+        centro,
+        edificio,
+        planta,
+        espacio,
+        tipo,
+        id_espacio
+    ))
+
+    conn.commit()
+    conn.close()
+    return True
