@@ -595,6 +595,10 @@ def mostrar_menu_admin():
         if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
             st.session_state["seccion_actual"] = "Configuración"
             st.rerun()
+            
+        if st.button("🏫\nColegio", key="btn_colegio", use_container_width=True):
+            st.session_state["seccion_actual"] = "Colegio"
+            st.rerun()   
 
         if st.button("🏫\nGestión espacios", key="btn_gestion_espacios_admin", use_container_width=True):
             st.session_state["seccion_actual"] = "Gestión espacios"
@@ -860,6 +864,9 @@ if perfil == "admin":
 
     elif seccion == "Panel Legionella":
         pantalla_panel_legionella()
+
+    elif seccion == "Colegio":
+        pantalla_colegio()
         
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas() 
