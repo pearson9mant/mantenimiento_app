@@ -182,9 +182,8 @@ def obtener_arbol_espacios():
     for centro in arbol:
         for edificio in arbol[centro]:
             for planta in arbol[centro][edificio]:
-                arbol[centro][edificio][planta] = sorted(
-                    arbol[centro][edificio][planta],
-                    key=lambda x: str(x.get("espacio") or "")
+                arbol[centro][edificio][planta] = ordenar_items_espacios(
+                    arbol[centro][edificio][planta]
                 )
 
     return arbol
