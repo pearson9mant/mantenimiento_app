@@ -147,12 +147,13 @@ def obtener_arbol_espacios():
     datos = obtener_espacios(True)
 
     for fila in datos:
-        _id, centro, edificio, planta, espacio, tipo, activo = fila
+        id_espacio, centro, edificio, planta, espacio, tipo, activo = fila
 
         centro = str(centro or "").strip()
         edificio = str(edificio or "").strip()
         planta = str(planta or "").strip()
         espacio = str(espacio or "").strip()
+        tipo = str(tipo or "").strip()
 
         if not centro or not edificio or not planta or not espacio:
             continue
@@ -161,14 +162,29 @@ def obtener_arbol_espacios():
         arbol[centro].setdefault(edificio, {})
         arbol[centro][edificio].setdefault(planta, [])
 
-        if espacio not in arbol[centro][edificio][planta]:
-            arbol[centro][edificio][planta].append(espacio)
+        item = {
+            "id": id_espacio,
+            "espacio": espacio,
+            "tipo": tipo,
+            "activo": activo,
+        }
+
+        existe = False
+
+        for existente in arbol[centro][edificio][planta]:
+            if existente.get("espacio") == espacio:
+                existe = True
+                break
+
+        if not existe:
+            arbol[centro][edificio][planta].append(item)
 
     for centro in arbol:
         for edificio in arbol[centro]:
             for planta in arbol[centro][edificio]:
                 arbol[centro][edificio][planta] = sorted(
-                    arbol[centro][edificio][planta]
+                    arbol[centro][edificio][planta],
+                    key=lambda x: str(x.get("espacio") or "")
                 )
 
     return arbol
