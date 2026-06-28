@@ -605,9 +605,6 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Gestión espacios"
             st.rerun()
 
-        if st.button("🏗️\nAdmin espacios", key="btn_admin_espacios", use_container_width=True):
-            st.session_state["seccion_actual"] = "Admin espacios"
-            st.rerun()
 
 
 def mostrar_menu_operario():
@@ -876,8 +873,6 @@ if perfil == "admin":
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas() 
         
-    elif seccion == "Admin espacios":
-        pantalla_admin_espacios() 
 
 
 elif perfil == "gerencia":
