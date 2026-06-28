@@ -808,15 +808,19 @@ def pantalla_configuracion_espacios():
                                 if not espacios:
                                     st.caption("Sin espacios registrados.")
                                 else:
-                                    for espacio in espacios:
-                                        with st.expander(f"🏫 {espacio}", expanded=False):
+                                    for item_espacio in espacios:
+                                        nombre_espacio = item_espacio.get("espacio", "")
+                                        tipo_espacio = item_espacio.get("tipo", "")
+                                        icono = icono_tipo_espacio(tipo_espacio)
+                                
+                                        with st.expander(f"{icono} {nombre_espacio}", expanded=False):
                                             from ui.ui_colegio import ficha_espacio_basica
-                                    
+                                
                                             ficha_espacio_basica(
                                                 centro=centro,
                                                 edificio=edificio,
                                                 planta=planta,
-                                                espacio=espacio
+                                                espacio=nombre_espacio
                                             )
 
 
