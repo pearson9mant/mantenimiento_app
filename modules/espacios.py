@@ -299,6 +299,52 @@ def actualizar_espacio(id_espacio, centro, edificio, planta, espacio, tipo):
         tipo,
         id_espacio
     ))
+def icono_tipo_espacio(tipo):
+    tipo = str(tipo or "").strip().lower()
+
+    if "aula" in tipo:
+        return "🏫"
+
+    if tipo in ["wc", "aseo", "baño", "lavabo"]:
+        return "🚻"
+
+    if "biblioteca" in tipo:
+        return "📚"
+
+    if "cocina" in tipo:
+        return "🍳"
+
+    if "comedor" in tipo:
+        return "🍽️"
+
+    if "despacho" in tipo:
+        return "🏢"
+
+    if "sala técnica" in tipo or "sala tecnica" in tipo:
+        return "⚙️"
+
+    if "pasillo" in tipo:
+        return "🚶"
+
+    if "patio" in tipo:
+        return "🌳"
+
+    if "terrado" in tipo or "cubierta" in tipo:
+        return "🏗️"
+
+    if "almacén" in tipo or "almacen" in tipo:
+        return "📦"
+
+    if "laboratorio" in tipo:
+        return "🧪"
+
+    if "gimnasio" in tipo:
+        return "🏃"
+
+    if "plástica" in tipo or "plastica" in tipo:
+        return "🎨"
+
+    return "📍"
 
     conn.commit()
     conn.close()
