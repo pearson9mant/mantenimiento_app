@@ -29,6 +29,7 @@ from ui.ui_estado_aulas import ui_estado_aulas
 from ui.ui_recordatorios import pantalla_recordatorios
 from ui.ui_gestion_aulas import pantalla_gestion_aulas
 from ui.ui_colegio import pantalla_colegio
+from ui.ui_admin_espacios import pantalla_admin_espacios
 from ui.ui_recordatorios import (
     pantalla_recordatorios,
     obtener_resumen_recordatorios
@@ -604,6 +605,10 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Gestión espacios"
             st.rerun()
 
+        if st.button("🏗️\nAdmin espacios", key="btn_admin_espacios", use_container_width=True):
+            st.session_state["seccion_actual"] = "Admin espacios"
+            st.rerun()
+
 
 def mostrar_menu_operario():
     perfil = st.session_state.get("perfil", "")
@@ -870,6 +875,9 @@ if perfil == "admin":
         
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas() 
+        
+    elif seccion == "Admin espacios":
+        pantalla_admin_espacios() 
 
 
 elif perfil == "gerencia":
