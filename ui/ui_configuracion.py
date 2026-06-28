@@ -748,7 +748,15 @@ def pantalla_configuracion_espacios():
                                     st.caption("Sin espacios registrados.")
                                 else:
                                     for espacio in espacios:
-                                        st.markdown(f"- {espacio}")
+                                        with st.expander(f"🏫 {espacio}", expanded=False):
+                                            from ui.ui_colegio import ficha_espacio_basica
+                                    
+                                            ficha_espacio_basica(
+                                                centro=centro,
+                                                edificio=edificio,
+                                                planta=planta,
+                                                espacio=espacio
+                                            )
 
 
 # =====================================================
