@@ -2,14 +2,13 @@ import streamlit as st
 
 from database.db import conectar, _sql, _es_postgres
 
-from modules.ubicaciones import (
-    CENTROS,
-    obtener_edificios,
-    obtener_espacios,
-    obtener_ubicaciones_personalizadas,
-    crear_espacio_personalizado,
-    activar_desactivar_espacio,
-    borrar_espacio_personalizado
+from modules.espacios import (
+    crear_tabla_espacios,
+    crear_espacio,
+    obtener_espacios as obtener_espacios_catalogo,
+    desactivar_espacio,
+    obtener_arbol_espacios,
+    PLANTAS_BASE,
 )
 
 
@@ -598,119 +597,148 @@ def pantalla_borrados_inicio():
 # =====================================================
 
 def pantalla_configuracion_espacios():
-    st.markdown("### 🏫 Espacios configurables")
+    crear_tabla_espacios()
+
+    st.markdown("### 🏫 Catálogo de espacios del colegio")
 
     sub1, sub2, sub3 = st.tabs([
-        "➕ Añadir espacio",
-        "📋 Personalizados",
-        "👀 Ver espacios por edificio"
+        "➕ Crear",
+        "📚 Catálogo",
+        "🌳 Árbol del colegio"
     ])
 
+    tipos_espacio = [
+        "Aula",
+        "WC",
+        "Biblioteca",
+        "Cocina",
+        "Comedor",
+        "Despacho",
+        "Sala técnica",
+        "Pasillo",
+        "Patio",
+        "Terrado",
+        "Almacén",
+        "Laboratorio",
+        "Gimnasio",
+        "Otro",
+    ]
+
     with sub1:
-        st.markdown("#### Añadir nuevo espacio")
+        st.markdown("#### ➕ Crear nuevo espacio")
 
-        centro = st.selectbox("Centro", CENTROS, key="cfg_centro")
-        edificios = obtener_edificios(centro)
-
-        if not edificios:
-            st.warning("No hay edificios configurados para este centro.")
-            return
-
-        edificio = st.selectbox("Edificio", edificios, key="cfg_edificio")
-
-        espacio = st.text_input(
-            "Nuevo espacio",
-            placeholder="Ejemplo: Sala psicomotricidad, Almacén, Despacho...",
-            key="cfg_nuevo_espacio"
+        centro = st.selectbox(
+            "Centro",
+            list(PLANTAS_BASE.keys()),
+            key="cfg_catalogo_centro"
         )
 
-        if st.button("➕ Crear espacio", use_container_width=True):
-            ok, mensaje = crear_espacio_personalizado(
-                centro=centro,
-                edificio=edificio,
-                espacio=espacio
+        edificios = list(PLANTAS_BASE.get(centro, {}).keys())
+
+        edificio = st.selectbox(
+            "Edificio",
+            edificios,
+            key="cfg_catalogo_edificio"
+        )
+
+        plantas = PLANTAS_BASE.get(centro, {}).get(edificio, [])
+
+        planta = st.selectbox(
+            "Planta",
+            plantas,
+            key="cfg_catalogo_planta"
+        )
+
+        tipo = st.selectbox(
+            "Tipo de espacio",
+            tipos_espacio,
+            key="cfg_catalogo_tipo"
+        )
+
+        if tipo == "Otro":
+            tipo = st.text_input(
+                "Especificar tipo",
+                key="cfg_catalogo_tipo_otro"
             )
 
-            if ok:
-                st.success(mensaje)
-                st.rerun()
+        espacio = st.text_input(
+            "Nombre del espacio",
+            placeholder="Ejemplo: Aula 6C, WC chicos, Biblioteca...",
+            key="cfg_catalogo_espacio"
+        )
+
+        if st.button("💾 Guardar espacio", use_container_width=True):
+            if not espacio:
+                st.warning("Indica el nombre del espacio.")
+            elif espacio == planta:
+                st.error("La planta no puede guardarse como espacio.")
             else:
-                st.warning(mensaje)
+                ok = crear_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    planta=planta,
+                    espacio=espacio,
+                    tipo=tipo
+                )
+
+                if ok:
+                    st.success("Espacio guardado correctamente.")
+                    st.rerun()
+                else:
+                    st.error("No se pudo guardar el espacio.")
 
     with sub2:
-        st.markdown("#### Espacios personalizados creados")
+        st.markdown("#### 📚 Espacios registrados")
 
-        ubicaciones = obtener_ubicaciones_personalizadas()
+        espacios = obtener_espacios_catalogo(activos=True)
 
-        if not ubicaciones:
-            st.info("Todavía no hay espacios personalizados.")
+        if not espacios:
+            st.info("Todavía no hay espacios registrados.")
         else:
-            for id_ubicacion, centro, edificio, espacio, activo in ubicaciones:
-                icono = "✅" if activo else "⛔"
-                titulo = f"{icono} {centro} · {edificio} · {espacio}"
-
-                with st.expander(titulo, expanded=False):
+            for id_espacio, centro, edificio, planta, espacio, tipo, activo in espacios:
+                with st.expander(
+                    f"🏫 {centro} · {edificio} · {planta} · {espacio} · {tipo}",
+                    expanded=False
+                ):
                     st.markdown(f"**Centro:** {centro}")
                     st.markdown(f"**Edificio:** {edificio}")
+                    st.markdown(f"**Planta:** {planta}")
                     st.markdown(f"**Espacio:** {espacio}")
-                    st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
+                    st.markdown(f"**Tipo:** {tipo}")
 
-                    c1, c2 = st.columns(2)
+                    confirmar = st.checkbox(
+                        "Confirmo desactivar este espacio",
+                        key=f"confirmar_desactivar_catalogo_{id_espacio}"
+                    )
 
-                    with c1:
-                        if activo:
-                            if st.button(
-                                f"⛔ Desactivar {espacio}",
-                                key=f"desactivar_espacio_{id_ubicacion}",
-                                use_container_width=True
-                            ):
-                                activar_desactivar_espacio(id_ubicacion, 0)
-                                st.rerun()
+                    if st.button(
+                        "🗑️ Desactivar espacio",
+                        key=f"desactivar_catalogo_{id_espacio}",
+                        use_container_width=True
+                    ):
+                        if not confirmar:
+                            st.error("Marca primero la confirmación.")
                         else:
-                            if st.button(
-                                f"✅ Activar {espacio}",
-                                key=f"activar_espacio_{id_ubicacion}",
-                                use_container_width=True
-                            ):
-                                activar_desactivar_espacio(id_ubicacion, 1)
-                                st.rerun()
-
-                    with c2:
-                        confirmar = st.checkbox(
-                            "Confirmar borrado",
-                            key=f"confirmar_borrar_espacio_{id_ubicacion}"
-                        )
-
-                        if st.button(
-                            f"🗑️ Borrar {espacio}",
-                            key=f"borrar_espacio_{id_ubicacion}",
-                            use_container_width=True
-                        ):
-                            if confirmar:
-                                borrar_espacio_personalizado(id_ubicacion)
-                                st.warning("Espacio eliminado.")
-                                st.rerun()
-                            else:
-                                st.error("Marca la confirmación antes de borrar.")
+                            desactivar_espacio(id_espacio)
+                            st.warning("Espacio desactivado.")
+                            st.rerun()
 
     with sub3:
-        st.markdown("#### Ver espacios disponibles")
+        st.markdown("#### 🌳 Árbol del colegio")
 
-        centro_ver = st.selectbox("Centro", CENTROS, key="cfg_ver_centro")
-        edificios_ver = obtener_edificios(centro_ver)
+        arbol = obtener_arbol_espacios()
 
-        if not edificios_ver:
-            st.warning("No hay edificios configurados para este centro.")
-            return
-
-        edificio_ver = st.selectbox("Edificio", edificios_ver, key="cfg_ver_edificio")
-
-        espacios = obtener_espacios(edificio_ver, centro_ver)
-
-        st.success(f"Espacios disponibles en {centro_ver} · {edificio_ver}: {len(espacios)}")
-
-        for espacio in espacios:
-            st.markdown(f"- {espacio}")
+        for centro, edificios in arbol.items():
+            with st.expander(f"🏢 {centro}", expanded=True):
+                for edificio, plantas in edificios.items():
+                    with st.expander(f"🏫 {edificio}", expanded=False):
+                        for planta, espacios in plantas.items():
+                            with st.expander(f"📍 {planta}", expanded=False):
+                                if not espacios:
+                                    st.caption("Sin espacios registrados.")
+                                else:
+                                    for espacio in espacios:
+                                        st.markdown(f"- {espacio}")
 
 
 # =====================================================
