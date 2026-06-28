@@ -28,6 +28,7 @@ from modules.alertas_empresas import obtener_alertas_empresas_externas, crear_ot
 from ui.ui_estado_aulas import ui_estado_aulas
 from ui.ui_recordatorios import pantalla_recordatorios
 from ui.ui_gestion_aulas import pantalla_gestion_aulas
+from ui.ui_colegio import pantalla_colegio
 from ui.ui_recordatorios import (
     pantalla_recordatorios,
     obtener_resumen_recordatorios
