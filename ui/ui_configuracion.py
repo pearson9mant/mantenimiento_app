@@ -711,11 +711,70 @@ def pantalla_configuracion_espacios():
                     f"🏫 {centro} · {edificio} · {planta} · {espacio} · {tipo}",
                     expanded=False
                 ):
-                    st.markdown(f"**Centro:** {centro}")
-                    st.markdown(f"**Edificio:** {edificio}")
-                    st.markdown(f"**Planta:** {planta}")
-                    st.markdown(f"**Espacio:** {espacio}")
-                    st.markdown(f"**Tipo:** {tipo}")
+
+                    nuevo_centro = st.selectbox(
+                        "Centro",
+                        list(PLANTAS_BASE.keys()),
+                        index=list(PLANTAS_BASE.keys()).index(centro)
+                        if centro in PLANTAS_BASE else 0,
+                        key=f"edit_esp_centro_{id_espacio}"
+                    )
+
+                    nuevos_edificios = list(PLANTAS_BASE.get(nuevo_centro, {}).keys())
+
+                    nuevo_edificio = st.selectbox(
+                        "Edificio",
+                        nuevos_edificios,
+                        index=nuevos_edificios.index(edificio)
+                        if edificio in nuevos_edificios else 0,
+                        key=f"edit_esp_edificio_{id_espacio}"
+                    )
+
+                    nuevas_plantas = PLANTAS_BASE.get(nuevo_centro, {}).get(nuevo_edificio, [])
+
+                    nueva_planta = st.selectbox(
+                        "Planta",
+                        nuevas_plantas,
+                        index=nuevas_plantas.index(planta)
+                        if planta in nuevas_plantas else 0,
+                        key=f"edit_esp_planta_{id_espacio}"
+                    )
+
+                    nuevo_tipo = st.selectbox(
+                        "Tipo",
+                        tipos_espacio,
+                        index=tipos_espacio.index(tipo)
+                        if tipo in tipos_espacio else tipos_espacio.index("Otro"),
+                        key=f"edit_esp_tipo_{id_espacio}"
+                    )
+
+                    nuevo_espacio = st.text_input(
+                        "Nombre del espacio",
+                        value=str(espacio or ""),
+                        key=f"edit_esp_nombre_{id_espacio}"
+                    )
+
+                    if st.button(
+                        "💾 Guardar cambios",
+                        key=f"guardar_cambios_espacio_{id_espacio}",
+                        use_container_width=True
+                    ):
+                        ok = actualizar_espacio(
+                            id_espacio=id_espacio,
+                            centro=nuevo_centro,
+                            edificio=nuevo_edificio,
+                            planta=nueva_planta,
+                            espacio=nuevo_espacio,
+                            tipo=nuevo_tipo
+                        )
+
+                        if ok:
+                            st.success("Espacio actualizado correctamente.")
+                            st.rerun()
+                        else:
+                            st.error("No se pudo actualizar el espacio.")
+
+                    st.markdown("---")
 
                     confirmar = st.checkbox(
                         "Confirmo desactivar este espacio",
