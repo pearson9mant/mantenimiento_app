@@ -175,10 +175,15 @@ def obtener_estado_espacio(centro, edificio, espacio):
         cur.execute(_sql("""
             SELECT COUNT(*)
             FROM ordenes_trabajo
-            WHERE centro = ?
-              AND edificio = ?
-              AND espacio = ?
-              AND estado NOT IN ('Finalizada', 'Cerrado', 'Cerrada', 'Cancelada')
+            WHERE TRIM(LOWER(centro)) = TRIM(LOWER(?))
+              AND TRIM(LOWER(edificio)) = TRIM(LOWER(?))
+              AND TRIM(LOWER(espacio)) = TRIM(LOWER(?))
+              AND TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
+                    'finalizada',
+                    'cerrado',
+                    'cerrada',
+                    'cancelada'
+              )
         """), (centro, edificio, espacio))
 
         if int(cur.fetchone()[0] or 0) > 0:
@@ -194,9 +199,9 @@ def obtener_estado_espacio(centro, edificio, espacio):
             SELECT COUNT(*)
             FROM preventivo_aulas_items i
             INNER JOIN preventivo_aulas r ON i.revision_id = r.id
-            WHERE r.centro = ?
-              AND r.edificio = ?
-              AND r.espacio = ?
+            WHERE TRIM(LOWER(r.centro)) = TRIM(LOWER(?))
+              AND TRIM(LOWER(r.edificio)) = TRIM(LOWER(?))
+              AND TRIM(LOWER(r.espacio)) = TRIM(LOWER(?))
               AND i.estado = 'Revisar'
         """), (centro, edificio, espacio))
 
