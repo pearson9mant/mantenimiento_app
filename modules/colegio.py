@@ -180,7 +180,10 @@ def obtener_estado_espacio(centro, edificio, espacio):
               )
         """), (centro, edificio, espacio))
 
-        if int(cur.fetchone()[0] or 0) > 0:
+        resultado = cur.fetchone()
+        st.write("DEBUG COUNT:", resultado)
+        
+        if int(resultado[0] or 0) > 0:
             conn.close()
             return "rojo"
 
