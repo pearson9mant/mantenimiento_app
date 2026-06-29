@@ -661,6 +661,7 @@ def pantalla_configuracion_espacios():
     sub1, sub2, sub3 = st.tabs([
         "➕ Crear",
         "📚 Catálogo",
+        "📍 Plantas",
         "🌳 Árbol del colegio"
     ])
 
