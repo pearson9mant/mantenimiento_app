@@ -1,28 +1,78 @@
 from database.db import conectar, _sql
 
 
+def _normalizar_comparacion(texto):
+    return (
+        str(texto or "")
+        .lower()
+        .replace("edif.", "")
+        .replace("edificio", "")
+        .replace(" ", "")
+        .replace("·", "")
+        .strip()
+    )
+
+
 def obtener_actuaciones_espacio(centro, edificio, espacio):
     conn = conectar()
     cur = conn.cursor()
 
+    datos = []
+
     try:
         cur.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, prioridad,
-                   operario, origen, area, fecha_creacion
+                   operario, origen, area, fecha_creacion,
+                   centro, edificio, espacio
             FROM ordenes_trabajo
-            WHERE centro = ?
-              AND edificio = ?
-              AND espacio = ?
-              AND LOWER(COALESCE(estado, '')) NOT IN (
+            WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
                     'finalizada',
                     'cerrado',
                     'cerrada',
                     'cancelada'
               )
             ORDER BY id DESC
-        """), (centro, edificio, espacio))
+        """))
 
-        datos = cur.fetchall()
+        filas = cur.fetchall()
+
+        centro_obj = _normalizar_comparacion(centro)
+        edificio_obj = _normalizar_comparacion(edificio)
+        espacio_obj = _normalizar_comparacion(espacio)
+
+        for fila in filas:
+            (
+                id_ot,
+                numero_ot,
+                descripcion,
+                estado,
+                prioridad,
+                operario,
+                origen,
+                area,
+                fecha_creacion,
+                centro_ot,
+                edificio_ot,
+                espacio_ot,
+            ) = fila
+
+            if (
+                _normalizar_comparacion(centro_ot) == centro_obj
+                and _normalizar_comparacion(edificio_ot) == edificio_obj
+                and _normalizar_comparacion(espacio_ot) == espacio_obj
+            ):
+                datos.append((
+                    id_ot,
+                    numero_ot,
+                    descripcion,
+                    estado,
+                    prioridad,
+                    operario,
+                    origen,
+                    area,
+                    fecha_creacion,
+                ))
+
     except Exception:
         datos = []
 
