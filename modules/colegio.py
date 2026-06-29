@@ -215,6 +215,13 @@ def obtener_estado_espacio(centro, edificio, espacio):
         pass
 
     conn.close()
+        st.write("DEBUG espacio árbol:", centro, edificio, espacio)
+
+    try:
+        cur.execute("SELECT id, numero_ot, centro, edificio, espacio, estado FROM ordenes_trabajo ORDER BY id DESC LIMIT 10")
+        st.write("DEBUG últimas OT:", cur.fetchall())
+    except Exception as e:
+        st.write("DEBUG error OT:", e)
     return "verde"
 
 
