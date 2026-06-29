@@ -658,7 +658,7 @@ def pantalla_configuracion_espacios():
 
     st.markdown("### 🏫 Catálogo de espacios del colegio")
 
-    sub1, sub2, sub3 = st.tabs([
+    sub1, sub2, sub3, sub4 = st.tabs([
         "➕ Crear",
         "📚 Catálogo",
         "📍 Plantas",
