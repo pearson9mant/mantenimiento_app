@@ -58,7 +58,6 @@ def obtener_actuaciones_espacio(centro, edificio, espacio):
 
             if (
                 _normalizar_comparacion(centro_ot) == centro_obj
-                and _normalizar_comparacion(edificio_ot) == edificio_obj
                 and _normalizar_comparacion(espacio_ot) == espacio_obj
             ):
                 datos.append((
