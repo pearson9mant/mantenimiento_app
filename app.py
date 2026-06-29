@@ -867,6 +867,10 @@ if perfil == "admin":
         
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas() 
+
+    elif seccion == "Colegio":
+        from ui.ui_colegio import pantalla_colegio
+        pantalla_colegio()
         
 
 
