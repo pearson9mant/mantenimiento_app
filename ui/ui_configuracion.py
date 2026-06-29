@@ -841,7 +841,43 @@ def pantalla_configuracion_espacios():
                             st.rerun()
 
     with sub3:
+        st.markdown("#### 📍 Plantas visibles")
+
+        plantas = obtener_plantas_config()
+
+        if not plantas:
+            st.info("No hay plantas configuradas.")
+        else:
+            for id_planta, centro, edificio, planta, visible in plantas:
+                col1, col2 = st.columns([4, 1])
+
+                with col1:
+                    estado = "✅ Visible" if visible else "❌ Oculta"
+                    st.markdown(
+                        f"**{centro}** · {edificio} · {planta} · {estado}"
+                    )
+
+                with col2:
+                    if visible:
+                        if st.button(
+                            "Ocultar",
+                            key=f"ocultar_planta_{id_planta}",
+                            use_container_width=True
+                        ):
+                            actualizar_visible_planta(id_planta, 0)
+                            st.rerun()
+                    else:
+                        if st.button(
+                            "Mostrar",
+                            key=f"mostrar_planta_{id_planta}",
+                            use_container_width=True
+                        ):
+                            actualizar_visible_planta(id_planta, 1)
+                            st.rerun()
+
+    with sub4:
         mostrar_arbol_colegio()
+
 
 
 # =====================================================
