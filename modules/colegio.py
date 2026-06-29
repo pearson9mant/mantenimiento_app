@@ -239,3 +239,29 @@ def icono_estado_espacio(estado):
     if estado == "amarillo":
         return "🟡"
     return "🟢"
+
+def obtener_centros_visibles_usuario():
+    """
+    Centros visibles según perfil/operario.
+    Admin ve todos.
+    Operarios ven solo su centro asignado.
+    """
+
+    import streamlit as st
+
+    perfil = str(st.session_state.get("perfil", "")).strip().lower()
+    operario = str(st.session_state.get("operario_activo", "")).strip().lower()
+
+    if perfil == "admin":
+        return ["Pearson 22", "Pearson 9"]
+
+    if "luis" in operario or "lozano" in operario:
+        return ["Pearson 9"]
+
+    if "almeda" in operario or "juan" in operario or "j.a." in operario:
+        return ["Pearson 22"]
+
+    if "abel" in operario or "vasquez" in operario:
+        return ["Pearson 22", "Pearson 9"]
+
+    return ["Pearson 22"]
