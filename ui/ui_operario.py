@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 from pathlib import Path
+from ui.ui_ot import mostrar_tarjeta_ot
 
 from modules.ordenes import (
     obtener_ordenes_operario,
