@@ -2,7 +2,8 @@ import streamlit as st
 
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 from ui.ui_arbol_colegio import mostrar_arbol_colegio
-from ui.ui_ot_comun import mostrar_ficha_ot_comun
+from ui.ui_ot import mostrar_tarjeta_ot
+from modules.inventario import obtener_materiales_para_select
 
 from modules.ficha_espacio import (
     obtener_resumen_ficha_espacio,
