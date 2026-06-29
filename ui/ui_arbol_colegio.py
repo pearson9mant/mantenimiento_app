@@ -1,7 +1,7 @@
 import streamlit as st
 
-from modules.espacios import obtener_arbol_espacios
-from modules.colegio import obtener_estado_espacio, icono_estado_espacio, icono_tipo_espacio
+from modules.espacios import obtener_arbol_espacios, icono_tipo_espacio
+from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 
 
 def mostrar_arbol_colegio():
