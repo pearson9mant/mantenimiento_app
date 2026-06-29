@@ -2,6 +2,7 @@ import streamlit as st
 
 from modules.espacios import obtener_arbol_espacios
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
+from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from modules.ficha_espacio import (
     obtener_resumen_ficha_espacio,
     obtener_actuaciones_espacio,
