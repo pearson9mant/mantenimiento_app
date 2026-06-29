@@ -40,7 +40,95 @@ PLANTAS_BASE = {
     },
 }
 
+def crear_tabla_plantas_config():
+    conn = conectar()
+    cur = conn.cursor()
 
+    cur.execute(_sql("""
+        CREATE TABLE IF NOT EXISTS plantas_config (
+            id SERIAL PRIMARY KEY,
+            centro TEXT,
+            edificio TEXT,
+            planta TEXT,
+            visible INTEGER DEFAULT 1
+        )
+    """))
+
+    conn.commit()
+
+    for centro, edificios in PLANTAS_BASE.items():
+        for edificio, plantas in edificios.items():
+            for planta in plantas:
+                cur.execute(_sql("""
+                    SELECT COUNT(*)
+                    FROM plantas_config
+                    WHERE centro = ? AND edificio = ? AND planta = ?
+                """), (centro, edificio, planta))
+
+                if int(cur.fetchone()[0] or 0) == 0:
+                    cur.execute(_sql("""
+                        INSERT INTO plantas_config
+                        (centro, edificio, planta, visible)
+                        VALUES (?, ?, ?, 1)
+                    """), (centro, edificio, planta))
+
+    conn.commit()
+    conn.close()
+
+
+def obtener_plantas_config():
+    crear_tabla_plantas_config()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT id, centro, edificio, planta, visible
+        FROM plantas_config
+        ORDER BY centro, edificio, planta
+    """))
+
+    datos = cur.fetchall()
+    conn.close()
+    return datos
+
+
+def actualizar_visible_planta(id_planta, visible):
+    crear_tabla_plantas_config()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        UPDATE plantas_config
+        SET visible = ?
+        WHERE id = ?
+    """), (visible, id_planta))
+
+    conn.commit()
+    conn.close()
+
+
+def planta_visible(centro, edificio, planta):
+    crear_tabla_plantas_config()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT visible
+        FROM plantas_config
+        WHERE centro = ? AND edificio = ? AND planta = ?
+        LIMIT 1
+    """), (centro, edificio, planta))
+
+    fila = cur.fetchone()
+    conn.close()
+
+    if not fila:
+        return True
+
+    return int(fila[0] or 0) == 1
 def crear_tabla_espacios():
     conn = conectar()
     cur = conn.cursor()
