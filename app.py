@@ -915,5 +915,8 @@ else:
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas()
 
+    elif seccion == "Colegio":
+        pantalla_colegio()
+
 
 pintar_footer()
