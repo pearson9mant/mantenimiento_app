@@ -142,48 +142,4 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         st.info("Aquí mostraremos las fotos asociadas al espacio.")
 
 
-def pantalla_colegio():
-    st.markdown("## 🏫 Colegio")
 
-    st.caption(
-        "Navegación por centro, edificio, planta y espacio. "
-        "Todo pensado para móvil y trabajo diario."
-    )
-
-    arbol = obtener_arbol_espacios()
-
-    if not arbol:
-        st.warning("No hay espacios configurados todavía.")
-        return
-
-    for centro, edificios in arbol.items():
-        with st.expander(f"🏢 {centro}", expanded=True):
-
-            for edificio, plantas in edificios.items():
-                with st.expander(f"🏫 {edificio}", expanded=False):
-
-                    for planta, espacios in plantas.items():
-                        with st.expander(f"📍 {planta}", expanded=False):
-
-                            if not espacios:
-                                st.caption("Sin espacios registrados.")
-                                continue
-
-                            for espacio in espacios:
-                                estado = obtener_estado_espacio(
-                                    centro,
-                                    edificio,
-                                    espacio
-                                )
-                                icono = icono_estado_espacio(estado)
-
-                                with st.expander(
-                                    f"{icono} {espacio}",
-                                    expanded=False
-                                ):
-                                    ficha_espacio_basica(
-                                        centro,
-                                        edificio,
-                                        planta,
-                                        espacio
-                                    )
