@@ -162,17 +162,9 @@ def obtener_arbol_colegio():
 
 
 def obtener_estado_espacio(centro, edificio, espacio):
-    """
-    Devuelve:
-    rojo     -> tiene OT activa / correctivo pendiente
-    amarillo -> tiene elementos a revisar
-    verde    -> sin avisos
-    """
-
     conn = conectar()
     cur = conn.cursor()
 
-    # 1. Órdenes abiertas en ese espacio
     try:
         cur.execute(_sql("""
             SELECT COUNT(*)
@@ -195,33 +187,7 @@ def obtener_estado_espacio(centro, edificio, espacio):
     except Exception:
         pass
 
-    # 2. Revisiones con elementos a revisar
-    try:
-        cur.execute(_sql("""
-            SELECT COUNT(*)
-            FROM preventivo_aulas_items i
-            INNER JOIN preventivo_aulas r ON i.revision_id = r.id
-            WHERE TRIM(LOWER(r.centro)) = TRIM(LOWER(?))
-              AND TRIM(LOWER(r.edificio)) = TRIM(LOWER(?))
-              AND TRIM(LOWER(r.espacio)) = TRIM(LOWER(?))
-              AND i.estado = 'Revisar'
-        """), (centro, edificio, espacio))
-
-        if int(cur.fetchone()[0] or 0) > 0:
-            conn.close()
-            return "amarillo"
-
-    except Exception:
-        pass
-
     conn.close()
-        st.write("DEBUG espacio árbol:", centro, edificio, espacio)
-
-    try:
-        cur.execute("SELECT id, numero_ot, centro, edificio, espacio, estado FROM ordenes_trabajo ORDER BY id DESC LIMIT 10")
-        st.write("DEBUG últimas OT:", cur.fetchall())
-    except Exception as e:
-        st.write("DEBUG error OT:", e)
     return "verde"
 
 
