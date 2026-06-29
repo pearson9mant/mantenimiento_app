@@ -54,11 +54,22 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             for a in actuaciones:
                 id_ot, numero_ot, descripcion, estado_ot, prioridad, operario, origen, area, fecha = a
 
-                st.markdown(
-                    f"**{numero_ot or '-'}** · {estado_ot or '-'} · "
-                    f"{prioridad or '-'} · {area or '-'}"
-                )
-                st.caption(descripcion or "")
+                with st.expander(
+                    f"🔴 {numero_ot or '-'} · {estado_ot or '-'} · {prioridad or '-'}",
+                    expanded=False
+                ):
+                    st.caption(descripcion or "")
+
+                    if st.button(
+                        f"👁 Abrir OT {numero_ot or id_ot}",
+                        key=f"abrir_ot_colegio_{id_ot}",
+                        use_container_width=True
+                    ):
+                        st.session_state["ot_colegio_abierta"] = id_ot
+                        st.rerun()
+
+                    if st.session_state.get("ot_colegio_abierta") == id_ot:
+                        mostrar_ficha_ot_comun(id_ot, prefijo="colegio")
 
     with st.expander(f"📦 Inventario ({resumen['inventario']})", expanded=False):
         inventario = obtener_inventario_espacio(centro, edificio, espacio)
