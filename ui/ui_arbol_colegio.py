@@ -4,6 +4,27 @@ from modules.espacios import obtener_arbol_espacios, icono_tipo_espacio
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 
 
+def obtener_estado_planta(centro, edificio, espacios):
+    """
+    La planta se pone roja si alguno de sus espacios tiene incidencia abierta.
+    Si no hay incidencias, queda verde.
+    """
+
+    for item_espacio in espacios:
+        nombre_espacio = item_espacio.get("espacio", "")
+
+        estado = obtener_estado_espacio(
+            centro=centro,
+            edificio=edificio,
+            espacio=nombre_espacio
+        )
+
+        if estado == "rojo":
+            return "rojo"
+
+    return "verde"
+
+
 def mostrar_arbol_colegio():
     st.markdown("#### 🌳 Árbol del colegio")
 
@@ -14,7 +35,16 @@ def mostrar_arbol_colegio():
             for edificio, plantas in edificios.items():
                 with st.expander(f"🏫 {edificio}", expanded=False):
                     for planta, espacios in plantas.items():
-                        with st.expander(f"📍 {planta}", expanded=False):
+
+                        estado_planta = obtener_estado_planta(
+                            centro=centro,
+                            edificio=edificio,
+                            espacios=espacios
+                        )
+
+                        icono_planta = icono_estado_espacio(estado_planta)
+
+                        with st.expander(f"{icono_planta} 📍 {planta}", expanded=False):
                             if not espacios:
                                 st.caption("Sin espacios registrados.")
                             else:
