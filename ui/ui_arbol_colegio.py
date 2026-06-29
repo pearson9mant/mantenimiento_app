@@ -1,7 +1,11 @@
 import streamlit as st
 
 from modules.espacios import obtener_arbol_espacios, icono_tipo_espacio
-from modules.colegio import obtener_estado_espacio, icono_estado_espacio
+from modules.colegio import (
+    obtener_estado_espacio,
+    icono_estado_espacio,
+    obtener_centros_visibles_usuario,
+)
 
 
 def combinar_estados(estados):
@@ -120,6 +124,13 @@ def mostrar_arbol_colegio():
     st.markdown("#### 🌳 Árbol del colegio")
 
     arbol = obtener_arbol_espacios()
+    centros_visibles = obtener_centros_visibles_usuario()
+
+    arbol = {
+        centro: datos
+        for centro, datos in arbol.items()
+        if centro in centros_visibles
+    }
 
     for centro, edificios in arbol.items():
         estado_centro = obtener_estado_centro(
