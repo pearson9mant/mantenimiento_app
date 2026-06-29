@@ -13,6 +13,12 @@ def obtener_actuaciones_espacio(centro, edificio, espacio):
             WHERE centro = ?
               AND edificio = ?
               AND espacio = ?
+              AND LOWER(COALESCE(estado, '')) NOT IN (
+                    'finalizada',
+                    'cerrado',
+                    'cerrada',
+                    'cancelada'
+              )
             ORDER BY id DESC
         """), (centro, edificio, espacio))
 
@@ -99,10 +105,7 @@ def obtener_resumen_ficha_espacio(centro, edificio, espacio):
     preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
     historial = obtener_historial_tecnico_espacio(centro, edificio, espacio)
 
-    actuaciones_abiertas = [
-        a for a in actuaciones
-        if str(a[3] or "").lower() not in ["finalizada", "cerrado", "cerrada", "cancelada"]
-    ]
+    actuaciones_abiertas = actuaciones
 
     return {
         "actuaciones": len(actuaciones),
