@@ -221,7 +221,6 @@ def obtener_estado_espacio(centro, edificio, espacio):
         for centro_ot, edificio_ot, espacio_ot, estado_ot in ordenes:
             if (
                 _normalizar_comparacion(centro_ot) == centro_obj
-                and _normalizar_comparacion(edificio_ot) == edificio_obj
                 and _normalizar_comparacion(espacio_ot) == espacio_obj
             ):
                 conn.close()
