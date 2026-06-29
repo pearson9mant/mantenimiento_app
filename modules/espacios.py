@@ -246,6 +246,8 @@ def obtener_arbol_espacios():
 
         if not centro or not edificio or not planta or not espacio:
             continue
+        if not planta_visible(centro, edificio, planta):
+            continue
 
         arbol.setdefault(centro, {})
         arbol[centro].setdefault(edificio, {})
