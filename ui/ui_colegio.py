@@ -70,7 +70,34 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                         st.rerun()
 
                     if st.session_state.get("ot_colegio_abierta") == id_ot:
-                        mostrar_ficha_ot_comun(id_ot, prefijo="colegio")
+                        fila_ot = (
+                            id_ot,
+                            numero_ot,
+                            descripcion,
+                            estado_ot,
+                            fecha,
+                            centro,
+                            edificio,
+                            espacio,
+                            area,
+                            prioridad,
+                            operario,
+                            origen,
+                            "",
+                            "",
+                            "",
+                            "Operarios",
+                            "",
+                        )
+                        
+                        materiales_select = obtener_materiales_para_select()
+                        
+                        mostrar_tarjeta_ot(
+                            fila=fila_ot,
+                            materiales_select=materiales_select,
+                            operario_sel=operario or "",
+                            modo="colegio"
+                        )
 
     with st.expander(f"📦 Inventario ({resumen['inventario']})", expanded=False):
         inventario = obtener_inventario_espacio(centro, edificio, espacio)
