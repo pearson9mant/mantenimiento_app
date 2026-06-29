@@ -641,7 +641,7 @@ def mostrar_menu_operario():
         unsafe_allow_html=True
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         if st.button("📋\nResumen", key="btn_resumen_operario", use_container_width=True):
@@ -649,29 +649,24 @@ def mostrar_menu_operario():
             st.rerun()
 
     with col2:
-        if st.button("🛠\nMis órdenes", key="btn_ot_operario", use_container_width=True):
-            st.session_state["seccion_actual"] = "Órdenes"
+        if st.button("🏫\nColegio", key="btn_colegio_operario", use_container_width=True):
+            st.session_state["seccion_actual"] = "Colegio"
             st.rerun()
+
+    col3, col4 = st.columns(2)
 
     with col3:
-        if st.button("📦\nInventario", key="btn_inv_operario", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario"
-            st.rerun()
-        if st.button("📩\nPedidos material", key="btn_pedidos_material", use_container_width=True):
-            st.session_state["seccion_actual"] = "Pedidos material"
-            st.rerun() 
-
-    st.markdown("---")
-
-    col4, col5 = st.columns(2)
-
-    with col4:
         if st.button(
-            "🏫\nGestión espacios",
+            "🏫\nInventario / revisión aulas",
             key="btn_gestion_espacios_operario",
             use_container_width=True
         ):
             st.session_state["seccion_actual"] = "Gestión espacios"
+            st.rerun()
+
+    with col4:
+        if st.button("📩\nPedidos material", key="btn_pedidos_material", use_container_width=True):
+            st.session_state["seccion_actual"] = "Pedidos material"
             st.rerun()
 
 
