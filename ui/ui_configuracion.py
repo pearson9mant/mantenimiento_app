@@ -22,6 +22,8 @@ from modules.espacios import (
     actualizar_espacio,
     obtener_arbol_espacios,
     icono_tipo_espacio,
+    obtener_plantas_config,
+    actualizar_visible_planta,
     PLANTAS_BASE,
 )
 
