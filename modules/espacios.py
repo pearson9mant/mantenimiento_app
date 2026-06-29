@@ -229,7 +229,8 @@ def obtener_arbol_espacios():
             arbol[centro][edificio] = {}
 
             for planta in plantas:
-                arbol[centro][edificio][planta] = []
+                if planta_visible(centro, edificio, planta):
+                    arbol[centro][edificio][planta] = []
 
     # Después metemos espacios reales
     datos = obtener_espacios(True)
