@@ -1,5 +1,3 @@
-import streamlit as st
-
 from database.db import conectar, _sql
 
 
@@ -32,13 +30,13 @@ COLEGIO_BASE = {
             "Planta 2": [],
         },
         "Edificio B": {
-            "Terrado": [], 
+            "Terrado": [],
             "Planta 0": [],
             "Planta 1": [],
             "Planta 2": [],
         },
         "Edificio C": {
-            "Terrado": [], 
+            "Terrado": [],
             "Planta 0": [],
             "Planta 1": [],
             "Planta 2": [],
@@ -47,13 +45,40 @@ COLEGIO_BASE = {
 }
 
 
+# =====================================================
+# NORMALIZADORES
+# =====================================================
+
 def normalizar_texto(texto):
     return str(texto or "").strip()
 
 
+def _normalizar_comparacion(texto):
+    """
+    Normaliza textos para comparar centro/edificio/espacio aunque vengan
+    escritos de forma ligeramente distinta.
+
+    Ejemplo:
+    'Edif. Infantil/Primaria' == 'Infantil / Primaria'
+    """
+    return (
+        str(texto or "")
+        .lower()
+        .replace("edif.", "")
+        .replace("edificio", "")
+        .replace(" ", "")
+        .replace("·", "")
+        .strip()
+    )
+
+
+# =====================================================
+# ÁRBOL BASE ANTIGUO / COMPATIBILIDAD
+# =====================================================
+
 def detectar_planta_desde_espacio(espacio):
     texto = normalizar_texto(espacio).lower()
-  
+
     if "terrado" in texto or "cubierta" in texto:
         return "Terrado"
     if "planta 5" in texto or "p5" in texto:
@@ -115,7 +140,6 @@ def obtener_espacios_desde_bd():
             pass
 
     conn.close()
-
     return espacios
 
 
@@ -161,31 +185,47 @@ def obtener_arbol_colegio():
     return arbol
 
 
+# =====================================================
+# ESTADO DEL ESPACIO
+# =====================================================
+
 def obtener_estado_espacio(centro, edificio, espacio):
+    """
+    Devuelve:
+    rojo     -> tiene OT activa / correctivo pendiente
+    amarillo -> reservado para elementos a revisar
+    verde    -> sin avisos
+    """
+
+    centro_obj = _normalizar_comparacion(centro)
+    edificio_obj = _normalizar_comparacion(edificio)
+    espacio_obj = _normalizar_comparacion(espacio)
+
     conn = conectar()
     cur = conn.cursor()
 
     try:
         cur.execute(_sql("""
-            SELECT COUNT(*)
+            SELECT centro, edificio, espacio, estado
             FROM ordenes_trabajo
-            WHERE TRIM(LOWER(centro)) = TRIM(LOWER(?))
-              AND TRIM(LOWER(edificio)) = TRIM(LOWER(?))
-              AND TRIM(LOWER(espacio)) = TRIM(LOWER(?))
-              AND TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
-                    'finalizada',
-                    'cerrado',
-                    'cerrada',
-                    'cancelada'
-              )
-        """), (centro, edificio, espacio))
+            WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
+                'finalizada',
+                'cerrado',
+                'cerrada',
+                'cancelada'
+            )
+        """))
 
-        resultado = cur.fetchone()
-        st.write("DEBUG COUNT:", resultado)
-        
-        if int(resultado[0] or 0) > 0:
-            conn.close()
-            return "rojo"
+        ordenes = cur.fetchall()
+
+        for centro_ot, edificio_ot, espacio_ot, estado_ot in ordenes:
+            if (
+                _normalizar_comparacion(centro_ot) == centro_obj
+                and _normalizar_comparacion(edificio_ot) == edificio_obj
+                and _normalizar_comparacion(espacio_ot) == espacio_obj
+            ):
+                conn.close()
+                return "rojo"
 
     except Exception:
         pass
