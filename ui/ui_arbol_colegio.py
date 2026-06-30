@@ -175,11 +175,10 @@ def mostrar_arbol_colegio():
                                         use_container_width=True
                                     ):
                                         st.session_state["ficha_espacio_abierta"] = clave_espacio
-                                        st.rerun()
-                                
+                                    
                                     if st.session_state.get("ficha_espacio_abierta") == clave_espacio:
                                         from ui.ui_colegio import ficha_espacio_basica
-                                
+                                    
                                         ficha_espacio_basica(
                                             centro=centro,
                                             edificio=edificio,
