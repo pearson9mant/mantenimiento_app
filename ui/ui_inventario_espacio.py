@@ -201,10 +201,45 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.error("No se pudo actualizar el elemento.")
 
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
-                st.warning(
-                    "Este elemento está marcado como incidencia. "
-                    "El siguiente paso será crear correctivo automático desde aquí."
+                st.warning("Este elemento necesita correctivo.")
+            
+                descripcion_defecto = st.text_area(
+                    "Descripción del correctivo",
+                    value=f"{elemento} en estado {nuevo_estado}. {nuevas_obs}",
+                    key=f"correctivo_desc_{clave_base}_{id_inv}"
                 )
+            
+                crear_correctivo = st.checkbox(
+                    "Crear OT correctiva para este elemento",
+                    key=f"crear_correctivo_inv_{clave_base}_{id_inv}"
+                )
+            
+                if st.button(
+                    "🛠️ Crear correctivo",
+                    key=f"btn_correctivo_inv_{clave_base}_{id_inv}",
+                    use_container_width=True
+                ):
+                    if not crear_correctivo:
+                        st.warning("Marca primero la casilla de confirmación.")
+                    else:
+                        ok, mensaje = crear_correctiva_desde_ot(
+                            centro=centro,
+                            edificio=edificio,
+                            espacio=espacio,
+                            area="Mantenimiento",
+                            prioridad="Media",
+                            operario=st.session_state.get("operario_activo", ""),
+                            descripcion_defecto=descripcion_defecto,
+                            numero_ot_origen=f"INV-{id_inv}",
+                            origen="INVENTARIO",
+                            solicitante="Inventario espacio",
+                        )
+            
+                        if ok:
+                            st.success("OT correctiva creada correctamente.")
+                            st.rerun()
+                        else:
+                            st.error(mensaje)
 
 
 def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario, clave_base):
