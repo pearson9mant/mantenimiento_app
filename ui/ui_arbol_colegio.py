@@ -125,7 +125,7 @@ def mostrar_arbol_colegio():
 
                 with st.expander(
                     f"{icono_edificio} 🏫 {edificio}{texto_contador(total_edificio)}",
-                    expanded=total_edificio > 0
+                    expanded=False
                 ):
                     for planta, espacios in plantas.items():
                         if not espacios:
