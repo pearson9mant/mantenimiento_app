@@ -52,52 +52,37 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         if not actuaciones:
             st.info("No hay actuaciones abiertas en este espacio.")
         else:
+            materiales_select = obtener_materiales_para_select()
+        
             for a in actuaciones:
                 id_ot, numero_ot, descripcion, estado_ot, prioridad, operario, origen, area, fecha = a
-
-                with st.expander(
-                    f"🔴 {numero_ot or '-'} · {estado_ot or '-'} · {prioridad or '-'}",
-                    expanded=False
-                ):
-                    st.caption(descripcion or "")
-
-                    if st.button(
-                        f"👁 Abrir OT {numero_ot or id_ot}",
-                        key=f"abrir_ot_colegio_{id_ot}",
-                        use_container_width=True
-                    ):
-                        st.session_state["ot_colegio_abierta"] = id_ot
-                        st.rerun()
-
-                    if st.session_state.get("ot_colegio_abierta") == id_ot:
-                        fila_ot = (
-                            id_ot,
-                            numero_ot,
-                            descripcion,
-                            estado_ot,
-                            fecha,
-                            centro,
-                            edificio,
-                            espacio,
-                            area,
-                            prioridad,
-                            operario,
-                            origen,
-                            "",
-                            "",
-                            "",
-                            "Operarios",
-                            "",
-                        )
-                        
-                        materiales_select = obtener_materiales_para_select()
-                        
-                        mostrar_tarjeta_ot(
-                            fila=fila_ot,
-                            materiales_select=materiales_select,
-                            operario_sel=operario or "",
-                            modo="colegio"
-                        )
+        
+                fila_ot = (
+                    id_ot,
+                    numero_ot,
+                    descripcion,
+                    estado_ot,
+                    fecha,
+                    centro,
+                    edificio,
+                    espacio,
+                    area,
+                    prioridad,
+                    operario,
+                    origen,
+                    "",
+                    "",
+                    "",
+                    "Operarios",
+                    "",
+                )
+        
+                mostrar_tarjeta_ot(
+                    fila=fila_ot,
+                    materiales_select=materiales_select,
+                    operario_sel=operario or "",
+                    modo="colegio"
+                )
 
     with st.expander(f"📦 Inventario ({resumen['inventario']})", expanded=False):
         inventario = obtener_inventario_espacio(centro, edificio, espacio)
