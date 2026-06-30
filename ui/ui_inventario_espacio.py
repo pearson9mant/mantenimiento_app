@@ -251,13 +251,17 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                             )
 
                             if ok:
-                                numero_ot_generada = str(mensaje or "").strip()
-
+                                numero_ot_generada = (
+                                    str(mensaje or "")
+                                    .replace("Correctiva creada correctamente:", "")
+                                    .strip()
+                                )
+                            
                                 guardar_correctivo_inventario(
                                     id_elemento=id_inv,
                                     numero_ot=numero_ot_generada
                                 )
-
+                            
                                 st.success(f"OT correctiva creada: {numero_ot_generada}")
                                 st.rerun()
                             else:
