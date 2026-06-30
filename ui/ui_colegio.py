@@ -19,6 +19,11 @@ from modules.ficha_espacio import (
     obtener_preventivos_espacio,
     obtener_historial_tecnico_espacio,
 )
+from modules.inventario_aulas import (
+    guardar_o_actualizar_espacio,
+    guardar_foto_espacio,
+    eliminar_inventario_espacio,
+)
 
 
 def pantalla_colegio():
