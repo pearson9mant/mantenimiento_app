@@ -167,11 +167,22 @@ def mostrar_arbol_colegio():
                                     f"{icono_estado} {icono_tipo} {nombre_espacio}{texto_contador(total_espacio)}",
                                     expanded=False
                                 ):
-                                    from ui.ui_colegio import ficha_espacio_basica
-
-                                    ficha_espacio_basica(
-                                        centro=centro,
-                                        edificio=edificio,
-                                        planta=planta,
-                                        espacio=nombre_espacio
-                                    )
+                                    clave_espacio = f"{centro}_{edificio}_{planta}_{nombre_espacio}"
+                                
+                                    if st.button(
+                                        f"📂 Abrir ficha {nombre_espacio}",
+                                        key=f"abrir_ficha_{clave_espacio}",
+                                        use_container_width=True
+                                    ):
+                                        st.session_state["ficha_espacio_abierta"] = clave_espacio
+                                        st.rerun()
+                                
+                                    if st.session_state.get("ficha_espacio_abierta") == clave_espacio:
+                                        from ui.ui_colegio import ficha_espacio_basica
+                                
+                                        ficha_espacio_basica(
+                                            centro=centro,
+                                            edificio=edificio,
+                                            planta=planta,
+                                            espacio=nombre_espacio
+                                        )
