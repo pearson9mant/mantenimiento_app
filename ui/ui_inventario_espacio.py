@@ -11,6 +11,10 @@ from modules.inventario_aulas import (
     guardar_correctivo_inventario,
     actualizar_datos_activo_espacio,
 )
+from modules.activos import (
+    obtener_activo_por_inventario,
+    guardar_o_actualizar_activo,
+)
 
 
 def _clave(centro, edificio, planta, espacio):
