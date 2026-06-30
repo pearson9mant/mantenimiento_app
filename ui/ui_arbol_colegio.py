@@ -141,7 +141,7 @@ def mostrar_arbol_colegio():
 
                         with st.expander(
                             f"{icono_planta} 📍 {planta}{texto_contador(total_planta)}",
-                            expanded=total_planta > 0
+                            expanded=False
                         ):
                             for item_espacio in espacios:
                                 nombre_espacio = item_espacio.get("espacio", "")
