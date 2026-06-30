@@ -12,6 +12,7 @@ from modules.inventario_aulas import (
     actualizar_datos_activo_espacio,
 )
 
+
 def _clave(centro, edificio, planta, espacio):
     return (
         f"{centro}_{edificio}_{planta}_{espacio}"
@@ -132,6 +133,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             expanded=False
         ):
             st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
+
             if numero_ot_correctiva:
                 st.warning(f"🟠 OT correctiva asociada: {numero_ot_correctiva}")
 
@@ -186,6 +188,34 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.image(foto, width=220)
                 except Exception:
                     st.caption("Foto no disponible.")
+
+            if st.button(
+                "💾 Guardar cambios",
+                key=f"guardar_edit_inv_{clave_base}_{id_inv}",
+                use_container_width=True
+            ):
+                ok = guardar_o_actualizar_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    elemento=elemento,
+                    cantidad=nueva_cantidad,
+                    estado=nuevo_estado,
+                    ancho=ancho or 0,
+                    alto=alto or 0,
+                    fondo=fondo or 0,
+                    unidad=unidad or "cm",
+                    observaciones=nuevas_obs,
+                    foto=foto_final,
+                    operario=st.session_state.get("operario_activo", "")
+                )
+
+                if ok:
+                    st.success("Elemento actualizado.")
+                    st.rerun()
+                else:
+                    st.error("No se pudo actualizar el elemento.")
+
             st.markdown("---")
             st.markdown("### 🏷️ Ficha técnica del activo")
 
@@ -239,38 +269,34 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 value=float(coste_estimado or 0),
                 key=f"activo_coste_{clave_base}_{id_inv}"
             )
+
             if st.button(
-                "💾 Guardar cambios",
-                key=f"guardar_edit_inv_{clave_base}_{id_inv}",
+                "💾 Guardar ficha técnica",
+                key=f"guardar_ficha_tecnica_{clave_base}_{id_inv}",
                 use_container_width=True
             ):
-                ok = guardar_o_actualizar_espacio(
-                    centro=centro,
-                    edificio=edificio,
-                    espacio=espacio,
-                    elemento=elemento,
-                    cantidad=nueva_cantidad,
-                    estado=nuevo_estado,
-                    ancho=ancho or 0,
-                    alto=alto or 0,
-                    fondo=fondo or 0,
-                    unidad=unidad or "cm",
-                    observaciones=nuevas_obs,
-                    foto=foto_final,
-                    operario=st.session_state.get("operario_activo", "")
+                ok_activo = actualizar_datos_activo_espacio(
+                    id_elemento=id_inv,
+                    fabricante=fabricante_nuevo,
+                    modelo=modelo_nuevo,
+                    numero_serie=numero_serie_nuevo,
+                    fecha_instalacion=fecha_instalacion_nueva,
+                    proveedor=proveedor_nuevo,
+                    vida_util_anios=vida_util_nueva,
+                    coste_estimado=coste_estimado_nuevo,
                 )
 
-                if ok:
-                    st.success("Elemento actualizado.")
+                if ok_activo:
+                    st.success("Ficha técnica actualizada correctamente.")
                     st.rerun()
                 else:
-                    st.error("No se pudo actualizar el elemento.")
+                    st.error("No se pudo guardar la ficha técnica.")
+
+            st.markdown("---")
 
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
-
                 if numero_ot_correctiva:
                     st.warning(f"🟠 Ya existe OT correctiva asociada: {numero_ot_correctiva}")
-
                 else:
                     st.warning("Este elemento necesita correctivo.")
 
@@ -312,12 +338,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                                     .replace("Correctiva creada correctamente:", "")
                                     .strip()
                                 )
-                            
+
                                 guardar_correctivo_inventario(
                                     id_elemento=id_inv,
                                     numero_ot=numero_ot_generada
                                 )
-                            
+
                                 st.success(f"OT correctiva creada: {numero_ot_generada}")
                                 st.rerun()
                             else:
