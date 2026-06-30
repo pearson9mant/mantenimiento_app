@@ -2,17 +2,14 @@ import streamlit as st
 
 from modules.catalogo_aulas import obtener_elementos_catalogo_aulas
 from modules.ficha_espacio import obtener_inventario_espacio
-from modules.inventario_aulas import (
-    guardar_o_actualizar_espacio,
-    guardar_foto_espacio,
-    eliminar_inventario_espacio,
-)
 from modules.ordenes import crear_correctiva_desde_ot
+
 from modules.inventario_aulas import (
     guardar_o_actualizar_espacio,
     guardar_foto_espacio,
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
+    actualizar_datos_activo_espacio,
 )
 
 def _clave(centro, edificio, planta, espacio):
