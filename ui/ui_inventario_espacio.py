@@ -186,7 +186,59 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.image(foto, width=220)
                 except Exception:
                     st.caption("Foto no disponible.")
+            st.markdown("---")
+            st.markdown("### 🏷️ Ficha técnica del activo")
 
+            t1, t2 = st.columns(2)
+
+            with t1:
+                fabricante_nuevo = st.text_input(
+                    "Fabricante",
+                    value=str(fabricante or ""),
+                    key=f"activo_fabricante_{clave_base}_{id_inv}"
+                )
+
+                modelo_nuevo = st.text_input(
+                    "Modelo",
+                    value=str(modelo or ""),
+                    key=f"activo_modelo_{clave_base}_{id_inv}"
+                )
+
+                numero_serie_nuevo = st.text_input(
+                    "Nº de serie",
+                    value=str(numero_serie or ""),
+                    key=f"activo_serie_{clave_base}_{id_inv}"
+                )
+
+            with t2:
+                proveedor_nuevo = st.text_input(
+                    "Proveedor",
+                    value=str(proveedor or ""),
+                    key=f"activo_proveedor_{clave_base}_{id_inv}"
+                )
+
+                fecha_instalacion_nueva = st.text_input(
+                    "Fecha instalación",
+                    value=str(fecha_instalacion or ""),
+                    placeholder="AAAA-MM-DD",
+                    key=f"activo_fecha_inst_{clave_base}_{id_inv}"
+                )
+
+                vida_util_nueva = st.number_input(
+                    "Vida útil estimada (años)",
+                    min_value=0,
+                    step=1,
+                    value=int(vida_util_anios or 0),
+                    key=f"activo_vida_{clave_base}_{id_inv}"
+                )
+
+            coste_estimado_nuevo = st.number_input(
+                "Coste estimado (€)",
+                min_value=0.0,
+                step=1.0,
+                value=float(coste_estimado or 0),
+                key=f"activo_coste_{clave_base}_{id_inv}"
+            )
             if st.button(
                 "💾 Guardar cambios",
                 key=f"guardar_edit_inv_{clave_base}_{id_inv}",
