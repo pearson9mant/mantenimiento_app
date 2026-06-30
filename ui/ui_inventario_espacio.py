@@ -111,6 +111,8 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             observaciones,
             foto,
             operario,
+            numero_ot_correctiva,
+            fecha_correctivo,
         ) = item
 
         icono = _icono_estado(estado_inv)
