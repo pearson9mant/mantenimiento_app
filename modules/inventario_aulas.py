@@ -78,6 +78,8 @@ def crear_tabla_inventario_aulas():
         ("foto", "TEXT"),
         ("operario", "TEXT"),
         ("fecha_creacion", "TEXT"),
+        ("numero_ot_correctiva", "TEXT"),
+        ("fecha_correctivo", "TEXT"),
     ]:
         try:
             cursor.execute(_sql(f"""
