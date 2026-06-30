@@ -570,6 +570,35 @@ def eliminar_elemento_inventario_espacio(id_elemento):
     finally:
         conn.close()
 
+def eliminar_inventario_espacio(centro, edificio, espacio):
+    crear_tabla_inventario_aulas()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            DELETE
+            FROM inventario_aulas
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+        """), (
+            centro,
+            edificio,
+            espacio
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
 
 # Compatibilidad antigua
 def eliminar_elemento_inventario_aula(id_elemento):
