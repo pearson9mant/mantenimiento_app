@@ -1,225 +1,370 @@
- with st.expander("📦 Inventario del espacio", expanded=False):
-        inventario = obtener_inventario_espacio(centro, edificio, espacio)
+import streamlit as st
 
-        st.markdown("### 📋 Inventario actual")
-        perfil = str(st.session_state.get("perfil", "")).lower()
+from modules.catalogo_aulas import obtener_elementos_catalogo_aulas
+from modules.ficha_espacio import obtener_inventario_espacio
+from modules.inventario_aulas import (
+    guardar_o_actualizar_espacio,
+    guardar_foto_espacio,
+    eliminar_inventario_espacio,
+)
 
-        if perfil in ["admin", "administracion", "administración"]:
-        
-            st.markdown("---")
-            st.markdown("### ⚙️ Administración")
-        
-            if not st.session_state.get(
-                f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}",
-                False
-            ):
-        
-                if st.button(
-                    "🗑️ Reiniciar inventario del espacio",
-                    key=f"reiniciar_inv_{centro}_{edificio}_{espacio}",
-                    use_container_width=True
-                ):
-                    st.session_state[
-                        f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
-                    ] = True
-        
-                    st.rerun()
-        
-            else:
-        
-                st.warning(
-                    "¿Seguro?\n\n"
-                    "Se eliminarán TODOS los elementos del inventario de este espacio."
-                )
-        
-                c1, c2 = st.columns(2)
-        
-                with c1:
-        
-                    if st.button(
-                        "✅ Sí, reiniciar",
-                        key=f"si_reiniciar_inv_{centro}_{edificio}_{espacio}",
-                        use_container_width=True
-                    ):
-        
-                        ok = eliminar_inventario_espacio(
-                            centro,
-                            edificio,
-                            espacio
-                        )
-        
-                        st.session_state[
-                            f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
-                        ] = False
-        
-                        if ok:
-                            st.success("Inventario eliminado correctamente.")
-                        else:
-                            st.error("No se pudo eliminar el inventario.")
-        
-                        st.rerun()
-        
-                with c2:
-        
-                    if st.button(
-                        "Cancelar",
-                        key=f"cancelar_reiniciar_inv_{centro}_{edificio}_{espacio}",
-                        use_container_width=True
-                    ):
-        
-                        st.session_state[
-                            f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
-                        ] = False
-        
-                        st.rerun()
 
-        if not inventario:
-            st.info("Este espacio todavía no tiene inventario. Usa la carga rápida inicial.")
-        else:
-            for i in inventario:
-                (
-                    id_inv,
-                    fecha_revision,
-                    elemento,
-                    cantidad,
-                    estado_inv,
-                    ancho,
-                    alto,
-                    fondo,
-                    unidad,
-                    observaciones,
-                    foto,
-                    operario
-                ) = i
+def _clave(centro, edificio, planta, espacio):
+    return (
+        f"{centro}_{edificio}_{planta}_{espacio}"
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(":", "_")
+    )
 
-                icono_inv = "✅"
 
-                if estado_inv in ["Dañado", "Falta", "Retirar"]:
-                    icono_inv = "🔴"
-                elif estado_inv == "Regular":
-                    icono_inv = "🟡"
+def _icono_estado(estado):
+    if estado in ["Dañado", "Falta", "Retirar"]:
+        return "🔴"
+    if estado == "Regular":
+        return "🟡"
+    return "🟢"
 
-                with st.expander(
-                    f"{icono_inv} {elemento or '-'} · {cantidad or 0} uds · {estado_inv or '-'}",
-                    expanded=False
-                ):
-                    st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
 
-                    if observaciones:
-                        st.info(observaciones)
+def _opciones_elementos():
+    opciones = list(obtener_elementos_catalogo_aulas())
+    if "Otro" not in opciones:
+        opciones.append("Otro")
+    return opciones
 
-                    if foto:
-                        try:
-                            st.image(foto, width=220)
-                        except Exception:
-                            st.caption("Foto no disponible.")
 
-        st.markdown("---")
-        st.markdown("### ➕ Carga rápida inicial")
+def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
+    perfil = str(st.session_state.get("perfil", "")).lower()
 
-        num_elementos = st.number_input(
-            "Número de elementos a introducir",
-            min_value=1,
-            max_value=30,
-            value=5,
-            step=1,
-            key=f"colegio_inv_num_elementos_{centro}_{edificio}_{espacio}"
+    if perfil not in ["admin", "administracion", "administración"]:
+        return
+
+    if not inventario:
+        return
+
+    st.markdown("---")
+    st.markdown("### ⚙️ Administración")
+
+    key_confirmar = f"confirmar_reiniciar_inv_{clave_base}"
+
+    if not st.session_state.get(key_confirmar, False):
+        if st.button(
+            "🗑️ Reiniciar inventario del espacio",
+            key=f"btn_reiniciar_inv_{clave_base}",
+            use_container_width=True
+        ):
+            st.session_state[key_confirmar] = True
+            st.rerun()
+    else:
+        st.warning(
+            "¿Seguro?\n\n"
+            "Se eliminarán TODOS los elementos del inventario de este espacio."
         )
 
-        opciones_base = list(obtener_elementos_catalogo_aulas())
+        c1, c2 = st.columns(2)
 
-        if "Otro" not in opciones_base:
-            opciones_base.append("Otro")
+        with c1:
+            if st.button(
+                "✅ Sí, reiniciar",
+                key=f"si_reiniciar_inv_{clave_base}",
+                use_container_width=True
+            ):
+                ok = eliminar_inventario_espacio(centro, edificio, espacio)
+                st.session_state[key_confirmar] = False
 
-        registros_a_guardar = []
+                if ok:
+                    st.success("Inventario eliminado correctamente.")
+                else:
+                    st.error("No se pudo eliminar el inventario.")
 
-        for i in range(int(num_elementos)):
-            st.markdown(f"#### Elemento {i + 1}")
+                st.rerun()
 
-            c1, c2, c3 = st.columns([2, 1, 1])
+        with c2:
+            if st.button(
+                "Cancelar",
+                key=f"cancelar_reiniciar_inv_{clave_base}",
+                use_container_width=True
+            ):
+                st.session_state[key_confirmar] = False
+                st.rerun()
+
+
+def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base):
+    st.markdown("### 📋 Inventario actual")
+
+    if not inventario:
+        st.info("Este espacio todavía no tiene inventario.")
+        return
+
+    for item in inventario:
+        (
+            id_inv,
+            fecha_revision,
+            elemento,
+            cantidad,
+            estado_inv,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario,
+        ) = item
+
+        icono = _icono_estado(estado_inv)
+
+        with st.expander(
+            f"{icono} {elemento or '-'} · {cantidad or 0} uds · {estado_inv or '-'}",
+            expanded=False
+        ):
+            st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
+
+            opciones_estado = ["Correcto", "Regular", "Dañado", "Falta", "Retirar"]
+
+            c1, c2 = st.columns(2)
 
             with c1:
-                elemento = st.selectbox(
-                    "Elemento",
-                    opciones_base,
-                    key=f"colegio_inv_rapido_elemento_{centro}_{edificio}_{espacio}_{i}"
-                )
-
-                if elemento == "Otro":
-                    elemento = st.text_input(
-                        "Especificar elemento",
-                        key=f"colegio_inv_rapido_otro_{centro}_{edificio}_{espacio}_{i}"
-                    )
-
-            with c2:
-                cantidad = st.number_input(
+                nueva_cantidad = st.number_input(
                     "Cantidad",
                     min_value=0,
                     step=1,
-                    key=f"colegio_inv_rapido_cantidad_{centro}_{edificio}_{espacio}_{i}"
+                    value=int(cantidad or 0),
+                    key=f"edit_cantidad_{clave_base}_{id_inv}"
                 )
 
-            with c3:
-                estado_item = st.selectbox(
+            with c2:
+                estado_actual = estado_inv if estado_inv in opciones_estado else "Correcto"
+
+                nuevo_estado = st.selectbox(
                     "Estado",
-                    ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
-                    key=f"colegio_inv_rapido_estado_{centro}_{edificio}_{espacio}_{i}"
+                    opciones_estado,
+                    index=opciones_estado.index(estado_actual),
+                    key=f"edit_estado_{clave_base}_{id_inv}"
                 )
 
-            observaciones_inv = st.text_input(
+            nuevas_obs = st.text_input(
                 "Observaciones",
-                key=f"colegio_inv_rapido_obs_{centro}_{edificio}_{espacio}_{i}"
+                value=str(observaciones or ""),
+                key=f"edit_obs_{clave_base}_{id_inv}"
             )
 
-            foto_inv = st.file_uploader(
-                "Foto",
+            nueva_foto = st.file_uploader(
+                "Actualizar foto",
                 type=["jpg", "jpeg", "png"],
-                key=f"colegio_inv_rapido_foto_{centro}_{edificio}_{espacio}_{i}"
+                key=f"edit_foto_{clave_base}_{id_inv}"
             )
 
-            if foto_inv is not None:
-                st.image(foto_inv, width=180)
+            foto_final = foto
 
-            registros_a_guardar.append(
-                (elemento, cantidad, estado_item, observaciones_inv, foto_inv)
-            )
-
-            st.markdown("---")
-
-        if st.button(
-            "💾 Guardar inventario del espacio",
-            key=f"colegio_guardar_inv_multiple_{centro}_{edificio}_{espacio}",
-            use_container_width=True
-        ):
-            guardados = 0
-
-            for elemento, cantidad, estado_item, observaciones_inv, foto_inv in registros_a_guardar:
-                elemento = str(elemento or "").strip()
-
-                if not elemento or cantidad <= 0:
-                    continue
-
-                ruta_foto = guardar_foto_espacio(
-                    foto_inv,
+            if nueva_foto is not None:
+                st.image(nueva_foto, width=180)
+                foto_final = guardar_foto_espacio(
+                    nueva_foto,
                     centro,
                     edificio,
                     espacio,
                     elemento
                 )
+            elif foto:
+                try:
+                    st.image(foto, width=220)
+                except Exception:
+                    st.caption("Foto no disponible.")
 
+            if st.button(
+                "💾 Guardar cambios",
+                key=f"guardar_edit_inv_{clave_base}_{id_inv}",
+                use_container_width=True
+            ):
                 ok = guardar_o_actualizar_espacio(
                     centro=centro,
                     edificio=edificio,
                     espacio=espacio,
                     elemento=elemento,
-                    cantidad=cantidad,
-                    estado=estado_item,
+                    cantidad=nueva_cantidad,
+                    estado=nuevo_estado,
+                    ancho=ancho or 0,
+                    alto=alto or 0,
+                    fondo=fondo or 0,
+                    unidad=unidad or "cm",
+                    observaciones=nuevas_obs,
+                    foto=foto_final,
+                    operario=st.session_state.get("operario_activo", "")
+                )
+
+                if ok:
+                    st.success("Elemento actualizado.")
+                    st.rerun()
+                else:
+                    st.error("No se pudo actualizar el elemento.")
+
+            if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
+                st.warning("Este elemento está marcado como incidencia. El siguiente paso será crear correctivo automático desde aquí.")
+
+
+def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario, clave_base):
+    st.markdown("---")
+
+    if not inventario:
+        st.markdown("### 🚀 Crear inventario inicial")
+    else:
+        st.markdown("### ➕ Añadir nuevo elemento")
+
+    if "inventario_temp" not in st.session_state:
+        st.session_state["inventario_temp"] = {}
+
+    if clave_base not in st.session_state["inventario_temp"]:
+        st.session_state["inventario_temp"][clave_base] = []
+
+    elementos_temp = st.session_state["inventario_temp"][clave_base]
+
+    if elementos_temp:
+        st.markdown("#### Elementos preparados")
+
+        for idx, item in enumerate(elementos_temp):
+            st.markdown(
+                f"✅ **{item['elemento']}** · "
+                f"{item['cantidad']} uds · {item['estado']}"
+            )
+
+    opciones_base = _opciones_elementos()
+
+    st.markdown("#### Nuevo elemento")
+
+    elemento_nuevo = st.selectbox(
+        "Elemento",
+        opciones_base,
+        key=f"add_elemento_{clave_base}"
+    )
+
+    if elemento_nuevo == "Otro":
+        elemento_nuevo = st.text_input(
+            "Especificar elemento",
+            key=f"add_elemento_otro_{clave_base}"
+        )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        cantidad_nueva = st.number_input(
+            "Cantidad",
+            min_value=0,
+            step=1,
+            key=f"add_cantidad_{clave_base}"
+        )
+
+    with c2:
+        estado_nuevo = st.selectbox(
+            "Estado",
+            ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
+            key=f"add_estado_{clave_base}"
+        )
+
+    observaciones_nuevo = st.text_input(
+        "Observaciones",
+        key=f"add_obs_{clave_base}"
+    )
+
+    foto_nuevo = st.file_uploader(
+        "Foto",
+        type=["jpg", "jpeg", "png"],
+        key=f"add_foto_{clave_base}"
+    )
+
+    if foto_nuevo is not None:
+        st.image(foto_nuevo, width=180)
+
+    c_btn1, c_btn2 = st.columns(2)
+
+    with c_btn1:
+        if st.button(
+            "➕ Añadir elemento a la lista",
+            key=f"add_temp_{clave_base}",
+            use_container_width=True
+        ):
+            elemento_nuevo = str(elemento_nuevo or "").strip()
+
+            if not elemento_nuevo:
+                st.warning("Indica un elemento.")
+            elif cantidad_nueva <= 0:
+                st.warning("Indica una cantidad mayor que 0.")
+            else:
+                existe_bd = any(
+                    str(x[2] or "").strip().lower() == elemento_nuevo.lower()
+                    for x in inventario
+                )
+
+                existe_temp = any(
+                    str(x["elemento"]).strip().lower() == elemento_nuevo.lower()
+                    for x in elementos_temp
+                )
+
+                if existe_bd or existe_temp:
+                    st.warning(
+                        "Este elemento ya existe en este espacio. "
+                        "Modifícalo desde su ficha."
+                    )
+                else:
+                    ruta_foto = guardar_foto_espacio(
+                        foto_nuevo,
+                        centro,
+                        edificio,
+                        espacio,
+                        elemento_nuevo
+                    )
+
+                    elementos_temp.append({
+                        "elemento": elemento_nuevo,
+                        "cantidad": cantidad_nueva,
+                        "estado": estado_nuevo,
+                        "observaciones": observaciones_nuevo,
+                        "foto": ruta_foto,
+                    })
+
+                    st.session_state["inventario_temp"][clave_base] = elementos_temp
+                    st.success("Elemento añadido a la lista.")
+                    st.rerun()
+
+    with c_btn2:
+        if elementos_temp:
+            if st.button(
+                "🧹 Vaciar lista preparada",
+                key=f"vaciar_temp_{clave_base}",
+                use_container_width=True
+            ):
+                st.session_state["inventario_temp"][clave_base] = []
+                st.rerun()
+
+    if elementos_temp:
+        texto_boton = (
+            "💾 Crear inventario inicial"
+            if not inventario
+            else "💾 Guardar nuevos elementos"
+        )
+
+        if st.button(
+            texto_boton,
+            key=f"guardar_temp_{clave_base}",
+            use_container_width=True
+        ):
+            guardados = 0
+
+            for item in elementos_temp:
+                ok = guardar_o_actualizar_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    elemento=item["elemento"],
+                    cantidad=item["cantidad"],
+                    estado=item["estado"],
                     ancho=0,
                     alto=0,
                     fondo=0,
                     unidad="cm",
-                    observaciones=observaciones_inv,
-                    foto=ruta_foto,
+                    observaciones=item["observaciones"],
+                    foto=item["foto"],
                     operario=st.session_state.get("operario_activo", "")
                 )
 
@@ -227,7 +372,43 @@
                     guardados += 1
 
             if guardados > 0:
+                st.session_state["inventario_temp"][clave_base] = []
                 st.success(f"Inventario actualizado. Elementos guardados: {guardados}")
                 st.rerun()
             else:
-                st.warning("No hay elementos con cantidad para guardar.")
+                st.error("No se pudo guardar el inventario.")
+
+
+def mostrar_inventario_espacio(centro, edificio, planta, espacio):
+    clave_base = _clave(centro, edificio, planta, espacio)
+
+    inventario = obtener_inventario_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+    _mostrar_inventario_actual(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        inventario=inventario,
+        clave_base=clave_base
+    )
+
+    _mostrar_asistente_inventario(
+        centro=centro,
+        edificio=edificio,
+        planta=planta,
+        espacio=espacio,
+        inventario=inventario,
+        clave_base=clave_base
+    )
+
+    _mostrar_reinicio_admin(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        inventario=inventario,
+        clave_base=clave_base
+    )
