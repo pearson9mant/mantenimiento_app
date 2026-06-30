@@ -13,10 +13,8 @@ from modules.colegio import (
 def combinar_estados(estados):
     if "rojo" in estados:
         return "rojo"
-
     if "amarillo" in estados:
         return "amarillo"
-
     return "verde"
 
 
@@ -50,6 +48,9 @@ def estado_y_total_edificio(centro, plantas, ots_abiertas):
     total = 0
 
     for planta, espacios in plantas.items():
+        if not espacios:
+            continue
+
         estado, cantidad = estado_y_total_planta(
             centro=centro,
             espacios=espacios,
@@ -73,24 +74,21 @@ def estado_y_total_centro(centro, edificios, ots_abiertas):
             ots_abiertas=ots_abiertas
         )
 
-        estados.append(estado)
+        states = estado
+        estados.append(states)
         total += cantidad
 
     return combinar_estados(estados), total
 
 
 def texto_contador(total):
-    if total > 0:
-        return f" ({total})"
-
-    return ""
+    return f" ({total})" if total > 0 else ""
 
 
 def mostrar_arbol_colegio():
     st.markdown("#### 🌳 Árbol del colegio")
 
     arbol = obtener_arbol_espacios()
-
     centros_visibles = obtener_centros_visibles_usuario()
 
     arbol = {
@@ -101,6 +99,8 @@ def mostrar_arbol_colegio():
 
     ots_abiertas = obtener_ots_abiertas_por_centro()
 
+    hay_incidencias = False
+
     for centro, edificios in arbol.items():
         estado_centro, total_centro = estado_y_total_centro(
             centro=centro,
@@ -108,6 +108,11 @@ def mostrar_arbol_colegio():
             ots_abiertas=ots_abiertas
         )
 
+        # No pintamos centros sin incidencias
+        if total_centro == 0:
+            continue
+
+        hay_incidencias = True
         icono_centro = icono_estado_espacio(estado_centro)
 
         with st.expander(
@@ -120,6 +125,10 @@ def mostrar_arbol_colegio():
                     plantas=plantas,
                     ots_abiertas=ots_abiertas
                 )
+
+                # No pintamos edificios sin incidencias
+                if total_edificio == 0:
+                    continue
 
                 icono_edificio = icono_estado_espacio(estado_edificio)
 
@@ -137,6 +146,10 @@ def mostrar_arbol_colegio():
                             ots_abiertas=ots_abiertas
                         )
 
+                        # No pintamos plantas sin incidencias
+                        if total_planta == 0:
+                            continue
+
                         icono_planta = icono_estado_espacio(estado_planta)
 
                         with st.expander(
@@ -147,7 +160,15 @@ def mostrar_arbol_colegio():
                                 nombre_espacio = item_espacio.get("espacio", "")
                                 tipo_espacio = item_espacio.get("tipo", "")
 
-                                icono_tipo = icono_tipo_espacio(tipo_espacio)
+                                total_espacio = contar_ots_espacio_rapido(
+                                    centro=centro,
+                                    espacio=nombre_espacio,
+                                    ots_abiertas=ots_abiertas
+                                )
+
+                                # No pintamos espacios sin incidencias
+                                if total_espacio == 0:
+                                    continue
 
                                 estado_espacio = obtener_estado_espacio_rapido(
                                     centro=centro,
@@ -155,23 +176,21 @@ def mostrar_arbol_colegio():
                                     ots_abiertas=ots_abiertas
                                 )
 
-                                total_espacio = contar_ots_espacio_rapido(
-                                    centro=centro,
-                                    espacio=nombre_espacio,
-                                    ots_abiertas=ots_abiertas
-                                )
-
                                 icono_estado = icono_estado_espacio(estado_espacio)
+                                icono_tipo = icono_tipo_espacio(tipo_espacio)
 
                                 with st.expander(
                                     f"{icono_estado} {icono_tipo} {nombre_espacio}{texto_contador(total_espacio)}",
-                                    expanded=total_espacio > 0
+                                    expanded=False
                                 ):
                                     from ui.ui_colegio import ficha_espacio_basica
-                                
+
                                     ficha_espacio_basica(
                                         centro=centro,
                                         edificio=edificio,
                                         planta=planta,
                                         espacio=nombre_espacio
                                     )
+
+    if not hay_incidencias:
+        st.success("No hay incidencias abiertas en tus centros.")
