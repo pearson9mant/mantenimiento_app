@@ -86,7 +86,8 @@ def obtener_inventario_espacio(centro, edificio, espacio):
     try:
         cur.execute(_sql("""
             SELECT id, fecha_revision, elemento, cantidad, estado,
-                   ancho, alto, fondo, unidad, observaciones, foto, operario
+                   ancho, alto, fondo, unidad, observaciones, foto, operario,
+                   numero_ot_correctiva, fecha_correctivo
             FROM inventario_aulas
             WHERE centro = ?
               AND edificio = ?
