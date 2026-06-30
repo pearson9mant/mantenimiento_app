@@ -265,3 +265,64 @@ def obtener_centros_visibles_usuario():
         return ["Pearson 22", "Pearson 9"]
 
     return ["Pearson 22"]
+
+def obtener_ots_abiertas_por_centro():
+    """
+    Devuelve todas las OT abiertas agrupadas por centro + espacio.
+    Se usa para pintar el árbol rápido sin consultar la BD por cada aula.
+    """
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT centro, espacio, COUNT(*)
+            FROM ordenes_trabajo
+            WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
+                'finalizada',
+                'cerrado',
+                'cerrada',
+                'cancelada'
+            )
+            GROUP BY centro, espacio
+        """))
+
+        filas = cur.fetchall()
+
+    except Exception:
+        filas = []
+
+    conn.close()
+
+    datos = {}
+
+    for centro, espacio, total in filas:
+        clave = (
+            _normalizar_comparacion(centro),
+            _normalizar_comparacion(espacio)
+        )
+        datos[clave] = int(total or 0)
+
+    return datos
+
+
+def obtener_estado_espacio_rapido(centro, espacio, ots_abiertas):
+    clave = (
+        _normalizar_comparacion(centro),
+        _normalizar_comparacion(espacio)
+    )
+
+    if ots_abiertas.get(clave, 0) > 0:
+        return "rojo"
+
+    return "verde"
+
+
+def contar_ots_espacio_rapido(centro, espacio, ots_abiertas):
+    clave = (
+        _normalizar_comparacion(centro),
+        _normalizar_comparacion(espacio)
+    )
+
+    return int(ots_abiertas.get(clave, 0) or 0)
