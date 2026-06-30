@@ -85,17 +85,41 @@ def obtener_inventario_espacio(centro, edificio, espacio):
 
     try:
         cur.execute(_sql("""
-            SELECT id, fecha_revision, elemento, cantidad, estado,
-                   ancho, alto, fondo, unidad, observaciones, foto, operario,
-                   numero_ot_correctiva, fecha_correctivo
+            SELECT
+                id,
+                fecha_revision,
+                elemento,
+                cantidad,
+                estado,
+                ancho,
+                alto,
+                fondo,
+                unidad,
+                observaciones,
+                foto,
+                operario,
+                numero_ot_correctiva,
+                fecha_correctivo,
+                fabricante,
+                modelo,
+                numero_serie,
+                fecha_instalacion,
+                proveedor,
+                vida_util_anios,
+                coste_estimado
             FROM inventario_aulas
             WHERE centro = ?
               AND edificio = ?
               AND espacio = ?
             ORDER BY elemento ASC
-        """), (centro, edificio, espacio))
+        """), (
+            centro,
+            edificio,
+            espacio
+        ))
 
         datos = cur.fetchall()
+
     except Exception:
         datos = []
 
