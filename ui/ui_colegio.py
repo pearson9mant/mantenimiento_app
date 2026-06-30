@@ -92,105 +92,12 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 )
 
     with st.expander("📦 Inventario del espacio", expanded=False):
-        st.markdown("### 📦 Añadir / actualizar elemento")
-
-        opciones_elementos = list(obtener_elementos_catalogo_aulas())
-
-        if "Otro" not in opciones_elementos:
-            opciones_elementos.append("Otro")
-
-        elemento = st.selectbox(
-            "Elemento",
-            opciones_elementos,
-            key=f"colegio_inv_elemento_{centro}_{edificio}_{espacio}"
-        )
-
-        if elemento == "Otro":
-            elemento = st.text_input(
-                "Especificar elemento",
-                key=f"colegio_inv_elemento_otro_{centro}_{edificio}_{espacio}"
-            )
-
-        c_inv1, c_inv2 = st.columns(2)
-
-        with c_inv1:
-            cantidad = st.number_input(
-                "Cantidad",
-                min_value=0,
-                step=1,
-                key=f"colegio_inv_cantidad_{centro}_{edificio}_{espacio}"
-            )
-
-        with c_inv2:
-            estado_item = st.selectbox(
-                "Estado",
-                ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
-                key=f"colegio_inv_estado_{centro}_{edificio}_{espacio}"
-            )
-
-        observaciones_inv = st.text_input(
-            "Observaciones",
-            key=f"colegio_inv_obs_{centro}_{edificio}_{espacio}"
-        )
-
-        foto_inv = st.file_uploader(
-            "Foto del elemento",
-            type=["jpg", "jpeg", "png"],
-            key=f"colegio_inv_foto_{centro}_{edificio}_{espacio}"
-        )
-
-        if foto_inv is not None:
-            st.image(foto_inv, width=220)
-
-        if st.button(
-            "💾 Guardar elemento en este espacio",
-            key=f"colegio_guardar_inv_{centro}_{edificio}_{espacio}",
-            use_container_width=True
-        ):
-            elemento = str(elemento or "").strip()
-
-            if not elemento:
-                st.warning("Indica un elemento.")
-            elif cantidad <= 0:
-                st.warning("Indica una cantidad mayor que 0.")
-            else:
-                ruta_foto = guardar_foto_espacio(
-                    foto_inv,
-                    centro,
-                    edificio,
-                    espacio,
-                    elemento
-                )
-
-                ok = guardar_o_actualizar_espacio(
-                    centro=centro,
-                    edificio=edificio,
-                    espacio=espacio,
-                    elemento=elemento,
-                    cantidad=cantidad,
-                    estado=estado_item,
-                    ancho=0,
-                    alto=0,
-                    fondo=0,
-                    unidad="cm",
-                    observaciones=observaciones_inv,
-                    foto=ruta_foto,
-                    operario=st.session_state.get("operario_activo", "")
-                )
-
-                if ok:
-                    st.success("Inventario del espacio actualizado.")
-                    st.rerun()
-                else:
-                    st.error("No se pudo guardar el inventario del espacio.")
-
-        st.markdown("---")
-        st.markdown("### 📋 Inventario actual")
-
         inventario = obtener_inventario_espacio(centro, edificio, espacio)
 
+        st.markdown("### 📋 Inventario actual")
+
         if not inventario:
-            st.info("No hay inventario registrado en este espacio.")
+            st.info("Este espacio todavía no tiene inventario. Usa la carga rápida inicial.")
         else:
             for i in inventario:
                 (
@@ -229,6 +136,124 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                             st.image(foto, width=220)
                         except Exception:
                             st.caption("Foto no disponible.")
+
+        st.markdown("---")
+        st.markdown("### ➕ Carga rápida inicial")
+
+        num_elementos = st.number_input(
+            "Número de elementos a introducir",
+            min_value=1,
+            max_value=30,
+            value=5,
+            step=1,
+            key=f"colegio_inv_num_elementos_{centro}_{edificio}_{espacio}"
+        )
+
+        opciones_base = list(obtener_elementos_catalogo_aulas())
+
+        if "Otro" not in opciones_base:
+            opciones_base.append("Otro")
+
+        registros_a_guardar = []
+
+        for i in range(int(num_elementos)):
+            st.markdown(f"#### Elemento {i + 1}")
+
+            c1, c2, c3 = st.columns([2, 1, 1])
+
+            with c1:
+                elemento = st.selectbox(
+                    "Elemento",
+                    opciones_base,
+                    key=f"colegio_inv_rapido_elemento_{centro}_{edificio}_{espacio}_{i}"
+                )
+
+                if elemento == "Otro":
+                    elemento = st.text_input(
+                        "Especificar elemento",
+                        key=f"colegio_inv_rapido_otro_{centro}_{edificio}_{espacio}_{i}"
+                    )
+
+            with c2:
+                cantidad = st.number_input(
+                    "Cantidad",
+                    min_value=0,
+                    step=1,
+                    key=f"colegio_inv_rapido_cantidad_{centro}_{edificio}_{espacio}_{i}"
+                )
+
+            with c3:
+                estado_item = st.selectbox(
+                    "Estado",
+                    ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
+                    key=f"colegio_inv_rapido_estado_{centro}_{edificio}_{espacio}_{i}"
+                )
+
+            observaciones_inv = st.text_input(
+                "Observaciones",
+                key=f"colegio_inv_rapido_obs_{centro}_{edificio}_{espacio}_{i}"
+            )
+
+            foto_inv = st.file_uploader(
+                "Foto",
+                type=["jpg", "jpeg", "png"],
+                key=f"colegio_inv_rapido_foto_{centro}_{edificio}_{espacio}_{i}"
+            )
+
+            if foto_inv is not None:
+                st.image(foto_inv, width=180)
+
+            registros_a_guardar.append(
+                (elemento, cantidad, estado_item, observaciones_inv, foto_inv)
+            )
+
+            st.markdown("---")
+
+        if st.button(
+            "💾 Guardar inventario del espacio",
+            key=f"colegio_guardar_inv_multiple_{centro}_{edificio}_{espacio}",
+            use_container_width=True
+        ):
+            guardados = 0
+
+            for elemento, cantidad, estado_item, observaciones_inv, foto_inv in registros_a_guardar:
+                elemento = str(elemento or "").strip()
+
+                if not elemento or cantidad <= 0:
+                    continue
+
+                ruta_foto = guardar_foto_espacio(
+                    foto_inv,
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento
+                )
+
+                ok = guardar_o_actualizar_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    elemento=elemento,
+                    cantidad=cantidad,
+                    estado=estado_item,
+                    ancho=0,
+                    alto=0,
+                    fondo=0,
+                    unidad="cm",
+                    observaciones=observaciones_inv,
+                    foto=ruta_foto,
+                    operario=st.session_state.get("operario_activo", "")
+                )
+
+                if ok:
+                    guardados += 1
+
+            if guardados > 0:
+                st.success(f"Inventario actualizado. Elementos guardados: {guardados}")
+                st.rerun()
+            else:
+                st.warning("No hay elementos con cantidad para guardar.")
 
     with st.expander(f"📅 Preventivos ({resumen['preventivos']})", expanded=False):
         preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
