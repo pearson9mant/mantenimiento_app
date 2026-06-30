@@ -100,6 +100,76 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         inventario = obtener_inventario_espacio(centro, edificio, espacio)
 
         st.markdown("### 📋 Inventario actual")
+        perfil = str(st.session_state.get("perfil", "")).lower()
+
+        if perfil in ["admin", "administracion", "administración"]:
+        
+            st.markdown("---")
+            st.markdown("### ⚙️ Administración")
+        
+            if not st.session_state.get(
+                f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}",
+                False
+            ):
+        
+                if st.button(
+                    "🗑️ Reiniciar inventario del espacio",
+                    key=f"reiniciar_inv_{centro}_{edificio}_{espacio}",
+                    use_container_width=True
+                ):
+                    st.session_state[
+                        f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
+                    ] = True
+        
+                    st.rerun()
+        
+            else:
+        
+                st.warning(
+                    "¿Seguro?\n\n"
+                    "Se eliminarán TODOS los elementos del inventario de este espacio."
+                )
+        
+                c1, c2 = st.columns(2)
+        
+                with c1:
+        
+                    if st.button(
+                        "✅ Sí, reiniciar",
+                        key=f"si_reiniciar_inv_{centro}_{edificio}_{espacio}",
+                        use_container_width=True
+                    ):
+        
+                        ok = eliminar_inventario_espacio(
+                            centro,
+                            edificio,
+                            espacio
+                        )
+        
+                        st.session_state[
+                            f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
+                        ] = False
+        
+                        if ok:
+                            st.success("Inventario eliminado correctamente.")
+                        else:
+                            st.error("No se pudo eliminar el inventario.")
+        
+                        st.rerun()
+        
+                with c2:
+        
+                    if st.button(
+                        "Cancelar",
+                        key=f"cancelar_reiniciar_inv_{centro}_{edificio}_{espacio}",
+                        use_container_width=True
+                    ):
+        
+                        st.session_state[
+                            f"confirmar_borrar_inv_{centro}_{edificio}_{espacio}"
+                        ] = False
+        
+                        st.rerun()
 
         if not inventario:
             st.info("Este espacio todavía no tiene inventario. Usa la carga rápida inicial.")
