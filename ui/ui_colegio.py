@@ -3,14 +3,8 @@ import streamlit as st
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
-
+from ui.ui_inventario_espacio import mostrar_inventario_espacio
 from modules.inventario import obtener_materiales_para_select
-from modules.catalogo_aulas import obtener_elementos_catalogo_aulas
-
-from modules.inventario_aulas import (
-    guardar_o_actualizar_espacio,
-    guardar_foto_espacio,
-)
 
 from modules.ficha_espacio import (
     obtener_resumen_ficha_espacio,
@@ -19,11 +13,7 @@ from modules.ficha_espacio import (
     obtener_preventivos_espacio,
     obtener_historial_tecnico_espacio,
 )
-from modules.inventario_aulas import (
-    guardar_o_actualizar_espacio,
-    guardar_foto_espacio,
-    eliminar_inventario_espacio,
-)
+
 
 
 def pantalla_colegio():
@@ -95,6 +85,14 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                     operario_sel=operario or "",
                     modo="colegio"
                 )
+
+    with st.expander("📦 Inventario del espacio", expanded=False):
+        mostrar_inventario_espacio(
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio
+        )
 
    
 
