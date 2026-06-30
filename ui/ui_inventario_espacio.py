@@ -122,6 +122,8 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             expanded=False
         ):
             st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
+            if numero_ot_correctiva:
+                st.warning(f"🟠 OT correctiva asociada: {numero_ot_correctiva}")
 
             opciones_estado = ["Correcto", "Regular", "Dañado", "Falta", "Retirar"]
 
