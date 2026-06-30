@@ -221,66 +221,80 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
     elementos_temp = st.session_state["inventario_temp"][clave_base]
 
     if elementos_temp:
-        st.markdown("#### Elementos preparados")
+        st.markdown("#### ✅ Elementos preparados")
 
-        for idx, item in enumerate(elementos_temp):
+        for item in elementos_temp:
             st.markdown(
                 f"✅ **{item['elemento']}** · "
                 f"{item['cantidad']} uds · {item['estado']}"
             )
 
-    opciones_base = _opciones_elementos()
+        st.markdown("---")
 
-    st.markdown("#### Nuevo elemento")
-
-    elemento_nuevo = st.selectbox(
-        "Elemento",
-        opciones_base,
-        key=f"add_elemento_{clave_base}"
+    mostrar_formulario = st.session_state.get(
+        f"mostrar_form_add_{clave_base}",
+        not elementos_temp
     )
 
-    if elemento_nuevo == "Otro":
-        elemento_nuevo = st.text_input(
-            "Especificar elemento",
-            key=f"add_elemento_otro_{clave_base}"
-        )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        cantidad_nueva = st.number_input(
-            "Cantidad",
-            min_value=0,
-            step=1,
-            key=f"add_cantidad_{clave_base}"
-        )
-
-    with c2:
-        estado_nuevo = st.selectbox(
-            "Estado",
-            ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
-            key=f"add_estado_{clave_base}"
-        )
-
-    observaciones_nuevo = st.text_input(
-        "Observaciones",
-        key=f"add_obs_{clave_base}"
-    )
-
-    foto_nuevo = st.file_uploader(
-        "Foto",
-        type=["jpg", "jpeg", "png"],
-        key=f"add_foto_{clave_base}"
-    )
-
-    if foto_nuevo is not None:
-        st.image(foto_nuevo, width=180)
-
-    c_btn1, c_btn2 = st.columns(2)
-
-    with c_btn1:
+    if not mostrar_formulario:
         if st.button(
-            "➕ Añadir elemento a la lista",
+            "➕ Añadir otro elemento",
+            key=f"mostrar_form_add_{clave_base}",
+            use_container_width=True
+        ):
+            st.session_state[f"mostrar_form_add_{clave_base}"] = True
+            st.rerun()
+
+    if mostrar_formulario:
+        st.markdown("#### Nuevo elemento")
+
+        opciones_base = _opciones_elementos()
+
+        elemento_nuevo = st.selectbox(
+            "Elemento",
+            opciones_base,
+            key=f"add_elemento_{clave_base}"
+        )
+
+        if elemento_nuevo == "Otro":
+            elemento_nuevo = st.text_input(
+                "Especificar elemento",
+                key=f"add_elemento_otro_{clave_base}"
+            )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            cantidad_nueva = st.number_input(
+                "Cantidad",
+                min_value=0,
+                step=1,
+                key=f"add_cantidad_{clave_base}"
+            )
+
+        with c2:
+            estado_nuevo = st.selectbox(
+                "Estado",
+                ["Correcto", "Regular", "Dañado", "Falta", "Retirar"],
+                key=f"add_estado_{clave_base}"
+            )
+
+        observaciones_nuevo = st.text_input(
+            "Observaciones",
+            key=f"add_obs_{clave_base}"
+        )
+
+        foto_nuevo = st.file_uploader(
+            "Foto",
+            type=["jpg", "jpeg", "png"],
+            key=f"add_foto_{clave_base}"
+        )
+
+        if foto_nuevo is not None:
+            st.image(foto_nuevo, width=180)
+
+        if st.button(
+            "✅ Añadir a la lista",
             key=f"add_temp_{clave_base}",
             use_container_width=True
         ):
@@ -324,59 +338,66 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
                     })
 
                     st.session_state["inventario_temp"][clave_base] = elementos_temp
+                    st.session_state[f"mostrar_form_add_{clave_base}"] = False
                     st.success("Elemento añadido a la lista.")
                     st.rerun()
 
-    with c_btn2:
-        if elementos_temp:
+    if elementos_temp:
+        st.markdown("---")
+
+        c_final1, c_final2 = st.columns(2)
+
+        with c_final1:
+            texto_boton = (
+                "💾 Crear inventario inicial"
+                if not inventario
+                else "💾 Guardar nuevos elementos"
+            )
+
+            if st.button(
+                texto_boton,
+                key=f"guardar_temp_{clave_base}",
+                use_container_width=True
+            ):
+                guardados = 0
+
+                for item in elementos_temp:
+                    ok = guardar_o_actualizar_espacio(
+                        centro=centro,
+                        edificio=edificio,
+                        espacio=espacio,
+                        elemento=item["elemento"],
+                        cantidad=item["cantidad"],
+                        estado=item["estado"],
+                        ancho=0,
+                        alto=0,
+                        fondo=0,
+                        unidad="cm",
+                        observaciones=item["observaciones"],
+                        foto=item["foto"],
+                        operario=st.session_state.get("operario_activo", "")
+                    )
+
+                    if ok:
+                        guardados += 1
+
+                if guardados > 0:
+                    st.session_state["inventario_temp"][clave_base] = []
+                    st.session_state[f"mostrar_form_add_{clave_base}"] = True
+                    st.success(f"Inventario actualizado. Elementos guardados: {guardados}")
+                    st.rerun()
+                else:
+                    st.error("No se pudo guardar el inventario.")
+
+        with c_final2:
             if st.button(
                 "🧹 Vaciar lista preparada",
                 key=f"vaciar_temp_{clave_base}",
                 use_container_width=True
             ):
                 st.session_state["inventario_temp"][clave_base] = []
+                st.session_state[f"mostrar_form_add_{clave_base}"] = True
                 st.rerun()
-
-    if elementos_temp:
-        texto_boton = (
-            "💾 Crear inventario inicial"
-            if not inventario
-            else "💾 Guardar nuevos elementos"
-        )
-
-        if st.button(
-            texto_boton,
-            key=f"guardar_temp_{clave_base}",
-            use_container_width=True
-        ):
-            guardados = 0
-
-            for item in elementos_temp:
-                ok = guardar_o_actualizar_espacio(
-                    centro=centro,
-                    edificio=edificio,
-                    espacio=espacio,
-                    elemento=item["elemento"],
-                    cantidad=item["cantidad"],
-                    estado=item["estado"],
-                    ancho=0,
-                    alto=0,
-                    fondo=0,
-                    unidad="cm",
-                    observaciones=item["observaciones"],
-                    foto=item["foto"],
-                    operario=st.session_state.get("operario_activo", "")
-                )
-
-                if ok:
-                    guardados += 1
-
-            if guardados > 0:
-                st.session_state["inventario_temp"][clave_base] = []
-                st.success(f"Inventario actualizado. Elementos guardados: {guardados}")
-                st.rerun()
-            else:
-                st.error("No se pudo guardar el inventario.")
 
 
 def mostrar_inventario_espacio(centro, edificio, planta, espacio):
