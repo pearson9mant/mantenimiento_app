@@ -80,6 +80,13 @@ def crear_tabla_inventario_aulas():
         ("fecha_creacion", "TEXT"),
         ("numero_ot_correctiva", "TEXT"),
         ("fecha_correctivo", "TEXT"),
+        ("fabricante", "TEXT"),
+        ("modelo", "TEXT"),
+        ("numero_serie", "TEXT"),
+        ("fecha_instalacion", "TEXT"),
+        ("proveedor", "TEXT"),
+        ("vida_util_anios", "INTEGER DEFAULT 0"),
+        ("coste_estimado", "REAL DEFAULT 0"),
     ]:
         try:
             cursor.execute(_sql(f"""
@@ -633,6 +640,63 @@ def guardar_correctivo_inventario(
         """), (
             numero_ot,
             fecha_correctivo,
+            id_elemento
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+def actualizar_datos_activo_espacio(
+    id_elemento,
+    fabricante="",
+    modelo="",
+    numero_serie="",
+    fecha_instalacion="",
+    proveedor="",
+    vida_util_anios=0,
+    coste_estimado=0
+):
+    crear_tabla_inventario_aulas()
+
+    try:
+        vida_util_anios = int(vida_util_anios or 0)
+    except Exception:
+        vida_util_anios = 0
+
+    try:
+        coste_estimado = float(coste_estimado or 0)
+    except Exception:
+        coste_estimado = 0
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET fabricante = ?,
+                modelo = ?,
+                numero_serie = ?,
+                fecha_instalacion = ?,
+                proveedor = ?,
+                vida_util_anios = ?,
+                coste_estimado = ?
+            WHERE id = ?
+        """), (
+            fabricante,
+            modelo,
+            numero_serie,
+            fecha_instalacion,
+            proveedor,
+            vida_util_anios,
+            coste_estimado,
             id_elemento
         ))
 
