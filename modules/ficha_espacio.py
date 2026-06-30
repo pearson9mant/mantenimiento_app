@@ -150,16 +150,11 @@ def obtener_historial_tecnico_espacio(centro, edificio, espacio):
 
 def obtener_resumen_ficha_espacio(centro, edificio, espacio):
     actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
-    inventario = obtener_inventario_espacio(centro, edificio, espacio)
-    preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
-    historial = obtener_historial_tecnico_espacio(centro, edificio, espacio)
-
-    actuaciones_abiertas = actuaciones
 
     return {
         "actuaciones": len(actuaciones),
-        "actuaciones_abiertas": len(actuaciones_abiertas),
-        "inventario": len(inventario),
-        "preventivos": len(preventivos),
-        "historial": len(historial),
+        "actuaciones_abiertas": len(actuaciones),
+        "inventario": 0,
+        "preventivos": 0,
+        "historial": 0,
     }
