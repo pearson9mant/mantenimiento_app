@@ -9,7 +9,6 @@ from modules.inventario_aulas import (
     guardar_foto_espacio,
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
-    actualizar_datos_activo_espacio,
 )
 from modules.activos import (
     obtener_activo_por_inventario,
