@@ -1,8 +1,17 @@
 from datetime import datetime
-from database.db import conectar
+from pathlib import Path
+
+from database.db import conectar, _sql
 
 
-ELEMENTOS_BASE_AULA = [
+# =====================================================
+# INVENTARIO DE ESPACIOS
+# Antes llamado inventario_aulas.
+# Mantenemos nombre de tabla y funciones antiguas
+# para no romper nada.
+# =====================================================
+
+ELEMENTOS_BASE_ESPACIO = [
     "Mesas",
     "Sillas",
     "Pantalla / proyector",
@@ -12,8 +21,12 @@ ELEMENTOS_BASE_AULA = [
     "Puerta / maneta",
     "Ventanas / persianas",
     "Papeleras",
-    "Estado general del aula",
+    "Estado general",
 ]
+
+
+# Compatibilidad antigua
+ELEMENTOS_BASE_AULA = ELEMENTOS_BASE_ESPACIO
 
 
 def hoy():
@@ -28,7 +41,7 @@ def crear_tabla_inventario_aulas():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         CREATE TABLE IF NOT EXISTS inventario_aulas (
             id SERIAL PRIMARY KEY,
             fecha_revision TEXT,
@@ -47,10 +60,202 @@ def crear_tabla_inventario_aulas():
             operario TEXT,
             fecha_creacion TEXT
         )
-    """)
+    """))
+
+    for columna, tipo in [
+        ("fecha_revision", "TEXT"),
+        ("centro", "TEXT"),
+        ("edificio", "TEXT"),
+        ("espacio", "TEXT"),
+        ("elemento", "TEXT"),
+        ("cantidad", "INTEGER"),
+        ("estado", "TEXT"),
+        ("ancho", "REAL"),
+        ("alto", "REAL"),
+        ("fondo", "REAL"),
+        ("unidad", "TEXT"),
+        ("observaciones", "TEXT"),
+        ("foto", "TEXT"),
+        ("operario", "TEXT"),
+        ("fecha_creacion", "TEXT"),
+    ]:
+        try:
+            cursor.execute(_sql(f"""
+                ALTER TABLE inventario_aulas
+                ADD COLUMN IF NOT EXISTS {columna} {tipo}
+            """))
+        except Exception:
+            pass
 
     conn.commit()
     conn.close()
+
+
+def guardar_foto_espacio(foto_subida, centro, edificio, espacio, elemento):
+    if foto_subida is None:
+        return ""
+
+    carpeta = Path("data/fotos_espacios")
+    carpeta.mkdir(parents=True, exist_ok=True)
+
+    nombre_foto = f"{centro}_{edificio}_{espacio}_{elemento}_{foto_subida.name}"
+    nombre_foto = (
+        nombre_foto
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(":", "_")
+        .replace("*", "_")
+        .replace("?", "_")
+        .replace('"', "_")
+        .replace("<", "_")
+        .replace(">", "_")
+        .replace("|", "_")
+    )
+
+    ruta_foto = str(carpeta / nombre_foto)
+
+    with open(ruta_foto, "wb") as f:
+        f.write(foto_subida.getbuffer())
+
+    return ruta_foto
+
+
+# Compatibilidad antigua
+def guardar_foto_aula(foto_subida, centro, edificio, espacio, elemento):
+    return guardar_foto_espacio(
+        foto_subida=foto_subida,
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento
+    )
+
+
+def existe_registro_espacio(centro, edificio, espacio, elemento):
+    crear_tabla_inventario_aulas()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT id
+            FROM inventario_aulas
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+              AND elemento = ?
+            ORDER BY id DESC
+            LIMIT 1
+        """), (
+            centro,
+            edificio,
+            espacio,
+            elemento
+        ))
+
+        fila = cursor.fetchone()
+        return fila[0] if fila else None
+
+    except Exception:
+        return None
+
+    finally:
+        conn.close()
+
+
+# Compatibilidad antigua
+def existe_registro_aula(centro, edificio, espacio, elemento):
+    return existe_registro_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento
+    )
+
+
+def actualizar_inventario_espacio(
+    id_reg,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    crear_tabla_inventario_aulas()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET fecha_revision = ?,
+                cantidad = ?,
+                estado = ?,
+                ancho = ?,
+                alto = ?,
+                fondo = ?,
+                unidad = ?,
+                observaciones = ?,
+                foto = ?,
+                operario = ?
+            WHERE id = ?
+        """), (
+            hoy(),
+            cantidad,
+            estado,
+            ancho,
+            alto,
+            fondo,
+            unidad,
+            observaciones,
+            foto,
+            operario,
+            id_reg
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+# Compatibilidad antigua
+def actualizar_inventario_aula(
+    id_reg,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    return actualizar_inventario_espacio(
+        id_reg=id_reg,
+        cantidad=cantidad,
+        estado=estado,
+        ancho=ancho,
+        alto=alto,
+        fondo=fondo,
+        unidad=unidad,
+        observaciones=observaciones,
+        foto=foto,
+        operario=operario
+    )
 
 
 def guardar_inventario_aula(
@@ -68,14 +273,38 @@ def guardar_inventario_aula(
     foto,
     operario
 ):
+    """
+    Función antigua. Se mantiene para no romper pantallas existentes.
+    Realmente guarda inventario de cualquier espacio.
+    """
+
     crear_tabla_inventario_aulas()
 
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO inventario_aulas (
-            fecha_revision,
+    try:
+        cursor.execute(_sql("""
+            INSERT INTO inventario_aulas (
+                fecha_revision,
+                centro,
+                edificio,
+                espacio,
+                elemento,
+                cantidad,
+                estado,
+                ancho,
+                alto,
+                fondo,
+                unidad,
+                observaciones,
+                foto,
+                operario,
+                fecha_creacion
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """), (
+            hoy(),
             centro,
             edificio,
             espacio,
@@ -89,30 +318,111 @@ def guardar_inventario_aula(
             observaciones,
             foto,
             operario,
-            fecha_creacion
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        hoy(),
-        centro,
-        edificio,
-        espacio,
-        elemento,
-        cantidad,
-        estado,
-        ancho,
-        alto,
-        fondo,
-        unidad,
-        observaciones,
-        foto,
-        operario,
-        ahora()
-    ))
+            ahora()
+        ))
 
-    conn.commit()
-    conn.close()
-    return True
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+def guardar_o_actualizar_espacio(
+    centro,
+    edificio,
+    espacio,
+    elemento,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    crear_tabla_inventario_aulas()
+
+    elemento = str(elemento or "").strip()
+
+    if not centro or not edificio or not espacio or not elemento:
+        return False
+
+    id_existente = existe_registro_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento
+    )
+
+    if id_existente:
+        return actualizar_inventario_espacio(
+            id_reg=id_existente,
+            cantidad=cantidad,
+            estado=estado,
+            ancho=ancho,
+            alto=alto,
+            fondo=fondo,
+            unidad=unidad,
+            observaciones=observaciones,
+            foto=foto,
+            operario=operario
+        )
+
+    return guardar_inventario_aula(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento,
+        cantidad=cantidad,
+        estado=estado,
+        ancho=ancho,
+        alto=alto,
+        fondo=fondo,
+        unidad=unidad,
+        observaciones=observaciones,
+        foto=foto,
+        operario=operario
+    )
+
+
+# Compatibilidad antigua
+def guardar_o_actualizar_aula(
+    centro,
+    edificio,
+    espacio,
+    elemento,
+    cantidad,
+    estado,
+    ancho,
+    alto,
+    fondo,
+    unidad,
+    observaciones,
+    foto,
+    operario
+):
+    return guardar_o_actualizar_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio,
+        elemento=elemento,
+        cantidad=cantidad,
+        estado=estado,
+        ancho=ancho,
+        alto=alto,
+        fondo=fondo,
+        unidad=unidad,
+        observaciones=observaciones,
+        foto=foto,
+        operario=operario
+    )
 
 
 def obtener_inventario_aulas():
@@ -121,7 +431,7 @@ def obtener_inventario_aulas():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         SELECT
             id,
             fecha_revision,
@@ -141,20 +451,20 @@ def obtener_inventario_aulas():
             fecha_creacion
         FROM inventario_aulas
         ORDER BY fecha_creacion DESC
-    """)
+    """))
 
     datos = cursor.fetchall()
     conn.close()
     return datos
 
 
-def obtener_inventario_por_aula(centro, edificio, espacio):
+def obtener_inventario_por_espacio(centro, edificio, espacio):
     crear_tabla_inventario_aulas()
 
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(_sql("""
         SELECT
             id,
             fecha_revision,
@@ -173,11 +483,11 @@ def obtener_inventario_por_aula(centro, edificio, espacio):
             operario,
             fecha_creacion
         FROM inventario_aulas
-        WHERE centro = %s
-          AND edificio = %s
-          AND espacio = %s
+        WHERE centro = ?
+          AND edificio = ?
+          AND espacio = ?
         ORDER BY elemento ASC, fecha_creacion DESC
-    """, (
+    """), (
         centro,
         edificio,
         espacio
@@ -188,8 +498,17 @@ def obtener_inventario_por_aula(centro, edificio, espacio):
     return datos
 
 
-def obtener_elementos_aula_para_revision(centro, edificio, espacio):
-    inventario = obtener_inventario_por_aula(centro, edificio, espacio)
+# Compatibilidad antigua
+def obtener_inventario_por_aula(centro, edificio, espacio):
+    return obtener_inventario_por_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+
+def obtener_elementos_espacio_para_revision(centro, edificio, espacio):
+    inventario = obtener_inventario_por_espacio(centro, edificio, espacio)
 
     if inventario:
         elementos = []
@@ -217,18 +536,41 @@ def obtener_elementos_aula_para_revision(centro, edificio, espacio):
         if elementos:
             return elementos
 
-    return ELEMENTOS_BASE_AULA
+    return ELEMENTOS_BASE_ESPACIO
 
 
-def eliminar_elemento_inventario_aula(id_elemento):
+# Compatibilidad antigua
+def obtener_elementos_aula_para_revision(centro, edificio, espacio):
+    return obtener_elementos_espacio_para_revision(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+
+def eliminar_elemento_inventario_espacio(id_elemento):
+    crear_tabla_inventario_aulas()
+
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        DELETE FROM inventario_aulas
-        WHERE id = %s
-    """, (id_elemento,))
+    try:
+        cursor.execute(_sql("""
+            DELETE FROM inventario_aulas
+            WHERE id = ?
+        """), (id_elemento,))
 
-    conn.commit()
-    conn.close()
-    return True
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+# Compatibilidad antigua
+def eliminar_elemento_inventario_aula(id_elemento):
+    return eliminar_elemento_inventario_espacio(id_elemento)
