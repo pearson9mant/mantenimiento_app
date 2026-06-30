@@ -605,3 +605,43 @@ def eliminar_inventario_espacio(centro, edificio, espacio):
 # Compatibilidad antigua
 def eliminar_elemento_inventario_aula(id_elemento):
     return eliminar_elemento_inventario_espacio(id_elemento)
+
+def guardar_correctivo_inventario(
+    id_elemento,
+    numero_ot,
+    fecha_correctivo=None
+):
+    """
+    Guarda la OT correctiva asociada a un elemento del inventario.
+    Así evitamos crear varias OT para el mismo problema.
+    """
+
+    crear_tabla_inventario_aulas()
+
+    if not fecha_correctivo:
+        fecha_correctivo = ahora()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET numero_ot_correctiva = ?,
+                fecha_correctivo = ?
+            WHERE id = ?
+        """), (
+            numero_ot,
+            fecha_correctivo,
+            id_elemento
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
