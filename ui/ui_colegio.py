@@ -5,6 +5,12 @@ from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
 from modules.inventario import obtener_materiales_para_select
 
+from ui.ui_inventario_aulas import (
+    guardar_o_actualizar_aula,
+    guardar_foto_aula,
+    ELEMENTOS_RAPIDOS_AULA,
+)
+
 from modules.ficha_espacio import (
     obtener_resumen_ficha_espacio,
     obtener_actuaciones_espacio,
