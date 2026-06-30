@@ -201,7 +201,10 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.error("No se pudo actualizar el elemento.")
 
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
-                st.warning("Este elemento está marcado como incidencia. El siguiente paso será crear correctivo automático desde aquí.")
+                st.warning(
+                    "Este elemento está marcado como incidencia. "
+                    "El siguiente paso será crear correctivo automático desde aquí."
+                )
 
 
 def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario, clave_base):
@@ -211,6 +214,8 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
         st.markdown("### 🚀 Crear inventario inicial")
     else:
         st.markdown("### ➕ Añadir nuevo elemento")
+
+    key_mostrar_form = f"estado_mostrar_form_add_{clave_base}"
 
     if "inventario_temp" not in st.session_state:
         st.session_state["inventario_temp"] = {}
@@ -232,17 +237,17 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
         st.markdown("---")
 
     mostrar_formulario = st.session_state.get(
-        f"mostrar_form_add_{clave_base}",
+        key_mostrar_form,
         not elementos_temp
     )
 
     if not mostrar_formulario:
         if st.button(
             "➕ Añadir otro elemento",
-            key=f"mostrar_form_add_{clave_base}",
+            key=f"btn_mostrar_form_add_{clave_base}",
             use_container_width=True
         ):
-            st.session_state[f"mostrar_form_add_{clave_base}"] = True
+            st.session_state[key_mostrar_form] = True
             st.rerun()
 
     if mostrar_formulario:
@@ -338,7 +343,7 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
                     })
 
                     st.session_state["inventario_temp"][clave_base] = elementos_temp
-                    st.session_state[f"mostrar_form_add_{clave_base}"] = False
+                    st.session_state[key_mostrar_form] = False
                     st.success("Elemento añadido a la lista.")
                     st.rerun()
 
@@ -383,7 +388,7 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
 
                 if guardados > 0:
                     st.session_state["inventario_temp"][clave_base] = []
-                    st.session_state[f"mostrar_form_add_{clave_base}"] = True
+                    st.session_state[key_mostrar_form] = True
                     st.success(f"Inventario actualizado. Elementos guardados: {guardados}")
                     st.rerun()
                 else:
@@ -396,7 +401,7 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
                 use_container_width=True
             ):
                 st.session_state["inventario_temp"][clave_base] = []
-                st.session_state[f"mostrar_form_add_{clave_base}"] = True
+                st.session_state[key_mostrar_form] = True
                 st.rerun()
 
 
