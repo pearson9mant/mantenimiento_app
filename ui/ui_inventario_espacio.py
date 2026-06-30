@@ -7,7 +7,7 @@ from modules.inventario_aulas import (
     guardar_foto_espacio,
     eliminar_inventario_espacio,
 )
-
+from modules.ordenes import crear_correctiva_desde_ot
 
 def _clave(centro, edificio, planta, espacio):
     return (
