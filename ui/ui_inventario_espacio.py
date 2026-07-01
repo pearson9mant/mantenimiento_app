@@ -369,28 +369,11 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
 
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
                 if numero_ot_correctiva:
-                    st.warning(f"🟠 Ya existe OT correctiva asociada: {numero_ot_correctiva}")
-                
-                    confirmar_liberar = st.checkbox(
-                        "Confirmo que el correctivo está resuelto",
-                        key=f"confirmar_liberar_correctivo_{clave_base}_{id_inv}"
+                    st.warning(
+                        f"🟠 Correctivo pendiente\n\n"
+                        f"OT asociada: {numero_ot_correctiva}\n\n"
+                        "El elemento se desbloqueará automáticamente cuando esta OT se finalice."
                     )
-                
-                    if st.button(
-                        "✅ Liberar correctivo resuelto",
-                        key=f"liberar_correctivo_{clave_base}_{id_inv}",
-                        use_container_width=True
-                    ):
-                        if not confirmar_liberar:
-                            st.warning("Marca primero la confirmación.")
-                        else:
-                            ok_liberar = limpiar_correctivo_inventario(id_inv)
-                
-                            if ok_liberar:
-                                st.success("Correctivo liberado. Ahora puedes actualizar el estado del elemento.")
-                                st.rerun()
-                            else:
-                                st.error("No se pudo liberar el correctivo.")
                 
                 else:
                     st.warning("Este elemento necesita correctivo.")
