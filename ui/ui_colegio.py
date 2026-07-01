@@ -7,19 +7,25 @@ from ui.ui_inventario_espacio import mostrar_inventario_espacio
 from modules.inventario import obtener_materiales_para_select
 
 from modules.ficha_espacio import (
-    obtener_resumen_ficha_espacio,
     obtener_actuaciones_espacio,
-    obtener_inventario_espacio,
     obtener_preventivos_espacio,
     obtener_historial_tecnico_espacio,
 )
 
+
+def _clave_ficha(centro, edificio, planta, espacio):
+    return (
+        f"{centro}_{edificio}_{planta}_{espacio}"
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(":", "_")
+    )
+
+
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
-    st.caption(
-        "Navegación por centro, edificio, planta y espacio. "
-        "Todo pensado para móvil y trabajo diario."
-    )
+    st.caption("Selecciona un espacio. La ficha se cargará solo al abrirla.")
 
     mostrar_arbol_colegio()
 
@@ -37,28 +43,47 @@ def pantalla_colegio():
 
 
 def ficha_espacio_basica(centro, edificio, planta, espacio):
+    clave = _clave_ficha(centro, edificio, planta, espacio)
+
     estado = obtener_estado_espacio(centro, edificio, espacio)
     icono = icono_estado_espacio(estado)
-
-    resumen = obtener_resumen_ficha_espacio(
-        centro=centro,
-        edificio=edificio,
-        espacio=espacio
-    )
 
     st.markdown(f"### {icono} {espacio}")
     st.caption(f"{centro} · {edificio} · {planta}")
 
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric("Actuaciones", resumen["actuaciones_abiertas"])
-    c2.metric("Inventario", resumen["inventario"])
-    c3.metric("Preventivos", resumen["preventivos"])
-    c4.metric("Historial", resumen["historial"])
+    if st.button("❌ Cerrar ficha", key=f"cerrar_ficha_{clave}", use_container_width=True):
+        st.session_state["colegio_ficha_seleccionada"] = None
+        st.rerun()
 
     st.markdown("---")
 
-    with st.expander(f"📌 Actuaciones ({resumen['actuaciones_abiertas']})", expanded=False):
+    c1, c2 = st.columns(2)
+
+    with c1:
+        if st.button("📌 Actuaciones", key=f"ver_actuaciones_{clave}", use_container_width=True):
+            st.session_state[f"bloque_ficha_{clave}"] = "actuaciones"
+            st.rerun()
+
+        if st.button("📦 Inventario", key=f"ver_inventario_{clave}", use_container_width=True):
+            st.session_state[f"bloque_ficha_{clave}"] = "inventario"
+            st.rerun()
+
+    with c2:
+        if st.button("📅 Preventivos", key=f"ver_preventivos_{clave}", use_container_width=True):
+            st.session_state[f"bloque_ficha_{clave}"] = "preventivos"
+            st.rerun()
+
+        if st.button("📋 Historial", key=f"ver_historial_{clave}", use_container_width=True):
+            st.session_state[f"bloque_ficha_{clave}"] = "historial"
+            st.rerun()
+
+    bloque = st.session_state.get(f"bloque_ficha_{clave}", "")
+
+    st.markdown("---")
+
+    if bloque == "actuaciones":
+        st.markdown("### 📌 Actuaciones")
+
         actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
 
         if not actuaciones:
@@ -96,7 +121,9 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                     modo="colegio"
                 )
 
-    with st.expander("📦 Inventario del espacio", expanded=False):
+    elif bloque == "inventario":
+        st.markdown("### 📦 Inventario del espacio")
+
         mostrar_inventario_espacio(
             centro=centro,
             edificio=edificio,
@@ -104,9 +131,9 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             espacio=espacio
         )
 
-   
+    elif bloque == "preventivos":
+        st.markdown("### 📅 Preventivos")
 
-    with st.expander(f"📅 Preventivos ({resumen['preventivos']})", expanded=False):
         preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
 
         if not preventivos:
@@ -116,14 +143,15 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
 
                 st.markdown(
-                    f"**{fecha or '-'}** · {estado_prev or '-'} · "
-                    f"{operario or '-'}"
+                    f"**{fecha or '-'}** · {estado_prev or '-'} · {operario or '-'}"
                 )
 
                 if observaciones:
                     st.caption(observaciones)
 
-    with st.expander(f"📋 Historial ({resumen['historial']})", expanded=False):
+    elif bloque == "historial":
+        st.markdown("### 📋 Historial técnico")
+
         historial = obtener_historial_tecnico_espacio(centro, edificio, espacio)
 
         if not historial:
@@ -149,16 +177,13 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 ) = h
 
                 st.markdown(
-                    f"**{fecha or '-'}** · "
-                    f"{tipo or '-'} · "
-                    f"{area or '-'} · "
-                    f"OT `{numero_ot or '-'}`"
+                    f"**{fecha or '-'}** · {tipo or '-'} · {area or '-'} · OT `{numero_ot or '-'}`"
                 )
 
                 st.caption(descripcion or "")
 
-    with st.expander("📸 Fotografías", expanded=False):
-        st.info("Aquí mostraremos las fotos asociadas al espacio.")
+    else:
+        st.info("Elige qué quieres abrir de este espacio.")
 
 
 
