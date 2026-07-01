@@ -278,8 +278,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 key=f"guardar_ficha_tecnica_{clave_base}_{id_inv}",
                 use_container_width=True
             ):
-                ok_activo = actualizar_datos_activo_espacio(
-                    id_elemento=id_inv,
+                ok_activo = guardar_o_actualizar_activo(
+                    id_inventario=id_inv,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    elemento=elemento,
                     fabricante=fabricante_nuevo,
                     modelo=modelo_nuevo,
                     numero_serie=numero_serie_nuevo,
