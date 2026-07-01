@@ -2,6 +2,7 @@ from database.db import conectar, _sql
 
 
 CATALOGO_BASE_AULAS = [
+    # Mobiliario
     ("Mobiliario", "Silla alumno", "Equipamiento"),
     ("Mobiliario", "Silla profesor", "Equipamiento"),
     ("Mobiliario", "Mesa alumno", "Equipamiento"),
@@ -9,13 +10,23 @@ CATALOGO_BASE_AULAS = [
     ("Mobiliario", "Armario", "Equipamiento"),
     ("Mobiliario", "Estantería", "Equipamiento"),
     ("Mobiliario", "Papelera", "Equipamiento"),
+    ("Mobiliario", "Perchero", "Equipamiento"),
 
+    # Electricidad
     ("Electricidad", "Iluminación", "Electricidad"),
     ("Electricidad", "Luminaria LED", "Electricidad"),
+    ("Electricidad", "Tubo LED", "Electricidad"),
+    ("Electricidad", "Panel LED", "Electricidad"),
     ("Electricidad", "Interruptor", "Electricidad"),
+    ("Electricidad", "Conmutador", "Electricidad"),
+    ("Electricidad", "Pulsador", "Electricidad"),
     ("Electricidad", "Enchufe", "Electricidad"),
     ("Electricidad", "Canaleta", "Electricidad"),
+    ("Electricidad", "Cuadro eléctrico", "Electricidad"),
+    ("Electricidad", "Magnetotérmico", "Electricidad"),
+    ("Electricidad", "Diferencial", "Electricidad"),
 
+    # Informática / audiovisual
     ("Informática", "Ordenador", "Informática"),
     ("Informática", "Monitor", "Informática"),
     ("Informática", "Proyector", "Informática"),
@@ -25,27 +36,85 @@ CATALOGO_BASE_AULAS = [
     ("Informática", "Router / Switch", "Informática"),
     ("Informática", "Punto de red", "Informática"),
 
+    # Carpintería
     ("Carpintería", "Puerta", "Carpintería"),
+    ("Carpintería", "Puerta cortafuegos", "Carpintería"),
     ("Carpintería", "Maneta", "Carpintería"),
     ("Carpintería", "Cerradura", "Carpintería"),
+    ("Carpintería", "Bombín", "Carpintería"),
     ("Carpintería", "Cierrapuertas", "Carpintería"),
+    ("Carpintería", "Bisagra", "Carpintería"),
     ("Carpintería", "Ventana", "Carpintería"),
     ("Carpintería", "Persiana", "Carpintería"),
     ("Carpintería", "Cortina", "Carpintería"),
+    ("Carpintería", "Cristal", "Carpintería"),
 
+    # Construcción
+    ("Construcción", "Pared", "Construcción"),
+    ("Construcción", "Techo", "Construcción"),
+    ("Construcción", "Suelo", "Construcción"),
+    ("Construcción", "Rodapié", "Construcción"),
+    ("Construcción", "Escalera", "Construcción"),
+    ("Construcción", "Barandilla", "Construcción"),
+
+    # Climatización
     ("Climatización", "Radiador", "Climatización"),
     ("Climatización", "Split", "Climatización"),
+    ("Climatización", "Fan-coil", "Climatización"),
     ("Climatización", "Termostato", "Climatización"),
+    ("Climatización", "Rejilla ventilación", "Climatización"),
 
+    # Fontanería / WC
     ("Fontanería", "Lavabo", "Fontanería"),
     ("Fontanería", "Grifo", "Fontanería"),
     ("Fontanería", "Desagüe", "Fontanería"),
+    ("Fontanería", "Sifón", "Fontanería"),
     ("Fontanería", "WC", "Fontanería"),
+    ("Fontanería", "Inodoro", "Fontanería"),
+    ("Fontanería", "Urinario", "Fontanería"),
+    ("Fontanería", "Ducha", "Fontanería"),
+    ("Fontanería", "Plato de ducha", "Fontanería"),
+    ("Fontanería", "Bañera", "Fontanería"),
+    ("Fontanería", "Mampara", "Fontanería"),
+    ("Fontanería", "Fluxor", "Fontanería"),
+    ("Fontanería", "Llave de paso", "Fontanería"),
 
+    # Complementos WC
+    ("Complementos WC", "Espejo", "Equipamiento"),
+    ("Complementos WC", "Dispensador de jabón", "Equipamiento"),
+    ("Complementos WC", "Secamanos", "Electricidad"),
+    ("Complementos WC", "Portarrollos", "Equipamiento"),
+    ("Complementos WC", "Escobillero", "Equipamiento"),
+
+    # Seguridad / PCI
     ("Seguridad", "Extintor", "Seguridad"),
+    ("Seguridad", "BIE", "Seguridad"),
     ("Seguridad", "Luz emergencia", "Electricidad"),
     ("Seguridad", "Detector humo", "Seguridad"),
+    ("Seguridad", "Pulsador alarma", "Seguridad"),
+    ("Seguridad", "Señalización", "Seguridad"),
 
+    # Cocina
+    ("Cocina", "Fregadero", "Fontanería"),
+    ("Cocina", "Lavavajillas", "Equipamiento"),
+    ("Cocina", "Campana extractora", "Climatización"),
+    ("Cocina", "Horno", "Equipamiento"),
+    ("Cocina", "Cocina industrial", "Equipamiento"),
+    ("Cocina", "Nevera", "Equipamiento"),
+    ("Cocina", "Congelador", "Equipamiento"),
+
+    # ACS / Legionella
+    ("ACS / Legionella", "Acumulador ACS", "ACS"),
+    ("ACS / Legionella", "Depósito", "ACS"),
+    ("ACS / Legionella", "Bomba", "ACS"),
+    ("ACS / Legionella", "Bomba recirculación", "ACS"),
+    ("ACS / Legionella", "Válvula", "Fontanería"),
+    ("ACS / Legionella", "Válvula mezcladora", "ACS"),
+    ("ACS / Legionella", "Válvula termostática", "ACS"),
+    ("ACS / Legionella", "Intercambiador", "ACS"),
+    ("ACS / Legionella", "Grupo de presión", "Fontanería"),
+
+    # Otros
     ("Otros", "Otro", "Equipamiento"),
 ]
 
