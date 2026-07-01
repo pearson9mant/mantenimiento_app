@@ -211,28 +211,28 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     st.markdown(f"### {icono} {espacio}")
     st.caption(f"{centro} · {edificio} · {planta}")
 
-        resumen = obtener_cabecera_inteligente_espacio(
-            centro=centro,
-            edificio=edificio,
-            espacio=espacio
+    resumen = obtener_cabecera_inteligente_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+    if resumen["estado_global"] == "Atención":
+        st.warning("🔴 Este espacio requiere atención.")
+    else:
+        st.success("🟢 Espacio sin avisos pendientes.")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Trabajos", resumen["trabajos"])
+    c2.metric("Inventario", resumen["inventario"])
+    c3.metric("Preventivos", resumen["preventivos"])
+    c4.metric("Correctivos", resumen["correctivos_pendientes"])
+
+    if resumen["elementos_mal"] > 0:
+        st.error(
+            f"Hay {resumen['elementos_mal']} elemento(s) del inventario en estado Dañado/Falta/Retirar."
         )
-    
-        if resumen["estado_global"] == "Atención":
-            st.warning("🔴 Este espacio requiere atención.")
-        else:
-            st.success("🟢 Espacio sin avisos pendientes.")
-    
-        c1, c2, c3, c4 = st.columns(4)
-    
-        c1.metric("Trabajos", resumen["trabajos"])
-        c2.metric("Inventario", resumen["inventario"])
-        c3.metric("Preventivos", resumen["preventivos"])
-        c4.metric("Correctivos", resumen["correctivos_pendientes"])
-    
-        if resumen["elementos_mal"] > 0:
-            st.error(
-                f"Hay {resumen['elementos_mal']} elemento(s) del inventario en estado Dañado/Falta/Retirar."
-            )
 
     if st.button(
         "❌ Cerrar ficha",
