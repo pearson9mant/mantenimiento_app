@@ -14,8 +14,6 @@ from modules.ficha_espacio import (
     obtener_historial_tecnico_espacio,
 )
 
-
-
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption(
@@ -24,6 +22,18 @@ def pantalla_colegio():
     )
 
     mostrar_arbol_colegio()
+
+    ficha = st.session_state.get("colegio_ficha_seleccionada")
+
+    if ficha:
+        st.markdown("---")
+
+        ficha_espacio_basica(
+            centro=ficha["centro"],
+            edificio=ficha["edificio"],
+            planta=ficha["planta"],
+            espacio=ficha["espacio"],
+        )
 
 
 def ficha_espacio_basica(centro, edificio, planta, espacio):
