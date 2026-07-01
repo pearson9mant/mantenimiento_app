@@ -2164,6 +2164,162 @@ def limpiar_puntos_duplicados_legionella():
 
     return len(ids)
 
+def obtener_resumen_legionella_espacio(centro, edificio, espacio):
+    """
+    Resumen seguro de Legionella para el motor inteligente del espacio.
+    No modifica datos. Solo lee puntos, tareas, registros e incidencias.
+    """
+
+    resumen = {
+        "aplica": False,
+        "estado": "No aplica",
+        "color": "gris",
+        "puntos": 0,
+        "tareas": 0,
+        "incidencias_abiertas": 0,
+        "ultimo_control": "",
+        "proximo_control": "",
+        "diagnostico": [],
+        "recomendaciones": [],
+    }
+
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
+    espacio = str(espacio or "").strip()
+
+    if not centro or not edificio or not espacio:
+        return resumen
+
+    try:
+        df_puntos = leer_df("""
+            SELECT id, centro, edificio, instalacion, tipo_punto,
+                   tipo_control_punto, nombre_punto, ubicacion,
+                   ubicacion_exacta, activo
+            FROM legionella_puntos
+            WHERE centro = ?
+              AND edificio = ?
+              AND activo = 1
+              AND (
+                    TRIM(COALESCE(nombre_punto, '')) = ?
+                 OR TRIM(COALESCE(ubicacion, '')) = ?
+                 OR TRIM(COALESCE(ubicacion_exacta, '')) = ?
+              )
+            ORDER BY instalacion, nombre_punto
+        """, (
+            centro,
+            edificio,
+            espacio,
+            espacio,
+            espacio,
+        ))
+    except Exception:
+        return resumen
+
+    if df_puntos.empty:
+        return resumen
+
+    nombres_puntos = (
+        df_puntos["nombre_punto"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .tolist()
+    )
+
+    resumen["aplica"] = True
+    resumen["puntos"] = len(df_puntos)
+
+    placeholders = ",".join(["?"] * len(nombres_puntos))
+
+    try:
+        df_tareas = leer_df(f"""
+            SELECT id, punto, tarea, proxima_fecha, activo
+            FROM legionella_tareas
+            WHERE centro = ?
+              AND edificio = ?
+              AND activo = 1
+              AND punto IN ({placeholders})
+            ORDER BY proxima_fecha ASC
+        """, tuple([centro, edificio] + nombres_puntos))
+    except Exception:
+        df_tareas = pd.DataFrame()
+
+    try:
+        df_inc = leer_df(f"""
+            SELECT id, punto, tarea, descripcion, estado, prioridad
+            FROM legionella_incidencias
+            WHERE centro = ?
+              AND edificio = ?
+              AND LOWER(COALESCE(estado, '')) NOT IN ('cerrada', 'cerrado', 'finalizada', 'finalizado')
+              AND punto IN ({placeholders})
+            ORDER BY id DESC
+        """, tuple([centro, edificio] + nombres_puntos))
+    except Exception:
+        df_inc = pd.DataFrame()
+
+    try:
+        df_reg = leer_df(f"""
+            SELECT fecha, punto, tarea, estado, resultado
+            FROM legionella_registros
+            WHERE centro = ?
+              AND edificio = ?
+              AND punto IN ({placeholders})
+            ORDER BY fecha DESC, id DESC
+        """, tuple([centro, edificio] + nombres_puntos))
+    except Exception:
+        df_reg = pd.DataFrame()
+
+    resumen["tareas"] = 0 if df_tareas.empty else len(df_tareas)
+    resumen["incidencias_abiertas"] = 0 if df_inc.empty else len(df_inc)
+
+    if not df_reg.empty:
+        resumen["ultimo_control"] = str(df_reg.iloc[0]["fecha"] or "")
+
+    if not df_tareas.empty:
+        proxima = str(df_tareas.iloc[0]["proxima_fecha"] or "")
+        resumen["proximo_control"] = proxima
+
+    resumen["diagnostico"].append(
+        f"Legionella aplica en este espacio: {resumen['puntos']} punto(s) de control."
+    )
+
+    if resumen["tareas"] > 0:
+        resumen["diagnostico"].append(
+            f"{resumen['tareas']} control(es) planificados."
+        )
+    else:
+        resumen["diagnostico"].append(
+            "No hay controles planificados para estos puntos."
+        )
+
+    if resumen["ultimo_control"]:
+        resumen["diagnostico"].append(
+            f"Último control registrado: {resumen['ultimo_control']}."
+        )
+
+    if resumen["proximo_control"]:
+        resumen["diagnostico"].append(
+            f"Próximo control previsto: {resumen['proximo_control']}."
+        )
+
+    if resumen["incidencias_abiertas"] > 0:
+        resumen["estado"] = "Atención"
+        resumen["color"] = "rojo"
+        resumen["diagnostico"].append(
+            f"{resumen['incidencias_abiertas']} incidencia(s) Legionella abierta(s)."
+        )
+        resumen["recomendaciones"].append(
+            "Resolver las incidencias Legionella antes de cerrar el seguimiento del espacio."
+        )
+    else:
+        resumen["estado"] = "Correcto"
+        resumen["color"] = "verde"
+        resumen["recomendaciones"].append(
+            "Mantener la planificación preventiva de Legionella."
+        )
+
+    return resumen
+
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
     asegurar_columnas_clasificacion_legionella()
