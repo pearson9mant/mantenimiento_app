@@ -179,18 +179,18 @@ def mostrar_arbol_colegio():
                                 icono_estado = icono_estado_espacio(estado_espacio)
                                 icono_tipo = icono_tipo_espacio(tipo_espacio)
 
-                                with st.expander(
+                                if st.button(
                                     f"{icono_estado} {icono_tipo} {nombre_espacio}{texto_contador(total_espacio)}",
-                                    expanded=False
+                                    key=f"abrir_ficha_{centro}_{edificio}_{planta}_{nombre_espacio}",
+                                    use_container_width=True
                                 ):
-                                    from ui.ui_colegio import ficha_espacio_basica
-
-                                    ficha_espacio_basica(
-                                        centro=centro,
-                                        edificio=edificio,
-                                        planta=planta,
-                                        espacio=nombre_espacio
-                                    )
+                                    st.session_state["colegio_ficha_seleccionada"] = {
+                                        "centro": centro,
+                                        "edificio": edificio,
+                                        "planta": planta,
+                                        "espacio": nombre_espacio,
+                                    }
+                                    st.rerun()
 
     if not hay_incidencias:
         st.success("No hay incidencias abiertas en tus centros.")
