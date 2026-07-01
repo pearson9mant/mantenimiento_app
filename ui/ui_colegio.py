@@ -217,31 +217,26 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         espacio=espacio
     )
 
-    if resumen["estado_global"] == "Atención":
-        st.warning("🔴 Este espacio requiere atención.")
+    if resumen["color"] == "verde":
+        st.success(f"🟢 {resumen['estado_global']} · {resumen['diagnostico']}")
+    elif resumen["color"] == "amarillo":
+        st.warning(f"🟡 {resumen['estado_global']} · {resumen['diagnostico']}")
     else:
-        st.success("🟢 Espacio sin avisos pendientes.")
+        st.error(f"🔴 {resumen['estado_global']} · {resumen['diagnostico']}")
+
+    st.markdown("#### 🧠 Diagnóstico automático")
+    for motivo in resumen["motivos"]:
+        st.markdown(f"• {motivo}")
+
+    st.markdown("#### 💡 Recomendación")
+    for recomendacion in resumen["recomendaciones"]:
+        st.markdown(f"• {recomendacion}")
 
     c1, c2, c3, c4 = st.columns(4)
-
     c1.metric("Trabajos", resumen["trabajos"])
-    c2.metric("Inventario", resumen["inventario"])
-    c3.metric("Preventivos", resumen["preventivos"])
+    c2.metric("Activos", resumen["activos"])
+    c3.metric("Dañados", resumen["activos_danados"])
     c4.metric("Correctivos", resumen["correctivos_pendientes"])
-
-    if resumen["elementos_mal"] > 0:
-        st.error(
-            f"Hay {resumen['elementos_mal']} elemento(s) del inventario en estado Dañado/Falta/Retirar."
-        )
-
-    if st.button(
-        "❌ Cerrar ficha",
-        key=f"cerrar_ficha_{clave}",
-        use_container_width=True
-    ):
-        st.session_state["colegio_ficha_seleccionada"] = None
-        st.session_state[f"bloque_ficha_{clave}"] = ""
-        st.rerun()
 
     st.markdown("---")
 
@@ -291,7 +286,7 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
 
         if not actuaciones:
-            st.info("No hay actuaciones abiertas en este espacio.")
+            st.info("No hay trabajos abiertos en este espacio.")
         else:
             materiales_select = obtener_materiales_para_select()
 
@@ -337,7 +332,6 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     elif bloque == "inventario":
         st.markdown("### 📦 Inventario del espacio")
-
         mostrar_inventario_espacio(
             centro=centro,
             edificio=edificio,
@@ -354,19 +348,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             st.info("No hay preventivos registrados en este espacio.")
         else:
             for p in preventivos:
-                (
-                    id_prev,
-                    fecha,
-                    operario,
-                    estado_prev,
-                    observaciones,
-                    numero_ot_preventiva,
-                ) = p
+                id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
 
                 st.markdown(
-                    f"**{fecha or '-'}** · "
-                    f"{estado_prev or '-'} · "
-                    f"{operario or '-'}"
+                    f"**{fecha or '-'}** · {estado_prev or '-'} · {operario or '-'}"
                 )
 
                 if observaciones:
@@ -400,16 +385,23 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 ) = h
 
                 st.markdown(
-                    f"**{fecha or '-'}** · "
-                    f"{tipo or '-'} · "
-                    f"{area or '-'} · "
-                    f"OT `{numero_ot or '-'}`"
+                    f"**{fecha or '-'}** · {tipo or '-'} · {area or '-'} · OT `{numero_ot or '-'}`"
                 )
-
                 st.caption(descripcion or "")
 
     else:
         st.info("Elige qué quieres abrir de este espacio.")
+
+    st.markdown("---")
+
+    if st.button(
+        "❌ Cerrar ficha",
+        key=f"cerrar_ficha_{clave}",
+        use_container_width=True
+    ):
+        st.session_state["colegio_ficha_seleccionada"] = None
+        st.session_state[f"bloque_ficha_{clave}"] = ""
+        st.rerun()
 
 
 
