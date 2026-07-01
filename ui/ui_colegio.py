@@ -17,6 +17,7 @@ from modules.ficha_espacio import (
     obtener_actuaciones_espacio,
     obtener_preventivos_espacio,
     obtener_historial_tecnico_espacio,
+    obtener_cabecera_inteligente_espacio,
 )
 
 
