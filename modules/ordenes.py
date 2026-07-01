@@ -857,9 +857,12 @@ def finalizar_orden(id_orden, observaciones=""):
                 if match:
                     id_elemento_inv = int(match.group(1))
 
-                    from modules.inventario_aulas import limpiar_correctivo_inventario
+                    from modules.inventario_aulas import cerrar_correctivo_inventario
 
-                    limpiar_correctivo_inventario(id_elemento_inv)
+                    cerrar_correctivo_inventario(
+                        id_elemento=id_elemento_inv,
+                        estado_final="Correcto"
+                    )
 
         except Exception:
             pass
