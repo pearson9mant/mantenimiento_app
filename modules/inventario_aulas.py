@@ -738,3 +738,37 @@ def limpiar_correctivo_inventario(id_elemento):
 
     finally:
         conn.close()
+
+def cerrar_correctivo_inventario(id_elemento, estado_final="Correcto"):
+    """
+    Cierra el correctivo asociado al inventario y actualiza el estado del elemento.
+    Se ejecuta automáticamente al finalizar la OT.
+    """
+    crear_tabla_inventario_aulas()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET numero_ot_correctiva = '',
+                fecha_correctivo = '',
+                estado = ?,
+                fecha_revision = ?
+            WHERE id = ?
+        """), (
+            estado_final,
+            hoy(),
+            id_elemento
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
