@@ -225,7 +225,7 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     with c1:
         if st.button(
-            "📌 Actuaciones",
+            "📋 Trabajos del espacio"
             key=f"ver_actuaciones_{clave}",
             use_container_width=True
         ):
