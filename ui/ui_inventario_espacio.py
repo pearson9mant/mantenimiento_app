@@ -370,20 +370,42 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
                 if numero_ot_correctiva:
                     st.warning(f"🟠 Ya existe OT correctiva asociada: {numero_ot_correctiva}")
+                
+                    confirmar_liberar = st.checkbox(
+                        "Confirmo que el correctivo está resuelto",
+                        key=f"confirmar_liberar_correctivo_{clave_base}_{id_inv}"
+                    )
+                
+                    if st.button(
+                        "✅ Liberar correctivo resuelto",
+                        key=f"liberar_correctivo_{clave_base}_{id_inv}",
+                        use_container_width=True
+                    ):
+                        if not confirmar_liberar:
+                            st.warning("Marca primero la confirmación.")
+                        else:
+                            ok_liberar = limpiar_correctivo_inventario(id_inv)
+                
+                            if ok_liberar:
+                                st.success("Correctivo liberado. Ahora puedes actualizar el estado del elemento.")
+                                st.rerun()
+                            else:
+                                st.error("No se pudo liberar el correctivo.")
+                
                 else:
                     st.warning("Este elemento necesita correctivo.")
-
+                
                     descripcion_defecto = st.text_area(
                         "Descripción del correctivo",
                         value=f"{elemento} en estado {nuevo_estado}. {nuevas_obs}",
                         key=f"correctivo_desc_{clave_base}_{id_inv}"
                     )
-
+                
                     confirmar_correctivo = st.checkbox(
                         "Crear OT correctiva para este elemento",
                         key=f"crear_correctivo_inv_{clave_base}_{id_inv}"
                     )
-
+                
                     if st.button(
                         "🛠️ Crear correctivo",
                         key=f"btn_correctivo_inv_{clave_base}_{id_inv}",
@@ -404,19 +426,19 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                                 origen="INVENTARIO",
                                 solicitante="Inventario espacio",
                             )
-
+                
                             if ok:
                                 numero_ot_generada = (
                                     str(mensaje or "")
                                     .replace("Correctiva creada correctamente:", "")
                                     .strip()
                                 )
-
+                
                                 guardar_correctivo_inventario(
                                     id_elemento=id_inv,
                                     numero_ot=numero_ot_generada
                                 )
-
+                
                                 st.success(f"OT correctiva creada: {numero_ot_generada}")
                                 st.rerun()
                             else:
