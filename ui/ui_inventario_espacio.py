@@ -244,6 +244,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 key=f"guardar_edit_inv_{clave_base}_{id_inv}",
                 use_container_width=True
             ):
+                if numero_ot_correctiva and nuevo_estado == "Correcto":
+                    st.warning(
+                        "No puedes marcar este elemento como Correcto "
+                        "mientras tenga una OT correctiva asociada."
+                    )
+                    st.stop()
                 ok = guardar_o_actualizar_espacio(
                     centro=centro,
                     edificio=edificio,
