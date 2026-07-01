@@ -217,26 +217,33 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         espacio=espacio
     )
 
-    if resumen["color"] == "verde":
-        st.success(f"🟢 {resumen['estado_global']} · {resumen['diagnostico']}")
-    elif resumen["color"] == "amarillo":
-        st.warning(f"🟡 {resumen['estado_global']} · {resumen['diagnostico']}")
+    info = diagnosticar_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+    if info["color"] == "verde":
+        st.success(f"🟢 {info['estado']}")
     else:
-        st.error(f"🔴 {resumen['estado_global']} · {resumen['diagnostico']}")
+        st.error(f"🔴 {info['estado']}")
 
-    st.markdown("#### 🧠 Diagnóstico automático")
-    for motivo in resumen["motivos"]:
-        st.markdown(f"• {motivo}")
+    st.markdown("### 🧠 Asistente técnico")
 
-    st.markdown("#### 💡 Recomendación")
-    for recomendacion in resumen["recomendaciones"]:
-        st.markdown(f"• {recomendacion}")
+    st.markdown("**Situación actual**")
+
+    for linea in info["diagnostico"]:
+        st.markdown(f"• {linea}")
+
+    st.markdown("**Siguiente actuación**")
+    st.info(info["recomendacion"])
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Trabajos", resumen["trabajos"])
-    c2.metric("Activos", resumen["activos"])
-    c3.metric("Dañados", resumen["activos_danados"])
-    c4.metric("Correctivos", resumen["correctivos_pendientes"])
+
+    c1.metric("Trabajos", info["trabajos"])
+    c2.metric("Activos", info["activos"])
+    c3.metric("Dañados", info["danados"])
+    c4.metric("Correctivos", info["correctivos"])
 
     st.markdown("---")
 
