@@ -10,6 +10,7 @@ from modules.inventario_aulas import (
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
 )
+
 from modules.activos import (
     obtener_activo_por_inventario,
     guardar_o_actualizar_activo,
@@ -95,6 +96,52 @@ def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
             ):
                 st.session_state[key_confirmar] = False
                 st.rerun()
+
+
+def _obtener_datos_activo(id_inv):
+    activo = obtener_activo_por_inventario(id_inv)
+
+    if activo:
+        (
+            id_activo,
+            id_inventario_activo,
+            centro_activo,
+            edificio_activo,
+            espacio_activo,
+            elemento_activo,
+            fabricante_activo,
+            modelo_activo,
+            numero_serie_activo,
+            fecha_instalacion_activo,
+            proveedor_activo,
+            vida_util_activo,
+            coste_estimado_activo,
+            garantia_hasta_activo,
+            manual_pdf_activo,
+            observaciones_activo,
+            fecha_creacion_activo,
+            fecha_actualizacion_activo,
+        ) = activo
+
+        return {
+            "fabricante": fabricante_activo,
+            "modelo": modelo_activo,
+            "numero_serie": numero_serie_activo,
+            "fecha_instalacion": fecha_instalacion_activo,
+            "proveedor": proveedor_activo,
+            "vida_util_anios": vida_util_activo,
+            "coste_estimado": coste_estimado_activo,
+        }
+
+    return {
+        "fabricante": "",
+        "modelo": "",
+        "numero_serie": "",
+        "fecha_instalacion": "",
+        "proveedor": "",
+        "vida_util_anios": 0,
+        "coste_estimado": 0,
+    }
 
 
 def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base):
@@ -220,70 +267,51 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.error("No se pudo actualizar el elemento.")
 
             st.markdown("---")
-            activo = obtener_activo_por_inventario(id_inv)
-
-            if activo:
-                (
-                    id_activo,
-                    id_inventario_activo,
-                    centro_activo,
-                    edificio_activo,
-                    espacio_activo,
-                    elemento_activo,
-                    fabricante_activo,
-                    modelo_activo,
-                    numero_serie_activo,
-                    fecha_instalacion_activo,
-                    proveedor_activo,
-                    vida_util_activo,
-                    coste_estimado_activo,
-                    garantia_hasta_activo,
-                    manual_pdf_activo,
-                    observaciones_activo,
-                    fecha_creacion_activo,
-                    fecha_actualizacion_activo,
-                ) = activo
-            else:
-                fabricante_activo = ""
-                modelo_activo = ""
-                numero_serie_activo = ""
-                fecha_instalacion_activo = ""
-                proveedor_activo = ""
-                vida_util_activo = 0
-                coste_estimado_activo = 0
             st.markdown("### 🏷️ Ficha técnica del activo")
+
+            datos_activo = _obtener_datos_activo(id_inv)
+
+            try:
+                vida_util_valor = int(datos_activo["vida_util_anios"] or 0)
+            except Exception:
+                vida_util_valor = 0
+
+            try:
+                coste_estimado_valor = float(datos_activo["coste_estimado"] or 0)
+            except Exception:
+                coste_estimado_valor = 0.0
 
             t1, t2 = st.columns(2)
 
             with t1:
                 fabricante_nuevo = st.text_input(
                     "Fabricante",
-                    value=str(fabricante or ""),
+                    value=str(datos_activo["fabricante"] or ""),
                     key=f"activo_fabricante_{clave_base}_{id_inv}"
                 )
 
                 modelo_nuevo = st.text_input(
                     "Modelo",
-                    value=str(modelo or ""),
+                    value=str(datos_activo["modelo"] or ""),
                     key=f"activo_modelo_{clave_base}_{id_inv}"
                 )
 
                 numero_serie_nuevo = st.text_input(
                     "Nº de serie",
-                    value=str(numero_serie or ""),
+                    value=str(datos_activo["numero_serie"] or ""),
                     key=f"activo_serie_{clave_base}_{id_inv}"
                 )
 
             with t2:
                 proveedor_nuevo = st.text_input(
                     "Proveedor",
-                    value=str(proveedor or ""),
+                    value=str(datos_activo["proveedor"] or ""),
                     key=f"activo_proveedor_{clave_base}_{id_inv}"
                 )
 
                 fecha_instalacion_nueva = st.text_input(
                     "Fecha instalación",
-                    value=str(fecha_instalacion or ""),
+                    value=str(datos_activo["fecha_instalacion"] or ""),
                     placeholder="AAAA-MM-DD",
                     key=f"activo_fecha_inst_{clave_base}_{id_inv}"
                 )
@@ -292,7 +320,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     "Vida útil estimada (años)",
                     min_value=0,
                     step=1,
-                    value=int(vida_util_anios or 0),
+                    value=vida_util_valor,
                     key=f"activo_vida_{clave_base}_{id_inv}"
                 )
 
@@ -300,7 +328,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 "Coste estimado (€)",
                 min_value=0.0,
                 step=1.0,
-                value=float(coste_estimado or 0),
+                value=coste_estimado_valor,
                 key=f"activo_coste_{clave_base}_{id_inv}"
             )
 
