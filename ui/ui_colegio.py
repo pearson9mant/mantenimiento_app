@@ -61,7 +61,7 @@ def pantalla_colegio():
     edificio = st.selectbox(
         "🏫 Edificio",
         edificios,
-        key="colegio_rapido_edificio"
+        key=f"colegio_rapido_edificio_{centro}"
     )
 
     plantas = obtener_plantas_espacios(centro, edificio)
