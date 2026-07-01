@@ -183,3 +183,42 @@ def obtener_resumen_ficha_espacio(centro, edificio, espacio):
         "preventivos": 0,
         "historial": 0,
     }
+
+def obtener_cabecera_inteligente_espacio(centro, edificio, espacio):
+    actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
+    inventario = obtener_inventario_espacio(centro, edificio, espacio)
+    preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
+
+    total_trabajos = len(actuaciones)
+    total_inventario = len(inventario)
+    total_preventivos = len(preventivos)
+
+    elementos_mal = 0
+    correctivos_pendientes = 0
+
+    for item in inventario:
+        try:
+            estado = str(item[4] or "")
+            numero_ot_correctiva = str(item[12] or "")
+        except Exception:
+            continue
+
+        if estado in ["Dañado", "Falta", "Retirar"]:
+            elementos_mal += 1
+
+        if numero_ot_correctiva:
+            correctivos_pendientes += 1
+
+    estado_global = "Correcto"
+
+    if total_trabajos > 0 or elementos_mal > 0 or correctivos_pendientes > 0:
+        estado_global = "Atención"
+
+    return {
+        "estado_global": estado_global,
+        "trabajos": total_trabajos,
+        "inventario": total_inventario,
+        "preventivos": total_preventivos,
+        "elementos_mal": elementos_mal,
+        "correctivos_pendientes": correctivos_pendientes,
+    }
