@@ -9,6 +9,7 @@ from modules.inventario_aulas import (
     guardar_foto_espacio,
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
+    limpiar_correctivo_inventario,
 )
 
 from modules.activos import (
