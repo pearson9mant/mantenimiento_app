@@ -142,29 +142,36 @@ def pantalla_colegio():
         key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
     )
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1:
-        if st.button(
-            "🔵 Abrir ficha del espacio",
-            key="btn_abrir_ficha_colegio_rapido",
-            use_container_width=True
-        ):
+        if st.button("🔵 Abrir ficha del espacio", use_container_width=True):
             st.session_state["colegio_ficha_seleccionada"] = {
                 "centro": centro,
                 "edificio": edificio,
                 "planta": planta,
                 "espacio": espacio,
             }
+            st.session_state["bloque_ficha_" + _clave_ficha(centro, edificio, planta, espacio)] = ""
             st.session_state["colegio_ver_arbol"] = False
             st.rerun()
-
+    
     with c2:
-        if st.button(
-            "🌳 Ver árbol del colegio",
-            key="btn_ver_arbol_colegio",
-            use_container_width=True
-        ):
+        if st.button("📦 Inventario directo", use_container_width=True):
+            clave = _clave_ficha(centro, edificio, planta, espacio)
+    
+            st.session_state["colegio_ficha_seleccionada"] = {
+                "centro": centro,
+                "edificio": edificio,
+                "planta": planta,
+                "espacio": espacio,
+            }
+            st.session_state[f"bloque_ficha_{clave}"] = "inventario"
+            st.session_state["colegio_ver_arbol"] = False
+            st.rerun()
+    
+    with c3:
+        if st.button("🌳 Ver árbol", use_container_width=True):
             st.session_state["colegio_ver_arbol"] = not st.session_state.get(
                 "colegio_ver_arbol",
                 False
