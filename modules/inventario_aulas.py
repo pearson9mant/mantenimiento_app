@@ -709,3 +709,32 @@ def actualizar_datos_activo_espacio(
 
     finally:
         conn.close()
+
+def limpiar_correctivo_inventario(id_elemento):
+    """
+    Limpia la OT correctiva asociada a un elemento.
+    Se usa cuando el correctivo ya está resuelto.
+    """
+
+    crear_tabla_inventario_aulas()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE inventario_aulas
+            SET numero_ot_correctiva = '',
+                fecha_correctivo = ''
+            WHERE id = ?
+        """), (id_elemento,))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
