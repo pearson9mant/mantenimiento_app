@@ -152,7 +152,13 @@ def pantalla_colegio():
                 "planta": planta,
                 "espacio": espacio,
             }
-            st.session_state["bloque_ficha_" + _clave_ficha(centro, edificio, planta, espacio)] = ""
+            clave = _clave_ficha(centro, edificio, planta, espacio)
+
+            st.session_state[f"bloque_ficha_{clave}"] = (
+                "actuaciones"
+                if st.session_state.get("colegio_solo_incidencias", False)
+                else ""
+            )
             st.session_state["colegio_ver_arbol"] = False
             st.rerun()
     
