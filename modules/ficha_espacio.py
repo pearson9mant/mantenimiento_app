@@ -189,36 +189,65 @@ def obtener_cabecera_inteligente_espacio(centro, edificio, espacio):
     inventario = obtener_inventario_espacio(centro, edificio, espacio)
     preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
 
-    total_trabajos = len(actuaciones)
-    total_inventario = len(inventario)
-    total_preventivos = len(preventivos)
+    trabajos = len(actuaciones)
+    activos = len(inventario)
+    preventivos_total = len(preventivos)
 
-    elementos_mal = 0
+    activos_danados = 0
     correctivos_pendientes = 0
+
+    motivos = []
+    recomendaciones = []
 
     for item in inventario:
         try:
             estado = str(item[4] or "")
             numero_ot_correctiva = str(item[12] or "")
+            elemento = str(item[2] or "Elemento")
         except Exception:
             continue
 
         if estado in ["Dañado", "Falta", "Retirar"]:
-            elementos_mal += 1
+            activos_danados += 1
+            motivos.append(f"Hay un activo en estado {estado}: {elemento}.")
 
         if numero_ot_correctiva:
             correctivos_pendientes += 1
+            motivos.append(f"Existe un correctivo pendiente asociado a la OT {numero_ot_correctiva}.")
+            recomendaciones.append(f"Finalizar primero la OT {numero_ot_correctiva}.")
 
-    estado_global = "Correcto"
+    if trabajos > 0:
+        motivos.append(f"Hay {trabajos} trabajo(s) pendiente(s) en este espacio.")
+        recomendaciones.append("Revisar los trabajos abiertos del espacio.")
 
-    if total_trabajos > 0 or elementos_mal > 0 or correctivos_pendientes > 0:
-        estado_global = "Atención"
+    if preventivos_total > 0:
+        motivos.append(f"Hay {preventivos_total} preventivo(s) registrado(s).")
+
+    if trabajos == 0 and activos_danados == 0 and correctivos_pendientes == 0:
+        estado_global = "Excelente"
+        color = "verde"
+        diagnostico = "Espacio en condiciones correctas."
+        motivos.append("Sin trabajos pendientes.")
+        motivos.append("Sin activos dañados.")
+        recomendaciones.append("No es necesaria ninguna actuación inmediata.")
+    elif correctivos_pendientes > 0 or activos_danados > 0 or trabajos > 0:
+        estado_global = "Requiere intervención"
+        color = "rojo"
+        diagnostico = "Este espacio requiere atención."
+    else:
+        estado_global = "Requiere revisión"
+        color = "amarillo"
+        diagnostico = "Conviene revisar este espacio."
 
     return {
         "estado_global": estado_global,
-        "trabajos": total_trabajos,
-        "inventario": total_inventario,
-        "preventivos": total_preventivos,
-        "elementos_mal": elementos_mal,
+        "color": color,
+        "diagnostico": diagnostico,
+        "motivos": motivos,
+        "recomendaciones": recomendaciones,
+        "trabajos": trabajos,
+        "activos": activos,
+        "preventivos": preventivos_total,
+        "activos_danados": activos_danados,
         "correctivos_pendientes": correctivos_pendientes,
     }
