@@ -5,6 +5,7 @@ from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
 from ui.ui_inventario_espacio import mostrar_inventario_espacio
 from modules.inventario import obtener_materiales_para_select
+from modules.inteligencia import diagnosticar_espacio
 
 from modules.espacios import (
     obtener_centros_espacios,
