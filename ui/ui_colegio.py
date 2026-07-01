@@ -33,6 +33,7 @@ def _clave_ficha(centro, edificio, planta, espacio):
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Entrada rápida por centro, edificio, planta y espacio.")
+
     solo_incidencias = st.checkbox(
         "Mostrar solo espacios con incidencias",
         value=False,
@@ -45,7 +46,11 @@ def pantalla_colegio():
         st.warning("No hay espacios configurados.")
         return
 
-    centro = st.selectbox("🏢 Centro", centros, key="colegio_rapido_centro")
+    centro = st.selectbox(
+        "🏢 Centro",
+        centros,
+        key="colegio_rapido_centro"
+    )
 
     edificios = obtener_edificios_espacios(centro)
 
@@ -53,7 +58,11 @@ def pantalla_colegio():
         st.warning("No hay edificios configurados para este centro.")
         return
 
-    edificio = st.selectbox("🏫 Edificio", edificios, key="colegio_rapido_edificio")
+    edificio = st.selectbox(
+        "🏫 Edificio",
+        edificios,
+        key="colegio_rapido_edificio"
+    )
 
     plantas = obtener_plantas_espacios(centro, edificio)
 
@@ -61,21 +70,54 @@ def pantalla_colegio():
         st.warning("No hay plantas configuradas para este edificio.")
         return
 
-    planta = st.selectbox("📍 Planta", plantas, key="colegio_rapido_planta")
+    planta = st.selectbox(
+        "📍 Planta",
+        plantas,
+        key="colegio_rapido_planta"
+    )
 
     espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
+
+    if solo_incidencias:
+        from modules.colegio import (
+            obtener_ots_abiertas_por_centro,
+            contar_ots_espacio_rapido,
+        )
+
+        ots_abiertas = obtener_ots_abiertas_por_centro()
+
+        espacios_datos = [
+            e for e in espacios_datos
+            if contar_ots_espacio_rapido(
+                centro=centro,
+                espacio=e[0],
+                ots_abiertas=ots_abiertas
+            ) > 0
+        ]
+
     espacios = [e[0] for e in espacios_datos]
 
     if not espacios:
-        st.warning("No hay espacios configurados en esta planta.")
+        if solo_incidencias:
+            st.info("No hay espacios con incidencias en esta planta.")
+        else:
+            st.warning("No hay espacios configurados en esta planta.")
         return
 
-    espacio = st.selectbox("🚪 Espacio", espacios, key="colegio_rapido_espacio")
+    espacio = st.selectbox(
+        "🚪 Espacio",
+        espacios,
+        key="colegio_rapido_espacio"
+    )
 
     c1, c2 = st.columns(2)
 
     with c1:
-        if st.button("🔵 Abrir ficha del espacio", use_container_width=True):
+        if st.button(
+            "🔵 Abrir ficha del espacio",
+            key="btn_abrir_ficha_colegio_rapido",
+            use_container_width=True
+        ):
             st.session_state["colegio_ficha_seleccionada"] = {
                 "centro": centro,
                 "edificio": edificio,
@@ -86,7 +128,11 @@ def pantalla_colegio():
             st.rerun()
 
     with c2:
-        if st.button("🌳 Ver árbol del colegio", use_container_width=True):
+        if st.button(
+            "🌳 Ver árbol del colegio",
+            key="btn_ver_arbol_colegio",
+            use_container_width=True
+        ):
             st.session_state["colegio_ver_arbol"] = not st.session_state.get(
                 "colegio_ver_arbol",
                 False
@@ -101,6 +147,7 @@ def pantalla_colegio():
 
     if ficha:
         st.markdown("---")
+
         ficha_espacio_basica(
             centro=ficha["centro"],
             edificio=ficha["edificio"],
@@ -118,8 +165,13 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     st.markdown(f"### {icono} {espacio}")
     st.caption(f"{centro} · {edificio} · {planta}")
 
-    if st.button("❌ Cerrar ficha", key=f"cerrar_ficha_{clave}", use_container_width=True):
+    if st.button(
+        "❌ Cerrar ficha",
+        key=f"cerrar_ficha_{clave}",
+        use_container_width=True
+    ):
         st.session_state["colegio_ficha_seleccionada"] = None
+        st.session_state[f"bloque_ficha_{clave}"] = ""
         st.rerun()
 
     st.markdown("---")
@@ -127,20 +179,36 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     c1, c2 = st.columns(2)
 
     with c1:
-        if st.button("📌 Actuaciones", key=f"ver_actuaciones_{clave}", use_container_width=True):
+        if st.button(
+            "📌 Actuaciones",
+            key=f"ver_actuaciones_{clave}",
+            use_container_width=True
+        ):
             st.session_state[f"bloque_ficha_{clave}"] = "actuaciones"
             st.rerun()
 
-        if st.button("📦 Inventario", key=f"ver_inventario_{clave}", use_container_width=True):
+        if st.button(
+            "📦 Inventario",
+            key=f"ver_inventario_{clave}",
+            use_container_width=True
+        ):
             st.session_state[f"bloque_ficha_{clave}"] = "inventario"
             st.rerun()
 
     with c2:
-        if st.button("📅 Preventivos", key=f"ver_preventivos_{clave}", use_container_width=True):
+        if st.button(
+            "📅 Preventivos",
+            key=f"ver_preventivos_{clave}",
+            use_container_width=True
+        ):
             st.session_state[f"bloque_ficha_{clave}"] = "preventivos"
             st.rerun()
 
-        if st.button("📋 Historial", key=f"ver_historial_{clave}", use_container_width=True):
+        if st.button(
+            "📋 Historial",
+            key=f"ver_historial_{clave}",
+            use_container_width=True
+        ):
             st.session_state[f"bloque_ficha_{clave}"] = "historial"
             st.rerun()
 
@@ -159,7 +227,17 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             materiales_select = obtener_materiales_para_select()
 
             for a in actuaciones:
-                id_ot, numero_ot, descripcion, estado_ot, prioridad, operario, origen, area, fecha = a
+                (
+                    id_ot,
+                    numero_ot,
+                    descripcion,
+                    estado_ot,
+                    prioridad,
+                    operario,
+                    origen,
+                    area,
+                    fecha,
+                ) = a
 
                 fila_ot = (
                     id_ot,
@@ -190,7 +268,13 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     elif bloque == "inventario":
         st.markdown("### 📦 Inventario del espacio")
-        mostrar_inventario_espacio(centro, edificio, planta, espacio)
+
+        mostrar_inventario_espacio(
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio
+        )
 
     elif bloque == "preventivos":
         st.markdown("### 📅 Preventivos")
@@ -201,8 +285,21 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             st.info("No hay preventivos registrados en este espacio.")
         else:
             for p in preventivos:
-                id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
-                st.markdown(f"**{fecha or '-'}** · {estado_prev or '-'} · {operario or '-'}")
+                (
+                    id_prev,
+                    fecha,
+                    operario,
+                    estado_prev,
+                    observaciones,
+                    numero_ot_preventiva,
+                ) = p
+
+                st.markdown(
+                    f"**{fecha or '-'}** · "
+                    f"{estado_prev or '-'} · "
+                    f"{operario or '-'}"
+                )
+
                 if observaciones:
                     st.caption(observaciones)
 
@@ -234,8 +331,12 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 ) = h
 
                 st.markdown(
-                    f"**{fecha or '-'}** · {tipo or '-'} · {area or '-'} · OT `{numero_ot or '-'}`"
+                    f"**{fecha or '-'}** · "
+                    f"{tipo or '-'} · "
+                    f"{area or '-'} · "
+                    f"OT `{numero_ot or '-'}`"
                 )
+
                 st.caption(descripcion or "")
 
     else:
