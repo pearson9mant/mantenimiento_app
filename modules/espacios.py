@@ -493,3 +493,88 @@ def ordenar_items_espacios(items):
     conn.commit()
     conn.close()
     return True
+
+def obtener_centros_espacios():
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT DISTINCT centro
+        FROM espacios
+        WHERE activo = 1
+          AND centro IS NOT NULL
+          AND centro <> ''
+        ORDER BY centro
+    """))
+
+    datos = [fila[0] for fila in cur.fetchall()]
+    conn.close()
+    return datos
+
+
+def obtener_edificios_espacios(centro):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT DISTINCT edificio
+        FROM espacios
+        WHERE activo = 1
+          AND centro = ?
+          AND edificio IS NOT NULL
+          AND edificio <> ''
+        ORDER BY edificio
+    """), (centro,))
+
+    datos = [fila[0] for fila in cur.fetchall()]
+    conn.close()
+    return datos
+
+
+def obtener_plantas_espacios(centro, edificio):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT DISTINCT planta
+        FROM espacios
+        WHERE activo = 1
+          AND centro = ?
+          AND edificio = ?
+          AND planta IS NOT NULL
+          AND planta <> ''
+        ORDER BY planta
+    """), (centro, edificio))
+
+    datos = [fila[0] for fila in cur.fetchall()]
+    conn.close()
+    return datos
+
+
+def obtener_espacios_por_planta(centro, edificio, planta):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT espacio, tipo
+        FROM espacios
+        WHERE activo = 1
+          AND centro = ?
+          AND edificio = ?
+          AND planta = ?
+          AND espacio IS NOT NULL
+          AND espacio <> ''
+        ORDER BY espacio
+    """), (centro, edificio, planta))
+
+    datos = cur.fetchall()
+    conn.close()
+    return datos
