@@ -220,6 +220,37 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     st.error("No se pudo actualizar el elemento.")
 
             st.markdown("---")
+            activo = obtener_activo_por_inventario(id_inv)
+
+            if activo:
+                (
+                    id_activo,
+                    id_inventario_activo,
+                    centro_activo,
+                    edificio_activo,
+                    espacio_activo,
+                    elemento_activo,
+                    fabricante_activo,
+                    modelo_activo,
+                    numero_serie_activo,
+                    fecha_instalacion_activo,
+                    proveedor_activo,
+                    vida_util_activo,
+                    coste_estimado_activo,
+                    garantia_hasta_activo,
+                    manual_pdf_activo,
+                    observaciones_activo,
+                    fecha_creacion_activo,
+                    fecha_actualizacion_activo,
+                ) = activo
+            else:
+                fabricante_activo = ""
+                modelo_activo = ""
+                numero_serie_activo = ""
+                fecha_instalacion_activo = ""
+                proveedor_activo = ""
+                vida_util_activo = 0
+                coste_estimado_activo = 0
             st.markdown("### 🏷️ Ficha técnica del activo")
 
             t1, t2 = st.columns(2)
