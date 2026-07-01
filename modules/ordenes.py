@@ -841,6 +841,29 @@ def finalizar_orden(id_orden, observaciones=""):
             except Exception:
                 pass
 
+        # =====================================================
+        # MOTOR INVENTARIO INTELIGENTE
+        # Si esta OT viene de inventario, liberamos el elemento
+        # =====================================================
+        try:
+            origen_txt = str(origen or "").upper()
+            descripcion_txt = str(descripcion or "")
+
+            if origen_txt == "INVENTARIO":
+                import re
+
+                match = re.search(r"OT origen:\s*INV-(\d+)", descripcion_txt)
+
+                if match:
+                    id_elemento_inv = int(match.group(1))
+
+                    from modules.inventario_aulas import limpiar_correctivo_inventario
+
+                    limpiar_correctivo_inventario(id_elemento_inv)
+
+        except Exception:
+            pass
+
         cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
 
     conn.commit()
