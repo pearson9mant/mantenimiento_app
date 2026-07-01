@@ -262,7 +262,7 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     st.markdown("---")
 
     if bloque == "actuaciones":
-        st.markdown("### 📌 Actuaciones")
+        st.markdown("### 📋 Trabajos del espacio")
 
         actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
 
