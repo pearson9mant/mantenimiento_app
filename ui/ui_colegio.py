@@ -30,6 +30,16 @@ def _clave_ficha(centro, edificio, planta, espacio):
     )
 
 
+def _hay_incidencia_en_espacio(centro, espacio, ots_abiertas):
+    from modules.colegio import contar_ots_espacio_rapido
+
+    return contar_ots_espacio_rapido(
+        centro=centro,
+        espacio=espacio,
+        ots_abiertas=ots_abiertas
+    ) > 0
+
+
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Entrada rápida por centro, edificio, planta y espacio.")
@@ -40,10 +50,27 @@ def pantalla_colegio():
         key="colegio_solo_incidencias"
     )
 
+    ots_abiertas = None
+
+    if solo_incidencias:
+        from modules.colegio import obtener_ots_abiertas_por_centro
+        ots_abiertas = obtener_ots_abiertas_por_centro()
+
     centros = obtener_centros_espacios()
 
+    if solo_incidencias:
+        centros = [
+            c for c in centros
+            if any(
+                _hay_incidencia_en_espacio(c, espacio, ots_abiertas)
+                for edificio_tmp in obtener_edificios_espacios(c)
+                for planta_tmp in obtener_plantas_espacios(c, edificio_tmp)
+                for espacio, tipo in obtener_espacios_por_planta(c, edificio_tmp, planta_tmp)
+            )
+        ]
+
     if not centros:
-        st.warning("No hay espacios configurados.")
+        st.info("No hay espacios con incidencias abiertas.")
         return
 
     centro = st.selectbox(
@@ -54,8 +81,18 @@ def pantalla_colegio():
 
     edificios = obtener_edificios_espacios(centro)
 
+    if solo_incidencias:
+        edificios = [
+            e for e in edificios
+            if any(
+                _hay_incidencia_en_espacio(centro, espacio, ots_abiertas)
+                for planta_tmp in obtener_plantas_espacios(centro, e)
+                for espacio, tipo in obtener_espacios_por_planta(centro, e, planta_tmp)
+            )
+        ]
+
     if not edificios:
-        st.warning("No hay edificios configurados para este centro.")
+        st.info("No hay edificios con incidencias en este centro.")
         return
 
     edificio = st.selectbox(
@@ -66,8 +103,17 @@ def pantalla_colegio():
 
     plantas = obtener_plantas_espacios(centro, edificio)
 
+    if solo_incidencias:
+        plantas = [
+            p for p in plantas
+            if any(
+                _hay_incidencia_en_espacio(centro, espacio, ots_abiertas)
+                for espacio, tipo in obtener_espacios_por_planta(centro, edificio, p)
+            )
+        ]
+
     if not plantas:
-        st.warning("No hay plantas configuradas para este edificio.")
+        st.info("No hay plantas con incidencias en este edificio.")
         return
 
     planta = st.selectbox(
@@ -79,29 +125,15 @@ def pantalla_colegio():
     espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
 
     if solo_incidencias:
-        from modules.colegio import (
-            obtener_ots_abiertas_por_centro,
-            contar_ots_espacio_rapido,
-        )
-
-        ots_abiertas = obtener_ots_abiertas_por_centro()
-
         espacios_datos = [
             e for e in espacios_datos
-            if contar_ots_espacio_rapido(
-                centro=centro,
-                espacio=e[0],
-                ots_abiertas=ots_abiertas
-            ) > 0
+            if _hay_incidencia_en_espacio(centro, e[0], ots_abiertas)
         ]
 
     espacios = [e[0] for e in espacios_datos]
 
     if not espacios:
-        if solo_incidencias:
-            st.info("No hay espacios con incidencias en esta planta.")
-        else:
-            st.warning("No hay espacios configurados en esta planta.")
+        st.info("No hay espacios con incidencias en esta planta.")
         return
 
     espacio = st.selectbox(
