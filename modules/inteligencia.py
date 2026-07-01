@@ -91,3 +91,19 @@ def diagnosticar_espacio(centro, edificio, espacio):
         "primera_ot": primera_ot,
         "primera_desc": primera_desc,
     }
+
+def diagnosticar_legionella_espacio(centro, edificio, espacio):
+    """
+    Diagnóstico inicial Legionella por espacio.
+    De momento no rompe nada: si no encuentra datos, devuelve estado neutro.
+    Más adelante conectaremos registros reales, puntos y controles.
+    """
+
+    return {
+        "aplica": False,
+        "estado": "No aplica",
+        "color": "gris",
+        "diagnostico": [],
+        "recomendaciones": [],
+        "pendientes": 0,
+    }
