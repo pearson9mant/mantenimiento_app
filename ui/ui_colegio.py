@@ -33,6 +33,11 @@ def _clave_ficha(centro, edificio, planta, espacio):
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Entrada rápida por centro, edificio, planta y espacio.")
+    solo_incidencias = st.checkbox(
+        "Mostrar solo espacios con incidencias",
+        value=False,
+        key="colegio_solo_incidencias"
+    )
 
     centros = obtener_centros_espacios()
 
