@@ -3,23 +3,34 @@ from modules.ficha_espacio import (
     obtener_inventario_espacio,
     obtener_preventivos_espacio,
 )
+from modules.legionella import obtener_resumen_legionella_espacio
 
 
 def diagnosticar_legionella_espacio(centro, edificio, espacio):
     """
-    Diagnóstico inicial Legionella por espacio.
-    De momento no rompe nada: si no encuentra datos, devuelve estado neutro.
-    Más adelante conectaremos registros reales, puntos y controles.
+    El motor inteligente pregunta al módulo de Legionella.
+    Toda la lógica permanece dentro del módulo Legionella.
     """
 
-    return {
-        "aplica": False,
-        "estado": "No aplica",
-        "color": "gris",
-        "diagnostico": [],
-        "recomendaciones": [],
-        "pendientes": 0,
-    }
+    try:
+        return obtener_resumen_legionella_espacio(
+            centro,
+            edificio,
+            espacio
+        )
+    except Exception:
+        return {
+            "aplica": False,
+            "estado": "No aplica",
+            "color": "gris",
+            "puntos": 0,
+            "tareas": 0,
+            "incidencias_abiertas": 0,
+            "ultimo_control": "",
+            "proximo_control": "",
+            "diagnostico": [],
+            "recomendaciones": [],
+        }
 
 
 def diagnosticar_espacio(centro, edificio, espacio):
