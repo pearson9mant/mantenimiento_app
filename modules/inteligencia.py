@@ -3,7 +3,7 @@ from modules.ficha_espacio import (
     obtener_inventario_espacio,
     obtener_preventivos_espacio,
 )
-from modules.legionella import obtener_resumen_legionella_espacio
+from modules.legionela import obtener_resumen_legionella_espacio
 
 
 def diagnosticar_legionella_espacio(centro, edificio, espacio):
