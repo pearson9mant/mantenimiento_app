@@ -196,58 +196,101 @@ def obtener_cabecera_inteligente_espacio(centro, edificio, espacio):
     activos_danados = 0
     correctivos_pendientes = 0
 
-    motivos = []
+    diagnostico = []
     recomendaciones = []
+
+    primera_ot = ""
+
+    if actuaciones:
+        try:
+            primera_ot = str(actuaciones[0][1] or "")
+        except Exception:
+            primera_ot = ""
 
     for item in inventario:
         try:
+            elemento = str(item[2] or "Elemento")
             estado = str(item[4] or "")
             numero_ot_correctiva = str(item[12] or "")
-            elemento = str(item[2] or "Elemento")
         except Exception:
             continue
 
         if estado in ["Dañado", "Falta", "Retirar"]:
             activos_danados += 1
-            motivos.append(f"Hay un activo en estado {estado}: {elemento}.")
+            diagnostico.append(f"El activo {elemento} está en estado {estado}.")
 
         if numero_ot_correctiva:
             correctivos_pendientes += 1
-            motivos.append(f"Existe un correctivo pendiente asociado a la OT {numero_ot_correctiva}.")
-            recomendaciones.append(f"Finalizar primero la OT {numero_ot_correctiva}.")
+            diagnostico.append(f"Hay un correctivo pendiente asociado a la OT {numero_ot_correctiva}.")
+            recomendaciones.append(f"Finalizar la OT {numero_ot_correctiva}.")
 
     if trabajos > 0:
-        motivos.append(f"Hay {trabajos} trabajo(s) pendiente(s) en este espacio.")
-        recomendaciones.append("Revisar los trabajos abiertos del espacio.")
+        diagnostico.append(f"Hay {trabajos} trabajo(s) pendiente(s) en este espacio.")
 
-    if preventivos_total > 0:
-        motivos.append(f"Hay {preventivos_total} preventivo(s) registrado(s).")
+        if primera_ot:
+            recomendaciones.append(f"Abrir y revisar primero la OT {primera_ot}.")
+        else:
+            recomendaciones.append("Abrir Trabajos del espacio y revisar las OT pendientes.")
+
+    if activos == 0:
+        diagnostico.append("Este espacio todavía no tiene activos registrados.")
+        recomendaciones.append("Crear el inventario inicial cuando sea posible.")
+
+    if preventivos_total == 0:
+        diagnostico.append("No hay preventivos asociados a este espacio.")
 
     if trabajos == 0 and activos_danados == 0 and correctivos_pendientes == 0:
         estado_global = "Excelente"
         color = "verde"
-        diagnostico = "Espacio en condiciones correctas."
-        motivos.append("Sin trabajos pendientes.")
-        motivos.append("Sin activos dañados.")
-        recomendaciones.append("No es necesaria ninguna actuación inmediata.")
-    elif correctivos_pendientes > 0 or activos_danados > 0 or trabajos > 0:
+        mensaje_estado = "Espacio operativo."
+        diagnostico = [
+            "Sin trabajos pendientes.",
+            "Sin activos dañados.",
+            "Sin correctivos pendientes.",
+        ]
+
+        if activos == 0:
+            diagnostico.append("Inventario pendiente de crear.")
+
+        recomendaciones = ["No es necesaria ninguna actuación inmediata."]
+
+    elif correctivos_pendientes > 0 or activos_danados > 0:
         estado_global = "Requiere intervención"
         color = "rojo"
-        diagnostico = "Este espacio requiere atención."
+        mensaje_estado = "Hay elementos que necesitan reparación."
+
+    elif trabajos > 0:
+        estado_global = "Requiere intervención"
+        color = "rojo"
+        mensaje_estado = "Hay trabajos pendientes en este espacio."
+
     else:
         estado_global = "Requiere revisión"
         color = "amarillo"
-        diagnostico = "Conviene revisar este espacio."
+        mensaje_estado = "Conviene revisar este espacio."
+
+    resumen_corto = ""
+
+    if trabajos > 0:
+        resumen_corto = f"{trabajos} trabajo(s) pendiente(s)"
+    elif correctivos_pendientes > 0:
+        resumen_corto = f"{correctivos_pendientes} correctivo(s) pendiente(s)"
+    elif activos_danados > 0:
+        resumen_corto = f"{activos_danados} activo(s) dañado(s)"
+    else:
+        resumen_corto = "Sin avisos pendientes"
 
     return {
         "estado_global": estado_global,
         "color": color,
-        "diagnostico": diagnostico,
-        "motivos": motivos,
+        "diagnostico": mensaje_estado,
+        "resumen_corto": resumen_corto,
+        "motivos": diagnostico,
         "recomendaciones": recomendaciones,
         "trabajos": trabajos,
         "activos": activos,
         "preventivos": preventivos_total,
         "activos_danados": activos_danados,
         "correctivos_pendientes": correctivos_pendientes,
+        "primera_ot": primera_ot,
     }
