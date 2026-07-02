@@ -612,15 +612,13 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
             st.rerun()
 
     if elementos_temp:
-        st.markdown("#### ✅ Elementos preparados")
-
-        for item in elementos_temp:
-            st.markdown(
-                f"✅ **{item['elemento']}** · "
-                f"{item['cantidad']} uds · {item['estado']}"
-            )
-
-        st.markdown("---")
+        _mostrar_lista_preparada_editable(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+            clave_base=clave_base,
+            elementos_temp=elementos_temp
+        )
 
     mostrar_formulario = st.session_state.get(
         key_mostrar_form,
