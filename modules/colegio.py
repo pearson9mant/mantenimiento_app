@@ -1,6 +1,5 @@
 import streamlit as st
 from database.db import conectar, _sql
-from modules.ubicaciones import obtener_centros_espacios
 
 # =====================================================
 # MAPA BASE DEL COLEGIO
