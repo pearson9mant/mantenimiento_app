@@ -106,7 +106,8 @@ def obtener_inventario_espacio(centro, edificio, espacio):
                 fecha_instalacion,
                 proveedor,
                 vida_util_anios,
-                coste_estimado
+                coste_estimado,
+                cantidad_afectada
             FROM inventario_aulas
             WHERE centro = ?
               AND edificio = ?
