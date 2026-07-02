@@ -417,6 +417,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     espacio=espacio,
                     elemento=elemento,
                     cantidad=nueva_cantidad,
+                    cantidad_afectada=nueva_cantidad_afectada,
                     estado=nuevo_estado,
                     ancho=ancho or 0,
                     alto=alto or 0,
