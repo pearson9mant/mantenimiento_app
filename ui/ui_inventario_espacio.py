@@ -324,8 +324,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
 
         icono = _icono_estado(estado_inv)
 
+        texto_afectado = ""
+        if cantidad_afectada > 0:
+            texto_afectado = f" · {cantidad_afectada} afectado(s)"
+
         with st.expander(
-            f"{icono} {elemento or '-'} · {cantidad or 0} uds · {estado_inv or '-'}",
+            f"{icono} {elemento or '-'} · {cantidad or 0} uds{texto_afectado} · {estado_inv or '-'}",
             expanded=False
         ):
             st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
