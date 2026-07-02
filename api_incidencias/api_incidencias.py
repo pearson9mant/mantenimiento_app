@@ -337,27 +337,6 @@ def api_espacios(centro: str, edificio: str, planta: str):
 
 
 
-@app.get("/api/plantas")
-def api_plantas(centro: str, edificio: str):
-    conn = conectar()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT DISTINCT planta
-            FROM espacios
-            WHERE activo = 1
-              AND centro = %s
-              AND edificio = %s
-              AND planta IS NOT NULL
-              AND planta <> ''
-            ORDER BY planta
-        """, (centro, edificio))
-        return {"ok": True, "plantas": [r[0] for r in cur.fetchall()]}
-    finally:
-        cur.close()
-        conn.close()
-
-
 
 @app.post("/api/incidencias")
 def crear_incidencia(payload: IncidenciaIn, x_webhook_token: str = Header(default="")):
