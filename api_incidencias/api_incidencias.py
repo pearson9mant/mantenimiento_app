@@ -8,7 +8,12 @@ from pydantic import BaseModel
 import psycopg2
 
 app = FastAPI(title="API Incidencias")
-
+@app.get("/")
+def raiz():
+    return {
+        "api": "API Incidencias Loreto",
+        "version": "2.0"
+    }
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
