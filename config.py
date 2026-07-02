@@ -177,5 +177,9 @@ ASIGNACION_OPERARIO_POR_CENTRO = {
     "Pearson 9": "Luis Lozano",
     "Pearson 22": "J.A. Almeda"
 }
+CENTRO_POR_OPERARIO = {
+    "J.A. Almeda": "Pearson 22",
+    "Luis Lozano": "Pearson 9",
+}
 
 OPERARIOS_CON_ALTA_MATERIAL = ["Abel Vasquez"]
