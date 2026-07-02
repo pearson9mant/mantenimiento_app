@@ -1,5 +1,11 @@
 from database.db import conectar, _sql
 
+from modules.espacios import (
+    coincide_centro,
+    coincide_edificio,
+    coincide_espacio,
+)
+
 
 def _normalizar_comparacion(texto):
     return (
@@ -36,10 +42,6 @@ def obtener_actuaciones_espacio(centro, edificio, espacio):
 
         filas = cur.fetchall()
 
-        centro_obj = _normalizar_comparacion(centro)
-        edificio_obj = _normalizar_comparacion(edificio)
-        espacio_obj = _normalizar_comparacion(espacio)
-
         for fila in filas:
             (
                 id_ot,
@@ -57,8 +59,13 @@ def obtener_actuaciones_espacio(centro, edificio, espacio):
             ) = fila
 
             if (
-                _normalizar_comparacion(centro_ot) == centro_obj
-                and _normalizar_comparacion(espacio_ot) == espacio_obj
+                coincide_centro(centro_ot, centro)
+                and (
+                    not edificio
+                    or not edificio_ot
+                    or coincide_edificio(edificio_ot, edificio)
+                )
+                and coincide_espacio(espacio_ot, espacio)
             ):
                 datos.append((
                     id_ot,
@@ -184,6 +191,7 @@ def obtener_resumen_ficha_espacio(centro, edificio, espacio):
         "preventivos": 0,
         "historial": 0,
     }
+
 
 def obtener_cabecera_inteligente_espacio(centro, edificio, espacio):
     actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
