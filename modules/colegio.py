@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 import streamlit as st
 from database.db import conectar, _sql
 
@@ -53,16 +56,79 @@ def normalizar_texto(texto):
     return str(texto or "").strip()
 
 
-def _normalizar_comparacion(texto):
-    return (
-        str(texto or "")
-        .lower()
-        .replace("edif.", "")
-        .replace("edificio", "")
-        .replace(" ", "")
-        .replace("·", "")
-        .strip()
+def _sin_acentos(texto):
+    texto = str(texto or "")
+    return "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
     )
+
+
+def _normalizar_comparacion(texto):
+    texto = _sin_acentos(texto).lower()
+
+    texto = texto.replace("edif.", "")
+    texto = texto.replace("edificio", "")
+    texto = texto.replace("infantil/primaria", "infantilprimaria")
+    texto = texto.replace("infantil / primaria", "infantilprimaria")
+    texto = texto.replace("·", "")
+    texto = texto.replace("/", "")
+    texto = texto.replace("\\", "")
+    texto = texto.replace("-", "")
+    texto = texto.replace("_", "")
+    texto = texto.replace("ª", "a")
+    texto = texto.replace("º", "o")
+    texto = texto.replace("1a", "1")
+    texto = texto.replace("2a", "2")
+    texto = texto.replace("3a", "3")
+    texto = texto.replace("4a", "4")
+    texto = texto.replace("5a", "5")
+    texto = texto.replace("planta", "p")
+    texto = texto.replace(" ", "")
+
+    return texto.strip()
+
+
+def _normalizar_espacio_alias(texto):
+    """
+    Normalización prudente para espacios.
+    No convierte 'WC' en 'WC chicas' para evitar falsos positivos.
+    Sí corrige equivalencias claras:
+    - P5A / I5A
+    - WC niñas / WC chicas
+    - WC niños / WC chicos
+    """
+
+    t = _normalizar_comparacion(texto)
+
+    t = t.replace("ninas", "chicas")
+    t = t.replace("ninos", "chicos")
+    t = t.replace("profesores", "profes")
+
+    # Antiguo formulario: P3A/P4A/P5A
+    # Catálogo nuevo: I3A/I4A/I5A
+    m = re.fullmatch(r"p([345])([abc])", t)
+    if m:
+        return f"i{m.group(1)}{m.group(2)}"
+
+    return t
+
+
+def _coincide_centro(a, b):
+    return _normalizar_comparacion(a) == _normalizar_comparacion(b)
+
+
+def _coincide_espacio(a, b):
+    a_norm = _normalizar_espacio_alias(a)
+    b_norm = _normalizar_espacio_alias(b)
+
+    if not a_norm or not b_norm:
+        return False
+
+    if a_norm == b_norm:
+        return True
+
+    return False
 
 
 # =====================================================
@@ -70,10 +136,6 @@ def _normalizar_comparacion(texto):
 # =====================================================
 
 def obtener_centros_espacios():
-    """
-    Devuelve centros del catálogo colegio_espacios.
-    Si la tabla no existe o está vacía, usa COLEGIO_BASE.
-    """
     centros = []
 
     try:
@@ -87,7 +149,12 @@ def obtener_centros_espacios():
             ORDER BY centro
         """))
 
-        centros = [normalizar_texto(r[0]) for r in cur.fetchall() if normalizar_texto(r[0])]
+        centros = [
+            normalizar_texto(r[0])
+            for r in cur.fetchall()
+            if normalizar_texto(r[0])
+        ]
+
         conn.close()
 
     except Exception:
@@ -240,9 +307,6 @@ def obtener_arbol_colegio():
 # =====================================================
 
 def obtener_estado_espacio(centro, edificio, espacio):
-    centro_obj = _normalizar_comparacion(centro)
-    espacio_obj = _normalizar_comparacion(espacio)
-
     conn = conectar()
     cur = conn.cursor()
 
@@ -260,8 +324,8 @@ def obtener_estado_espacio(centro, edificio, espacio):
 
         for centro_ot, edificio_ot, espacio_ot, estado_ot in cur.fetchall():
             if (
-                _normalizar_comparacion(centro_ot) == centro_obj
-                and _normalizar_comparacion(espacio_ot) == espacio_obj
+                _coincide_centro(centro_ot, centro)
+                and _coincide_espacio(espacio_ot, espacio)
             ):
                 conn.close()
                 return "rojo"
@@ -305,34 +369,57 @@ def obtener_ots_abiertas_por_centro():
 
     conn.close()
 
-    datos = {}
+    datos = {
+        "__filas__": []
+    }
 
     for centro, espacio, total in filas:
+        centro_txt = normalizar_texto(centro)
+        espacio_txt = normalizar_texto(espacio)
+        total_int = int(total or 0)
+
         clave = (
-            _normalizar_comparacion(centro),
-            _normalizar_comparacion(espacio)
+            _normalizar_comparacion(centro_txt),
+            _normalizar_espacio_alias(espacio_txt)
         )
-        datos[clave] = int(total or 0)
+
+        datos[clave] = datos.get(clave, 0) + total_int
+
+        datos["__filas__"].append({
+            "centro": centro_txt,
+            "espacio": espacio_txt,
+            "total": total_int,
+        })
 
     return datos
 
 
 def obtener_estado_espacio_rapido(centro, espacio, ots_abiertas):
-    clave = (
-        _normalizar_comparacion(centro),
-        _normalizar_comparacion(espacio)
-    )
-
-    if ots_abiertas.get(clave, 0) > 0:
+    if contar_ots_espacio_rapido(centro, espacio, ots_abiertas) > 0:
         return "rojo"
 
     return "verde"
 
 
 def contar_ots_espacio_rapido(centro, espacio, ots_abiertas):
+    if not ots_abiertas:
+        return 0
+
     clave = (
         _normalizar_comparacion(centro),
-        _normalizar_comparacion(espacio)
+        _normalizar_espacio_alias(espacio)
     )
 
-    return int(ots_abiertas.get(clave, 0) or 0)
+    total = int(ots_abiertas.get(clave, 0) or 0)
+
+    if total > 0:
+        return total
+
+    for fila in ots_abiertas.get("__filas__", []):
+        if (
+            _coincide_centro(fila.get("centro"), centro)
+            and _coincide_espacio(fila.get("espacio"), espacio)
+        ):
+            total += int(fila.get("total") or 0)
+
+    return total
