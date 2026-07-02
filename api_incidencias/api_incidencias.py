@@ -236,7 +236,99 @@ def obtener_siguiente_numero_ot(cur, centro, tipo_ot="INC"):
 
     return f"{centro_codigo}-{tipo_codigo}-{siguiente:05d}"
 
+@app.get("/api/centros")
+def api_centros():
+    conn = conectar()
+    cur = conn.cursor()
 
+    try:
+        cur.execute("""
+            SELECT DISTINCT centro
+            FROM espacios
+            WHERE activo = 1
+              AND centro IS NOT NULL
+              AND centro <> ''
+            ORDER BY centro
+        """)
+        datos = [r[0] for r in cur.fetchall()]
+        return {"ok": True, "centros": datos}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/edificios")
+def api_edificios(centro: str):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT DISTINCT edificio
+            FROM espacios
+            WHERE activo = 1
+              AND centro = %s
+              AND edificio IS NOT NULL
+              AND edificio <> ''
+            ORDER BY edificio
+        """, (centro,))
+        datos = [r[0] for r in cur.fetchall()]
+        return {"ok": True, "edificios": datos}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/plantas")
+def api_plantas(centro: str, edificio: str):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT DISTINCT planta
+            FROM espacios
+            WHERE activo = 1
+              AND centro = %s
+              AND edificio = %s
+              AND planta IS NOT NULL
+              AND planta <> ''
+            ORDER BY planta
+        """, (centro, edificio))
+        datos = [r[0] for r in cur.fetchall()]
+        return {"ok": True, "plantas": datos}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/espacios")
+def api_espacios(centro: str, edificio: str, planta: str):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT espacio, tipo
+            FROM espacios
+            WHERE activo = 1
+              AND centro = %s
+              AND edificio = %s
+              AND planta = %s
+              AND espacio IS NOT NULL
+              AND espacio <> ''
+            ORDER BY espacio
+        """, (centro, edificio, planta))
+
+        datos = [
+            {"espacio": r[0], "tipo": r[1]}
+            for r in cur.fetchall()
+        ]
+
+        return {"ok": True, "espacios": datos}
+    finally:
+        cur.close()
+        conn.close()
 @app.post("/api/incidencias")
 def crear_incidencia(payload: IncidenciaIn, x_webhook_token: str = Header(default="")):
     if not WEBHOOK_TOKEN or x_webhook_token != WEBHOOK_TOKEN:
