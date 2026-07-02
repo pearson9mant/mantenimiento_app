@@ -336,25 +336,6 @@ def api_espacios(centro: str, edificio: str, planta: str):
         conn.close()
 
 
-@app.get("/api/edificios")
-def api_edificios(centro: str):
-    conn = conectar()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT DISTINCT edificio
-            FROM espacios
-            WHERE activo = 1
-              AND centro = %s
-              AND edificio IS NOT NULL
-              AND edificio <> ''
-            ORDER BY edificio
-        """, (centro,))
-        return {"ok": True, "edificios": [r[0] for r in cur.fetchall()]}
-    finally:
-        cur.close()
-        conn.close()
-
 
 @app.get("/api/plantas")
 def api_plantas(centro: str, edificio: str):
