@@ -54,13 +54,6 @@ def normalizar_texto(texto):
 
 
 def _normalizar_comparacion(texto):
-    """
-    Normaliza textos para comparar centro/edificio/espacio aunque vengan
-    escritos de forma ligeramente distinta.
-
-    Ejemplo:
-    'Edif. Infantil/Primaria' == 'Infantil / Primaria'
-    """
     return (
         str(texto or "")
         .lower()
@@ -70,6 +63,58 @@ def _normalizar_comparacion(texto):
         .replace("·", "")
         .strip()
     )
+
+
+# =====================================================
+# CENTROS / ESPACIOS
+# =====================================================
+
+def obtener_centros_espacios():
+    """
+    Devuelve centros del catálogo colegio_espacios.
+    Si la tabla no existe o está vacía, usa COLEGIO_BASE.
+    """
+    centros = []
+
+    try:
+        conn = conectar()
+        cur = conn.cursor()
+
+        cur.execute(_sql("""
+            SELECT DISTINCT centro
+            FROM colegio_espacios
+            WHERE centro IS NOT NULL AND TRIM(centro) <> ''
+            ORDER BY centro
+        """))
+
+        centros = [normalizar_texto(r[0]) for r in cur.fetchall() if normalizar_texto(r[0])]
+        conn.close()
+
+    except Exception:
+        centros = []
+
+    if centros:
+        return centros
+
+    return list(COLEGIO_BASE.keys())
+
+
+def obtener_centros_visibles_usuario():
+    perfil = str(st.session_state.get("perfil", "")).lower()
+    operario = str(st.session_state.get("operario_activo", "")).strip()
+
+    todos_centros = obtener_centros_espacios()
+
+    if perfil in ["admin", "administracion", "administración", "inventario"]:
+        return todos_centros
+
+    if operario == "J.A. Almeda":
+        return [c for c in todos_centros if c == "Pearson 22"]
+
+    if operario == "Luis Lozano":
+        return [c for c in todos_centros if c == "Pearson 9"]
+
+    return todos_centros
 
 
 # =====================================================
@@ -104,6 +149,11 @@ def obtener_espacios_desde_bd():
     cur = conn.cursor()
 
     consultas = [
+        """
+        SELECT DISTINCT centro, edificio, espacio
+        FROM colegio_espacios
+        WHERE espacio IS NOT NULL AND espacio <> ''
+        """,
         """
         SELECT DISTINCT centro, edificio, espacio
         FROM ordenes_trabajo
@@ -190,15 +240,7 @@ def obtener_arbol_colegio():
 # =====================================================
 
 def obtener_estado_espacio(centro, edificio, espacio):
-    """
-    Devuelve:
-    rojo     -> tiene OT activa / correctivo pendiente
-    amarillo -> reservado para elementos a revisar
-    verde    -> sin avisos
-    """
-
     centro_obj = _normalizar_comparacion(centro)
-    edificio_obj = _normalizar_comparacion(edificio)
     espacio_obj = _normalizar_comparacion(espacio)
 
     conn = conectar()
@@ -216,9 +258,7 @@ def obtener_estado_espacio(centro, edificio, espacio):
             )
         """))
 
-        ordenes = cur.fetchall()
-
-        for centro_ot, edificio_ot, espacio_ot, estado_ot in ordenes:
+        for centro_ot, edificio_ot, espacio_ot, estado_ot in cur.fetchall():
             if (
                 _normalizar_comparacion(centro_ot) == centro_obj
                 and _normalizar_comparacion(espacio_ot) == espacio_obj
@@ -240,32 +280,8 @@ def icono_estado_espacio(estado):
         return "🟡"
     return "🟢"
 
-def obtener_centros_visibles_usuario():
-    perfil = str(st.session_state.get("perfil", "")).lower()
-    operario = str(st.session_state.get("operario_activo", "")).strip()
-
-    todos_centros = obtener_centros_espacios()
-
-    if perfil in ["admin", "administracion", "administración"]:
-        return todos_centros
-
-    if perfil == "inventario":
-        return todos_centros
-
-    if operario == "J.A. Almeda":
-        return [c for c in todos_centros if c == "Pearson 22"]
-
-    if operario == "Luis Lozano":
-        return [c for c in todos_centros if c == "Pearson 9"]
-
-    return []
 
 def obtener_ots_abiertas_por_centro():
-    """
-    Devuelve todas las OT abiertas agrupadas por centro + espacio.
-    Se usa para pintar el árbol rápido sin consultar la BD por cada aula.
-    """
-
     conn = conectar()
     cur = conn.cursor()
 
