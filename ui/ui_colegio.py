@@ -55,11 +55,18 @@ def pantalla_colegio():
 
     ots_abiertas = None
 
+    centros = obtener_centros_espacios()
+
     if solo_incidencias:
         from modules.colegio import obtener_ots_abiertas_por_centro
         ots_abiertas = obtener_ots_abiertas_por_centro()
 
-    centros = obtener_centros_espacios()
+    centros_visibles = obtener_centros_visibles_usuario()
+
+    centros = [
+        c for c in centros
+        if c in centros_visibles
+    ]
 
     if solo_incidencias:
         centros = [
