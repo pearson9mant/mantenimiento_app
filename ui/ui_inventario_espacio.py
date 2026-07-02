@@ -42,6 +42,55 @@ def _opciones_elementos():
         opciones.append("Otro")
     return opciones
 
+def _plantilla_inventario_por_espacio(espacio):
+    texto = str(espacio or "").lower()
+
+    if "wc" in texto or "baño" in texto or "vestuario" in texto:
+        return [
+            ("WC", 2),
+            ("Fluxor", 2),
+            ("Lavabo", 2),
+            ("Grifo", 2),
+            ("Grifo mezclador de bañera", 1),
+            ("Bañera", 1),
+            ("Espejo", 2),
+            ("Dispensador de jabón", 2),
+            ("Portarrollos", 2),
+            ("Secamanos", 1),
+        ]
+
+    if "cocina" in texto:
+        return [
+            ("Fregadero", 1),
+            ("Grifo", 1),
+            ("Lavavajillas", 1),
+            ("Campana extractora", 1),
+            ("Horno", 1),
+            ("Cocina industrial", 1),
+            ("Nevera", 1),
+            ("Congelador", 1),
+        ]
+
+    if "aula" in texto:
+        return [
+            ("Mesa alumno", 25),
+            ("Silla alumno", 25),
+            ("Mesa profesor", 1),
+            ("Silla profesor", 1),
+            ("Pizarra", 1),
+            ("Pantalla interactiva", 1),
+            ("Iluminación", 1),
+            ("Enchufe", 6),
+            ("Papelera", 1),
+        ]
+
+    return [
+        ("Iluminación", 1),
+        ("Enchufe", 2),
+        ("Puerta", 1),
+        ("Estado general", 1),
+    ]
+
 
 def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
     perfil = str(st.session_state.get("perfil", "")).lower()
