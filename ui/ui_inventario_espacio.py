@@ -91,6 +91,101 @@ def _plantilla_inventario_por_espacio(espacio):
         ("Estado general", 1),
     ]
 
+def _mostrar_lista_preparada_editable(
+    centro,
+    edificio,
+    espacio,
+    clave_base,
+    elementos_temp
+):
+    st.markdown("#### ✅ Elementos preparados")
+    st.caption("Puedes ajustar cantidades, estado, observaciones, foto o quitar elementos antes de guardar.")
+
+    estados = ["Correcto", "Regular", "Dañado", "Falta", "Retirar"]
+
+    for i, item in enumerate(list(elementos_temp)):
+        elemento = str(item.get("elemento", ""))
+        cantidad = int(item.get("cantidad", 1) or 1)
+        estado = str(item.get("estado", "Correcto") or "Correcto")
+        observaciones = str(item.get("observaciones", "") or "")
+        foto = item.get("foto", "")
+
+        with st.container():
+            c1, c2, c3, c4 = st.columns([3, 1, 2, 1])
+
+            with c1:
+                st.markdown(f"**{elemento}**")
+
+            with c2:
+                nueva_cantidad = st.number_input(
+                    "Cantidad",
+                    min_value=0,
+                    step=1,
+                    value=cantidad,
+                    key=f"temp_cantidad_{clave_base}_{i}"
+                )
+
+            with c3:
+                estado_actual = estado if estado in estados else "Correcto"
+
+                nuevo_estado = st.selectbox(
+                    "Estado",
+                    estados,
+                    index=estados.index(estado_actual),
+                    key=f"temp_estado_{clave_base}_{i}"
+                )
+
+            with c4:
+                if st.button(
+                    "🗑️",
+                    key=f"temp_borrar_{clave_base}_{i}",
+                    help="Quitar este elemento"
+                ):
+                    elementos_temp.pop(i)
+                    st.session_state["inventario_temp"][clave_base] = elementos_temp
+                    st.rerun()
+
+            nuevas_obs = st.text_input(
+                "Observaciones",
+                value=observaciones,
+                key=f"temp_obs_{clave_base}_{i}"
+            )
+
+            foto_nueva = st.file_uploader(
+                "Foto",
+                type=["jpg", "jpeg", "png"],
+                key=f"temp_foto_{clave_base}_{i}"
+            )
+
+            foto_final = foto
+
+            if foto_nueva is not None:
+                st.image(foto_nueva, width=150)
+                foto_final = guardar_foto_espacio(
+                    foto_nueva,
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento
+                )
+            elif foto:
+                try:
+                    st.image(foto, width=150)
+                except Exception:
+                    st.caption("Foto no disponible.")
+
+            elementos_temp[i] = {
+                "elemento": elemento,
+                "cantidad": nueva_cantidad,
+                "estado": nuevo_estado,
+                "observaciones": nuevas_obs,
+                "foto": foto_final,
+            }
+
+            st.markdown("---")
+
+    st.session_state["inventario_temp"][clave_base] = elementos_temp
+
 
 def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
     perfil = str(st.session_state.get("perfil", "")).lower()
