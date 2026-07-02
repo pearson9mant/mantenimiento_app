@@ -195,7 +195,8 @@ def actualizar_inventario_espacio(
     unidad,
     observaciones,
     foto,
-    operario
+    operario,
+    cantidad_afectada=0
 ):
     crear_tabla_inventario_aulas()
 
@@ -207,6 +208,7 @@ def actualizar_inventario_espacio(
             UPDATE inventario_aulas
             SET fecha_revision = ?,
                 cantidad = ?,
+                cantidad_afectada = ?,
                 estado = ?,
                 ancho = ?,
                 alto = ?,
@@ -219,6 +221,7 @@ def actualizar_inventario_espacio(
         """), (
             hoy(),
             cantidad,
+            cantidad_afectada,
             estado,
             ancho,
             alto,
@@ -281,13 +284,9 @@ def guardar_inventario_aula(
     unidad,
     observaciones,
     foto,
-    operario
+    operario,
+    cantidad_afectada=0
 ):
-    """
-    Función antigua. Se mantiene para no romper pantallas existentes.
-    Realmente guarda inventario de cualquier espacio.
-    """
-
     crear_tabla_inventario_aulas()
 
     conn = conectar()
@@ -302,6 +301,7 @@ def guardar_inventario_aula(
                 espacio,
                 elemento,
                 cantidad,
+                cantidad_afectada,
                 estado,
                 ancho,
                 alto,
@@ -312,7 +312,7 @@ def guardar_inventario_aula(
                 operario,
                 fecha_creacion
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             hoy(),
             centro,
@@ -320,6 +320,7 @@ def guardar_inventario_aula(
             espacio,
             elemento,
             cantidad,
+            cantidad_afectada,
             estado,
             ancho,
             alto,
@@ -355,7 +356,8 @@ def guardar_o_actualizar_espacio(
     unidad,
     observaciones,
     foto,
-    operario
+    operario,
+    cantidad_afectada=0
 ):
     crear_tabla_inventario_aulas()
 
@@ -375,6 +377,7 @@ def guardar_o_actualizar_espacio(
         return actualizar_inventario_espacio(
             id_reg=id_existente,
             cantidad=cantidad,
+            cantidad_afectada=cantidad_afectada,
             estado=estado,
             ancho=ancho,
             alto=alto,
@@ -391,6 +394,7 @@ def guardar_o_actualizar_espacio(
         espacio=espacio,
         elemento=elemento,
         cantidad=cantidad,
+        cantidad_afectada=cantidad_afectada,
         estado=estado,
         ancho=ancho,
         alto=alto,
