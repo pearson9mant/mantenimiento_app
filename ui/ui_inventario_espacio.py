@@ -349,6 +349,17 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     value=int(cantidad or 0),
                     key=f"edit_cantidad_{clave_base}_{id_inv}"
                 )
+                nueva_cantidad_afectada = st.number_input(
+                    "Cantidad afectada",
+                    min_value=0,
+                    max_value=int(nueva_cantidad or 0),
+                    step=1,
+                    value=min(
+                        int(cantidad_afectada or 0),
+                        int(nueva_cantidad or 0)
+                    ),
+                    key=f"edit_cantidad_afectada_{clave_base}_{id_inv}"
+                )
 
             with c2:
                 estado_actual = estado_inv if estado_inv in opciones_estado else "Correcto"
