@@ -67,6 +67,7 @@ CATALOGO_BASE_AULAS = [
     # Fontanería / WC
     ("Fontanería", "Lavabo", "Fontanería"),
     ("Fontanería", "Grifo", "Fontanería"),
+    ("Fontanería", "Grifo mezclador de bañera", "Fontanería"),
     ("Fontanería", "Desagüe", "Fontanería"),
     ("Fontanería", "Sifón", "Fontanería"),
     ("Fontanería", "WC", "Fontanería"),
