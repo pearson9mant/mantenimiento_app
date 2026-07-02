@@ -1,6 +1,6 @@
 import streamlit as st
 from database.db import conectar, _sql
-
+from modules.ubicaciones import obtener_centros_espacios
 
 # =====================================================
 # MAPA BASE DEL COLEGIO
@@ -245,17 +245,19 @@ def obtener_centros_visibles_usuario():
     perfil = str(st.session_state.get("perfil", "")).lower()
     operario = str(st.session_state.get("operario_activo", "")).strip()
 
+    todos_centros = obtener_centros_espacios()
+
     if perfil in ["admin", "administracion", "administración"]:
-        return CENTROS
+        return todos_centros
 
     if perfil == "inventario":
-        return CENTROS
+        return todos_centros
 
     if operario == "J.A. Almeda":
-        return ["Pearson 22"]
+        return [c for c in todos_centros if c == "Pearson 22"]
 
     if operario == "Luis Lozano":
-        return ["Pearson 9"]
+        return [c for c in todos_centros if c == "Pearson 9"]
 
     return []
 
