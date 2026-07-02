@@ -87,6 +87,7 @@ def crear_tabla_inventario_aulas():
         ("proveedor", "TEXT"),
         ("vida_util_anios", "INTEGER DEFAULT 0"),
         ("coste_estimado", "REAL DEFAULT 0"),
+        ("cantidad_afectada", "INTEGER DEFAULT 0"),
     ]:
         try:
             cursor.execute(_sql(f"""
