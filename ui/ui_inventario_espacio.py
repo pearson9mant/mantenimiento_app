@@ -321,6 +321,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             coste_estimado,
             *extra
         ) = item
+        cantidad_afectada = 0
+        if extra:
+            try:
+                cantidad_afectada = int(extra[0] or 0)
+            except Exception:
+                cantidad_afectada = 0
 
         icono = _icono_estado(estado_inv)
 
