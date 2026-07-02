@@ -241,30 +241,22 @@ def icono_estado_espacio(estado):
     return "🟢"
 
 def obtener_centros_visibles_usuario():
-    """
-    Centros visibles según perfil/operario.
-    Admin ve todos.
-    Operarios ven solo su centro asignado.
-    """
+    perfil = str(st.session_state.get("perfil", "")).lower()
+    operario = str(st.session_state.get("operario_activo", "")).strip()
 
-    import streamlit as st
+    if perfil in ["admin", "administracion", "administración"]:
+        return CENTROS
 
-    perfil = str(st.session_state.get("perfil", "")).strip().lower()
-    operario = str(st.session_state.get("operario_activo", "")).strip().lower()
+    if perfil == "inventario":
+        return CENTROS
 
-    if perfil == "admin":
-        return ["Pearson 22", "Pearson 9"]
-
-    if "luis" in operario or "lozano" in operario:
-        return ["Pearson 9"]
-
-    if "almeda" in operario or "juan" in operario or "j.a." in operario:
+    if operario == "J.A. Almeda":
         return ["Pearson 22"]
 
-    if "abel" in operario or "vasquez" in operario:
-        return ["Pearson 22", "Pearson 9"]
+    if operario == "Luis Lozano":
+        return ["Pearson 9"]
 
-    return ["Pearson 22"]
+    return []
 
 def obtener_ots_abiertas_por_centro():
     """
