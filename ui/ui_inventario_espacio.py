@@ -494,6 +494,27 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
         st.session_state["inventario_temp"][clave_base] = []
 
     elementos_temp = st.session_state["inventario_temp"][clave_base]
+    if not inventario and not elementos_temp:
+        if st.button(
+            "🧠 Proponer inventario inicial inteligente",
+            key=f"btn_plantilla_inteligente_{clave_base}",
+            use_container_width=True
+        ):
+            plantilla = _plantilla_inventario_por_espacio(espacio)
+
+            st.session_state["inventario_temp"][clave_base] = [
+                {
+                    "elemento": elemento,
+                    "cantidad": cantidad,
+                    "estado": "Correcto",
+                    "observaciones": "",
+                    "foto": "",
+                }
+                for elemento, cantidad in plantilla
+            ]
+
+            st.session_state[key_mostrar_form] = False
+            st.rerun()
 
     if elementos_temp:
         st.markdown("#### ✅ Elementos preparados")
