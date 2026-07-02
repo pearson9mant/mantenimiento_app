@@ -319,6 +319,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             proveedor,
             vida_util_anios,
             coste_estimado,
+            *extra
         ) = item
 
         icono = _icono_estado(estado_inv)
