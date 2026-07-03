@@ -53,16 +53,36 @@ def _obtener_espacios_con_incidencias_edificio(centro, edificio, ots_abiertas):
             planta_tmp
         ):
             if _hay_incidencia_en_espacio(centro, espacio_tmp, ots_abiertas):
+                actuaciones = obtener_actuaciones_espacio(
+                    centro,
+                    edificio,
+                    espacio_tmp
+                )
+
                 resultado.append({
                     "centro": centro,
                     "edificio": edificio,
                     "planta": planta_tmp,
                     "espacio": espacio_tmp,
                     "tipo": tipo_tmp,
-                    "label": f"{planta_tmp} · {espacio_tmp}"
+                    "actuaciones": actuaciones,
                 })
 
     return resultado
+
+
+def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuaciones"):
+    st.session_state["colegio_ficha_seleccionada"] = {
+        "centro": centro,
+        "edificio": edificio,
+        "planta": planta,
+        "espacio": espacio,
+    }
+
+    clave = _clave_ficha(centro, edificio, planta, espacio)
+    st.session_state[f"bloque_ficha_{clave}"] = bloque
+    st.session_state["colegio_ver_arbol"] = False
+    st.rerun()
 
 
 def pantalla_colegio():
@@ -76,7 +96,6 @@ def pantalla_colegio():
     )
 
     ots_abiertas = None
-
     centros = obtener_centros_espacios()
 
     if solo_incidencias:
@@ -133,61 +152,108 @@ def pantalla_colegio():
         key=f"colegio_rapido_edificio_{centro}"
     )
 
+    # =====================================================
+    # MODO INCIDENCIAS: Centro -> Edificio -> Plantas -> OT
+    # =====================================================
     if solo_incidencias:
         espacios_incidencias = _obtener_espacios_con_incidencias_edificio(
             centro,
             edificio,
             ots_abiertas
         )
-    
+
         if not espacios_incidencias:
             st.info("No hay espacios con incidencias en este edificio.")
             return
-    
-        st.markdown("### 📋 Espacios con incidencias abiertas")
-    
+
+        st.markdown("### 📋 Incidencias abiertas por planta")
+
+        planta_actual = None
+
         for item in espacios_incidencias:
             planta_tmp = item["planta"]
             espacio_tmp = item["espacio"]
-    
-            c_info, c_btn = st.columns([4, 1])
-    
-            with c_info:
-                st.markdown(f"🔴 **{planta_tmp} · {espacio_tmp}**")
-    
-            with c_btn:
-                if st.button(
-                    "Abrir",
-                    key=f"abrir_inc_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}",
-                    use_container_width=True
-                ):
-                    st.session_state["colegio_ficha_seleccionada"] = {
-                        "centro": centro,
-                        "edificio": edificio,
-                        "planta": planta_tmp,
-                        "espacio": espacio_tmp,
-                    }
-    
-                    clave = _clave_ficha(centro, edificio, planta_tmp, espacio_tmp)
-                    st.session_state[f"bloque_ficha_{clave}"] = "actuaciones"
-                    st.session_state["colegio_ver_arbol"] = False
-                    st.rerun()
-    
+            actuaciones = item.get("actuaciones") or []
+
+            if planta_tmp != planta_actual:
+                planta_actual = planta_tmp
+                st.markdown(f"#### 📍 {planta_actual}")
+
+            if actuaciones:
+                for a in actuaciones:
+                    (
+                        id_ot,
+                        numero_ot,
+                        descripcion,
+                        estado_ot,
+                        prioridad,
+                        operario,
+                        origen,
+                        area,
+                        fecha,
+                    ) = a
+
+                    c_info, c_btn = st.columns([5, 1])
+
+                    with c_info:
+                        st.markdown(
+                            f"🔴 **{espacio_tmp}** · "
+                            f"`{numero_ot or '-'}` · "
+                            f"{prioridad or '-'} · "
+                            f"{descripcion or '-'}"
+                        )
+
+                    with c_btn:
+                        if st.button(
+                            "Abrir",
+                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}",
+                            use_container_width=True
+                        ):
+                            _abrir_ficha_desde_colegio(
+                                centro,
+                                edificio,
+                                planta_tmp,
+                                espacio_tmp,
+                                "actuaciones"
+                            )
+
+            else:
+                c_info, c_btn = st.columns([5, 1])
+
+                with c_info:
+                    st.markdown(
+                        f"🔴 **{espacio_tmp}** · OT abierta detectada, pendiente de enlazar"
+                    )
+
+                with c_btn:
+                    if st.button(
+                        "Abrir",
+                        key=f"abrir_espacio_sin_ot_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}",
+                        use_container_width=True
+                    ):
+                        _abrir_ficha_desde_colegio(
+                            centro,
+                            edificio,
+                            planta_tmp,
+                            espacio_tmp,
+                            "actuaciones"
+                        )
+
         st.markdown("---")
-    
+
         if st.button("🌳 Ver árbol", use_container_width=True):
             st.session_state["colegio_ver_arbol"] = not st.session_state.get(
                 "colegio_ver_arbol",
                 False
             )
             st.rerun()
-    
+
         if st.session_state.get("colegio_ver_arbol", False):
             st.markdown("---")
             mostrar_arbol_colegio()
-    
+
         ficha = st.session_state.get("colegio_ficha_seleccionada")
-    
+
         if ficha:
             st.markdown("---")
             ficha_espacio_basica(
@@ -196,68 +262,58 @@ def pantalla_colegio():
                 planta=ficha["planta"],
                 espacio=ficha["espacio"],
             )
-    
+
         return
 
-    else:
-        plantas = obtener_plantas_espacios(centro, edificio)
+    # =====================================================
+    # MODO NORMAL
+    # =====================================================
+    plantas = obtener_plantas_espacios(centro, edificio)
 
-        if not plantas:
-            st.info("No hay plantas en este edificio.")
-            return
+    if not plantas:
+        st.info("No hay plantas en este edificio.")
+        return
 
-        planta = st.selectbox(
-            "📍 Planta",
-            plantas,
-            key=f"colegio_rapido_planta_{centro}_{edificio}"
-        )
+    planta = st.selectbox(
+        "📍 Planta",
+        plantas,
+        key=f"colegio_rapido_planta_{centro}_{edificio}"
+    )
 
-        espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
-        espacios = [e[0] for e in espacios_datos]
+    espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
+    espacios = [e[0] for e in espacios_datos]
 
-        if not espacios:
-            st.info("No hay espacios en esta planta.")
-            return
+    if not espacios:
+        st.info("No hay espacios en esta planta.")
+        return
 
-        espacio = st.selectbox(
-            "🚪 Espacio",
-            espacios,
-            key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
-        )
+    espacio = st.selectbox(
+        "🚪 Espacio",
+        espacios,
+        key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
+    )
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
         if st.button("🔵 Abrir ficha del espacio", use_container_width=True):
-            st.session_state["colegio_ficha_seleccionada"] = {
-                "centro": centro,
-                "edificio": edificio,
-                "planta": planta,
-                "espacio": espacio,
-            }
-            clave = _clave_ficha(centro, edificio, planta, espacio)
-
-            st.session_state[f"bloque_ficha_{clave}"] = (
-                "actuaciones"
-                if st.session_state.get("colegio_solo_incidencias", False)
-                else ""
+            _abrir_ficha_desde_colegio(
+                centro,
+                edificio,
+                planta,
+                espacio,
+                ""
             )
-            st.session_state["colegio_ver_arbol"] = False
-            st.rerun()
 
     with c2:
         if st.button("📦 Inventario directo", use_container_width=True):
-            clave = _clave_ficha(centro, edificio, planta, espacio)
-
-            st.session_state["colegio_ficha_seleccionada"] = {
-                "centro": centro,
-                "edificio": edificio,
-                "planta": planta,
-                "espacio": espacio,
-            }
-            st.session_state[f"bloque_ficha_{clave}"] = "inventario"
-            st.session_state["colegio_ver_arbol"] = False
-            st.rerun()
+            _abrir_ficha_desde_colegio(
+                centro,
+                edificio,
+                planta,
+                espacio,
+                "inventario"
+            )
 
     with c3:
         if st.button("🌳 Ver árbol", use_container_width=True):
