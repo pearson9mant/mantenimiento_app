@@ -727,7 +727,7 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
         st.markdown("#### Nuevo elemento")
 
         catalogo = _catalogo_por_categoria()
-        categorias = list(catalogo.keys())
+        categorias = list(catalogo.keys()) or ["Otros"]
         
         categoria_sugerida = _categoria_sugerida_por_espacio(espacio)
         
