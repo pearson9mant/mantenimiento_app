@@ -855,8 +855,9 @@ def copiar_inventario_entre_espacios(
                     numero_ot_correctiva,
                     fecha_correctivo
                 )
-                VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', '')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', '')
             """), (
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 centro_destino,
                 edificio_destino,
                 espacio_destino,
