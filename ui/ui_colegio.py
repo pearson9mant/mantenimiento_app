@@ -164,9 +164,8 @@ def pantalla_colegio():
 
                     with c_info:
                         st.markdown(
-                            f"🔴 **{espacio}** · "
-                            f"`{numero_ot or '-'}` · "
-                            f"{prioridad or '-'} · "
+                            f"🔴 **{espacio}**  \n"
+                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
                             f"{descripcion or '-'}"
                         )
 
@@ -200,10 +199,9 @@ def pantalla_colegio():
 
                     with c_info:
                         st.markdown(
-                            f"🟠 **{espacio}** · Preventivo "
-                            f"`{num_prev or '-'}` · "
-                            f"{estado_prev or '-'} · "
-                            f"{obs_prev or ''}"
+                            f"🔴 **{espacio}**  \n"
+                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
+                            f"{descripcion or '-'}"
                         )
 
                     with c_btn:
@@ -241,11 +239,9 @@ def pantalla_colegio():
 
                     with c_info:
                         st.markdown(
-                            f"{icono_leg} **{espacio}** · Legionella · "
-                            f"{estado_leg} · "
-                            f"{puntos} punto(s) · "
-                            f"{tareas} tarea(s) · "
-                            f"{inc_leg} incidencia(s)"
+                            f"🔴 **{espacio}**  \n"
+                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
+                            f"{descripcion or '-'}"
                         )
 
                     with c_btn:
