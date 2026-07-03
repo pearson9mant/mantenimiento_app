@@ -55,6 +55,32 @@ def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuac
     st.rerun()
 
 
+def _mostrar_boton_arbol_y_ficha():
+    st.markdown("---")
+
+    if st.button("🌳 Ver árbol", use_container_width=True):
+        st.session_state["colegio_ver_arbol"] = not st.session_state.get(
+            "colegio_ver_arbol",
+            False
+        )
+        st.rerun()
+
+    if st.session_state.get("colegio_ver_arbol", False):
+        st.markdown("---")
+        mostrar_arbol_colegio()
+
+    ficha = st.session_state.get("colegio_ficha_seleccionada")
+
+    if ficha:
+        st.markdown("---")
+        ficha_espacio_basica(
+            centro=ficha["centro"],
+            edificio=ficha["edificio"],
+            planta=ficha["planta"],
+            espacio=ficha["espacio"],
+        )
+
+
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Centro de control por centro, edificio, planta y espacio.")
@@ -68,14 +94,10 @@ def pantalla_colegio():
     centros = obtener_centros_espacios()
     centros_visibles = obtener_centros_visibles_usuario()
 
-    centros = [
-        c for c in centros
-        if c in centros_visibles
-    ]
-
+    centros = [c for c in centros if c in centros_visibles]
 
     if not centros:
-        st.info("No hay espacios con actividad pendiente.")
+        st.info("No hay centros visibles para este usuario.")
         return
 
     centro = st.selectbox(
@@ -86,9 +108,8 @@ def pantalla_colegio():
 
     edificios = obtener_edificios_espacios(centro)
 
-
     if not edificios:
-        st.info("No hay edificios con actividad pendiente en este centro.")
+        st.info("No hay edificios configurados para este centro.")
         return
 
     edificio = st.selectbox(
@@ -99,175 +120,149 @@ def pantalla_colegio():
 
     # =====================================================
     # MODO CENTRO DE CONTROL
-    # Toda la actividad viene del módulo inteligente
     # =====================================================
-    
+    if solo_actividad:
+        mapa_actividad = obtener_mapa_actividad(
+            centro=centro,
+            edificio=edificio
+        )
 
-        if not actividad_edificio:
-            st.info("No hay actividad pendiente en este edificio.")
+        if not mapa_actividad:
+            st.success("🟢 No hay actividad pendiente en este edificio.")
+            _mostrar_boton_arbol_y_ficha()
             return
 
         st.markdown("### 📋 Actividad pendiente por planta")
 
-        planta_actual = None
+        for planta, items in mapa_actividad.items():
+            st.markdown(f"#### 📍 {planta}")
 
-        for item in actividad_edificio:
-            planta = item["planta"]
-            espacio = item["espacio"]
-            actuaciones = item.get("actuaciones", [])
-            preventivos_pend = item.get("preventivos_pendientes", [])
-            legionella = item.get("legionella", {})
-            tiene_legionella = item.get("tiene_legionella", False)
+            for item in items:
+                espacio = item.get("espacio", "")
+                actuaciones = item.get("actuaciones", [])
+                preventivos_pend = item.get("preventivos_pendientes", [])
+                legionella = item.get("legionella", {})
+                tiene_legionella = item.get("tiene_legionella", False)
 
-            if planta != planta_actual:
-                planta_actual = planta
-                st.markdown(f"#### 📍 {planta_actual}")
+                # -------------------------
+                # OT ABIERTAS
+                # -------------------------
+                for a in actuaciones:
+                    (
+                        id_ot,
+                        numero_ot,
+                        descripcion,
+                        estado_ot,
+                        prioridad,
+                        operario,
+                        origen,
+                        area,
+                        fecha,
+                    ) = a
 
-            # -------------------------
-            # OT ABIERTAS
-            # -------------------------
-            for a in actuaciones:
-                (
-                    id_ot,
-                    numero_ot,
-                    descripcion,
-                    estado_ot,
-                    prioridad,
-                    operario,
-                    origen,
-                    area,
-                    fecha,
-                ) = a
+                    c_info, c_btn = st.columns([5, 1])
 
-                c_info, c_btn = st.columns([5, 1])
-
-                with c_info:
-                    st.markdown(
-                        f"🔴 **{espacio}** · "
-                        f"`{numero_ot or '-'}` · "
-                        f"{prioridad or '-'} · "
-                        f"{descripcion or '-'}"
-                    )
-
-                with c_btn:
-                    if st.button(
-                        "Abrir",
-                        key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta}_{espacio}",
-                        use_container_width=True
-                    ):
-                        _abrir_ficha_desde_colegio(
-                            centro,
-                            edificio,
-                            planta,
-                            espacio,
-                            "actuaciones"
+                    with c_info:
+                        st.markdown(
+                            f"🔴 **{espacio}** · "
+                            f"`{numero_ot or '-'}` · "
+                            f"{prioridad or '-'} · "
+                            f"{descripcion or '-'}"
                         )
 
-            # -------------------------
-            # PREVENTIVOS
-            # -------------------------
-            for p in preventivos_pend:
-                try:
-                    id_prev, fecha_prev, operario_prev, estado_prev, obs_prev, num_prev = p
-                except Exception:
-                    id_prev = ""
-                    fecha_prev = ""
-                    operario_prev = ""
-                    estado_prev = ""
-                    obs_prev = ""
-                    num_prev = ""
+                    with c_btn:
+                        if st.button(
+                            "Abrir",
+                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta}_{espacio}",
+                            use_container_width=True
+                        ):
+                            _abrir_ficha_desde_colegio(
+                                centro,
+                                edificio,
+                                planta,
+                                espacio,
+                                "actuaciones"
+                            )
 
-                c_info, c_btn = st.columns([5, 1])
+                # -------------------------
+                # PREVENTIVOS
+                # -------------------------
+                for p in preventivos_pend:
+                    try:
+                        id_prev, fecha_prev, operario_prev, estado_prev, obs_prev, num_prev = p
+                    except Exception:
+                        id_prev = ""
+                        estado_prev = ""
+                        obs_prev = ""
+                        num_prev = ""
 
-                with c_info:
-                    st.markdown(
-                        f"🟠 **{espacio}** · Preventivo "
-                        f"`{num_prev or '-'}` · "
-                        f"{estado_prev or '-'} · "
-                        f"{obs_prev or ''}"
-                    )
+                    c_info, c_btn = st.columns([5, 1])
 
-                with c_btn:
-                    if st.button(
-                        "Abrir",
-                        key=f"abrir_prev_colegio_{id_prev}_{planta}_{espacio}",
-                        use_container_width=True
-                    ):
-                        _abrir_ficha_desde_colegio(
-                            centro,
-                            edificio,
-                            planta,
-                            espacio,
-                            "preventivos"
+                    with c_info:
+                        st.markdown(
+                            f"🟠 **{espacio}** · Preventivo "
+                            f"`{num_prev or '-'}` · "
+                            f"{estado_prev or '-'} · "
+                            f"{obs_prev or ''}"
                         )
 
-            # -------------------------
-            # LEGIONELLA
-            # -------------------------
-            if tiene_legionella:
-                color_leg = str(legionella.get("color") or "").lower()
-                estado_leg = legionella.get("estado") or "Legionella"
-                puntos = legionella.get("puntos") or 0
-                tareas = legionella.get("tareas") or 0
-                inc_leg = legionella.get("incidencias_abiertas") or 0
+                    with c_btn:
+                        if st.button(
+                            "Abrir",
+                            key=f"abrir_prev_colegio_{id_prev}_{planta}_{espacio}",
+                            use_container_width=True
+                        ):
+                            _abrir_ficha_desde_colegio(
+                                centro,
+                                edificio,
+                                planta,
+                                espacio,
+                                "preventivos"
+                            )
 
-                icono_leg = "🦠"
+                # -------------------------
+                # LEGIONELLA
+                # -------------------------
+                if tiene_legionella:
+                    color_leg = str(legionella.get("color") or "").lower()
+                    estado_leg = legionella.get("estado") or "Legionella"
+                    puntos = legionella.get("puntos") or 0
+                    tareas = legionella.get("tareas") or 0
+                    inc_leg = legionella.get("incidencias_abiertas") or 0
 
-                if color_leg == "rojo":
-                    icono_leg = "🔴🦠"
-                elif color_leg == "amarillo":
-                    icono_leg = "🟠🦠"
+                    icono_leg = "🦠"
 
-                c_info, c_btn = st.columns([5, 1])
+                    if color_leg == "rojo":
+                        icono_leg = "🔴🦠"
+                    elif color_leg == "amarillo":
+                        icono_leg = "🟠🦠"
 
-                with c_info:
-                    st.markdown(
-                        f"{icono_leg} **{espacio}** · Legionella · "
-                        f"{estado_leg} · "
-                        f"{puntos} punto(s) · "
-                        f"{tareas} tarea(s) · "
-                        f"{inc_leg} incidencia(s)"
-                    )
+                    c_info, c_btn = st.columns([5, 1])
 
-                with c_btn:
-                    if st.button(
-                        "Abrir",
-                        key=f"abrir_leg_colegio_{planta}_{espacio}",
-                        use_container_width=True
-                    ):
-                        _abrir_ficha_desde_colegio(
-                            centro,
-                            edificio,
-                            planta,
-                            espacio,
-                            "legionella"
+                    with c_info:
+                        st.markdown(
+                            f"{icono_leg} **{espacio}** · Legionella · "
+                            f"{estado_leg} · "
+                            f"{puntos} punto(s) · "
+                            f"{tareas} tarea(s) · "
+                            f"{inc_leg} incidencia(s)"
                         )
 
-        st.markdown("---")
+                    with c_btn:
+                        if st.button(
+                            "Abrir",
+                            key=f"abrir_leg_colegio_{planta}_{espacio}",
+                            use_container_width=True
+                        ):
+                            _abrir_ficha_desde_colegio(
+                                centro,
+                                edificio,
+                                planta,
+                                espacio,
+                                "legionella"
+                            )
 
-        if st.button("🌳 Ver árbol", use_container_width=True):
-            st.session_state["colegio_ver_arbol"] = not st.session_state.get(
-                "colegio_ver_arbol",
-                False
-            )
-            st.rerun()
-
-        if st.session_state.get("colegio_ver_arbol", False):
-            st.markdown("---")
-            mostrar_arbol_colegio()
-
-        ficha = st.session_state.get("colegio_ficha_seleccionada")
-
-        if ficha:
-            st.markdown("---")
-
-            ficha_espacio_basica(
-                centro=ficha["centro"],
-                edificio=ficha["edificio"],
-                planta=ficha["planta"],
-                espacio=ficha["espacio"],
-            )
-
+        _mostrar_boton_arbol_y_ficha()
         return
 
     # =====================================================
@@ -341,7 +336,6 @@ def pantalla_colegio():
 
     if ficha:
         st.markdown("---")
-
         ficha_espacio_basica(
             centro=ficha["centro"],
             edificio=ficha["edificio"],
@@ -373,7 +367,6 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         st.error(f"🔴 {info['estado']}")
 
     st.markdown("### 🧠 Asistente técnico")
-
     st.markdown("**Situación actual**")
 
     for linea in info.get("diagnostico", []):
