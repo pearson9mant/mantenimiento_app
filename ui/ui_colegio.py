@@ -75,11 +75,6 @@ def pantalla_colegio():
         if c in centros_visibles
     ]
 
-    if solo_actividad:
-        centros = [
-            c for c in centros
-            if centro_tiene_actividad(c)
-        ]
 
     if not centros:
         st.info("No hay espacios con actividad pendiente.")
