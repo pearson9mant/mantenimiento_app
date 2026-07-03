@@ -627,6 +627,86 @@ def mostrar_selector_centros():
         if st.button("🏫 Pearson 22", use_container_width=True, key="btn_gerencia_p22"):
             seleccionar_centro("Pearson 22")
 
+def evaluar_estado_centro(df, centro):
+    abiertas = contar(df, centro, "abiertas")
+    material = contar(df, centro, "material")
+    legionella = contar(df, centro, "legionella_mes")
+    preventivas = contar(df, centro, "preventivas_mes")
+
+    if abiertas >= 20 or material >= 5:
+        return "rojo", 55, "Existen incidencias que requieren atención prioritaria."
+
+    if abiertas >= 8 or material > 0:
+        return "amarillo", 76, "Hay actuaciones pendientes que conviene seguir."
+
+    return "verde", 94, "Estado general correcto."
+
+
+def obtener_riesgos_criticos(df, centro):
+    if df.empty:
+        return pd.DataFrame()
+
+    datos = obtener_df_tarjeta(df, centro, "abiertas")
+
+    if datos.empty:
+        return datos
+
+    texto = (
+        datos["espacio"].fillna("").astype(str) + " " +
+        datos["area"].fillna("").astype(str) + " " +
+        datos["descripcion"].fillna("").astype(str) + " " +
+        datos["prioridad"].fillna("").astype(str)
+    ).str.lower()
+
+    palabras_criticas = (
+        "caldera|acs|legionella|cuadro eléctrico|electricidad|fuga|gas|"
+        "frigorífica|congelador|cámara|alarma|incendio|extintor|bie|"
+        "cristal roto|desprendido|riesgo|urgente"
+    )
+
+    return datos[
+        texto.str.contains(palabras_criticas, na=False)
+        | datos["prioridad"].fillna("").astype(str).str.lower().str.contains("urgente|alta", na=False)
+    ].head(8)
+
+
+def mostrar_resumen_ejecutivo(df, centro):
+    color, porcentaje, mensaje = evaluar_estado_centro(df, centro)
+
+    if color == "verde":
+        st.success(f"🟢 Estado general del centro · {porcentaje}%\n\n{mensaje}")
+    elif color == "amarillo":
+        st.warning(f"🟠 Estado general del centro · {porcentaje}%\n\n{mensaje}")
+    else:
+        st.error(f"🔴 Estado general del centro · {porcentaje}%\n\n{mensaje}")
+
+    riesgos = obtener_riesgos_criticos(df, centro)
+
+    st.markdown("### 🔴 Riesgos críticos")
+
+    if riesgos.empty:
+        st.success("No hay riesgos críticos detectados.")
+    else:
+        for _, row in riesgos.iterrows():
+            st.markdown(
+                f"**{row.get('espacio', '-') or '-'}** · "
+                f"`{row.get('numero_ot', '-') or '-'}`"
+            )
+            st.caption(row.get("descripcion", "") or "")
+
+    st.markdown("### 🎯 Actuaciones recomendadas hoy")
+
+    abiertas = obtener_df_tarjeta(df, centro, "abiertas").head(5)
+
+    if abiertas.empty:
+        st.success("No hay actuaciones pendientes prioritarias.")
+    else:
+        for i, (_, row) in enumerate(abiertas.iterrows(), start=1):
+            st.markdown(
+                f"{i}. **{row.get('espacio', '-') or '-'}** · "
+                f"{row.get('descripcion', '-') or '-'}"
+            )
+
 
 def mostrar_menu_centro(df, centro):
     st.markdown(f"<div class='gerencia-section-title'>🏫 {centro}</div>", unsafe_allow_html=True)
@@ -634,45 +714,46 @@ def mostrar_menu_centro(df, centro):
     if st.button("⬅️ Volver a centros", use_container_width=True, key="volver_centros_gerencia"):
         volver_a_centros()
 
-    st.markdown(
-        "<div class='gerencia-card-info'>Pulsa una tarjeta para ver solo ese detalle.</div>",
-        unsafe_allow_html=True
-    )
+    mostrar_resumen_ejecutivo(df, centro)
 
-    c1, c2, c3, c4 = st.columns(4)
+    with st.expander("📊 Indicadores de mantenimiento", expanded=False):
+        c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        boton_tarjeta("Órdenes abiertas", contar(df, centro, "abiertas"), centro, "abiertas", "📂")
+        with c1:
+            boton_tarjeta("Órdenes abiertas", contar(df, centro, "abiertas"), centro, "abiertas", "📂")
 
-    with c2:
-        boton_tarjeta("En curso", contar(df, centro, "en_curso"), centro, "en_curso", "🟡")
+        with c2:
+            boton_tarjeta("En curso", contar(df, centro, "en_curso"), centro, "en_curso", "🟡")
 
-    with c3:
-        boton_tarjeta("Pendiente material", contar(df, centro, "material"), centro, "material", "📦")
+        with c3:
+            boton_tarjeta("Pendiente material", contar(df, centro, "material"), centro, "material", "📦")
 
-    with c4:
-        boton_tarjeta("Órdenes cerradas", contar(df, centro, "cerradas"), centro, "cerradas", "✅")
+        with c4:
+            boton_tarjeta("Órdenes cerradas", contar(df, centro, "cerradas"), centro, "cerradas", "✅")
 
-    c3, c4 = st.columns(2)
+        c5, c6 = st.columns(2)
 
-    with c3:
-        boton_tarjeta("Legionella este mes", contar(df, centro, "legionella_mes"), centro, "legionella_mes", "💧")
+        with c5:
+            boton_tarjeta("Legionella este mes", contar(df, centro, "legionella_mes"), centro, "legionella_mes", "💧")
 
-    with c4:
-        boton_tarjeta("Preventivas este mes", contar(df, centro, "preventivas_mes"), centro, "preventivas_mes", "🛠️")
+        with c6:
+            boton_tarjeta("Preventivas este mes", contar(df, centro, "preventivas_mes"), centro, "preventivas_mes", "🛠️")
 
-    st.markdown("### 💶 Inventario")
+    with st.expander("🌳 Ver incidencias por centro", expanded=False):
+        st.caption("Vista solo lectura para gerencia.")
+        mostrar_arbol_gerencia()
 
-    total_inv = total_inventario_centro(centro)
-    total_usado = total_utilizado_centro(centro, df)
+    with st.expander("💶 Recursos e inventario", expanded=False):
+        total_inv = total_inventario_centro(centro)
+        total_usado = total_utilizado_centro(centro, df)
 
-    c5, c6 = st.columns(2)
+        c7, c8 = st.columns(2)
 
-    with c5:
-        boton_tarjeta_dinero("Total inventario", total_inv, centro, "inventario_total", "💰")
+        with c7:
+            boton_tarjeta_dinero("Total inventario", total_inv, centro, "inventario_total", "💰")
 
-    with c6:
-        boton_tarjeta_dinero("Material utilizado", total_usado, centro, "inventario_utilizado", "📉")
+        with c8:
+            boton_tarjeta_dinero("Material utilizado", total_usado, centro, "inventario_utilizado", "📉")
 
 
 def mostrar_detalle_ordenes(df, centro, tipo, titulo):
