@@ -668,6 +668,86 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                             else:
                                 st.error(mensaje)
 
+def _mostrar_copiar_inventario(centro, edificio, planta, espacio, inventario, clave_base):
+    st.markdown("---")
+    st.markdown("### 📋 Copiar inventario desde otro espacio")
+
+    with st.expander("Copiar elementos de otro espacio", expanded=False):
+        centro_origen = st.selectbox(
+            "Centro origen",
+            obtener_centros_espacios(),
+            index=obtener_centros_espacios().index(centro) if centro in obtener_centros_espacios() else 0,
+            key=f"copiar_inv_centro_{clave_base}"
+        )
+
+        edificios = obtener_edificios_espacios(centro_origen)
+
+        edificio_origen = st.selectbox(
+            "Edificio origen",
+            edificios,
+            index=edificios.index(edificio) if edificio in edificios else 0,
+            key=f"copiar_inv_edificio_{clave_base}"
+        )
+
+        plantas = obtener_plantas_espacios(centro_origen, edificio_origen)
+
+        planta_origen = st.selectbox(
+            "Planta origen",
+            plantas,
+            key=f"copiar_inv_planta_{clave_base}"
+        )
+
+        espacios_datos = obtener_espacios_por_planta(
+            centro_origen,
+            edificio_origen,
+            planta_origen
+        )
+
+        espacios = [e[0] for e in espacios_datos]
+
+        espacio_origen = st.selectbox(
+            "Espacio origen",
+            espacios,
+            key=f"copiar_inv_espacio_{clave_base}"
+        )
+
+        st.caption(f"Destino: {centro} · {edificio} · {planta} · {espacio}")
+
+        confirmar = st.checkbox(
+            "Confirmo copiar inventario al espacio actual",
+            key=f"confirmar_copiar_inv_{clave_base}"
+        )
+
+        if st.button(
+            "📋 Copiar inventario",
+            key=f"btn_copiar_inv_{clave_base}",
+            use_container_width=True
+        ):
+            if not confirmar:
+                st.warning("Marca primero la confirmación.")
+            elif (
+                centro_origen == centro
+                and edificio_origen == edificio
+                and espacio_origen == espacio
+            ):
+                st.warning("El origen y el destino son el mismo espacio.")
+            else:
+                ok, mensaje = copiar_inventario_entre_espacios(
+                    centro_origen=centro_origen,
+                    edificio_origen=edificio_origen,
+                    espacio_origen=espacio_origen,
+                    centro_destino=centro,
+                    edificio_destino=edificio,
+                    espacio_destino=espacio,
+                    operario=st.session_state.get("operario_activo", "")
+                )
+
+                if ok:
+                    st.success(mensaje)
+                    st.rerun()
+                else:
+                    st.error(mensaje)
+
 
 def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario, clave_base):
     st.markdown("---")
@@ -916,6 +996,15 @@ def mostrar_inventario_espacio(centro, edificio, planta, espacio):
     _mostrar_inventario_actual(
         centro=centro,
         edificio=edificio,
+        espacio=espacio,
+        inventario=inventario,
+        clave_base=clave_base
+    )
+
+    _mostrar_copiar_inventario(
+        centro=centro,
+        edificio=edificio,
+        planta=planta,
         espacio=espacio,
         inventario=inventario,
         clave_base=clave_base
