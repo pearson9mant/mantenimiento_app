@@ -14,9 +14,7 @@ from modules.inventario import obtener_materiales_para_select
 
 from modules.inteligencia import (
     diagnosticar_espacio,
-    obtener_actividad_edificio,
-    edificio_tiene_actividad,
-    centro_tiene_actividad,
+    obtener_mapa_actividad,
 )
 
 from modules.espacios import (
