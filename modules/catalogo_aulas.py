@@ -63,6 +63,10 @@ CATALOGO_BASE_AULAS = [
     ("Climatización", "Fan-coil", "Climatización"),
     ("Climatización", "Termostato", "Climatización"),
     ("Climatización", "Rejilla ventilación", "Climatización"),
+    ("Climatización", "Aire acondicionado", "Climatización"),
+    ("Climatización", "Unidad interior A/A", "Climatización"),
+    ("Climatización", "Unidad exterior A/A", "Climatización"),
+    ("Climatización", "Mando aire acondicionado", "Climatización"),
 
     # Fontanería / WC
     ("Fontanería", "Lavabo", "Fontanería"),
