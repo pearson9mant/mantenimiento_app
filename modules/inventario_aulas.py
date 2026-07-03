@@ -777,3 +777,108 @@ def cerrar_correctivo_inventario(id_elemento, estado_final="Correcto"):
 
     finally:
         conn.close()
+
+def copiar_inventario_entre_espacios(
+    centro_origen,
+    edificio_origen,
+    espacio_origen,
+    centro_destino,
+    edificio_destino,
+    espacio_destino,
+    operario=""
+):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT elemento, cantidad, estado, ancho, alto, fondo, unidad, observaciones
+            FROM inventario_aulas
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+        """), (
+            centro_origen,
+            edificio_origen,
+            espacio_origen
+        ))
+
+        filas = cur.fetchall()
+
+        if not filas:
+            conn.close()
+            return False, "El espacio origen no tiene inventario."
+
+        copiados = 0
+        omitidos = 0
+
+        for fila in filas:
+            elemento, cantidad, estado, ancho, alto, fondo, unidad, observaciones = fila
+
+            cur.execute(_sql("""
+                SELECT COUNT(*)
+                FROM inventario_aulas
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND espacio = ?
+                  AND LOWER(TRIM(elemento)) = LOWER(TRIM(?))
+            """), (
+                centro_destino,
+                edificio_destino,
+                espacio_destino,
+                elemento
+            ))
+
+            existe = cur.fetchone()[0]
+
+            if existe:
+                omitidos += 1
+                continue
+
+            cur.execute(_sql("""
+                INSERT INTO inventario_aulas
+                (
+                    fecha_revision,
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento,
+                    cantidad,
+                    estado,
+                    ancho,
+                    alto,
+                    fondo,
+                    unidad,
+                    observaciones,
+                    foto,
+                    operario,
+                    numero_ot_correctiva,
+                    fecha_correctivo
+                )
+                VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', '')
+            """), (
+                centro_destino,
+                edificio_destino,
+                espacio_destino,
+                elemento,
+                cantidad,
+                estado,
+                ancho or 0,
+                alto or 0,
+                fondo or 0,
+                unidad or "cm",
+                observaciones or "",
+                operario or ""
+            ))
+
+            copiados += 1
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Inventario copiado. Elementos copiados: {copiados}. Omitidos por existir: {omitidos}."
+
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return False, f"Error copiando inventario: {e}"
