@@ -505,7 +505,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     unidad=unidad or "cm",
                     observaciones=nuevas_obs,
                     foto=foto_final,
-                    operario=st.session_state.get("operario_activo", "")
+                    operario=st.session_state.get("operario_activo", ""),
                 )
 
                 if ok:
