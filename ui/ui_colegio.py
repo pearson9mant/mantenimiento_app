@@ -139,28 +139,65 @@ def pantalla_colegio():
             edificio,
             ots_abiertas
         )
-
+    
         if not espacios_incidencias:
             st.info("No hay espacios con incidencias en este edificio.")
             return
-
-        labels = [e["label"] for e in espacios_incidencias]
-
-        label_sel = st.selectbox(
-            "🚪 Espacios con incidencias",
-            labels,
-            key=f"colegio_rapido_espacio_inc_{centro}_{edificio}"
-        )
-
-        seleccionado = next(
-            e for e in espacios_incidencias
-            if e["label"] == label_sel
-        )
-
-        planta = seleccionado["planta"]
-        espacio = seleccionado["espacio"]
-
-        st.caption(f"📍 {centro} · {edificio} · {planta}")
+    
+        st.markdown("### 📋 Espacios con incidencias abiertas")
+    
+        for item in espacios_incidencias:
+            planta_tmp = item["planta"]
+            espacio_tmp = item["espacio"]
+    
+            c_info, c_btn = st.columns([4, 1])
+    
+            with c_info:
+                st.markdown(f"🔴 **{planta_tmp} · {espacio_tmp}**")
+    
+            with c_btn:
+                if st.button(
+                    "Abrir",
+                    key=f"abrir_inc_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}",
+                    use_container_width=True
+                ):
+                    st.session_state["colegio_ficha_seleccionada"] = {
+                        "centro": centro,
+                        "edificio": edificio,
+                        "planta": planta_tmp,
+                        "espacio": espacio_tmp,
+                    }
+    
+                    clave = _clave_ficha(centro, edificio, planta_tmp, espacio_tmp)
+                    st.session_state[f"bloque_ficha_{clave}"] = "actuaciones"
+                    st.session_state["colegio_ver_arbol"] = False
+                    st.rerun()
+    
+        st.markdown("---")
+    
+        if st.button("🌳 Ver árbol", use_container_width=True):
+            st.session_state["colegio_ver_arbol"] = not st.session_state.get(
+                "colegio_ver_arbol",
+                False
+            )
+            st.rerun()
+    
+        if st.session_state.get("colegio_ver_arbol", False):
+            st.markdown("---")
+            mostrar_arbol_colegio()
+    
+        ficha = st.session_state.get("colegio_ficha_seleccionada")
+    
+        if ficha:
+            st.markdown("---")
+            ficha_espacio_basica(
+                centro=ficha["centro"],
+                edificio=ficha["edificio"],
+                planta=ficha["planta"],
+                espacio=ficha["espacio"],
+            )
+    
+        return
 
     else:
         plantas = obtener_plantas_espacios(centro, edificio)
