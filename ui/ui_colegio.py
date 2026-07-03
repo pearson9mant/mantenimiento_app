@@ -1,12 +1,12 @@
 import streamlit as st
 
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
+from modules.colegio import obtener_centros_visibles_usuario
 from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
 from ui.ui_inventario_espacio import mostrar_inventario_espacio
 from modules.inventario import obtener_materiales_para_select
 from modules.inteligencia import diagnosticar_espacio
-from modules.colegio import obtener_centros_visibles_usuario
 
 from modules.espacios import (
     obtener_centros_espacios,
@@ -33,41 +33,6 @@ def _clave_ficha(centro, edificio, planta, espacio):
     )
 
 
-def _hay_incidencia_en_espacio(centro, espacio, ots_abiertas):
-    from modules.colegio import contar_ots_espacio_rapido
-
-    return contar_ots_espacio_rapido(
-        centro=centro,
-        espacio=espacio,
-        ots_abiertas=ots_abiertas
-    ) > 0
-
-
-def _obtener_trabajos_abiertos_edificio(centro, edificio):
-    trabajos = []
-
-    for planta_tmp in obtener_plantas_espacios(centro, edificio):
-        for espacio_tmp, tipo_tmp in obtener_espacios_por_planta(
-            centro,
-            edificio,
-            planta_tmp
-        ):
-            actuaciones = obtener_actuaciones_espacio(
-                centro,
-                edificio,
-                espacio_tmp
-            )
-
-            for a in actuaciones:
-                trabajos.append({
-                    "planta": planta_tmp,
-                    "espacio": espacio_tmp,
-                    "actuacion": a,
-                })
-
-    return trabajos
-
-
 def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuaciones"):
     st.session_state["colegio_ficha_seleccionada"] = {
         "centro": centro,
@@ -82,23 +47,159 @@ def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuac
     st.rerun()
 
 
+def _preventivos_pendientes(preventivos):
+    pendientes = []
+
+    for p in preventivos:
+        try:
+            estado = str(p[3] or "").strip().lower()
+        except Exception:
+            estado = ""
+
+        if estado not in [
+            "finalizado",
+            "finalizada",
+            "cerrado",
+            "cerrada",
+            "completado",
+            "completada",
+            "ok",
+        ]:
+            pendientes.append(p)
+
+    return pendientes
+
+
+def _obtener_resumen_legionella_seguro(centro, edificio, espacio):
+    try:
+        from ui.ui_legionella import obtener_resumen_legionella_espacio
+
+        return obtener_resumen_legionella_espacio(
+            centro,
+            edificio,
+            espacio
+        )
+    except Exception:
+        return {
+            "aplica": False,
+            "estado": "No aplica",
+            "color": "gris",
+            "puntos": 0,
+            "tareas": 0,
+            "incidencias_abiertas": 0,
+            "ultimo_control": "",
+            "proximo_control": "",
+            "diagnostico": [],
+            "recomendaciones": [],
+        }
+
+
+def _legionella_relevante(resumen_legionella):
+    if not resumen_legionella:
+        return False
+
+    if not resumen_legionella.get("aplica"):
+        return False
+
+    if int(resumen_legionella.get("incidencias_abiertas") or 0) > 0:
+        return True
+
+    color = str(resumen_legionella.get("color") or "").lower()
+
+    if color in ["rojo", "amarillo"]:
+        return True
+
+    return False
+
+
+def _obtener_actividad_espacio(centro, edificio, planta, espacio):
+    actuaciones = obtener_actuaciones_espacio(
+        centro,
+        edificio,
+        espacio
+    )
+
+    preventivos = obtener_preventivos_espacio(
+        centro,
+        edificio,
+        espacio
+    )
+
+    preventivos_pend = _preventivos_pendientes(preventivos)
+
+    legionella = _obtener_resumen_legionella_seguro(
+        centro,
+        edificio,
+        espacio
+    )
+
+    tiene_legionella = _legionella_relevante(legionella)
+
+    tiene_actividad = (
+        len(actuaciones) > 0
+        or len(preventivos_pend) > 0
+        or tiene_legionella
+    )
+
+    return {
+        "centro": centro,
+        "edificio": edificio,
+        "planta": planta,
+        "espacio": espacio,
+        "actuaciones": actuaciones,
+        "preventivos": preventivos,
+        "preventivos_pendientes": preventivos_pend,
+        "legionella": legionella,
+        "tiene_legionella": tiene_legionella,
+        "tiene_actividad": tiene_actividad,
+    }
+
+
+def _obtener_actividad_edificio(centro, edificio):
+    actividad = []
+
+    for planta in obtener_plantas_espacios(centro, edificio):
+        for espacio, tipo in obtener_espacios_por_planta(
+            centro,
+            edificio,
+            planta
+        ):
+            item = _obtener_actividad_espacio(
+                centro,
+                edificio,
+                planta,
+                espacio
+            )
+
+            if item["tiene_actividad"]:
+                actividad.append(item)
+
+    return actividad
+
+
+def _edificio_tiene_actividad(centro, edificio):
+    return len(_obtener_actividad_edificio(centro, edificio)) > 0
+
+
+def _centro_tiene_actividad(centro):
+    for edificio in obtener_edificios_espacios(centro):
+        if _edificio_tiene_actividad(centro, edificio):
+            return True
+
+    return False
+
+
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
-    st.caption("Entrada rápida por centro, edificio, planta y espacio.")
+    st.caption("Centro de control por centro, edificio, planta y espacio.")
 
-    solo_incidencias = st.checkbox(
-        "Mostrar solo espacios con incidencias",
+    solo_actividad = st.checkbox(
+        "Mostrar solo espacios con actividad pendiente",
         value=False,
         key="colegio_solo_incidencias"
     )
 
-    ots_abiertas = None
     centros = obtener_centros_espacios()
-
-    if solo_incidencias:
-        from modules.colegio import obtener_ots_abiertas_por_centro
-        ots_abiertas = obtener_ots_abiertas_por_centro()
-
     centros_visibles = obtener_centros_visibles_usuario()
 
     centros = [
@@ -106,19 +207,14 @@ def pantalla_colegio():
         if c in centros_visibles
     ]
 
-    if solo_incidencias:
+    if solo_actividad:
         centros = [
             c for c in centros
-            if any(
-                _hay_incidencia_en_espacio(c, espacio, ots_abiertas)
-                for edificio_tmp in obtener_edificios_espacios(c)
-                for planta_tmp in obtener_plantas_espacios(c, edificio_tmp)
-                for espacio, tipo in obtener_espacios_por_planta(c, edificio_tmp, planta_tmp)
-            )
+            if _centro_tiene_actividad(c)
         ]
 
     if not centros:
-        st.info("No hay espacios con incidencias abiertas.")
+        st.info("No hay espacios con actividad pendiente.")
         return
 
     centro = st.selectbox(
@@ -129,18 +225,14 @@ def pantalla_colegio():
 
     edificios = obtener_edificios_espacios(centro)
 
-    if solo_incidencias:
+    if solo_actividad:
         edificios = [
             e for e in edificios
-            if any(
-                _hay_incidencia_en_espacio(centro, espacio, ots_abiertas)
-                for planta_tmp in obtener_plantas_espacios(centro, e)
-                for espacio, tipo in obtener_espacios_por_planta(centro, e, planta_tmp)
-            )
+            if _edificio_tiene_actividad(centro, e)
         ]
 
     if not edificios:
-        st.info("No hay edificios con incidencias en este centro.")
+        st.info("No hay edificios con actividad pendiente en este centro.")
         return
 
     edificio = st.selectbox(
@@ -150,90 +242,151 @@ def pantalla_colegio():
     )
 
     # =====================================================
-    # MODO INCIDENCIAS: Centro -> Edificio -> Plantas -> OT
+    # MODO CENTRO DE CONTROL
     # =====================================================
-    if solo_incidencias:
-        espacios_incidencias = _obtener_espacios_con_incidencias_edificio(
+    if solo_actividad:
+        actividad_edificio = _obtener_actividad_edificio(
             centro,
-            edificio,
-            ots_abiertas
+            edificio
         )
 
-        if not espacios_incidencias:
-            st.info("No hay espacios con incidencias en este edificio.")
+        if not actividad_edificio:
+            st.info("No hay actividad pendiente en este edificio.")
             return
 
-        st.markdown("### 📋 Incidencias abiertas por planta")
+        st.markdown("### 📋 Actividad pendiente por planta")
 
         planta_actual = None
 
-        for item in espacios_incidencias:
-            planta_tmp = item["planta"]
-            espacio_tmp = item["espacio"]
-            actuaciones = item.get("actuaciones") or []
+        for item in actividad_edificio:
+            planta = item["planta"]
+            espacio = item["espacio"]
+            actuaciones = item["actuaciones"]
+            preventivos_pend = item["preventivos_pendientes"]
+            legionella = item["legionella"]
+            tiene_legionella = item["tiene_legionella"]
 
-            if planta_tmp != planta_actual:
-                planta_actual = planta_tmp
+            if planta != planta_actual:
+                planta_actual = planta
                 st.markdown(f"#### 📍 {planta_actual}")
 
-            if actuaciones:
-                for a in actuaciones:
-                    (
-                        id_ot,
-                        numero_ot,
-                        descripcion,
-                        estado_ot,
-                        prioridad,
-                        operario,
-                        origen,
-                        area,
-                        fecha,
-                    ) = a
+            # -------------------------
+            # OT ABIERTAS
+            # -------------------------
+            for a in actuaciones:
+                (
+                    id_ot,
+                    numero_ot,
+                    descripcion,
+                    estado_ot,
+                    prioridad,
+                    operario,
+                    origen,
+                    area,
+                    fecha,
+                ) = a
 
-                    c_info, c_btn = st.columns([5, 1])
-
-                    with c_info:
-                        st.markdown(
-                            f"🔴 **{espacio_tmp}** · "
-                            f"`{numero_ot or '-'}` · "
-                            f"{prioridad or '-'} · "
-                            f"{descripcion or '-'}"
-                        )
-
-                    with c_btn:
-                        if st.button(
-                            "Abrir",
-                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta_tmp}_{espacio_tmp}",
-                            use_container_width=True
-                        ):
-                            _abrir_ficha_desde_colegio(
-                                centro,
-                                edificio,
-                                planta_tmp,
-                                espacio_tmp,
-                                "actuaciones"
-                            )
-
-            else:
                 c_info, c_btn = st.columns([5, 1])
 
                 with c_info:
                     st.markdown(
-                        f"🔴 **{espacio_tmp}** · OT abierta detectada, pendiente de enlazar"
+                        f"🔴 **{espacio}** · "
+                        f"`{numero_ot or '-'}` · "
+                        f"{prioridad or '-'} · "
+                        f"{descripcion or '-'}"
                     )
 
                 with c_btn:
                     if st.button(
                         "Abrir",
-                        key=f"abrir_espacio_sin_ot_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}_{len(actuaciones)}",
+                        key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta}_{espacio}",
                         use_container_width=True
                     ):
                         _abrir_ficha_desde_colegio(
                             centro,
                             edificio,
-                            planta_tmp,
-                            espacio_tmp,
+                            planta,
+                            espacio,
                             "actuaciones"
+                        )
+
+            # -------------------------
+            # PREVENTIVOS
+            # -------------------------
+            for p in preventivos_pend:
+                try:
+                    id_prev, fecha_prev, operario_prev, estado_prev, obs_prev, num_prev = p
+                except Exception:
+                    id_prev = ""
+                    fecha_prev = ""
+                    operario_prev = ""
+                    estado_prev = ""
+                    obs_prev = ""
+                    num_prev = ""
+
+                c_info, c_btn = st.columns([5, 1])
+
+                with c_info:
+                    st.markdown(
+                        f"🟠 **{espacio}** · Preventivo "
+                        f"`{num_prev or '-'}` · "
+                        f"{estado_prev or '-'} · "
+                        f"{obs_prev or ''}"
+                    )
+
+                with c_btn:
+                    if st.button(
+                        "Abrir",
+                        key=f"abrir_prev_colegio_{id_prev}_{planta}_{espacio}",
+                        use_container_width=True
+                    ):
+                        _abrir_ficha_desde_colegio(
+                            centro,
+                            edificio,
+                            planta,
+                            espacio,
+                            "preventivos"
+                        )
+
+            # -------------------------
+            # LEGIONELLA
+            # -------------------------
+            if tiene_legionella:
+                color_leg = str(legionella.get("color") or "").lower()
+                estado_leg = legionella.get("estado") or "Legionella"
+                puntos = legionella.get("puntos") or 0
+                tareas = legionella.get("tareas") or 0
+                inc_leg = legionella.get("incidencias_abiertas") or 0
+
+                icono_leg = "🦠"
+                if color_leg == "rojo":
+                    icono_leg = "🔴🦠"
+                elif color_leg == "amarillo":
+                    icono_leg = "🟠🦠"
+
+                c_info, c_btn = st.columns([5, 1])
+
+                with c_info:
+                    st.markdown(
+                        f"{icono_leg} **{espacio}** · Legionella · "
+                        f"{estado_leg} · "
+                        f"{puntos} punto(s) · "
+                        f"{tareas} tarea(s) · "
+                        f"{inc_leg} incidencia(s)"
+                    )
+
+                with c_btn:
+                    if st.button(
+                        "Abrir",
+                        key=f"abrir_leg_colegio_{planta}_{espacio}",
+                        use_container_width=True
+                    ):
+                        _abrir_ficha_desde_colegio(
+                            centro,
+                            edificio,
+                            planta,
+                            espacio,
+                            "legionella"
                         )
 
         st.markdown("---")
@@ -253,6 +406,7 @@ def pantalla_colegio():
 
         if ficha:
             st.markdown("---")
+
             ficha_espacio_basica(
                 centro=ficha["centro"],
                 edificio=ficha["edificio"],
@@ -277,7 +431,12 @@ def pantalla_colegio():
         key=f"colegio_rapido_planta_{centro}_{edificio}"
     )
 
-    espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
+    espacios_datos = obtener_espacios_por_planta(
+        centro,
+        edificio,
+        planta
+    )
+
     espacios = [e[0] for e in espacios_datos]
 
     if not espacios:
@@ -360,6 +519,8 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     if info["color"] == "verde":
         st.success(f"🟢 {info['estado']}")
+    elif info["color"] == "amarillo":
+        st.warning(f"🟠 {info['estado']}")
     else:
         st.error(f"🔴 {info['estado']}")
 
@@ -401,6 +562,14 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             st.session_state[f"bloque_ficha_{clave}"] = "inventario"
             st.rerun()
 
+        if st.button(
+            "🦠 Legionella",
+            key=f"ver_legionella_{clave}",
+            use_container_width=True
+        ):
+            st.session_state[f"bloque_ficha_{clave}"] = "legionella"
+            st.rerun()
+
     with c2:
         if st.button(
             "📅 Preventivos",
@@ -425,7 +594,11 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     if bloque == "actuaciones":
         st.markdown("### 📋 Trabajos del espacio")
 
-        actuaciones = obtener_actuaciones_espacio(centro, edificio, espacio)
+        actuaciones = obtener_actuaciones_espacio(
+            centro,
+            edificio,
+            espacio
+        )
 
         if not actuaciones:
             st.info("No hay trabajos abiertos en este espacio.")
@@ -474,6 +647,7 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     elif bloque == "inventario":
         st.markdown("### 📦 Inventario del espacio")
+
         mostrar_inventario_espacio(
             centro=centro,
             edificio=edificio,
@@ -484,25 +658,86 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     elif bloque == "preventivos":
         st.markdown("### 📅 Preventivos")
 
-        preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
+        preventivos = obtener_preventivos_espacio(
+            centro,
+            edificio,
+            espacio
+        )
 
         if not preventivos:
             st.info("No hay preventivos registrados en este espacio.")
         else:
             for p in preventivos:
-                id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
+                try:
+                    id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
+                except Exception:
+                    continue
 
                 st.markdown(
-                    f"**{fecha or '-'}** · {estado_prev or '-'} · {operario or '-'}"
+                    f"**{fecha or '-'}** · "
+                    f"{estado_prev or '-'} · "
+                    f"{operario or '-'} · "
+                    f"OT `{numero_ot_preventiva or '-'}`"
                 )
 
                 if observaciones:
                     st.caption(observaciones)
 
+    elif bloque == "legionella":
+        st.markdown("### 🦠 Legionella")
+
+        legionella = _obtener_resumen_legionella_seguro(
+            centro,
+            edificio,
+            espacio
+        )
+
+        if not legionella.get("aplica"):
+            st.info("Este espacio no tiene controles de Legionella asociados.")
+        else:
+            color = str(legionella.get("color") or "").lower()
+            estado_leg = legionella.get("estado") or "Legionella"
+
+            if color == "rojo":
+                st.error(f"🔴 {estado_leg}")
+            elif color == "amarillo":
+                st.warning(f"🟠 {estado_leg}")
+            else:
+                st.success(f"🟢 {estado_leg}")
+
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric("Puntos", legionella.get("puntos") or 0)
+            c2.metric("Tareas", legionella.get("tareas") or 0)
+            c3.metric("Incidencias", legionella.get("incidencias_abiertas") or 0)
+
+            ultimo = legionella.get("ultimo_control") or "-"
+            proximo = legionella.get("proximo_control") or "-"
+
+            st.caption(f"Último control: {ultimo}")
+            st.caption(f"Próximo control: {proximo}")
+
+            diagnostico = legionella.get("diagnostico") or []
+            recomendaciones = legionella.get("recomendaciones") or []
+
+            if diagnostico:
+                st.markdown("**Diagnóstico Legionella**")
+                for d in diagnostico:
+                    st.markdown(f"• {d}")
+
+            if recomendaciones:
+                st.markdown("**Recomendaciones**")
+                for r in recomendaciones:
+                    st.info(r)
+
     elif bloque == "historial":
         st.markdown("### 📋 Historial técnico")
 
-        historial = obtener_historial_tecnico_espacio(centro, edificio, espacio)
+        historial = obtener_historial_tecnico_espacio(
+            centro,
+            edificio,
+            espacio
+        )
 
         if not historial:
             st.info("No hay historial técnico registrado en este espacio.")
@@ -527,7 +762,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 ) = h
 
                 st.markdown(
-                    f"**{fecha or '-'}** · {tipo or '-'} · {area or '-'} · OT `{numero_ot or '-'}`"
+                    f"**{fecha or '-'}** · "
+                    f"{tipo or '-'} · "
+                    f"{area or '-'} · "
+                    f"OT `{numero_ot or '-'}`"
                 )
                 st.caption(descripcion or "")
 
