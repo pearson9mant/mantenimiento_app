@@ -228,7 +228,7 @@ def pantalla_colegio():
                 with c_btn:
                     if st.button(
                         "Abrir",
-                        key=f"abrir_espacio_sin_ot_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}",
+                        key=f"abrir_espacio_sin_ot_{centro}_{edificio}_{planta_tmp}_{espacio_tmp}_{len(actuaciones)}",
                         use_container_width=True
                     ):
                         _abrir_ficha_desde_colegio(
