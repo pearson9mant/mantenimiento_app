@@ -4,6 +4,7 @@ from datetime import datetime
 import unicodedata
 
 from database.db import conectar
+from ui.ui_arbol_colegio import mostrar_arbol_gerencia
 
 
 CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
