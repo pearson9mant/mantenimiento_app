@@ -109,9 +109,19 @@ def diagnosticar_espacio(centro, edificio, espacio):
     elif activos_danados > 0 or correctivos > 0:
         estado = "Requiere intervención"
         color = "rojo"
-        recomendaciones.append(
-            "Revisar los activos dañados y finalizar los correctivos pendientes."
-        )
+    
+        if activos_danados > 0 and correctivos == 0:
+            recomendaciones.append(
+                "Abrir Inventario, revisar el activo dañado y crear la OT correctiva si procede."
+            )
+        elif correctivos > 0:
+            recomendaciones.append(
+                "Finalizar los correctivos pendientes asociados al inventario."
+            )
+        else:
+            recomendaciones.append(
+                "Revisar los activos dañados."
+            )
 
     else:
         estado = "Excelente"
