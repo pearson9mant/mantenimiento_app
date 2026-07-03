@@ -101,11 +101,7 @@ def pantalla_colegio():
     # MODO CENTRO DE CONTROL
     # Toda la actividad viene del módulo inteligente
     # =====================================================
-    if solo_actividad:
-        actividad_edificio = obtener_actividad_edificio(
-            centro,
-            edificio
-        )
+    
 
         if not actividad_edificio:
             st.info("No hay actividad pendiente en este edificio.")
