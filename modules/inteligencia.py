@@ -255,26 +255,119 @@ def centro_tiene_actividad(centro):
 
 def obtener_mapa_actividad(centro, edificio):
     """
-    Motor rápido de actividad por edificio.
-    La UI no decide: solo muestra lo que devuelve este motor.
+    Motor rápido de actividad.
+    No recorre todos los espacios diagnosticando uno a uno.
+    Solo busca actividad real: OT abiertas y preventivos pendientes.
     """
+    from database.db import conectar, _sql
     from modules.espacios import obtener_plantas_espacios, obtener_espacios_por_planta
 
+    def norm(txt):
+        return (
+            str(txt or "")
+            .lower()
+            .replace("edif.", "")
+            .replace("edificio", "")
+            .replace("/", "")
+            .replace(" ", "")
+            .strip()
+        )
+
     mapa = {}
+    ubicaciones = {}
 
     for planta in obtener_plantas_espacios(centro, edificio):
         for espacio, tipo in obtener_espacios_por_planta(centro, edificio, planta):
-            item = obtener_actividad_espacio(
-                centro=centro,
-                edificio=edificio,
-                planta=planta,
-                espacio=espacio
+            ubicaciones[norm(espacio)] = {
+                "planta": planta,
+                "espacio": espacio,
+            }
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT id, numero_ot, descripcion, estado, prioridad,
+                   operario, origen, area, fecha_creacion,
+                   centro, edificio, espacio
+            FROM ordenes_trabajo
+            WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
+                'finalizada', 'cerrado', 'cerrada', 'cancelada'
             )
+              AND centro = ?
+            ORDER BY id DESC
+        """), (centro,))
 
-            if item.get("tiene_actividad"):
-                if planta not in mapa:
-                    mapa[planta] = []
+        filas = cur.fetchall()
 
-                mapa[planta].append(item)
+    except Exception:
+        filas = []
+
+    conn.close()
+
+    for fila in filas:
+        (
+            id_ot,
+            numero_ot,
+            descripcion,
+            estado,
+            prioridad,
+            operario,
+            origen,
+            area,
+            fecha_creacion,
+            centro_ot,
+            edificio_ot,
+            espacio_ot,
+        ) = fila
+
+        if edificio_ot and norm(edificio_ot) != norm(edificio):
+            continue
+
+        clave_espacio = norm(espacio_ot)
+
+        if clave_espacio not in ubicaciones:
+            continue
+
+        planta = ubicaciones[clave_espacio]["planta"]
+        espacio_real = ubicaciones[clave_espacio]["espacio"]
+
+        if planta not in mapa:
+            mapa[planta] = []
+
+        existente = None
+
+        for item in mapa[planta]:
+            if item["espacio"] == espacio_real:
+                existente = item
+                break
+
+        if existente is None:
+            existente = {
+                "centro": centro,
+                "edificio": edificio,
+                "planta": planta,
+                "espacio": espacio_real,
+                "actuaciones": [],
+                "preventivos": [],
+                "preventivos_pendientes": [],
+                "legionella": {},
+                "tiene_legionella": False,
+                "tiene_actividad": True,
+            }
+            mapa[planta].append(existente)
+
+        existente["actuaciones"].append((
+            id_ot,
+            numero_ot,
+            descripcion,
+            estado,
+            prioridad,
+            operario,
+            origen,
+            area,
+            fecha_creacion,
+        ))
 
     return mapa
