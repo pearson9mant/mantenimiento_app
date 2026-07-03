@@ -739,7 +739,7 @@ def _mostrar_copiar_inventario(centro, edificio, planta, espacio, inventario, cl
                     centro_destino=centro,
                     edificio_destino=edificio,
                     espacio_destino=espacio,
-                    operario=st.session_state.get("operario_activo", "")
+                    operario=st.session_state.get("operario_activo", ""),
                     copiar_fotos=False
                 )
 
