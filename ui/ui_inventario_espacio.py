@@ -732,7 +732,7 @@ def _mostrar_copiar_inventario(centro, edificio, planta, espacio, inventario, cl
             ):
                 st.warning("El origen y el destino son el mismo espacio.")
             else:
-                ok, mensaje = copiar_inventario_entre_espacios(
+                ok, mensaje = clonar_inventario_espacio(
                     centro_origen=centro_origen,
                     edificio_origen=edificio_origen,
                     espacio_origen=espacio_origen,
@@ -740,6 +740,7 @@ def _mostrar_copiar_inventario(centro, edificio, planta, espacio, inventario, cl
                     edificio_destino=edificio,
                     espacio_destino=espacio,
                     operario=st.session_state.get("operario_activo", "")
+                    copiar_fotos=False
                 )
 
                 if ok:
