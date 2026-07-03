@@ -294,11 +294,11 @@ def mostrar_arbol_gerencia():
                                 st.markdown(
                                     f"**{icono_tipo} {nombre_espacio} ({len(incidencias)})**"
                                 )
-
+                                
                                 for inc in incidencias:
-                                    st.caption(
-                                        f"• {inc['numero'] or '-'} · "
-                                        f"{inc['prioridad'] or '-'} · "
+                                    st.markdown(
+                                        f"• `{inc['numero'] or '-'}` · "
+                                        f"**{inc['prioridad'] or '-'}** · "
                                         f"{inc['descripcion'] or '-'}"
                                     )
 
