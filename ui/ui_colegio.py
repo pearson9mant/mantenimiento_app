@@ -43,6 +43,28 @@ def _hay_incidencia_en_espacio(centro, espacio, ots_abiertas):
     ) > 0
 
 
+def _obtener_espacios_con_incidencias_edificio(centro, edificio, ots_abiertas):
+    resultado = []
+
+    for planta_tmp in obtener_plantas_espacios(centro, edificio):
+        for espacio_tmp, tipo_tmp in obtener_espacios_por_planta(
+            centro,
+            edificio,
+            planta_tmp
+        ):
+            if _hay_incidencia_en_espacio(centro, espacio_tmp, ots_abiertas):
+                resultado.append({
+                    "centro": centro,
+                    "edificio": edificio,
+                    "planta": planta_tmp,
+                    "espacio": espacio_tmp,
+                    "tipo": tipo_tmp,
+                    "label": f"{planta_tmp} · {espacio_tmp}"
+                })
+
+    return resultado
+
+
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Entrada rápida por centro, edificio, planta y espacio.")
@@ -111,46 +133,60 @@ def pantalla_colegio():
         key=f"colegio_rapido_edificio_{centro}"
     )
 
-    plantas = obtener_plantas_espacios(centro, edificio)
-
     if solo_incidencias:
-        plantas = [
-            p for p in plantas
-            if any(
-                _hay_incidencia_en_espacio(centro, espacio, ots_abiertas)
-                for espacio, tipo in obtener_espacios_por_planta(centro, edificio, p)
-            )
-        ]
+        espacios_incidencias = _obtener_espacios_con_incidencias_edificio(
+            centro,
+            edificio,
+            ots_abiertas
+        )
 
-    if not plantas:
-        st.info("No hay plantas con incidencias en este edificio.")
-        return
+        if not espacios_incidencias:
+            st.info("No hay espacios con incidencias en este edificio.")
+            return
 
-    planta = st.selectbox(
-        "📍 Planta",
-        plantas,
-        key=f"colegio_rapido_planta_{centro}_{edificio}"
-    )
+        labels = [e["label"] for e in espacios_incidencias]
 
-    espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
+        label_sel = st.selectbox(
+            "🚪 Espacios con incidencias",
+            labels,
+            key=f"colegio_rapido_espacio_inc_{centro}_{edificio}"
+        )
 
-    if solo_incidencias:
-        espacios_datos = [
-            e for e in espacios_datos
-            if _hay_incidencia_en_espacio(centro, e[0], ots_abiertas)
-        ]
+        seleccionado = next(
+            e for e in espacios_incidencias
+            if e["label"] == label_sel
+        )
 
-    espacios = [e[0] for e in espacios_datos]
+        planta = seleccionado["planta"]
+        espacio = seleccionado["espacio"]
 
-    if not espacios:
-        st.info("No hay espacios con incidencias en esta planta.")
-        return
+        st.caption(f"📍 {centro} · {edificio} · {planta}")
 
-    espacio = st.selectbox(
-        "🚪 Espacio",
-        espacios,
-        key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
-    )
+    else:
+        plantas = obtener_plantas_espacios(centro, edificio)
+
+        if not plantas:
+            st.info("No hay plantas en este edificio.")
+            return
+
+        planta = st.selectbox(
+            "📍 Planta",
+            plantas,
+            key=f"colegio_rapido_planta_{centro}_{edificio}"
+        )
+
+        espacios_datos = obtener_espacios_por_planta(centro, edificio, planta)
+        espacios = [e[0] for e in espacios_datos]
+
+        if not espacios:
+            st.info("No hay espacios en esta planta.")
+            return
+
+        espacio = st.selectbox(
+            "🚪 Espacio",
+            espacios,
+            key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
+        )
 
     c1, c2, c3 = st.columns(3)
 
@@ -171,11 +207,11 @@ def pantalla_colegio():
             )
             st.session_state["colegio_ver_arbol"] = False
             st.rerun()
-    
+
     with c2:
         if st.button("📦 Inventario directo", use_container_width=True):
             clave = _clave_ficha(centro, edificio, planta, espacio)
-    
+
             st.session_state["colegio_ficha_seleccionada"] = {
                 "centro": centro,
                 "edificio": edificio,
@@ -185,7 +221,7 @@ def pantalla_colegio():
             st.session_state[f"bloque_ficha_{clave}"] = "inventario"
             st.session_state["colegio_ver_arbol"] = False
             st.rerun()
-    
+
     with c3:
         if st.button("🌳 Ver árbol", use_container_width=True):
             st.session_state["colegio_ver_arbol"] = not st.session_state.get(
