@@ -4,12 +4,20 @@ from modules.catalogo_aulas import obtener_elementos_catalogo_aulas, obtener_cat
 from modules.ficha_espacio import obtener_inventario_espacio
 from modules.ordenes import crear_correctiva_desde_ot
 
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
+
 from modules.inventario_aulas import (
     guardar_o_actualizar_espacio,
     guardar_foto_espacio,
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
     limpiar_correctivo_inventario,
+    copiar_inventario_entre_espacios,
 )
 
 from modules.activos import (
