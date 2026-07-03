@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules.catalogo_aulas import obtener_elementos_catalogo_aulas
+from modules.catalogo_aulas import obtener_elementos_catalogo_aulas, obtener_catalogo_aulas
 from modules.ficha_espacio import obtener_inventario_espacio
 from modules.ordenes import crear_correctiva_desde_ot
 
