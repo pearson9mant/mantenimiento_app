@@ -195,8 +195,23 @@ def mostrar_arbol_colegio():
     if not hay_incidencias:
         st.success("No hay incidencias abiertas en tus centros.")
 
+def _normalizar_arbol(texto):
+    return (
+        str(texto or "")
+        .lower()
+        .replace("edif.", "")
+        .replace("edificio", "")
+        .replace(" ", "")
+        .replace("·", "")
+        .strip()
+    )
+
+
 def _incidencias_por_espacio(centro, espacio, ots_abiertas):
     incidencias = []
+
+    centro_obj = _normalizar_arbol(centro)
+    espacio_obj = _normalizar_arbol(espacio)
 
     for ot in ots_abiertas:
         try:
@@ -208,8 +223,10 @@ def _incidencias_por_espacio(centro, espacio, ots_abiertas):
         except Exception:
             continue
 
-        if str(centro_ot).strip().lower() == str(centro).strip().lower() \
-           and str(espacio_ot).strip().lower() == str(espacio).strip().lower():
+        if (
+            _normalizar_arbol(centro_ot) == centro_obj
+            and _normalizar_arbol(espacio_ot) == espacio_obj
+        ):
             incidencias.append({
                 "numero": numero,
                 "descripcion": descripcion,
