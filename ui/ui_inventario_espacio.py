@@ -42,6 +42,72 @@ def _opciones_elementos():
         opciones.append("Otro")
     return opciones
 
+def _catalogo_por_categoria():
+    catalogo = {}
+
+    try:
+        datos = obtener_catalogo_aulas(True)
+    except Exception:
+        datos = []
+
+    for fila in datos:
+        try:
+            _id, categoria, elemento, area, activo = fila
+        except Exception:
+            continue
+
+        categoria = str(categoria or "Otros").strip()
+        elemento = str(elemento or "").strip()
+
+        if not elemento:
+            continue
+
+        if categoria not in catalogo:
+            catalogo[categoria] = []
+
+        if elemento not in catalogo[categoria]:
+            catalogo[categoria].append(elemento)
+
+    extras_clima = [
+        "Aire acondicionado",
+        "Unidad interior A/A",
+        "Unidad exterior A/A",
+        "Mando aire acondicionado",
+    ]
+
+    if "Climatización" not in catalogo:
+        catalogo["Climatización"] = []
+
+    for e in extras_clima:
+        if e not in catalogo["Climatización"]:
+            catalogo["Climatización"].append(e)
+
+    if "Otros" not in catalogo:
+        catalogo["Otros"] = ["Otro"]
+
+    for categoria in catalogo:
+        catalogo[categoria] = sorted(catalogo[categoria])
+
+    return catalogo
+
+
+def _categoria_sugerida_por_espacio(espacio):
+    texto = str(espacio or "").lower()
+
+    if "wc" in texto or "baño" in texto or "aseo" in texto or "vestuario" in texto:
+        return "Fontanería"
+
+    if "cocina" in texto:
+        return "Cocina"
+
+    if "acs" in texto or "caldera" in texto or "depósito" in texto:
+        return "ACS / Legionella"
+
+    if "aula" in texto or texto[:1].isdigit() or texto.startswith("i"):
+        return "Mobiliario"
+
+    return "Otros"
+
 def _plantilla_inventario_por_espacio(espacio):
     texto = str(espacio or "").lower()
 
