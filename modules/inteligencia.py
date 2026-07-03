@@ -252,3 +252,29 @@ def centro_tiene_actividad(centro):
             return True
 
     return False
+
+def obtener_mapa_actividad(centro, edificio):
+    """
+    Motor rápido de actividad por edificio.
+    La UI no decide: solo muestra lo que devuelve este motor.
+    """
+    from modules.espacios import obtener_plantas_espacios, obtener_espacios_por_planta
+
+    mapa = {}
+
+    for planta in obtener_plantas_espacios(centro, edificio):
+        for espacio, tipo in obtener_espacios_por_planta(centro, edificio, planta):
+            item = obtener_actividad_espacio(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio
+            )
+
+            if item.get("tiene_actividad"):
+                if planta not in mapa:
+                    mapa[planta] = []
+
+                mapa[planta].append(item)
+
+    return mapa
