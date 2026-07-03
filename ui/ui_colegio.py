@@ -206,7 +206,7 @@ def pantalla_colegio():
                     with c_btn:
                         if st.button(
                             "Abrir",
-                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}",
+                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta_tmp}_{espacio_tmp}",
                             use_container_width=True
                         ):
                             _abrir_ficha_desde_colegio(
