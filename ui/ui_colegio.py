@@ -43,8 +43,8 @@ def _hay_incidencia_en_espacio(centro, espacio, ots_abiertas):
     ) > 0
 
 
-def _obtener_espacios_con_incidencias_edificio(centro, edificio, ots_abiertas):
-    resultado = []
+def _obtener_trabajos_abiertos_edificio(centro, edificio):
+    trabajos = []
 
     for planta_tmp in obtener_plantas_espacios(centro, edificio):
         for espacio_tmp, tipo_tmp in obtener_espacios_por_planta(
@@ -52,23 +52,20 @@ def _obtener_espacios_con_incidencias_edificio(centro, edificio, ots_abiertas):
             edificio,
             planta_tmp
         ):
-            if _hay_incidencia_en_espacio(centro, espacio_tmp, ots_abiertas):
-                actuaciones = obtener_actuaciones_espacio(
-                    centro,
-                    edificio,
-                    espacio_tmp
-                )
+            actuaciones = obtener_actuaciones_espacio(
+                centro,
+                edificio,
+                espacio_tmp
+            )
 
-                resultado.append({
-                    "centro": centro,
-                    "edificio": edificio,
+            for a in actuaciones:
+                trabajos.append({
                     "planta": planta_tmp,
                     "espacio": espacio_tmp,
-                    "tipo": tipo_tmp,
-                    "actuaciones": actuaciones,
+                    "actuacion": a,
                 })
 
-    return resultado
+    return trabajos
 
 
 def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuaciones"):
