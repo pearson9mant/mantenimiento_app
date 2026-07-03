@@ -88,11 +88,6 @@ def pantalla_colegio():
 
     edificios = obtener_edificios_espacios(centro)
 
-    if solo_actividad:
-        edificios = [
-            e for e in edificios
-            if edificio_tiene_actividad(centro, e)
-        ]
 
     if not edificios:
         st.info("No hay edificios con actividad pendiente en este centro.")
