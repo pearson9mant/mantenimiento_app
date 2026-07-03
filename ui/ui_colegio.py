@@ -1,12 +1,23 @@
 import streamlit as st
 
-from modules.colegio import obtener_estado_espacio, icono_estado_espacio
-from modules.colegio import obtener_centros_visibles_usuario
+from modules.colegio import (
+    obtener_estado_espacio,
+    icono_estado_espacio,
+    obtener_centros_visibles_usuario,
+)
+
 from ui.ui_arbol_colegio import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
 from ui.ui_inventario_espacio import mostrar_inventario_espacio
+
 from modules.inventario import obtener_materiales_para_select
-from modules.inteligencia import diagnosticar_espacio
+
+from modules.inteligencia import (
+    diagnosticar_espacio,
+    obtener_actividad_edificio,
+    edificio_tiene_actividad,
+    centro_tiene_actividad,
+)
 
 from modules.espacios import (
     obtener_centros_espacios,
@@ -19,7 +30,6 @@ from modules.ficha_espacio import (
     obtener_actuaciones_espacio,
     obtener_preventivos_espacio,
     obtener_historial_tecnico_espacio,
-    obtener_cabecera_inteligente_espacio,
 )
 
 
@@ -47,148 +57,6 @@ def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuac
     st.rerun()
 
 
-def _preventivos_pendientes(preventivos):
-    pendientes = []
-
-    for p in preventivos:
-        try:
-            estado = str(p[3] or "").strip().lower()
-        except Exception:
-            estado = ""
-
-        if estado not in [
-            "finalizado",
-            "finalizada",
-            "cerrado",
-            "cerrada",
-            "completado",
-            "completada",
-            "ok",
-        ]:
-            pendientes.append(p)
-
-    return pendientes
-
-
-def _obtener_resumen_legionella_seguro(centro, edificio, espacio):
-    try:
-        from ui.ui_legionella import obtener_resumen_legionella_espacio
-
-        return obtener_resumen_legionella_espacio(
-            centro,
-            edificio,
-            espacio
-        )
-    except Exception:
-        return {
-            "aplica": False,
-            "estado": "No aplica",
-            "color": "gris",
-            "puntos": 0,
-            "tareas": 0,
-            "incidencias_abiertas": 0,
-            "ultimo_control": "",
-            "proximo_control": "",
-            "diagnostico": [],
-            "recomendaciones": [],
-        }
-
-
-def _legionella_relevante(resumen_legionella):
-    if not resumen_legionella:
-        return False
-
-    if not resumen_legionella.get("aplica"):
-        return False
-
-    if int(resumen_legionella.get("incidencias_abiertas") or 0) > 0:
-        return True
-
-    color = str(resumen_legionella.get("color") or "").lower()
-
-    if color in ["rojo", "amarillo"]:
-        return True
-
-    return False
-
-
-def _obtener_actividad_espacio(centro, edificio, planta, espacio):
-    actuaciones = obtener_actuaciones_espacio(
-        centro,
-        edificio,
-        espacio
-    )
-
-    preventivos = obtener_preventivos_espacio(
-        centro,
-        edificio,
-        espacio
-    )
-
-    preventivos_pend = _preventivos_pendientes(preventivos)
-
-    legionella = _obtener_resumen_legionella_seguro(
-        centro,
-        edificio,
-        espacio
-    )
-
-    tiene_legionella = _legionella_relevante(legionella)
-
-    tiene_actividad = (
-        len(actuaciones) > 0
-        or len(preventivos_pend) > 0
-        or tiene_legionella
-    )
-
-    return {
-        "centro": centro,
-        "edificio": edificio,
-        "planta": planta,
-        "espacio": espacio,
-        "actuaciones": actuaciones,
-        "preventivos": preventivos,
-        "preventivos_pendientes": preventivos_pend,
-        "legionella": legionella,
-        "tiene_legionella": tiene_legionella,
-        "tiene_actividad": tiene_actividad,
-    }
-
-
-def _obtener_actividad_edificio(centro, edificio):
-    actividad = []
-
-    for planta in obtener_plantas_espacios(centro, edificio):
-        for espacio, tipo in obtener_espacios_por_planta(
-            centro,
-            edificio,
-            planta
-        ):
-            item = _obtener_actividad_espacio(
-                centro,
-                edificio,
-                planta,
-                espacio
-            )
-
-            if item["tiene_actividad"]:
-                actividad.append(item)
-
-    return actividad
-
-
-def _edificio_tiene_actividad(centro, edificio):
-    return len(_obtener_actividad_edificio(centro, edificio)) > 0
-
-
-def _centro_tiene_actividad(centro):
-    for edificio in obtener_edificios_espacios(centro):
-        if _edificio_tiene_actividad(centro, edificio):
-            return True
-
-    return False
-
-
 def pantalla_colegio():
     st.markdown("## 🏫 Colegio")
     st.caption("Centro de control por centro, edificio, planta y espacio.")
@@ -210,7 +78,7 @@ def pantalla_colegio():
     if solo_actividad:
         centros = [
             c for c in centros
-            if _centro_tiene_actividad(c)
+            if centro_tiene_actividad(c)
         ]
 
     if not centros:
@@ -228,7 +96,7 @@ def pantalla_colegio():
     if solo_actividad:
         edificios = [
             e for e in edificios
-            if _edificio_tiene_actividad(centro, e)
+            if edificio_tiene_actividad(centro, e)
         ]
 
     if not edificios:
@@ -243,9 +111,10 @@ def pantalla_colegio():
 
     # =====================================================
     # MODO CENTRO DE CONTROL
+    # Toda la actividad viene del módulo inteligente
     # =====================================================
     if solo_actividad:
-        actividad_edificio = _obtener_actividad_edificio(
+        actividad_edificio = obtener_actividad_edificio(
             centro,
             edificio
         )
@@ -261,10 +130,10 @@ def pantalla_colegio():
         for item in actividad_edificio:
             planta = item["planta"]
             espacio = item["espacio"]
-            actuaciones = item["actuaciones"]
-            preventivos_pend = item["preventivos_pendientes"]
-            legionella = item["legionella"]
-            tiene_legionella = item["tiene_legionella"]
+            actuaciones = item.get("actuaciones", [])
+            preventivos_pend = item.get("preventivos_pendientes", [])
+            legionella = item.get("legionella", {})
+            tiene_legionella = item.get("tiene_legionella", False)
 
             if planta != planta_actual:
                 planta_actual = planta
@@ -359,6 +228,7 @@ def pantalla_colegio():
                 inc_leg = legionella.get("incidencias_abiertas") or 0
 
                 icono_leg = "🦠"
+
                 if color_leg == "rojo":
                     icono_leg = "🔴🦠"
                 elif color_leg == "amarillo":
@@ -505,12 +375,6 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     st.markdown(f"### {icono} {espacio}")
     st.caption(f"{centro} · {edificio} · {planta}")
 
-    resumen = obtener_cabecera_inteligente_espacio(
-        centro=centro,
-        edificio=edificio,
-        espacio=espacio
-    )
-
     info = diagnosticar_espacio(
         centro=centro,
         edificio=edificio,
@@ -528,18 +392,18 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
 
     st.markdown("**Situación actual**")
 
-    for linea in info["diagnostico"]:
+    for linea in info.get("diagnostico", []):
         st.markdown(f"• {linea}")
 
     st.markdown("**Siguiente actuación**")
-    st.info(info["recomendacion"])
+    st.info(info.get("recomendacion", "No es necesaria ninguna actuación inmediata."))
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric("Trabajos", info["trabajos"])
-    c2.metric("Activos", info["activos"])
-    c3.metric("Dañados", info["danados"])
-    c4.metric("Correctivos", info["correctivos"])
+    c1.metric("Trabajos", info.get("trabajos", 0))
+    c2.metric("Activos", info.get("activos", 0))
+    c3.metric("Dañados", info.get("danados", 0))
+    c4.metric("Correctivos", info.get("correctivos", 0))
 
     st.markdown("---")
 
@@ -686,11 +550,13 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     elif bloque == "legionella":
         st.markdown("### 🦠 Legionella")
 
-        legionella = _obtener_resumen_legionella_seguro(
-            centro,
-            edificio,
-            espacio
+        info = diagnosticar_espacio(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio
         )
+
+        legionella = info.get("legionella", {})
 
         if not legionella.get("aplica"):
             st.info("Este espacio no tiene controles de Legionella asociados.")
