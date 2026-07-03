@@ -17,7 +17,7 @@ from modules.inventario_aulas import (
     eliminar_inventario_espacio,
     guardar_correctivo_inventario,
     limpiar_correctivo_inventario,
-    copiar_inventario_entre_espacios,
+    clonar_inventario_espacio,
 )
 
 from modules.activos import (
