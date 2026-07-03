@@ -151,3 +151,104 @@ def diagnosticar_espacio(centro, edificio, espacio):
         "primera_desc": primera_desc,
         "legionella": legionella,
     }
+
+def _preventivos_pendientes(preventivos):
+    pendientes = []
+
+    for p in preventivos:
+        try:
+            estado = str(p[3] or "").strip().lower()
+        except Exception:
+            estado = ""
+
+        if estado not in [
+            "finalizado", "finalizada",
+            "cerrado", "cerrada",
+            "completado", "completada",
+            "ok",
+        ]:
+            pendientes.append(p)
+
+    return pendientes
+
+
+def _legionella_relevante(legionella):
+    if not legionella:
+        return False
+
+    if not legionella.get("aplica"):
+        return False
+
+    if int(legionella.get("incidencias_abiertas") or 0) > 0:
+        return True
+
+    color = str(legionella.get("color") or "").lower()
+    return color in ["rojo", "amarillo"]
+
+
+def obtener_actividad_espacio(centro, edificio, planta, espacio):
+    trabajos = obtener_actuaciones_espacio(centro, edificio, espacio)
+    preventivos = obtener_preventivos_espacio(centro, edificio, espacio)
+    preventivos_pend = _preventivos_pendientes(preventivos)
+
+    info = diagnosticar_espacio(
+        centro=centro,
+        edificio=edificio,
+        espacio=espacio
+    )
+
+    legionella = info.get("legionella", {})
+    tiene_legionella = _legionella_relevante(legionella)
+
+    tiene_actividad = (
+        len(trabajos) > 0
+        or len(preventivos_pend) > 0
+        or tiene_legionella
+    )
+
+    return {
+        "centro": centro,
+        "edificio": edificio,
+        "planta": planta,
+        "espacio": espacio,
+        "actuaciones": trabajos,
+        "preventivos": preventivos,
+        "preventivos_pendientes": preventivos_pend,
+        "legionella": legionella,
+        "tiene_legionella": tiene_legionella,
+        "tiene_actividad": tiene_actividad,
+    }
+
+
+def obtener_actividad_edificio(centro, edificio):
+    from modules.espacios import obtener_plantas_espacios, obtener_espacios_por_planta
+
+    actividad = []
+
+    for planta in obtener_plantas_espacios(centro, edificio):
+        for espacio, tipo in obtener_espacios_por_planta(centro, edificio, planta):
+            item = obtener_actividad_espacio(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio
+            )
+
+            if item["tiene_actividad"]:
+                actividad.append(item)
+
+    return actividad
+
+
+def edificio_tiene_actividad(centro, edificio):
+    return len(obtener_actividad_edificio(centro, edificio)) > 0
+
+
+def centro_tiene_actividad(centro):
+    from modules.espacios import obtener_edificios_espacios
+
+    for edificio in obtener_edificios_espacios(centro):
+        if edificio_tiene_actividad(centro, edificio):
+            return True
+
+    return False
