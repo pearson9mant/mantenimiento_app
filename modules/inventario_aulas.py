@@ -778,21 +778,25 @@ def cerrar_correctivo_inventario(id_elemento, estado_final="Correcto"):
     finally:
         conn.close()
 
-def copiar_inventario_entre_espacios(
+def clonar_inventario_espacio(
     centro_origen,
     edificio_origen,
     espacio_origen,
     centro_destino,
     edificio_destino,
     espacio_destino,
-    operario=""
+    operario="",
+    copiar_fotos=False
 ):
+    from datetime import datetime
+
     conn = conectar()
     cur = conn.cursor()
 
     try:
         cur.execute(_sql("""
-            SELECT elemento, cantidad, estado, ancho, alto, fondo, unidad, observaciones
+            SELECT elemento, cantidad, estado, ancho, alto, fondo, unidad,
+                   observaciones, foto
             FROM inventario_aulas
             WHERE centro = ?
               AND edificio = ?
@@ -813,7 +817,17 @@ def copiar_inventario_entre_espacios(
         omitidos = 0
 
         for fila in filas:
-            elemento, cantidad, estado, ancho, alto, fondo, unidad, observaciones = fila
+            (
+                elemento,
+                cantidad,
+                estado,
+                ancho,
+                alto,
+                fondo,
+                unidad,
+                observaciones,
+                foto
+            ) = fila
 
             cur.execute(_sql("""
                 SELECT COUNT(*)
@@ -829,11 +843,11 @@ def copiar_inventario_entre_espacios(
                 elemento
             ))
 
-            existe = cur.fetchone()[0]
-
-            if existe:
+            if cur.fetchone()[0] > 0:
                 omitidos += 1
                 continue
+
+            foto_final = foto if copiar_fotos else ""
 
             cur.execute(_sql("""
                 INSERT INTO inventario_aulas
@@ -855,7 +869,7 @@ def copiar_inventario_entre_espacios(
                     numero_ot_correctiva,
                     fecha_correctivo
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', '')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '')
             """), (
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 centro_destino,
@@ -869,6 +883,7 @@ def copiar_inventario_entre_espacios(
                 fondo or 0,
                 unidad or "cm",
                 observaciones or "",
+                foto_final,
                 operario or ""
             ))
 
@@ -877,9 +892,13 @@ def copiar_inventario_entre_espacios(
         conn.commit()
         conn.close()
 
-        return True, f"Inventario copiado. Elementos copiados: {copiados}. Omitidos por existir: {omitidos}."
+        return True, (
+            f"Espacio clonado correctamente. "
+            f"Elementos copiados: {copiados}. "
+            f"Omitidos porque ya existían: {omitidos}."
+        )
 
     except Exception as e:
         conn.rollback()
         conn.close()
-        return False, f"Error copiando inventario: {e}"
+        return False, f"Error clonando inventario: {e}"
