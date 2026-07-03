@@ -194,3 +194,113 @@ def mostrar_arbol_colegio():
 
     if not hay_incidencias:
         st.success("No hay incidencias abiertas en tus centros.")
+
+def _incidencias_por_espacio(centro, espacio, ots_abiertas):
+    incidencias = []
+
+    for ot in ots_abiertas:
+        try:
+            numero = ot.get("numero_ot", "")
+            descripcion = ot.get("descripcion", "")
+            prioridad = ot.get("prioridad", "")
+            centro_ot = ot.get("centro", "")
+            espacio_ot = ot.get("espacio", "")
+        except Exception:
+            continue
+
+        if str(centro_ot).strip().lower() == str(centro).strip().lower() \
+           and str(espacio_ot).strip().lower() == str(espacio).strip().lower():
+            incidencias.append({
+                "numero": numero,
+                "descripcion": descripcion,
+                "prioridad": prioridad,
+            })
+
+    return incidencias
+
+
+def mostrar_arbol_gerencia():
+    st.markdown("#### 🌳 Árbol de incidencias")
+
+    arbol = obtener_arbol_espacios()
+    ots_abiertas = obtener_ots_abiertas_por_centro()
+
+    hay_incidencias = False
+
+    for centro, edificios in arbol.items():
+        estado_centro, total_centro = estado_y_total_centro(
+            centro=centro,
+            edificios=edificios,
+            ots_abiertas=ots_abiertas
+        )
+
+        if total_centro == 0:
+            continue
+
+        hay_incidencias = True
+        icono_centro = icono_estado_espacio(estado_centro)
+
+        with st.expander(
+            f"{icono_centro} 🏢 {centro}{texto_contador(total_centro)}",
+            expanded=True
+        ):
+            for edificio, plantas in edificios.items():
+                estado_edificio, total_edificio = estado_y_total_edificio(
+                    centro=centro,
+                    plantas=plantas,
+                    ots_abiertas=ots_abiertas
+                )
+
+                if total_edificio == 0:
+                    continue
+
+                icono_edificio = icono_estado_espacio(estado_edificio)
+
+                with st.expander(
+                    f"{icono_edificio} 🏫 {edificio}{texto_contador(total_edificio)}",
+                    expanded=False
+                ):
+                    for planta, espacios in plantas.items():
+                        estado_planta, total_planta = estado_y_total_planta(
+                            centro=centro,
+                            espacios=espacios,
+                            ots_abiertas=ots_abiertas
+                        )
+
+                        if total_planta == 0:
+                            continue
+
+                        icono_planta = icono_estado_espacio(estado_planta)
+
+                        with st.expander(
+                            f"{icono_planta} 📍 {planta}{texto_contador(total_planta)}",
+                            expanded=False
+                        ):
+                            for item_espacio in espacios:
+                                nombre_espacio = item_espacio.get("espacio", "")
+                                tipo_espacio = item_espacio.get("tipo", "")
+
+                                incidencias = _incidencias_por_espacio(
+                                    centro,
+                                    nombre_espacio,
+                                    ots_abiertas
+                                )
+
+                                if not incidencias:
+                                    continue
+
+                                icono_tipo = icono_tipo_espacio(tipo_espacio)
+
+                                st.markdown(
+                                    f"**{icono_tipo} {nombre_espacio} ({len(incidencias)})**"
+                                )
+
+                                for inc in incidencias:
+                                    st.caption(
+                                        f"• {inc['numero'] or '-'} · "
+                                        f"{inc['prioridad'] or '-'} · "
+                                        f"{inc['descripcion'] or '-'}"
+                                    )
+
+    if not hay_incidencias:
+        st.success("No hay incidencias abiertas.")
