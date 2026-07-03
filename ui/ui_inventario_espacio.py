@@ -726,8 +726,26 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
     if mostrar_formulario:
         st.markdown("#### Nuevo elemento")
 
-        opciones_base = _opciones_elementos()
-
+        catalogo = _catalogo_por_categoria()
+        categorias = list(catalogo.keys())
+        
+        categoria_sugerida = _categoria_sugerida_por_espacio(espacio)
+        
+        if categoria_sugerida not in categorias:
+            categoria_sugerida = categorias[0] if categorias else "Otros"
+        
+        categoria_sel = st.selectbox(
+            "Categoría",
+            categorias,
+            index=categorias.index(categoria_sugerida),
+            key=f"add_categoria_{clave_base}"
+        )
+        
+        opciones_base = catalogo.get(categoria_sel, [])
+        
+        if "Otro" not in opciones_base:
+            opciones_base.append("Otro")
+        
         elemento_nuevo = st.selectbox(
             "Elemento",
             opciones_base,
