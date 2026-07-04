@@ -600,3 +600,150 @@ def obtener_estabilidad_puntos_legionella(centro=None, limite=20):
     )
 
     return resultados[:limite]
+
+# ======================================================
+# MOTOR DE TEMPERATURAS LEGIONELLA
+# ======================================================
+
+def _evaluar_valor_temperatura(tarea, valor, valor_2=None, valor_3=None):
+    tarea_txt = str(tarea or "").lower()
+
+    try:
+        v1 = float(valor)
+    except Exception:
+        v1 = None
+
+    try:
+        v2 = float(valor_2)
+    except Exception:
+        v2 = None
+
+    try:
+        v3 = float(valor_3)
+    except Exception:
+        v3 = None
+
+    problemas = []
+
+    if "sala acs" in tarea_txt:
+        if v1 is not None and v1 < 60:
+            problemas.append("Acumulador ACS inferior a 60 ºC.")
+        if v2 is not None and v2 < 50:
+            problemas.append("Impulsión ACS inferior a 50 ºC.")
+        if v3 is not None and v3 < 50:
+            problemas.append("Retorno ACS inferior a 50 ºC.")
+
+    elif "acumulador" in tarea_txt and v1 is not None:
+        if v1 < 60:
+            problemas.append("Acumulador ACS inferior a 60 ºC.")
+
+    elif "retorno" in tarea_txt and v1 is not None:
+        if v1 < 50:
+            problemas.append("Retorno ACS inferior a 50 ºC.")
+
+    elif "impulsión" in tarea_txt and v1 is not None:
+        if v1 < 50:
+            problemas.append("Impulsión ACS inferior a 50 ºC.")
+
+    elif "acs terminal" in tarea_txt and v1 is not None:
+        if v1 < 50:
+            problemas.append("ACS terminal inferior a 50 ºC.")
+
+    elif "afs" in tarea_txt and v1 is not None:
+        if v1 > 25:
+            problemas.append("AFCH superior a 25 ºC.")
+
+    elif "punto terminal completo" in tarea_txt:
+        if v1 is not None and v1 > 25:
+            problemas.append("AFCH superior a 25 ºC.")
+        if v3 is not None and v3 < 50:
+            problemas.append("ACS terminal inferior a 50 ºC.")
+
+    return problemas
+
+
+def evaluar_temperaturas_legionella(centro=None):
+    """
+    Evalúa el comportamiento térmico de la instalación.
+    Solo interpreta registros. No modifica datos.
+    """
+
+    puntos, tareas, incidencias, registros, informes = _leer_datos(centro)
+
+    if registros.empty:
+        return {
+            "score": 50,
+            "estado": "Sin datos térmicos",
+            "color": "amarillo",
+            "fuera_rango": 0,
+            "controles_revisados": 0,
+            "mensaje": "No hay registros suficientes para valorar temperaturas.",
+            "motivos": ["Todavía no existe histórico térmico suficiente."],
+        }
+
+    df = registros.copy()
+
+    if "fecha" in df.columns:
+        df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
+        df = df.sort_values("fecha_dt", ascending=False).head(60)
+
+    fuera_rango = 0
+    controles_revisados = 0
+    motivos = []
+
+    for _, row in df.iterrows():
+        tarea = row.get("tarea", "")
+        valor = row.get("valor", None)
+        valor_2 = row.get("valor_2", None)
+        valor_3 = row.get("valor_3", None)
+
+        problemas = _evaluar_valor_temperatura(
+            tarea=tarea,
+            valor=valor,
+            valor_2=valor_2,
+            valor_3=valor_3
+        )
+
+        controles_revisados += 1
+
+        if problemas:
+            fuera_rango += len(problemas)
+            punto = row.get("punto", "")
+            for problema in problemas:
+                motivos.append(f"{punto}: {problema}")
+
+    score = 100
+    score -= fuera_rango * 12
+    score = max(0, min(100, score))
+
+    if fuera_rango == 0:
+        return {
+            "score": score,
+            "estado": "Temperaturas correctas",
+            "color": "verde",
+            "fuera_rango": fuera_rango,
+            "controles_revisados": controles_revisados,
+            "mensaje": "Los últimos controles térmicos están dentro de los valores esperados.",
+            "motivos": ["Sin desviaciones térmicas relevantes."],
+        }
+
+    if fuera_rango <= 2:
+        return {
+            "score": score,
+            "estado": "Vigilancia térmica",
+            "color": "amarillo",
+            "fuera_rango": fuera_rango,
+            "controles_revisados": controles_revisados,
+            "mensaje": "Se han detectado algunas desviaciones térmicas que conviene revisar.",
+            "motivos": motivos[:6],
+        }
+
+    return {
+        "score": score,
+        "estado": "Riesgo térmico",
+        "color": "rojo",
+        "fuera_rango": fuera_rango,
+        "controles_revisados": controles_revisados,
+        "mensaje": "Existen varias temperaturas fuera de rango en controles recientes.",
+        "motivos": motivos[:8],
+    }
