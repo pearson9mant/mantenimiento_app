@@ -747,3 +747,113 @@ def evaluar_temperaturas_legionella(centro=None):
         "mensaje": "Existen varias temperaturas fuera de rango en controles recientes.",
         "motivos": motivos[:8],
     }
+
+# ======================================================
+# MOTOR DE PLANIFICACIÓN LEGIONELLA
+# ======================================================
+
+def evaluar_planificacion_legionella(centro=None):
+    """
+    Evalúa si la planificación Legionella está controlada.
+    Solo interpreta tareas. No modifica datos.
+    """
+
+    puntos, tareas, incidencias, registros, informes = _leer_datos(centro)
+
+    if tareas.empty:
+        return {
+            "score": 40,
+            "estado": "Sin planificación",
+            "color": "rojo",
+            "total": 0,
+            "activas": 0,
+            "vencidas": 0,
+            "proximas": 0,
+            "sin_fecha": 0,
+            "mensaje": "No existe planificación activa de Legionella.",
+            "motivos": ["Crear planificación automática desde puntos."],
+        }
+
+    df = tareas.copy()
+
+    if "activo" in df.columns:
+        df_activas = df[df["activo"].fillna(0).astype(int) == 1].copy()
+    else:
+        df_activas = df.copy()
+
+    total = len(df)
+    activas = len(df_activas)
+
+    if df_activas.empty:
+        return {
+            "score": 45,
+            "estado": "Planificación inactiva",
+            "color": "rojo",
+            "total": total,
+            "activas": 0,
+            "vencidas": 0,
+            "proximas": 0,
+            "sin_fecha": 0,
+            "mensaje": "Existen tareas, pero ninguna está activa.",
+            "motivos": ["Activar las tareas necesarias o revisar configuración."],
+        }
+
+    hoy = pd.Timestamp(date.today())
+
+    df_activas["proxima_fecha_dt"] = pd.to_datetime(
+        df_activas.get("proxima_fecha", ""),
+        errors="coerce"
+    )
+
+    sin_fecha = len(df_activas[df_activas["proxima_fecha_dt"].isna()])
+    vencidas = len(df_activas[df_activas["proxima_fecha_dt"] <= hoy])
+    proximas = len(
+        df_activas[
+            (df_activas["proxima_fecha_dt"] > hoy)
+            & (df_activas["proxima_fecha_dt"] <= hoy + pd.Timedelta(days=15))
+        ]
+    )
+
+    score = 100
+    score -= vencidas * 12
+    score -= proximas * 4
+    score -= sin_fecha * 8
+    score = max(0, min(100, int(score)))
+
+    motivos = []
+
+    if vencidas > 0:
+        motivos.append(f"{vencidas} control(es) vencido(s).")
+
+    if proximas > 0:
+        motivos.append(f"{proximas} control(es) próximo(s) a vencer.")
+
+    if sin_fecha > 0:
+        motivos.append(f"{sin_fecha} tarea(s) sin próxima fecha.")
+
+    if score >= 90:
+        estado = "Planificación excelente"
+        color = "verde"
+        mensaje = "La planificación preventiva está controlada."
+        motivos = motivos or ["Todos los controles activos están en fecha."]
+    elif score >= 70:
+        estado = "Planificación en seguimiento"
+        color = "amarillo"
+        mensaje = "La planificación está razonablemente controlada, con controles próximos o pequeños ajustes pendientes."
+    else:
+        estado = "Planificación crítica"
+        color = "rojo"
+        mensaje = "Existen controles vencidos o tareas sin fecha que requieren revisión."
+
+    return {
+        "score": score,
+        "estado": estado,
+        "color": color,
+        "total": total,
+        "activas": activas,
+        "vencidas": vencidas,
+        "proximas": proximas,
+        "sin_fecha": sin_fecha,
+        "mensaje": mensaje,
+        "motivos": motivos,
+    }
