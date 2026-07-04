@@ -238,3 +238,208 @@ def obtener_prioridades_legionella(centro=None, limite=5):
             })
 
     return prioridades[:limite]
+
+# ======================================================
+# MOTOR DE CRITICIDAD LEGIONELLA
+# ======================================================
+
+def evaluar_nivel_criticidad(score):
+    score = int(score or 0)
+
+    if score >= 81:
+        return "Crítico", "rojo"
+    if score >= 61:
+        return "Alto", "rojo"
+    if score >= 41:
+        return "Vigilancia", "amarillo"
+    if score >= 21:
+        return "Bueno", "verde"
+
+    return "Excelente", "verde"
+
+
+def _peso_tipo_punto(tipo_punto, nombre_punto="", tarea=""):
+    texto = f"{tipo_punto} {nombre_punto} {tarea}".lower()
+
+    if "acumulador" in texto and "solar" not in texto:
+        return 25, "Punto crítico: acumulador ACS."
+
+    if "retorno" in texto:
+        return 20, "Punto crítico: retorno ACS."
+
+    if "solar" in texto:
+        return 18, "Punto sensible: acumulador solar."
+
+    if "ducha" in texto:
+        return 15, "Punto sensible: ducha."
+
+    if "grifo" in texto or "terminal" in texto:
+        return 10, "Punto terminal de control."
+
+    if "muestra" in texto:
+        return 8, "Punto de muestra."
+
+    return 5, "Punto de control general."
+
+
+def _peso_resultado_registro(registro):
+    if not registro:
+        return 0, ""
+
+    estado = str(registro.get("estado") or "").upper()
+    resultado = str(registro.get("resultado") or "")
+
+    if estado == "RIESGO":
+        return 35, f"Último registro en RIESGO: {resultado}"
+
+    if estado == "INCIDENCIA":
+        return 25, f"Último registro con incidencia: {resultado}"
+
+    return 0, "Último registro correcto."
+
+
+def _peso_incidencia(incidencia):
+    if not incidencia:
+        return 0, ""
+
+    estado = str(incidencia.get("estado") or "").lower()
+
+    if estado not in ESTADOS_CIERRE:
+        return 30, "Existe incidencia Legionella abierta."
+
+    return 0, ""
+
+
+def _accion_por_contexto(punto, registro=None, incidencia=None):
+    texto = (
+        f"{punto.get('tipo_punto', '')} "
+        f"{punto.get('nombre_punto', '')} "
+        f"{punto.get('tipo_control_punto', '')} "
+        f"{registro.get('resultado', '') if registro else ''}"
+    ).lower()
+
+    if incidencia:
+        return "Resolver la incidencia abierta y registrar cierre técnico."
+
+    if "retorno" in texto:
+        return "Comprobar bomba de recirculación, purga de aire y temperatura de retorno."
+
+    if "acumulador" in texto and "solar" not in texto:
+        return "Comprobar consigna, producción ACS y recuperación térmica."
+
+    if "solar" in texto:
+        return "Revisar acumulador solar y confirmar temperatura real de acumulación."
+
+    if "cloro" in texto:
+        return "Repetir medición de cloro y comprobar dosificación / renovación de agua."
+
+    if "afs" in texto or "agua fría" in texto:
+        return "Comprobar temperatura AFCH, uso del punto y posible mezcla con ACS."
+
+    if "ducha" in texto or "grifo" in texto:
+        return "Realizar purga, revisar aireador y repetir control terminal."
+
+    return "Mantener seguimiento preventivo según planificación."
+
+
+def calcular_criticidad_punto(punto, ultimo_registro=None, incidencia=None):
+    """
+    Calcula la criticidad sanitaria de un punto Legionella.
+    No modifica datos. Solo interpreta.
+    """
+
+    score = 0
+    motivos = []
+
+    peso, motivo = _peso_tipo_punto(
+        punto.get("tipo_punto", ""),
+        punto.get("nombre_punto", ""),
+        punto.get("tipo_control_punto", "")
+    )
+    score += peso
+    motivos.append(motivo)
+
+    peso, motivo = _peso_resultado_registro(ultimo_registro)
+    score += peso
+    if motivo:
+        motivos.append(motivo)
+
+    peso, motivo = _peso_incidencia(incidencia)
+    score += peso
+    if motivo:
+        motivos.append(motivo)
+
+    score = max(0, min(100, score))
+
+    nivel, color = evaluar_nivel_criticidad(score)
+
+    return {
+        "score": score,
+        "nivel": nivel,
+        "color": color,
+        "motivos": motivos,
+        "accion": _accion_por_contexto(punto, ultimo_registro, incidencia),
+    }
+
+
+def obtener_criticidad_puntos_legionella(centro=None, limite=20):
+    puntos, tareas, incidencias, registros, informes = _leer_datos(centro)
+
+    if puntos.empty:
+        return []
+
+    resultados = []
+
+    for _, punto_row in puntos.iterrows():
+        punto = punto_row.to_dict()
+        nombre_punto = str(punto.get("nombre_punto") or "")
+
+        ultimo_registro = None
+        incidencia = None
+
+        if not registros.empty and "punto" in registros.columns:
+            df_reg = registros[
+                registros["punto"].fillna("").astype(str) == nombre_punto
+            ]
+
+            if not df_reg.empty:
+                ultimo_registro = df_reg.iloc[0].to_dict()
+
+        if not incidencias.empty and "punto" in incidencias.columns:
+            df_inc = incidencias[
+                incidencias["punto"].fillna("").astype(str) == nombre_punto
+            ]
+
+            if not df_inc.empty:
+                estados = df_inc["estado"].fillna("").astype(str).str.lower()
+                abiertas = df_inc[~estados.isin(ESTADOS_CIERRE)]
+
+                if not abiertas.empty:
+                    incidencia = abiertas.iloc[0].to_dict()
+
+        critica = calcular_criticidad_punto(
+            punto=punto,
+            ultimo_registro=ultimo_registro,
+            incidencia=incidencia
+        )
+
+        resultados.append({
+            "centro": punto.get("centro", ""),
+            "edificio": punto.get("edificio", ""),
+            "instalacion": punto.get("instalacion", ""),
+            "punto": nombre_punto,
+            "tipo_punto": punto.get("tipo_punto", ""),
+            "score": critica["score"],
+            "nivel": critica["nivel"],
+            "color": critica["color"],
+            "motivos": critica["motivos"],
+            "accion": critica["accion"],
+        })
+
+    resultados = sorted(
+        resultados,
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    return resultados[:limite]
