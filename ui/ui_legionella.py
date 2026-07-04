@@ -2408,6 +2408,7 @@ def pantalla_legionella():
         st.info(mensaje)
 
     st.subheader("💧 Legionella")
+    mostrar_panel_inteligente_legionella() 
     st.markdown("### 🗺️ Planos de puntos de control")
 
     col1, col2 = st.columns(2)
