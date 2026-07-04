@@ -443,3 +443,160 @@ def obtener_criticidad_puntos_legionella(centro=None, limite=20):
     )
 
     return resultados[:limite]
+
+# ======================================================
+# MOTOR DE ESTABILIDAD LEGIONELLA
+# ======================================================
+
+def evaluar_estabilidad_punto(nombre_punto, registros):
+    """
+    Evalúa si un punto Legionella es estable según sus últimos registros.
+    Solo interpreta datos. No modifica nada.
+    """
+
+    if registros is None or registros.empty:
+        return {
+            "score": 50,
+            "estado": "Sin histórico suficiente",
+            "color": "amarillo",
+            "mensaje": "No hay suficientes registros para valorar la estabilidad.",
+            "motivos": ["Histórico insuficiente."],
+        }
+
+    df = registros.copy()
+
+    if "punto" in df.columns:
+        df = df[df["punto"].fillna("").astype(str) == str(nombre_punto)]
+
+    if df.empty or len(df) < 3:
+        return {
+            "score": 55,
+            "estado": "Histórico corto",
+            "color": "amarillo",
+            "mensaje": "El punto tiene pocos controles registrados. Conviene seguir acumulando histórico.",
+            "motivos": ["Menos de 3 registros disponibles."],
+        }
+
+    df["fecha_dt"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df = df.sort_values("fecha_dt", ascending=False).head(8)
+
+    riesgos = 0
+
+    if "estado" in df.columns:
+        riesgos = len(
+            df[
+                df["estado"]
+                .fillna("")
+                .astype(str)
+                .str.upper()
+                .isin(["RIESGO", "INCIDENCIA"])
+            ]
+        )
+
+    valores = []
+
+    for col in ["valor", "valor_2", "valor_3"]:
+        if col in df.columns:
+            serie = pd.to_numeric(df[col], errors="coerce").dropna()
+            if not serie.empty:
+                valores.extend(serie.tolist())
+
+    variacion = 0
+
+    if valores:
+        try:
+            variacion = max(valores) - min(valores)
+        except Exception:
+            variacion = 0
+
+    score = 100
+    score -= riesgos * 20
+
+    if variacion > 15:
+        score -= 25
+    elif variacion > 8:
+        score -= 15
+    elif variacion > 4:
+        score -= 8
+
+    score = max(0, min(100, int(score)))
+
+    motivos = []
+
+    if riesgos > 0:
+        motivos.append(f"{riesgos} registro(s) con riesgo o incidencia.")
+
+    if variacion > 0:
+        motivos.append(f"Variación observada aproximada: {round(variacion, 2)}.")
+
+    if score >= 90:
+        return {
+            "score": score,
+            "estado": "Muy estable",
+            "color": "verde",
+            "mensaje": "El punto mantiene un comportamiento muy estable.",
+            "motivos": motivos or ["Sin desviaciones relevantes."],
+        }
+
+    if score >= 70:
+        return {
+            "score": score,
+            "estado": "Estable",
+            "color": "verde",
+            "mensaje": "El punto presenta estabilidad aceptable.",
+            "motivos": motivos or ["Sin incidencias relevantes."],
+        }
+
+    if score >= 50:
+        return {
+            "score": score,
+            "estado": "Vigilancia",
+            "color": "amarillo",
+            "mensaje": "El punto requiere seguimiento preventivo.",
+            "motivos": motivos or ["Se recomienda revisar próximos registros."],
+        }
+
+    return {
+        "score": score,
+        "estado": "Inestable",
+        "color": "rojo",
+        "mensaje": "El punto presenta señales de inestabilidad sanitaria o técnica.",
+        "motivos": motivos or ["Revisar punto y controles asociados."],
+    }
+
+
+def obtener_estabilidad_puntos_legionella(centro=None, limite=20):
+    puntos, tareas, incidencias, registros, informes = _leer_datos(centro)
+
+    if puntos.empty:
+        return []
+
+    resultados = []
+
+    for _, punto_row in puntos.iterrows():
+        punto = punto_row.to_dict()
+        nombre_punto = str(punto.get("nombre_punto") or "")
+
+        estabilidad = evaluar_estabilidad_punto(
+            nombre_punto=nombre_punto,
+            registros=registros
+        )
+
+        resultados.append({
+            "centro": punto.get("centro", ""),
+            "edificio": punto.get("edificio", ""),
+            "instalacion": punto.get("instalacion", ""),
+            "punto": nombre_punto,
+            "score": estabilidad["score"],
+            "estado": estabilidad["estado"],
+            "color": estabilidad["color"],
+            "mensaje": estabilidad["mensaje"],
+            "motivos": estabilidad["motivos"],
+        })
+
+    resultados = sorted(
+        resultados,
+        key=lambda x: x["score"]
+    )
+
+    return resultados[:limite]
