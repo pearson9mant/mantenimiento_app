@@ -857,3 +857,87 @@ def evaluar_planificacion_legionella(centro=None):
         "mensaje": mensaje,
         "motivos": motivos,
     }
+
+# ======================================================
+# OPINIÓN TÉCNICA LEGIONELLA
+# ======================================================
+
+def generar_opinion_tecnica_legionella(centro=None):
+    """
+    Genera una opinión técnica resumida del estado sanitario.
+    No modifica datos. Solo interpreta el motor.
+    """
+
+    global_diag = diagnosticar_legionella_global(centro)
+    plan = evaluar_planificacion_legionella(centro)
+    temp = evaluar_temperaturas_legionella(centro)
+    prioridades = obtener_prioridades_legionella(centro, limite=3)
+
+    score = int(global_diag.get("score", 0))
+    color = global_diag.get("color", "verde")
+
+    texto = []
+
+    texto.append(
+        f"La instalación de {centro or 'todos los centros'} presenta un índice sanitario del {score}%."
+    )
+
+    if color == "verde":
+        texto.append(
+            "El estado general se considera correcto según los datos registrados."
+        )
+    elif color == "amarillo":
+        texto.append(
+            "El estado general requiere seguimiento preventivo, aunque no se observan señales críticas inmediatas."
+        )
+    else:
+        texto.append(
+            "El estado general requiere atención sanitaria prioritaria."
+        )
+
+    texto.append(plan.get("mensaje", ""))
+    texto.append(temp.get("mensaje", ""))
+
+    if prioridades:
+        primera = prioridades[0]
+        texto.append(
+            "La actuación prioritaria recomendada es revisar "
+            f"{primera.get('punto', 'el punto indicado')} "
+            f"en {primera.get('edificio', 'la instalación correspondiente')}."
+        )
+    else:
+        texto.append(
+            "No se detectan actuaciones prioritarias críticas en este momento."
+        )
+
+    if global_diag.get("incidencias_abiertas", 0) == 0:
+        texto.append(
+            "No constan incidencias Legionella abiertas."
+        )
+    else:
+        texto.append(
+            f"Constan {global_diag.get('incidencias_abiertas', 0)} incidencia(s) abiertas que deben cerrarse con trazabilidad técnica."
+        )
+
+    if global_diag.get("informes_total", 0) > 0:
+        texto.append(
+            f"Hay {global_diag.get('informes_total', 0)} informe(s) externo(s) archivado(s) en el sistema."
+        )
+
+    conclusion = ""
+
+    if color == "verde":
+        conclusion = "Conclusión: mantener la planificación preventiva actual."
+    elif color == "amarillo":
+        conclusion = "Conclusión: revisar próximos controles y mantener seguimiento."
+    else:
+        conclusion = "Conclusión: actuar sobre incidencias y controles prioritarios antes de considerar la instalación estabilizada."
+
+    return {
+        "centro": centro or "Todos",
+        "score": score,
+        "color": color,
+        "estado": global_diag.get("estado", ""),
+        "parrafos": [t for t in texto if t],
+        "conclusion": conclusion,
+    }
