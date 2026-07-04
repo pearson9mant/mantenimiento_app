@@ -2386,6 +2386,47 @@ def mostrar_panel_inteligente_legionella():
 
     st.markdown("---")
 
+    st.markdown("### 🧬 Puntos con mayor criticidad sanitaria")
+
+    puntos_criticos = obtener_criticidad_puntos_legionella(
+        centro_motor,
+        limite=5
+    )
+
+    if not puntos_criticos:
+        st.success("No hay puntos críticos detectados.")
+    else:
+        for p in puntos_criticos:
+            color = p.get("color", "verde")
+
+            if color == "rojo":
+                st.error(
+                    f"🔴 **{p.get('punto', '-')}** · "
+                    f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
+                )
+            elif color == "amarillo":
+                st.warning(
+                    f"🟠 **{p.get('punto', '-')}** · "
+                    f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
+                )
+            else:
+                st.success(
+                    f"🟢 **{p.get('punto', '-')}** · "
+                    f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
+                )
+
+            st.caption(
+                f"{p.get('centro', '')} · "
+                f"{p.get('edificio', '')} · "
+                f"{p.get('instalacion', '')}"
+            )
+
+            with st.expander("🧠 Motivos y acción recomendada", expanded=False):
+                for motivo in p.get("motivos", []):
+                    st.markdown(f"• {motivo}")
+
+                st.info(p.get("accion", "Mantener seguimiento preventivo."))
+
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
     asegurar_columnas_clasificacion_legionella()
