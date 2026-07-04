@@ -236,10 +236,25 @@ def _incidencias_por_espacio(centro, espacio, ots_abiertas):
     return incidencias
 
 
+def _valor_ot(ot, campo, posicion=None, defecto=""):
+    try:
+        if isinstance(ot, dict):
+            return ot.get(campo, defecto)
+        if posicion is not None:
+            return ot[posicion]
+    except Exception:
+        pass
+    return defecto
+
+
 def mostrar_arbol_gerencia():
     st.markdown("#### 🌳 Árbol de incidencias")
 
-    ots_abiertas = obtener_ots_abiertas_por_centro()
+    try:
+        ots_abiertas = obtener_ots_abiertas_por_centro()
+    except Exception as e:
+        st.error(f"No se pudieron cargar las incidencias: {e}")
+        return
 
     if not ots_abiertas:
         st.success("No hay incidencias abiertas.")
@@ -248,24 +263,25 @@ def mostrar_arbol_gerencia():
     agrupado = {}
 
     for ot in ots_abiertas:
-        try:
-            centro = ot.get("centro", "") or "Sin centro"
-            edificio = ot.get("edificio", "") or "Sin edificio"
-            espacio = ot.get("espacio", "") or "Sin espacio"
-            numero = ot.get("numero_ot", "") or "-"
-            prioridad = ot.get("prioridad", "") or "-"
-            descripcion = ot.get("descripcion", "") or "-"
-        except Exception:
-            continue
+        numero = _valor_ot(ot, "numero_ot", 1, "-")
+        descripcion = _valor_ot(ot, "descripcion", 2, "-")
+        prioridad = _valor_ot(ot, "prioridad", 8, "-")
+        centro = _valor_ot(ot, "centro", 5, "Sin centro")
+        edificio = _valor_ot(ot, "edificio", 6, "Sin edificio")
+        espacio = _valor_ot(ot, "espacio", 7, "Sin espacio")
+
+        centro = str(centro or "Sin centro")
+        edificio = str(edificio or "Sin edificio")
+        espacio = str(espacio or "Sin espacio")
 
         agrupado.setdefault(centro, {})
         agrupado[centro].setdefault(edificio, {})
         agrupado[centro][edificio].setdefault(espacio, [])
 
         agrupado[centro][edificio][espacio].append({
-            "numero": numero,
-            "prioridad": prioridad,
-            "descripcion": descripcion,
+            "numero": str(numero or "-"),
+            "prioridad": str(prioridad or "-"),
+            "descripcion": str(descripcion or "-"),
         })
 
     for centro, edificios in agrupado.items():
@@ -277,17 +293,18 @@ def mostrar_arbol_gerencia():
 
         with st.expander(f"🔴 🏢 {centro} ({total_centro})", expanded=True):
             for edificio, espacios in edificios.items():
-                total_edificio = sum(len(inc) for inc in espacios.values())
+                total_edificio = sum(len(lista) for lista in espacios.values())
 
-                with st.expander(f"🔴 🏫 {edificio} ({total_edificio})", expanded=False):
-                    for espacio, incidencias in espacios.items():
-                        st.markdown(f"**📍 {espacio} ({len(incidencias)})**")
+                st.markdown(f"### 🏫 {edificio} ({total_edificio})")
 
-                        for inc in incidencias:
-                            st.markdown(
-                                f"• `{inc['numero']}` · "
-                                f"**{inc['prioridad']}** · "
-                                f"{inc['descripcion']}"
-                            )
+                for espacio, incidencias in espacios.items():
+                    st.markdown(f"**📍 {espacio} ({len(incidencias)})**")
 
-                        st.markdown("---")
+                    for inc in incidencias:
+                        st.markdown(
+                            f"• `{inc['numero']}` · "
+                            f"**{inc['prioridad']}** · "
+                            f"{inc['descripcion']}"
+                        )
+
+                    st.markdown("---")
