@@ -2324,6 +2324,67 @@ def obtener_resumen_legionella_espacio(centro, edificio, espacio):
 
     return resumen
 
+def mostrar_panel_inteligente_legionella():
+    st.markdown("## 🦠 Centro de Control Sanitario")
+
+    centro_panel = st.selectbox(
+        "Centro sanitario",
+        ["Todos", "Pearson 22", "Pearson 9"],
+        key="legionella_panel_centro"
+    )
+
+    centro_motor = None if centro_panel == "Todos" else centro_panel
+
+    estado = diagnosticar_legionella_global(centro_motor)
+    prioridades = obtener_prioridades_legionella(centro_motor)
+
+    color = estado.get("color", "verde")
+    score = estado.get("score", 0)
+
+    if color == "rojo":
+        st.error(f"🔴 Estado sanitario: {estado['estado']} · {score}%")
+    elif color == "amarillo":
+        st.warning(f"🟠 Estado sanitario: {estado['estado']} · {score}%")
+    else:
+        st.success(f"🟢 Estado sanitario: {estado['estado']} · {score}%")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Puntos activos", estado.get("puntos_activos", 0))
+    c2.metric("Controles", estado.get("tareas_activas", 0))
+    c3.metric("Vencidos", estado.get("controles_vencidos", 0))
+    c4.metric("Incidencias", estado.get("incidencias_abiertas", 0))
+
+    c5, c6, c7 = st.columns(3)
+
+    c5.metric("Próximos", estado.get("controles_proximos", 0))
+    c6.metric("Riesgos registrados", estado.get("riesgos_registro", 0))
+    c7.metric("Informes", estado.get("informes_total", 0))
+
+    st.markdown("### 🧠 Diagnóstico sanitario")
+
+    for linea in estado.get("diagnostico", []):
+        st.markdown(f"• {linea}")
+
+    st.info(f"**Recomendación:** {estado.get('recomendacion', '')}")
+
+    st.markdown("### 🔥 Prioridades sanitarias")
+
+    if not prioridades:
+        st.success("No hay prioridades críticas en este momento.")
+    else:
+        for i, p in enumerate(prioridades, start=1):
+            icono = "🔴" if p.get("nivel") == "rojo" else "🟠"
+
+            st.markdown(
+                f"{icono} **{i}. {p.get('tipo', '')}** · "
+                f"{p.get('centro', '')} · {p.get('edificio', '')} · {p.get('punto', '')}"
+            )
+            st.caption(p.get("descripcion", ""))
+            st.info(p.get("accion", ""))
+
+    st.markdown("---")
+
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
     asegurar_columnas_clasificacion_legionella()
