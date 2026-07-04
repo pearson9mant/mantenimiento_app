@@ -239,85 +239,55 @@ def _incidencias_por_espacio(centro, espacio, ots_abiertas):
 def mostrar_arbol_gerencia():
     st.markdown("#### 🌳 Árbol de incidencias")
 
-    arbol = obtener_arbol_espacios()
     ots_abiertas = obtener_ots_abiertas_por_centro()
 
-    hay_incidencias = False
+    if not ots_abiertas:
+        st.success("No hay incidencias abiertas.")
+        return
 
-    for centro, edificios in arbol.items():
-        estado_centro, total_centro = estado_y_total_centro(
-            centro=centro,
-            edificios=edificios,
-            ots_abiertas=ots_abiertas
-        )
+    agrupado = {}
 
-        if total_centro == 0:
+    for ot in ots_abiertas:
+        try:
+            centro = ot.get("centro", "") or "Sin centro"
+            edificio = ot.get("edificio", "") or "Sin edificio"
+            espacio = ot.get("espacio", "") or "Sin espacio"
+            numero = ot.get("numero_ot", "") or "-"
+            prioridad = ot.get("prioridad", "") or "-"
+            descripcion = ot.get("descripcion", "") or "-"
+        except Exception:
             continue
 
-        hay_incidencias = True
-        icono_centro = icono_estado_espacio(estado_centro)
+        agrupado.setdefault(centro, {})
+        agrupado[centro].setdefault(edificio, {})
+        agrupado[centro][edificio].setdefault(espacio, [])
 
-        with st.expander(
-            f"{icono_centro} 🏢 {centro}{texto_contador(total_centro)}",
-            expanded=True
-        ):
-            for edificio, plantas in edificios.items():
-                estado_edificio, total_edificio = estado_y_total_edificio(
-                    centro=centro,
-                    plantas=plantas,
-                    ots_abiertas=ots_abiertas
-                )
+        agrupado[centro][edificio][espacio].append({
+            "numero": numero,
+            "prioridad": prioridad,
+            "descripcion": descripcion,
+        })
 
-                if total_edificio == 0:
-                    continue
+    for centro, edificios in agrupado.items():
+        total_centro = sum(
+            len(incidencias)
+            for espacios in edificios.values()
+            for incidencias in espacios.values()
+        )
 
-                icono_edificio = icono_estado_espacio(estado_edificio)
+        with st.expander(f"🔴 🏢 {centro} ({total_centro})", expanded=True):
+            for edificio, espacios in edificios.items():
+                total_edificio = sum(len(inc) for inc in espacios.values())
 
-                with st.expander(
-                    f"{icono_edificio} 🏫 {edificio}{texto_contador(total_edificio)}",
-                    expanded=False
-                ):
-                    for planta, espacios in plantas.items():
-                        estado_planta, total_planta = estado_y_total_planta(
-                            centro=centro,
-                            espacios=espacios,
-                            ots_abiertas=ots_abiertas
-                        )
+                with st.expander(f"🔴 🏫 {edificio} ({total_edificio})", expanded=False):
+                    for espacio, incidencias in espacios.items():
+                        st.markdown(f"**📍 {espacio} ({len(incidencias)})**")
 
-                        if total_planta == 0:
-                            continue
+                        for inc in incidencias:
+                            st.markdown(
+                                f"• `{inc['numero']}` · "
+                                f"**{inc['prioridad']}** · "
+                                f"{inc['descripcion']}"
+                            )
 
-                        icono_planta = icono_estado_espacio(estado_planta)
-
-                        with st.expander(
-                            f"{icono_planta} 📍 {planta}{texto_contador(total_planta)}",
-                            expanded=False
-                        ):
-                            for item_espacio in espacios:
-                                nombre_espacio = item_espacio.get("espacio", "")
-                                tipo_espacio = item_espacio.get("tipo", "")
-
-                                incidencias = _incidencias_por_espacio(
-                                    centro,
-                                    nombre_espacio,
-                                    ots_abiertas
-                                )
-
-                                if not incidencias:
-                                    continue
-
-                                icono_tipo = icono_tipo_espacio(tipo_espacio)
-
-                                st.markdown(
-                                    f"**{icono_tipo} {nombre_espacio} ({len(incidencias)})**"
-                                )
-                                
-                                for inc in incidencias:
-                                    st.markdown(
-                                        f"• `{inc['numero'] or '-'}` · "
-                                        f"**{inc['prioridad'] or '-'}** · "
-                                        f"{inc['descripcion'] or '-'}"
-                                    )
-
-    if not hay_incidencias:
-        st.success("No hay incidencias abiertas.")
+                        st.markdown("---")
