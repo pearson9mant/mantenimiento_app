@@ -941,3 +941,349 @@ def generar_opinion_tecnica_legionella(centro=None):
         "parrafos": [t for t in texto if t],
         "conclusion": conclusion,
     }
+
+# ======================================================
+# MATRIZ DE CUMPLIMIENTO NORMATIVO LEGIONELLA
+# RD 487/2022 + RD 614/2024
+# Motor orientativo. No certifica cumplimiento legal.
+# ======================================================
+
+def _normalizar_normativa(texto):
+    return (
+        str(texto or "")
+        .lower()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ü", "u")
+        .strip()
+    )
+
+
+def _punto_contiene(punto, palabras):
+    texto = _normalizar_normativa(
+        f"{punto.get('instalacion', '')} "
+        f"{punto.get('tipo_punto', '')} "
+        f"{punto.get('tipo_control_punto', '')} "
+        f"{punto.get('nombre_punto', '')} "
+        f"{punto.get('ubicacion', '')} "
+        f"{punto.get('ubicacion_exacta', '')} "
+        f"{punto.get('categoria_panel', '')} "
+        f"{punto.get('subcategoria_panel', '')}"
+    )
+
+    return any(_normalizar_normativa(p) in texto for p in palabras)
+
+
+def _existe_punto(df_puntos, palabras):
+    if df_puntos.empty:
+        return False
+
+    for _, row in df_puntos.iterrows():
+        if _punto_contiene(row.to_dict(), palabras):
+            return True
+
+    return False
+
+
+def _existe_tarea(df_tareas, palabras):
+    if df_tareas.empty:
+        return False
+
+    for _, row in df_tareas.iterrows():
+        texto = _normalizar_normativa(
+            f"{row.get('tarea', '')} {row.get('tipo_control', '')}"
+        )
+
+        if any(_normalizar_normativa(p) in texto for p in palabras):
+            return True
+
+    return False
+
+
+def _item_matriz(codigo, titulo, ok, evidencia="", recomendacion="", peso=1):
+    return {
+        "codigo": codigo,
+        "titulo": titulo,
+        "ok": bool(ok),
+        "estado": "OK" if ok else "REVISAR",
+        "evidencia": evidencia,
+        "recomendacion": recomendacion,
+        "peso": peso,
+    }
+
+
+def evaluar_matriz_cumplimiento_legionella(centro=None):
+    """
+    Matriz orientativa de cobertura normativa.
+    Evalúa estructura documental y técnica: puntos, planificación,
+    registros, incidencias, informes y evidencias.
+    """
+
+    puntos, tareas, incidencias, registros, informes = _leer_datos(centro)
+
+    if not puntos.empty and "activo" in puntos.columns:
+        puntos_activos = puntos[puntos["activo"].fillna(0).astype(int) == 1].copy()
+    else:
+        puntos_activos = puntos.copy()
+
+    if not tareas.empty and "activo" in tareas.columns:
+        tareas_activas = tareas[tareas["activo"].fillna(0).astype(int) == 1].copy()
+    else:
+        tareas_activas = tareas.copy()
+
+    tiene_puntos = not puntos_activos.empty
+    tiene_tareas = not tareas_activas.empty
+    tiene_registros = not registros.empty
+    tiene_informes = not informes.empty
+
+    tiene_acumulador = _existe_punto(
+        puntos_activos,
+        ["acumulador", "deposito acs", "deposito", "acs-"]
+    )
+
+    tiene_retorno = _existe_punto(
+        puntos_activos,
+        ["retorno"]
+    )
+
+    tiene_terminal = _existe_punto(
+        puntos_activos,
+        ["grifo", "ducha", "terminal", "lavamanos", "fuente"]
+    )
+
+    tiene_afs = _existe_punto(
+        puntos_activos,
+        ["afch", "afs", "agua fria", "grifo", "fuente"]
+    )
+
+    tiene_ducha = _existe_punto(
+        puntos_activos,
+        ["ducha", "vestuario"]
+    )
+
+    tiene_vtm = _existe_punto(
+        puntos_activos,
+        ["valvula", "termostatica", "vtm"]
+    )
+
+    tiene_solar = _existe_punto(
+        puntos_activos,
+        ["solar"]
+    )
+
+    tarea_temperatura = _existe_tarea(
+        tareas_activas,
+        ["temperatura", "control sala acs", "control acs terminal"]
+    )
+
+    tarea_afs_cloro = _existe_tarea(
+        tareas_activas,
+        ["control afs", "cloro"]
+    )
+
+    tarea_purga_visual = _existe_tarea(
+        tareas_activas,
+        ["purga", "revision visual"]
+    )
+
+    tarea_limpieza = _existe_tarea(
+        tareas_activas,
+        ["limpieza", "desinfeccion"]
+    )
+
+    incidencias_abiertas = 0
+
+    if not incidencias.empty and "estado" in incidencias.columns:
+        estado = incidencias["estado"].fillna("").astype(str).str.lower()
+        incidencias_abiertas = len(
+            incidencias[~estado.isin(ESTADOS_CIERRE)]
+        )
+
+    informes_externos = len(informes) if not informes.empty else 0
+
+    matriz = []
+
+    matriz.append(_item_matriz(
+        "N01",
+        "Inventario de puntos de control",
+        tiene_puntos,
+        f"{len(puntos_activos)} punto(s) activo(s).",
+        "Crear o completar inventario de puntos físicos.",
+        peso=5
+    ))
+
+    matriz.append(_item_matriz(
+        "N02",
+        "Acumulación ACS identificada",
+        tiene_acumulador,
+        "Acumulador o depósito ACS localizado.",
+        "Registrar acumulador ACS si existe en la instalación.",
+        peso=5
+    ))
+
+    matriz.append(_item_matriz(
+        "N03",
+        "Retorno ACS identificado",
+        tiene_retorno,
+        "Retorno ACS localizado.",
+        "Registrar retorno ACS o justificar si no aplica.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N04",
+        "Puntos terminales representativos",
+        tiene_terminal,
+        "Hay grifos, duchas o terminales registrados.",
+        "Registrar puntos terminales representativos, alejados o de bajo uso.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N05",
+        "AFCH / AFS representativa",
+        tiene_afs,
+        "Hay puntos de agua fría registrados.",
+        "Registrar puntos AFCH/AFS representativos.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N06",
+        "Duchas / vestuarios considerados",
+        tiene_ducha,
+        "Hay duchas o vestuarios registrados.",
+        "Si existen duchas, registrarlas y planificar controles/purgas.",
+        peso=3
+    ))
+
+    matriz.append(_item_matriz(
+        "N07",
+        "Válvulas termostáticas consideradas",
+        tiene_vtm,
+        "Hay VTM registradas.",
+        "Si existen VTM, registrarlas y planificar control específico.",
+        peso=2
+    ))
+
+    matriz.append(_item_matriz(
+        "N08",
+        "Solar térmica considerada",
+        tiene_solar,
+        "Hay puntos solares registrados.",
+        "Si existe solar térmica, registrar depósitos o puntos asociados.",
+        peso=2
+    ))
+
+    matriz.append(_item_matriz(
+        "N09",
+        "Planificación preventiva activa",
+        tiene_tareas,
+        f"{len(tareas_activas)} tarea(s) activa(s).",
+        "Crear planificación automática desde puntos.",
+        peso=5
+    ))
+
+    matriz.append(_item_matriz(
+        "N10",
+        "Controles de temperatura planificados",
+        tarea_temperatura,
+        "Existen controles térmicos planificados.",
+        "Planificar controles de temperatura ACS/AFCH según instalación.",
+        peso=5
+    ))
+
+    matriz.append(_item_matriz(
+        "N11",
+        "Control AFCH / cloro planificado",
+        tarea_afs_cloro,
+        "Existen controles de AFS/cloro.",
+        "Planificar control de AFCH y cloro residual cuando aplique.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N12",
+        "Purgas / revisión visual contempladas",
+        tarea_purga_visual,
+        "Existen purgas o revisiones visuales planificadas.",
+        "Añadir purgas y revisiones visuales en puntos que lo requieran.",
+        peso=3
+    ))
+
+    matriz.append(_item_matriz(
+        "N13",
+        "Limpieza y desinfección documental",
+        tarea_limpieza or tiene_informes,
+        "Hay tareas o informes externos de limpieza/desinfección.",
+        "Registrar limpiezas, desinfecciones o certificados externos.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N14",
+        "Registros operacionales",
+        tiene_registros,
+        f"{len(registros)} registro(s) archivado(s).",
+        "Registrar controles con fecha, punto, resultado y operario.",
+        peso=5
+    ))
+
+    matriz.append(_item_matriz(
+        "N15",
+        "Informes externos / analíticas",
+        tiene_informes,
+        f"{informes_externos} informe(s) archivado(s).",
+        "Guardar analíticas, certificados o informes externos.",
+        peso=4
+    ))
+
+    matriz.append(_item_matriz(
+        "N16",
+        "Gestión de incidencias y correctivos",
+        incidencias_abiertas == 0,
+        f"{incidencias_abiertas} incidencia(s) abierta(s).",
+        "Cerrar incidencias con trazabilidad técnica y evidencia.",
+        peso=5
+    ))
+
+    peso_total = sum(item["peso"] for item in matriz)
+    peso_ok = sum(item["peso"] for item in matriz if item["ok"])
+
+    score = round((peso_ok / peso_total) * 100, 1) if peso_total else 0
+
+    revisar = [item for item in matriz if not item["ok"]]
+
+    if score >= 90:
+        estado = "Cobertura normativa sólida"
+        color = "verde"
+    elif score >= 70:
+        estado = "Cobertura normativa en seguimiento"
+        color = "amarillo"
+    else:
+        estado = "Cobertura normativa incompleta"
+        color = "rojo"
+
+    recomendaciones = [
+        item["recomendacion"]
+        for item in revisar[:5]
+        if item.get("recomendacion")
+    ]
+
+    return {
+        "centro": centro or "Todos",
+        "estado": estado,
+        "color": color,
+        "score": score,
+        "matriz": matriz,
+        "revisar": revisar,
+        "recomendaciones": recomendaciones,
+        "nota": (
+            "Evaluación orientativa basada en la estructura del PPCL/PSL, "
+            "puntos de control, planificación, registros, incidencias e informes. "
+            "No sustituye revisión técnica ni criterio de empresa especializada."
+        )
+    }
