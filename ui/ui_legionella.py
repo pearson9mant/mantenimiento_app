@@ -2331,15 +2331,22 @@ def mostrar_panel_inteligente_legionella():
     )
 
     centro_motor = None if centro_panel == "Todos" else centro_panel
-
+    panel = construir_panel_sanitario_legionella(centro_motor)
     
-    prioridades = obtener_prioridades_legionella(centro_motor)
-    criticidad = obtener_criticidad_puntos_legionella(centro_motor, limite=5)
-    estabilidad = obtener_estabilidad_puntos_legionella(centro_motor, limite=5)
-    temperaturas = evaluar_temperaturas_legionella(centro_motor)
-    planificacion = evaluar_planificacion_legionella(centro_motor)
-    opinion = generar_opinion_tecnica_legionella(centro_motor)
-    normativa = evaluar_matriz_cumplimiento_legionella(centro_motor)
+    resumen = panel["resumen"]
+    estado = resumen
+    
+    opinion = panel["opinion"]
+    semaforo = panel["semaforo"]
+    prioridad_hoy = panel["prioridad_hoy"]
+    
+    prioridades = panel["prioridades"]
+    criticidad = panel["criticidad"]
+    estabilidad = panel["estabilidad"]
+    
+    temperaturas = panel["temperaturas"]
+    planificacion = panel["planificacion"]
+    normativa = panel["normativa"]
 
     color = estado.get("color", "verde")
     score = estado.get("score", 0)
