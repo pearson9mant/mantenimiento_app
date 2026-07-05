@@ -1295,3 +1295,145 @@ def evaluar_matriz_cumplimiento_legionella(centro=None):
             "No sustituye revisión técnica ni criterio de empresa especializada."
         )
     }
+
+# ======================================================
+# PANEL SANITARIO LEGIONELLA
+# Capa preparada para UI, Gerencia, PDF y futuro móvil
+# ======================================================
+
+def _color_a_icono(color):
+    if color == "rojo":
+        return "🔴"
+    if color == "amarillo":
+        return "🟠"
+    return "🟢"
+
+
+def _estado_semaforo(nombre, evaluacion):
+    color = evaluacion.get("color", "verde")
+    return {
+        "nombre": nombre,
+        "color": color,
+        "icono": _color_a_icono(color),
+        "estado": evaluacion.get("estado", ""),
+        "score": evaluacion.get("score", 0),
+        "mensaje": evaluacion.get("mensaje", ""),
+        "motivos": evaluacion.get("motivos", []),
+    }
+
+
+def construir_panel_sanitario_legionella(centro=None):
+    """
+    Construye un panel sanitario completo.
+    La UI solo debe pintar este resultado.
+    No modifica datos.
+    """
+
+    estado = diagnosticar_legionella_global(centro)
+    opinion = generar_opinion_tecnica_legionella(centro)
+    temperaturas = evaluar_temperaturas_legionella(centro)
+    planificacion = evaluar_planificacion_legionella(centro)
+    normativa = evaluar_matriz_cumplimiento_legionella(centro)
+    prioridades = obtener_prioridades_legionella(centro, limite=5)
+    criticidad = obtener_criticidad_puntos_legionella(centro, limite=5)
+    estabilidad = obtener_estabilidad_puntos_legionella(centro, limite=5)
+
+    incidencias_color = "verde"
+    incidencias_estado = "Sin incidencias abiertas"
+
+    if estado.get("incidencias_abiertas", 0) > 0:
+        incidencias_color = "rojo"
+        incidencias_estado = f"{estado.get('incidencias_abiertas', 0)} incidencia(s) abierta(s)"
+
+    informes_color = "verde" if estado.get("informes_total", 0) > 0 else "amarillo"
+    informes_estado = (
+        f"{estado.get('informes_total', 0)} informe(s) archivado(s)"
+        if estado.get("informes_total", 0) > 0
+        else "Sin informes externos archivados"
+    )
+
+    semaforo = [
+        _estado_semaforo("Temperaturas", temperaturas),
+        _estado_semaforo("Planificación", planificacion),
+        {
+            "nombre": "Incidencias",
+            "color": incidencias_color,
+            "icono": _color_a_icono(incidencias_color),
+            "estado": incidencias_estado,
+            "score": 100 if incidencias_color == "verde" else 50,
+            "mensaje": "Revisar y cerrar incidencias con trazabilidad técnica.",
+            "motivos": [],
+        },
+        {
+            "nombre": "Informes",
+            "color": informes_color,
+            "icono": _color_a_icono(informes_color),
+            "estado": informes_estado,
+            "score": 100 if informes_color == "verde" else 70,
+            "mensaje": "Mantener analíticas, certificados e informes externos archivados.",
+            "motivos": [],
+        },
+        {
+            "nombre": "Normativa",
+            "color": normativa.get("color", "amarillo"),
+            "icono": _color_a_icono(normativa.get("color", "amarillo")),
+            "estado": normativa.get("estado", ""),
+            "score": normativa.get("score", 0),
+            "mensaje": "Cobertura normativa y documental.",
+            "motivos": normativa.get("recomendaciones", []),
+        },
+    ]
+
+    prioridad_hoy = None
+
+    if prioridades:
+        p = prioridades[0]
+        prioridad_hoy = {
+            "titulo": p.get("punto", "Actuación prioritaria"),
+            "centro": p.get("centro", ""),
+            "edificio": p.get("edificio", ""),
+            "tipo": p.get("tipo", ""),
+            "descripcion": p.get("descripcion", ""),
+            "accion": p.get("accion", ""),
+            "motivo": "Es la actuación que el sistema considera más urgente ahora mismo.",
+        }
+    elif criticidad:
+        p = criticidad[0]
+        prioridad_hoy = {
+            "titulo": p.get("punto", "Punto a revisar"),
+            "centro": p.get("centro", ""),
+            "edificio": p.get("edificio", ""),
+            "tipo": p.get("nivel", ""),
+            "descripcion": "Punto con mayor criticidad sanitaria.",
+            "accion": p.get("accion", ""),
+            "motivo": "Es el punto con mayor peso sanitario según el motor.",
+        }
+
+    resumen = {
+        "centro": centro or "Todos",
+        "score": estado.get("score", 0),
+        "estado": estado.get("estado", ""),
+        "color": estado.get("color", "verde"),
+        "icono": _color_a_icono(estado.get("color", "verde")),
+        "puntos_activos": estado.get("puntos_activos", 0),
+        "controles": estado.get("tareas_activas", 0),
+        "vencidos": estado.get("controles_vencidos", 0),
+        "proximos": estado.get("controles_proximos", 0),
+        "incidencias": estado.get("incidencias_abiertas", 0),
+        "riesgos": estado.get("riesgos_registro", 0),
+        "informes": estado.get("informes_total", 0),
+        "normativa": normativa.get("score", 0),
+    }
+
+    return {
+        "resumen": resumen,
+        "opinion": opinion,
+        "semaforo": semaforo,
+        "prioridad_hoy": prioridad_hoy,
+        "prioridades": prioridades,
+        "criticidad": criticidad,
+        "estabilidad": estabilidad,
+        "temperaturas": temperaturas,
+        "planificacion": planificacion,
+        "normativa": normativa,
+    }
