@@ -707,7 +707,9 @@ def evaluar_temperaturas_legionella(centro=None):
             tarea=tarea,
             valor=valor,
             valor_2=valor_2,
-            valor_3=valor_3
+            valor_3=valor_3,
+            punto=row.get("punto", ""),
+            instalacion=row.get("instalacion", "")
         )
 
         controles_revisados += 1
