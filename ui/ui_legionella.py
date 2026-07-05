@@ -2343,36 +2343,83 @@ def mostrar_panel_inteligente_legionella():
 
     estado = diagnosticar_legionella_global(centro_motor)
     prioridades = obtener_prioridades_legionella(centro_motor)
+    criticidad = obtener_criticidad_puntos_legionella(centro_motor, limite=5)
+    estabilidad = obtener_estabilidad_puntos_legionella(centro_motor, limite=5)
+    temperaturas = evaluar_temperaturas_legionella(centro_motor)
+    planificacion = evaluar_planificacion_legionella(centro_motor)
+    opinion = generar_opinion_tecnica_legionella(centro_motor)
+    normativa = evaluar_matriz_cumplimiento_legionella(centro_motor)
 
     color = estado.get("color", "verde")
     score = estado.get("score", 0)
 
     if color == "rojo":
-        st.error(f"🔴 Estado sanitario: {estado['estado']} · {score}%")
+        st.error(f"🔴 Estado sanitario: {estado.get('estado', '')} · {score}%")
     elif color == "amarillo":
-        st.warning(f"🟠 Estado sanitario: {estado['estado']} · {score}%")
+        st.warning(f"🟠 Estado sanitario: {estado.get('estado', '')} · {score}%")
     else:
-        st.success(f"🟢 Estado sanitario: {estado['estado']} · {score}%")
+        st.success(f"🟢 Estado sanitario: {estado.get('estado', '')} · {score}%")
 
     c1, c2, c3, c4 = st.columns(4)
-
     c1.metric("Puntos activos", estado.get("puntos_activos", 0))
     c2.metric("Controles", estado.get("tareas_activas", 0))
     c3.metric("Vencidos", estado.get("controles_vencidos", 0))
     c4.metric("Incidencias", estado.get("incidencias_abiertas", 0))
 
-    c5, c6, c7 = st.columns(3)
-
+    c5, c6, c7, c8 = st.columns(4)
     c5.metric("Próximos", estado.get("controles_proximos", 0))
-    c6.metric("Riesgos registrados", estado.get("riesgos_registro", 0))
+    c6.metric("Riesgos", estado.get("riesgos_registro", 0))
     c7.metric("Informes", estado.get("informes_total", 0))
+    c8.metric("Normativa", f"{normativa.get('score', 0)}%")
 
-    st.markdown("### 🧠 Diagnóstico sanitario")
+    st.markdown("### 🧠 Opinión técnica")
 
-    for linea in estado.get("diagnostico", []):
-        st.markdown(f"• {linea}")
+    for parrafo in opinion.get("parrafos", []):
+        st.markdown(f"• {parrafo}")
 
-    st.info(f"**Recomendación:** {estado.get('recomendacion', '')}")
+    if opinion.get("color") == "rojo":
+        st.error(opinion.get("conclusion", ""))
+    elif opinion.get("color") == "amarillo":
+        st.warning(opinion.get("conclusion", ""))
+    else:
+        st.success(opinion.get("conclusion", ""))
+
+    with st.expander("📋 Matriz normativa / cobertura documental", expanded=False):
+        if normativa.get("color") == "rojo":
+            st.error(f"{normativa.get('estado')} · {normativa.get('score')}%")
+        elif normativa.get("color") == "amarillo":
+            st.warning(f"{normativa.get('estado')} · {normativa.get('score')}%")
+        else:
+            st.success(f"{normativa.get('estado')} · {normativa.get('score')}%")
+
+        for item in normativa.get("matriz", []):
+            icono = "✅" if item.get("ok") else "⚠️"
+            st.markdown(
+                f"{icono} **{item.get('codigo')} · {item.get('titulo')}**"
+            )
+            st.caption(item.get("evidencia", ""))
+
+        if normativa.get("recomendaciones"):
+            st.markdown("#### Recomendaciones")
+            for r in normativa.get("recomendaciones", []):
+                st.markdown(f"• {r}")
+
+        st.info(normativa.get("nota", ""))
+
+    with st.expander("🌡️ Temperaturas y planificación", expanded=False):
+        st.markdown(f"**Temperaturas:** {temperaturas.get('estado')} · {temperaturas.get('score')}%")
+        st.caption(temperaturas.get("mensaje", ""))
+
+        for motivo in temperaturas.get("motivos", []):
+            st.markdown(f"• {motivo}")
+
+        st.markdown("---")
+
+        st.markdown(f"**Planificación:** {planificacion.get('estado')} · {planificacion.get('score')}%")
+        st.caption(planificacion.get("mensaje", ""))
+
+        for motivo in planificacion.get("motivos", []):
+            st.markdown(f"• {motivo}")
 
     st.markdown("### 🔥 Prioridades sanitarias")
 
@@ -2380,43 +2427,32 @@ def mostrar_panel_inteligente_legionella():
         st.success("No hay prioridades críticas en este momento.")
     else:
         for i, p in enumerate(prioridades, start=1):
-            icono = "🔴" if p.get("nivel") == "rojo" else "🟠"
-
             st.markdown(
-                f"{icono} **{i}. {p.get('tipo', '')}** · "
+                f"🔴 **{i}. {p.get('tipo', '')}** · "
                 f"{p.get('centro', '')} · {p.get('edificio', '')} · {p.get('punto', '')}"
             )
             st.caption(p.get("descripcion", ""))
             st.info(p.get("accion", ""))
 
-    st.markdown("---")
+    st.markdown("### 🧠 El sistema recomienda revisar")
 
-    st.markdown("### 🧬 Puntos con mayor criticidad sanitaria")
-
-    puntos_criticos = obtener_criticidad_puntos_legionella(
-        centro_motor,
-        limite=5
-    )
-
-    if not puntos_criticos:
+    if not criticidad:
         st.success("No hay puntos críticos detectados.")
     else:
-        for p in puntos_criticos:
-            color = p.get("color", "verde")
-
-            if color == "rojo":
+        for p in criticidad:
+            if p.get("color") == "rojo":
                 st.error(
-                    f"🔴 **{p.get('punto', '-')}** · "
+                    f"🔴 {p.get('punto', '-')} · "
                     f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
                 )
-            elif color == "amarillo":
+            elif p.get("color") == "amarillo":
                 st.warning(
-                    f"🟠 **{p.get('punto', '-')}** · "
+                    f"🟠 {p.get('punto', '-')} · "
                     f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
                 )
             else:
                 st.success(
-                    f"🟢 **{p.get('punto', '-')}** · "
+                    f"🟢 {p.get('punto', '-')} · "
                     f"{p.get('nivel', '-')} · {p.get('score', 0)}/100"
                 )
 
@@ -2426,11 +2462,24 @@ def mostrar_panel_inteligente_legionella():
                 f"{p.get('instalacion', '')}"
             )
 
-            with st.expander("🧠 Motivos y acción recomendada", expanded=False):
+            with st.expander("Ver evaluación técnica", expanded=False):
                 for motivo in p.get("motivos", []):
                     st.markdown(f"• {motivo}")
 
                 st.info(p.get("accion", "Mantener seguimiento preventivo."))
+
+    with st.expander("📈 Estabilidad de puntos", expanded=False):
+        if not estabilidad:
+            st.info("Todavía no hay histórico suficiente para valorar estabilidad.")
+        else:
+            for p in estabilidad:
+                st.markdown(
+                    f"**{p.get('punto', '-')}** · "
+                    f"{p.get('estado', '-')} · {p.get('score', 0)}%"
+                )
+                st.caption(p.get("mensaje", ""))
+
+    st.markdown("---")
 
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
