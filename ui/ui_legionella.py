@@ -2332,7 +2332,7 @@ def mostrar_panel_inteligente_legionella():
 
     centro_motor = None if centro_panel == "Todos" else centro_panel
 
-    estado = diagnosticar_legionella_global(centro_motor)
+    
     prioridades = obtener_prioridades_legionella(centro_motor)
     criticidad = obtener_criticidad_puntos_legionella(centro_motor, limite=5)
     estabilidad = obtener_estabilidad_puntos_legionella(centro_motor, limite=5)
