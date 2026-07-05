@@ -12,16 +12,7 @@ from reportlab.lib.pagesizes import A4
 
 from database.db import conectar, _sql
 from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
-from modules.inteligencia_legionella import (
-    diagnosticar_legionella_global,
-    obtener_prioridades_legionella,
-    obtener_criticidad_puntos_legionella,
-    obtener_estabilidad_puntos_legionella,
-    evaluar_temperaturas_legionella,
-    evaluar_planificacion_legionella,
-    generar_opinion_tecnica_legionella,
-    evaluar_matriz_cumplimiento_legionella,
-)
+from modules.inteligencia_legionella import construir_panel_sanitario_legionella
 
 
 OPERARIOS = ["J.A. Almeda", "Abel Vasquez", "Luis Lozano", "Otro"]
