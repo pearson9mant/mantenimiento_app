@@ -605,8 +605,14 @@ def obtener_estabilidad_puntos_legionella(centro=None, limite=20):
 # MOTOR DE TEMPERATURAS LEGIONELLA
 # ======================================================
 
-def _evaluar_valor_temperatura(tarea, valor, valor_2=None, valor_3=None):
+def _evaluar_valor_temperatura(tarea, valor, valor_2=None, valor_3=None, punto="", instalacion=""):
     tarea_txt = str(tarea or "").lower()
+    punto_txt = str(punto or "").lower()
+    instalacion_txt = str(instalacion or "").lower()
+
+    # Solar térmica: se registra temperatura, pero no se exige 60 ºC
+    if "solar" in punto_txt or "solar" in instalacion_txt:
+        return []
 
     try:
         v1 = float(valor)
