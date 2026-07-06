@@ -2376,9 +2376,40 @@ def mostrar_panel_inteligente_legionella():
         """
     )
 
-    st.markdown("#### Resumen")
-    for parrafo in opinion.get("parrafos", [])[:4]:
-        st.markdown(f"• {parrafo}")
+    st.markdown("### 🧠 Opinión técnica")
+
+    st.markdown(
+        f"""
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:18px;
+            padding:22px;
+            background:#ffffff;
+            margin-bottom:18px;
+        ">
+            <h4>Estado general</h4>
+            <p style="font-size:18px;"><b>{resumen.get("icono", "🔴")} {estado_txt}</b></p>
+    
+            <p><b>Índice sanitario:</b> {score}%</p>
+            <p><b>Cobertura normativa:</b> {resumen.get("normativa", 0)}%</p>
+    
+            <hr>
+    
+            <h4>Resumen técnico</h4>
+            <p>{opinion.get("parrafos", [""])[1] if opinion.get("parrafos") else ""}</p>
+            <p>{opinion.get("parrafos", ["", ""])[2] if len(opinion.get("parrafos", [])) > 2 else ""}</p>
+            <p>{opinion.get("parrafos", ["", "", ""])[3] if len(opinion.get("parrafos", [])) > 3 else ""}</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    if color == "rojo":
+        st.error(opinion.get("conclusion", ""))
+    elif color == "amarillo":
+        st.warning(opinion.get("conclusion", ""))
+    else:
+        st.success(opinion.get("conclusion", ""))
 
     if color == "rojo":
         st.error(opinion.get("conclusion", ""))
