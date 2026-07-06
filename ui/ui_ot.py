@@ -256,54 +256,7 @@ def mostrar_tarjeta_ot(
         except Exception as e:
             st.error(f"📷 Error mostrando fotos: {e}")
 
-        # -----------------------------
-        # CONTROLES INTELIGENTES DE OT
-        # -----------------------------
-        
-        if es_ot_preventiva(origen, desc):
-            try:
-                from ui.ui_operario import mostrar_checklist_preventivo_operario
-        
-                mostrar_checklist_preventivo_operario(
-                    num_ot=num_ot,
-                    desc=desc,
-                    operario=operario
-                )
-        
-            except Exception as e:
-                st.error("No se ha podido cargar el checklist preventivo.")
-                st.exception(e)
-        
-        elif es_ot_legionella(area, origen, desc):
-            try:
-                from ui.ui_operario import (
-                    mostrar_ejecucion_legionella_operario,
-                    mostrar_checklist_correctivo_legionella_operario,
-                )
-        
-                if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
-                    mostrar_checklist_correctivo_legionella_operario(
-                        num_ot=num_ot,
-                        centro=centro,
-                        edificio=edificio,
-                        espacio=espacio,
-                        desc=desc
-                    )
-                else:
-                    mostrar_ejecucion_legionella_operario(
-                        id_orden=id_orden,
-                        num_ot=num_ot,
-                        desc=desc,
-                        centro=centro,
-                        edificio=edificio,
-                        espacio=espacio,
-                        operario=operario,
-                    )
-        
-            except Exception as e:
-                st.error("No se ha podido cargar el control de Legionella.")
-                st.exception(e)
-
+      
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
