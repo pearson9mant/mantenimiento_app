@@ -412,3 +412,77 @@ def evaluar_areas_preventivas(centro=None):
     resultado.sort(key=lambda x: x["score"])
 
     return resultado
+
+def calcular_salud_areas_preventivo(preventivos):
+    """
+    Devuelve la salud preventiva por áreas.
+    No modifica ninguna tabla.
+    Solo analiza los preventivos existentes.
+    """
+
+    from collections import defaultdict
+
+    areas = defaultdict(lambda: {
+        "total": 0,
+        "abiertos": 0,
+        "vencidos": 0,
+        "finalizados": 0,
+    })
+
+    for p in preventivos:
+
+        try:
+            area = str(p.get("area") or "Sin área")
+            estado = str(p.get("estado") or "").lower()
+
+            areas[area]["total"] += 1
+
+            if "final" in estado:
+                areas[area]["finalizados"] += 1
+            elif "venc" in estado:
+                areas[area]["vencidos"] += 1
+            else:
+                areas[area]["abiertos"] += 1
+
+        except Exception:
+            continue
+
+    resultado = []
+
+    for area, datos in areas.items():
+
+        score = 100
+
+        score -= datos["abiertos"] * 5
+        score -= datos["vencidos"] * 20
+        score += datos["finalizados"] * 2
+
+        score = max(0, min(100, score))
+
+        if score >= 90:
+            color = "verde"
+            mensaje = "Instalación muy estable."
+            icono = "🟢"
+
+        elif score >= 70:
+            color = "amarillo"
+            mensaje = "Conviene continuar el seguimiento."
+            icono = "🟡"
+
+        else:
+            color = "rojo"
+            mensaje = "Área prioritaria."
+            icono = "🔴"
+
+        resultado.append({
+            "area": area,
+            "score": score,
+            "color": color,
+            "icono": icono,
+            "mensaje": mensaje,
+            "datos": datos,
+        })
+
+    resultado.sort(key=lambda x: x["score"])
+
+    return resultado
