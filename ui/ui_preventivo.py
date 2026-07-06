@@ -7,6 +7,7 @@ from database.db import conectar, _sql
 from modules.preventivo import generar_ots_preventivo_si_toca
 from modules.ubicaciones import obtener_espacios
 from ui.preventivo_aulas import pantalla_preventivo_aulas
+from modules.inteligencia_preventivos import construir_panel_preventivo
 
 
 TAREAS_PREVENTIVAS = [
@@ -146,6 +147,103 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
 
     conn.close()
     return total > 0
+
+def mostrar_panel_inteligente_preventivo():
+    st.markdown("## 🛠 Centro de Control Preventivo")
+
+    centro_panel = st.selectbox(
+        "Centro preventivo",
+        ["Todos"] + CENTROS,
+        key="preventivo_panel_centro"
+    )
+
+    centro_motor = None if centro_panel == "Todos" else centro_panel
+
+    panel = construir_panel_preventivo(centro_motor)
+
+    resumen = panel["resumen"]
+    semaforo = panel["semaforo"]
+    prioridad_hoy = panel["prioridad_hoy"]
+    prioridades = panel["prioridades"]
+
+    color = resumen.get("color", "verde")
+    score = resumen.get("score", 0)
+
+    if color == "rojo":
+        st.error(f"🔴 Estado preventivo · {score}% · {resumen.get('estado', '')}")
+    elif color == "amarillo":
+        st.warning(f"🟠 Estado preventivo · {score}% · {resumen.get('estado', '')}")
+    else:
+        st.success(f"🟢 Estado preventivo · {score}% · {resumen.get('estado', '')}")
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Total", resumen.get("total", 0))
+    c2.metric("Abiertos", resumen.get("abiertas", 0))
+    c3.metric("Finalizados", resumen.get("finalizadas", 0))
+    c4.metric("Vencidos", resumen.get("vencidas", 0))
+    c5.metric("Próximos", resumen.get("proximas", 0))
+
+    with st.container(border=True):
+        st.markdown("### 🧠 Diagnóstico preventivo")
+
+        for linea in resumen.get("diagnostico", []):
+            st.markdown(f"• {linea}")
+
+        if color == "rojo":
+            st.error(f"🎯 {resumen.get('recomendacion', '')}")
+        elif color == "amarillo":
+            st.warning(f"🎯 {resumen.get('recomendacion', '')}")
+        else:
+            st.success(f"🎯 {resumen.get('recomendacion', '')}")
+
+    st.markdown("### 🚦 Semáforo preventivo")
+
+    cols = st.columns(len(semaforo))
+
+    for col, item in zip(cols, semaforo):
+        with col:
+            if item.get("color") == "rojo":
+                st.error(f"{item.get('icono')} **{item.get('nombre')}**\n\n{item.get('estado')}")
+            elif item.get("color") == "amarillo":
+                st.warning(f"{item.get('icono')} **{item.get('nombre')}**\n\n{item.get('estado')}")
+            else:
+                st.success(f"{item.get('icono')} **{item.get('nombre')}**\n\n{item.get('estado')}")
+
+            st.caption(item.get("mensaje", ""))
+
+    st.markdown("### 🎯 Si hoy solo hicieras una cosa...")
+
+    with st.container(border=True):
+        if prioridad_hoy:
+            st.markdown(f"#### ⭐ {prioridad_hoy.get('numero_ot', '')}")
+            st.markdown(f"### {prioridad_hoy.get('titulo', '')}")
+
+            st.caption(
+                f"{prioridad_hoy.get('centro', '')} · "
+                f"{prioridad_hoy.get('edificio', '')} · "
+                f"{prioridad_hoy.get('espacio', '')}"
+            )
+
+            st.markdown(f"**Área:** {prioridad_hoy.get('area', '-')}")
+            st.markdown(f"**Fecha programada:** {prioridad_hoy.get('fecha_programada', '-')}")
+            st.info(prioridad_hoy.get("accion", "Realizar preventivo."))
+            st.caption(prioridad_hoy.get("motivo", ""))
+        else:
+            st.success("No hay preventivos prioritarios pendientes.")
+
+    with st.expander("📋 Prioridades preventivas", expanded=False):
+        if not prioridades:
+            st.success("No hay preventivos pendientes.")
+        else:
+            for i, p in enumerate(prioridades, start=1):
+                st.markdown(
+                    f"**{i}. {p.get('numero_ot', '')}** · "
+                    f"{p.get('centro', '')} · {p.get('espacio', '')}"
+                )
+                st.caption(p.get("descripcion", ""))
+                st.info(p.get("accion", ""))
+
+    st.markdown("---")
 
 
 def pantalla_preventivo():
