@@ -33,6 +33,8 @@ from ui.ui_ot_controles import (
     mostrar_checklist_correctivo_legionella_operario,
 )
 
+from ui.ui_legionella import obtener_checklist_correctivo_legionella
+
 
 def rol_actual():
     return str(st.session_state.get("rol", "")).strip().lower()
@@ -145,6 +147,7 @@ def es_ot_legionella(area, origen, descripcion):
 def limpiar_tarea_preventiva(descripcion):
     texto = str(descripcion or "").strip()
     return texto.replace("[PREVENTIVO]", "").strip()
+
 
 def normalizar_estado_operario(estado):
     estado = str(estado or "").strip().lower()
@@ -323,6 +326,7 @@ def descomponer_orden_operario(fila):
         observaciones_estado,
     )
 
+
 def puede_finalizar_preventivo(num_ot, origen, desc):
     if es_ot_preventiva(origen, desc):
         return checklist_preventivo_completo(num_ot)
@@ -332,9 +336,7 @@ def puede_finalizar_preventivo(num_ot, origen, desc):
 def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
     desc_txt = str(desc or "").upper()
 
-
     if "CORRECTIVO LEGIONELLA" in desc_txt:
-
         checklist = obtener_checklist_correctivo_legionella(num_ot)
 
         if not checklist:
@@ -444,7 +446,8 @@ def mostrar_crear_correctiva_desde_revision(
         st.success("Ya se han creado correctivas desde esta revisión.")
 
     return st.session_state.get(f"correctiva_creada_{id_orden}", False)
-    
+
+
 def filtrar_seguridad_operario(ordenes, operario_sel):
     if not ordenes:
         return []
@@ -456,6 +459,7 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
         if len(o) > 10
         and normalizar_operario_nombre(o[10]) == operario_objetivo
     ]
+
 
 def pantalla_operario():
     st.subheader("👷 Vista operario")
@@ -501,7 +505,6 @@ def pantalla_operario():
         historico = obtener_historico()
     except Exception:
         historico = []
-    
 
     kpis = calcular_kpis_operario(
         ordenes_operario,
@@ -533,25 +536,25 @@ def pantalla_operario():
         horizontal=True,
         key="filtro_origen_operario"
     )
-    
+
     if filtro_origen_operario == "Preventivo":
         ordenes_operario = [
             o for o in ordenes_operario
             if len(o) > 11 and str(o[11] or "").strip().upper() == "PREVENTIVO"
         ]
-    
+
     elif filtro_origen_operario == "Legionella":
         ordenes_operario = [
             o for o in ordenes_operario
             if len(o) > 11 and str(o[11] or "").strip().upper() == "LEGIONELLA"
         ]
-    
+
     elif filtro_origen_operario == "☀️ Verano":
         ordenes_operario = [
             o for o in ordenes_operario
             if len(o) > 11 and str(o[11] or "").strip().upper() == "VERANO"
         ]
-    
+
     elif filtro_origen_operario == "Incidencias":
         ordenes_operario = [
             o for o in ordenes_operario
@@ -563,7 +566,7 @@ def pantalla_operario():
 
     else:
         st.markdown("## ⚡ Trabajo rápido")
-    
+
         for fila in ordenes_operario:
             mostrar_tarjeta_ot(
                 fila=fila,
@@ -583,15 +586,12 @@ def pantalla_operario():
     with st.expander("📁 Mi histórico", expanded=False):
 
         if not historico_operario:
-
             st.info("No hay trabajos finalizados todavía.")
 
         else:
-
             for h in reversed(historico_operario[-50:]):
 
                 try:
-
                     (
                         id_hist,
                         num_ot_hist,
@@ -641,13 +641,10 @@ def pantalla_operario():
                         fotos_db = obtener_fotos_ot(num_ot_hist)
 
                         if fotos_db:
-
                             cols_fotos = st.columns(3)
 
                             for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-
                                 with cols_fotos[i % 3]:
-
                                     st.image(
                                         bytes(foto_data),
                                         caption=f"Foto {i + 1}",
@@ -655,19 +652,16 @@ def pantalla_operario():
                                     )
 
                         elif foto_hist:
-
                             fotos = str(foto_hist).split("|")
                             cols_fotos = st.columns(3)
 
                             for i, ruta_foto in enumerate(fotos):
-
                                 ruta_foto = str(ruta_foto).strip()
 
                                 if not ruta_foto:
                                     continue
 
                                 with cols_fotos[i % 3]:
-
                                     try:
                                         st.image(
                                             ruta_foto,
