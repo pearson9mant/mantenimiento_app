@@ -202,7 +202,9 @@ def obtener_prioridades_legionella(centro=None, limite=5):
         estado = incidencias["estado"].fillna("").astype(str).str.lower()
         abiertas = incidencias[~estado.isin(ESTADOS_CIERRE)].copy()
 
-        for _, row in abiertas.head(limite).iterrows():
+        for _, row in abiertas.iterrows():
+            if _incidencia_solar_por_consigna_no_aplica(row):
+                continue
             prioridades.append({
                 "nivel": "rojo",
                 "tipo": "Incidencia abierta",
