@@ -328,6 +328,7 @@ def construir_panel_preventivo(centro=None):
         "semaforo": semaforo,
         "prioridad_hoy": prioridad_hoy,
         "prioridades": prioridades,
+        "areas": areas,
     }
 
 def evaluar_areas_preventivas(centro=None):
