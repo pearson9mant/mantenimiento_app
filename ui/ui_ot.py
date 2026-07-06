@@ -352,6 +352,25 @@ def mostrar_tarjeta_ot(
                 st.error("No se ha podido cargar el control de Legionella.")
                 st.exception(e)
 
+        if es_ot_preventiva(origen, desc):
+            mostrar_checklist_preventivo_operario(num_ot, desc, operario)
+        
+        elif es_ot_legionella(area, origen, desc):
+            if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
+                mostrar_checklist_correctivo_legionella_operario(
+                    num_ot, centro, edificio, espacio, desc
+                )
+            else:
+                mostrar_ejecucion_legionella_operario(
+                    id_orden=id_orden,
+                    num_ot=num_ot,
+                    desc=desc,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    operario=operario,
+                )
+
         st.markdown("### 📝 Estado y observaciones")
 
         observacion_estado_nueva = st.text_area(
