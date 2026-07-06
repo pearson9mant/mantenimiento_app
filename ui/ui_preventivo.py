@@ -232,6 +232,43 @@ def mostrar_panel_inteligente_preventivo():
         else:
             st.success("No hay preventivos prioritarios pendientes.")
 
+    st.markdown("## 📊 Salud del mantenimiento")
+
+    if not areas:
+        st.info("Todavía no hay información suficiente.")
+    else:
+        cols = st.columns(3)
+    
+        for i, area in enumerate(areas):
+            with cols[i % 3]:
+    
+                fondo = {
+                    "verde": "#ecfdf5",
+                    "amarillo": "#fffbeb",
+                    "rojo": "#fef2f2",
+                }.get(area.get("color", "verde"), "#ecfdf5")
+    
+                st.markdown(
+                    f"""
+                    <div style="
+                        background:{fondo};
+                        border:1px solid #e5e7eb;
+                        border-radius:18px;
+                        padding:18px;
+                        min-height:180px;
+                    ">
+                        <h4>{area.get("icono", "🟢")} {area.get("area", "-")}</h4>
+                        <h2>{area.get("score", 0)}%</h2>
+    
+                        <b>Estado:</b> {area.get("estado", "-")}<br>
+                        <b>Total:</b> {area.get("total", 0)}<br>
+                        <b>Abiertos:</b> {area.get("abiertas", 0)}<br>
+                        <b>Vencidos:</b> {area.get("vencidas", 0)}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
     with st.expander("📋 Prioridades preventivas", expanded=False):
         if not prioridades:
             st.success("No hay preventivos pendientes.")
