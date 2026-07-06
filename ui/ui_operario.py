@@ -27,10 +27,10 @@ from modules.preventivo import (
     crear_checklist_preventivo,
 )
 
-from ui.ui_legionella import (
-    obtener_checklist_correctivo_legionella,
-    guardar_checklist_correctivo_legionella,
-    borrar_checklist_correctivo_legionella,
+from ui.ui_ot_controles import (
+    mostrar_ejecucion_legionella_operario,
+    mostrar_checklist_preventivo_operario,
+    mostrar_checklist_correctivo_legionella_operario,
 )
 
 
