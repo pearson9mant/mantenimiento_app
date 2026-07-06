@@ -224,8 +224,19 @@ def evaluar_areas_preventivas(centro=None):
             vencidas = len(fechas[fechas < hoy])
 
         score = 100
+
+        for _, fila in abiertas.iterrows():
+            prioridad = str(fila.get("prioridad", "") or "").lower()
+        
+            if "alta" in prioridad or "urgente" in prioridad:
+                score -= 8
+            elif "media" in prioridad:
+                score -= 5
+            else:
+                score -= 3
+        
         score -= vencidas * 20
-        score -= len(abiertas) * 3
+        
         score = max(0, min(100, int(score)))
 
         if score >= 85:
