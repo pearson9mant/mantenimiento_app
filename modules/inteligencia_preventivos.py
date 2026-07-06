@@ -253,3 +253,85 @@ def construir_panel_preventivo(centro=None):
         "prioridad_hoy": prioridad_hoy,
         "prioridades": prioridades,
     }
+
+def evaluar_areas_preventivas(centro=None):
+    """
+    Evalúa el estado preventivo por áreas.
+    """
+
+    params = []
+    filtro = ""
+
+    if centro:
+        filtro = "AND centro = ?"
+        params.append(centro)
+
+    df = leer_df_preventivos(f"""
+        SELECT area,
+               estado,
+               fecha_programada
+        FROM ordenes_trabajo
+        WHERE UPPER(COALESCE(origen,''))='PREVENTIVO'
+        {filtro}
+    """, tuple(params))
+
+    if df.empty:
+        return []
+
+    hoy = pd.Timestamp(date.today())
+
+    resultado = []
+
+    for area, grupo in df.groupby("area"):
+
+        total = len(grupo)
+
+        abiertas = grupo[
+            ~grupo["estado"].fillna("").str.lower().isin(ESTADOS_CIERRE)
+        ]
+
+        vencidas = 0
+
+        if "fecha_programada" in abiertas.columns:
+
+            fechas = pd.to_datetime(
+                abiertas["fecha_programada"],
+                errors="coerce"
+            )
+
+            vencidas = len(fechas[fechas < hoy])
+
+        score = 100
+
+        score -= vencidas * 20
+
+        score = max(0, score)
+
+        if score >= 85:
+            color = "verde"
+            icono = "🟢"
+            estado = "Correcto"
+
+        elif score >= 60:
+            color = "amarillo"
+            icono = "🟠"
+            estado = "Seguimiento"
+
+        else:
+            color = "rojo"
+            icono = "🔴"
+            estado = "Crítico"
+
+        resultado.append({
+            "area": area,
+            "total": total,
+            "vencidas": vencidas,
+            "score": score,
+            "estado": estado,
+            "color": color,
+            "icono": icono,
+        })
+
+    resultado.sort(key=lambda x: x["score"])
+
+    return resultado
