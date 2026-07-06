@@ -15,3 +15,24 @@ from ui.ui_legionella import (
     guardar_checklist_correctivo_legionella,
     borrar_checklist_correctivo_legionella,
 )
+def extraer_datos_ot_legionella(descripcion, espacio):
+    texto = str(descripcion or "").strip()
+    partes = [p.strip() for p in texto.split(" - ")]
+
+    tarea = ""
+    punto = str(espacio or "").strip()
+
+    if texto.upper().startswith("CORRECTIVO LEGIONELLA"):
+        if len(partes) >= 2:
+            tarea = partes[1].strip()
+        if len(partes) >= 4:
+            punto = partes[-1].strip()
+        return tarea, punto
+
+    if len(partes) >= 3:
+        tarea = partes[1].strip()
+        punto = partes[2].strip()
+    elif len(partes) == 2:
+        tarea = partes[1].strip()
+
+    return tarea, punto
