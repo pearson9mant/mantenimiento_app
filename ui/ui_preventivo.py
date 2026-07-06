@@ -241,57 +241,29 @@ def mostrar_panel_inteligente_preventivo():
     
         for i, area in enumerate(areas):
             with cols[i % 3]:
-    
                 color_area = area.get("color", "verde")
     
-                fondo = {
-                    "verde": "#ecfdf5",
-                    "amarillo": "#fffbeb",
-                    "rojo": "#fef2f2",
-                }.get(color_area, "#ecfdf5")
-    
-                borde = {
-                    "verde": "#bbf7d0",
-                    "amarillo": "#fde68a",
-                    "rojo": "#fecaca",
-                }.get(color_area, "#bbf7d0")
-    
-                if color_area == "verde":
-                    valoracion = "Área estable. Mantener seguimiento habitual."
+                if color_area == "rojo":
+                    caja = st.container(border=True)
                 elif color_area == "amarillo":
-                    valoracion = "Conviene reducir preventivos abiertos para mantener la instalación estable."
+                    caja = st.container(border=True)
                 else:
-                    valoracion = "Área prioritaria. Revisar actuaciones pendientes cuanto antes."
+                    caja = st.container(border=True)
     
-                st.markdown(
-                    f"""
-                    <div style="
-                        background:{fondo};
-                        border:1px solid {borde};
-                        border-radius:18px;
-                        padding:20px;
-                        min-height:230px;
-                        margin-bottom:16px;
-                    ">
-                        <h3>{area.get("icono", "🟢")} {area.get("area", "-")}</h3>
+                with caja:
+                    st.markdown(f"### {area.get('icono', '🟢')} {area.get('area', '-')}")
+                    st.metric("Salud", f"{area.get('score', 0)}%")
+                    st.markdown(f"**Estado:** {area.get('estado', '-')}")
+                    st.markdown(f"📋 **Total:** {area.get('total', 0)}")
+                    st.markdown(f"🔧 **Abiertos:** {area.get('abiertas', 0)}")
+                    st.markdown(f"⏰ **Vencidos:** {area.get('vencidas', 0)}")
     
-                        <h1>{area.get("score", 0)}%</h1>
-    
-                        <h4>{area.get("estado", "-")}</h4>
-    
-                        <hr>
-    
-                        <p>📋 <b>Total:</b> {area.get("total", 0)}</p>
-                        <p>🔧 <b>Abiertos:</b> {area.get("abiertas", 0)}</p>
-                        <p>⏰ <b>Vencidos:</b> {area.get("vencidas", 0)}</p>
-    
-                        <hr>
-    
-                        <p><b>Valoración:</b><br>{valoracion}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                    if color_area == "verde":
+                        st.success("Área estable. Mantener seguimiento habitual.")
+                    elif color_area == "amarillo":
+                        st.warning("Conviene reducir preventivos abiertos.")
+                    else:
+                        st.error("Área prioritaria. Revisar cuanto antes.")
 
     with st.expander("📋 Prioridades preventivas", expanded=False):
         if not prioridades:
