@@ -251,6 +251,8 @@ def pantalla_preventivo():
     ejecutar_preventivos_automaticos()
 
     st.subheader("🔧 Mantenimiento preventivo")
+    
+    mostrar_panel_inteligente_preventivo()
 
     tab1, tab2, tab3 = st.tabs(
         [
