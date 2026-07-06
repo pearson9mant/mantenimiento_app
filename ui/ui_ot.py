@@ -300,6 +300,27 @@ def mostrar_tarjeta_ot(
                 st.error("No se ha podido cargar el control de Legionella.")
                 st.exception(e)
 
+        # -----------------------------
+        # CONTROLES INTELIGENTES DE OT
+        # -----------------------------
+        if es_ot_legionella(area, origen, desc):
+            try:
+                from ui.ui_operario import mostrar_ejecucion_legionella_operario
+        
+                mostrar_ejecucion_legionella_operario(
+                    id_orden=id_orden,
+                    num_ot=num_ot,
+                    desc=desc,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    operario=operario,
+                )
+        
+            except Exception as e:
+                st.error("No se ha podido cargar el control de Legionella.")
+                st.exception(e)
+
         st.markdown("### 📝 Estado y observaciones")
 
         observacion_estado_nueva = st.text_area(
