@@ -1437,3 +1437,12 @@ def construir_panel_sanitario_legionella(centro=None):
         "planificacion": planificacion,
         "normativa": normativa,
     }
+
+def _incidencia_solar_por_consigna_no_aplica(row):
+    punto = str(row.get("punto", "") or "").lower()
+    descripcion = str(row.get("descripcion", "") or "").lower()
+
+    es_solar = "solar" in punto
+    habla_60 = "60" in descripcion or "por debajo" in descripcion
+
+    return es_solar and habla_60
