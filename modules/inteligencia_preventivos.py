@@ -181,6 +181,81 @@ def _color_a_icono(color):
         return "🟠"
     return "🟢"
 
+def evaluar_areas_preventivas(centro=None):
+    """
+    Evalúa el estado preventivo por áreas.
+    Solo interpreta datos. No modifica nada.
+    """
+
+    params = []
+    filtro = ""
+
+    if centro:
+        filtro = "AND centro = ?"
+        params.append(centro)
+
+    df = leer_df_preventivos(f"""
+        SELECT area, estado, fecha_programada
+        FROM ordenes_trabajo
+        WHERE UPPER(COALESCE(origen,'')) = 'PREVENTIVO'
+        {filtro}
+    """, tuple(params))
+
+    if df.empty:
+        return []
+
+    hoy = pd.Timestamp(date.today())
+    resultado = []
+
+    for area, grupo in df.groupby("area"):
+        area_nombre = str(area or "Sin área")
+        total = len(grupo)
+
+        estados = grupo["estado"].fillna("").astype(str).str.lower()
+        abiertas = grupo[~estados.isin(ESTADOS_CIERRE)].copy()
+
+        vencidas = 0
+
+        if "fecha_programada" in abiertas.columns:
+            fechas = pd.to_datetime(
+                abiertas["fecha_programada"],
+                errors="coerce"
+            )
+            vencidas = len(fechas[fechas < hoy])
+
+        score = 100
+        score -= vencidas * 20
+        score -= len(abiertas) * 3
+        score = max(0, min(100, int(score)))
+
+        if score >= 85:
+            color = "verde"
+            icono = "🟢"
+            estado_txt = "Correcto"
+        elif score >= 60:
+            color = "amarillo"
+            icono = "🟠"
+            estado_txt = "Seguimiento"
+        else:
+            color = "rojo"
+            icono = "🔴"
+            estado_txt = "Crítico"
+
+        resultado.append({
+            "area": area_nombre,
+            "total": total,
+            "abiertas": len(abiertas),
+            "vencidas": vencidas,
+            "score": score,
+            "estado": estado_txt,
+            "color": color,
+            "icono": icono,
+        })
+
+    resultado.sort(key=lambda x: x["score"])
+
+    return resultado
+
 
 def construir_panel_preventivo(centro=None):
     """
