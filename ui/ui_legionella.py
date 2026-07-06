@@ -2349,11 +2349,24 @@ def mostrar_panel_inteligente_legionella():
     estado_txt = resumen.get("estado", "")
 
     if color == "rojo":
-        st.error(f"🔴 Estado sanitario · {score}% · {estado_txt}")
+        estado_icono = "🔴"
+        estado_ejecutivo = "Atención sanitaria prioritaria"
+        frase_estado = "La instalación requiere actuaciones prioritarias para alcanzar un estado estable."
     elif color == "amarillo":
-        st.warning(f"🟠 Estado sanitario · {score}% · {estado_txt}")
+        estado_icono = "🟠"
+        estado_ejecutivo = "Seguimiento sanitario"
+        frase_estado = "La instalación está controlada, pero requiere seguimiento preventivo."
     else:
-        st.success(f"🟢 Estado sanitario · {score}% · {estado_txt}")
+        estado_icono = "🟢"
+        estado_ejecutivo = "Instalación estabilizada"
+        frase_estado = "La instalación se encuentra en situación estable según los datos registrados."
+
+    if color == "rojo":
+        st.error(f"{estado_icono} Estado sanitario · {score}% · {estado_txt}")
+    elif color == "amarillo":
+        st.warning(f"{estado_icono} Estado sanitario · {score}% · {estado_txt}")
+    else:
+        st.success(f"{estado_icono} Estado sanitario · {score}% · {estado_txt}")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Puntos activos", resumen.get("puntos_activos", 0))
@@ -2367,46 +2380,52 @@ def mostrar_panel_inteligente_legionella():
     c7.metric("Informes", resumen.get("informes", 0))
     c8.metric("Normativa", f"{resumen.get('normativa', 0)}%")
 
+    # ==================================================
+    # TARJETA EJECUTIVA
+    # ==================================================
     st.markdown("## 🧠 Opinión técnica")
 
-    if color == "rojo":
-        estado_ejecutivo = "Atención sanitaria prioritaria"
-        estado_icono = "🔴"
-    elif color == "amarillo":
-        estado_ejecutivo = "Seguimiento sanitario"
-        estado_icono = "🟠"
-    else:
-        estado_ejecutivo = "Instalación estabilizada"
-        estado_icono = "🟢"
-    
     with st.container(border=True):
-    
+
         st.markdown(
             f"""
-    ### {estado_icono} Estado general
-    
-    # {estado_ejecutivo}
-    """
+### {estado_icono} Diagnóstico actual
+
+# {estado_ejecutivo}
+
+**{frase_estado}**
+"""
         )
-    
-        c1, c2 = st.columns(2)
-    
-        with c1:
-            st.metric("Índice sanitario", f"{score}%")
-    
-        with c2:
-            st.metric("Cobertura normativa", f"{resumen.get('normativa', 0)}%")
-    
+
+        k1, k2 = st.columns(2)
+
+        with k1:
+            st.metric(
+                "Índice sanitario",
+                f"{score}%",
+                help="Valor global calculado por el motor sanitario."
+            )
+            st.caption("Estado global de la instalación.")
+
+        with k2:
+            st.metric(
+                "Cobertura normativa",
+                f"{resumen.get('normativa', 0)}%",
+                help="Cobertura orientativa de puntos, planificación, registros e informes."
+            )
+            st.caption("Cobertura documental y normativa.")
+
         st.markdown("---")
-        st.markdown("#### 📝 Resumen técnico")
-    
+
+        st.markdown("#### 🧠 Valoración técnica")
+
         parrafos = opinion.get("parrafos", [])
-    
+
         for p in parrafos[1:4]:
             st.markdown(f"• {p}")
-    
+
         st.markdown("---")
-    
+
         if color == "rojo":
             st.error(f"🎯 {opinion.get('conclusion', '')}")
         elif color == "amarillo":
@@ -2414,41 +2433,75 @@ def mostrar_panel_inteligente_legionella():
         else:
             st.success(f"🎯 {opinion.get('conclusion', '')}")
 
-    st.markdown("### 🚦 Semáforo sanitario")
+    # ==================================================
+    # SEMÁFORO SANITARIO
+    # ==================================================
+    st.markdown("## 🚦 Semáforo sanitario")
+
     cols = st.columns(len(semaforo))
 
     for col, item in zip(cols, semaforo):
         with col:
+            item_color = item.get("color", "verde")
+            borde = "#fecaca" if item_color == "rojo" else "#fde68a" if item_color == "amarillo" else "#bbf7d0"
+            fondo = "#fff1f2" if item_color == "rojo" else "#fffbeb" if item_color == "amarillo" else "#f0fdf4"
+
             st.markdown(
                 f"""
                 <div style="
-                    border:1px solid #e5e7eb;
-                    border-radius:14px;
-                    padding:14px;
+                    border:1px solid {borde};
+                    border-radius:16px;
+                    padding:16px;
                     text-align:center;
-                    background:#ffffff;
+                    background:{fondo};
+                    min-height:150px;
                 ">
-                    <div style="font-size:26px;">{item.get("icono", "🟢")}</div>
+                    <div style="font-size:30px;">{item.get("icono", "🟢")}</div>
                     <b>{item.get("nombre", "")}</b><br>
-                    <span style="font-size:13px;">{item.get("estado", "")}</span><br>
-                    <b>{item.get("score", 0)}%</b>
+                    <span style="font-size:13px;">{item.get("estado", "")}</span><br><br>
+                    <b style="font-size:22px;">{item.get("score", 0)}%</b>
+                    <br>
+                    <span style="font-size:12px;">{item.get("mensaje", "")}</span>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-    st.markdown("### 🎯 Si hoy solo hicieras una cosa...")
+    # ==================================================
+    # CORAZÓN DEL SISTEMA
+    # ==================================================
+    st.markdown("## 🎯 Si hoy solo hicieras una cosa...")
 
-    if prioridad_hoy:
-        st.warning(
-            f"**{prioridad_hoy.get('titulo', '-')}**  \n"
-            f"{prioridad_hoy.get('centro', '')} · {prioridad_hoy.get('edificio', '')}"
-        )
-        st.markdown(f"**Motivo:** {prioridad_hoy.get('motivo', '')}")
-        st.info(prioridad_hoy.get("accion", ""))
-    else:
-        st.success("No hay una actuación sanitaria prioritaria en este momento.")
+    with st.container(border=True):
+        if prioridad_hoy:
+            st.markdown(
+                f"""
+### ⭐ Actuación recomendada
 
+# {prioridad_hoy.get('titulo', '-')}
+
+📍 **{prioridad_hoy.get('centro', '')}**  
+🏢 **{prioridad_hoy.get('edificio', '')}**
+
+---
+"""
+            )
+
+            st.markdown(f"**Motivo:** {prioridad_hoy.get('motivo', '')}")
+
+            if prioridad_hoy.get("descripcion"):
+                st.markdown(f"**Detalle:** {prioridad_hoy.get('descripcion', '')}")
+
+            st.info(f"**Acción recomendada:** {prioridad_hoy.get('accion', '')}")
+
+            st.caption("Esta actuación es la que el motor considera más importante ahora mismo.")
+        else:
+            st.success("No hay una actuación sanitaria prioritaria en este momento.")
+            st.caption("Mantener seguimiento preventivo y planificación activa.")
+
+    # ==================================================
+    # DETALLES DESPLEGABLES
+    # ==================================================
     with st.expander("📋 Matriz normativa / cobertura documental", expanded=False):
         if normativa.get("color") == "rojo":
             st.error(f"{normativa.get('estado')} · {normativa.get('score')}%")
