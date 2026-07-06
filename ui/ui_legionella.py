@@ -2369,11 +2369,15 @@ def mostrar_panel_inteligente_legionella():
 
     st.markdown("## 🧠 Opinión técnica")
 
-    estado_icono = {
-        "rojo": "🔴",
-        "amarillo": "🟠",
-        "verde": "🟢"
-    }.get(color, "⚪")
+    if color == "rojo":
+        estado_ejecutivo = "Atención sanitaria prioritaria"
+        estado_icono = "🔴"
+    elif color == "amarillo":
+        estado_ejecutivo = "Seguimiento sanitario"
+        estado_icono = "🟠"
+    else:
+        estado_ejecutivo = "Instalación estabilizada"
+        estado_icono = "🟢"
     
     with st.container(border=True):
     
@@ -2381,41 +2385,34 @@ def mostrar_panel_inteligente_legionella():
             f"""
     ### {estado_icono} Estado general
     
-    # {estado_txt}
+    # {estado_ejecutivo}
     """
         )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.metric(
-            "Índice sanitario",
-            f"{score}%"
-        )
-
-    with c2:
-        st.metric(
-            "Cobertura normativa",
-            f"{resumen.get('normativa',0)}%"
-        )
-
-    st.markdown("---")
-
-    st.markdown("#### 📝 Resumen técnico")
-
-    parrafos = opinion.get("parrafos", [])
-
-    for p in parrafos[1:4]:
-        st.markdown(f"• {p}")
-
-    st.markdown("---")
-
-    if color == "rojo":
-        st.error(f"🎯 {opinion.get('conclusion','')}")
-    elif color == "amarillo":
-        st.warning(f"🎯 {opinion.get('conclusion','')}")
-    else:
-        st.success(f"🎯 {opinion.get('conclusion','')}")
+    
+        c1, c2 = st.columns(2)
+    
+        with c1:
+            st.metric("Índice sanitario", f"{score}%")
+    
+        with c2:
+            st.metric("Cobertura normativa", f"{resumen.get('normativa', 0)}%")
+    
+        st.markdown("---")
+        st.markdown("#### 📝 Resumen técnico")
+    
+        parrafos = opinion.get("parrafos", [])
+    
+        for p in parrafos[1:4]:
+            st.markdown(f"• {p}")
+    
+        st.markdown("---")
+    
+        if color == "rojo":
+            st.error(f"🎯 {opinion.get('conclusion', '')}")
+        elif color == "amarillo":
+            st.warning(f"🎯 {opinion.get('conclusion', '')}")
+        else:
+            st.success(f"🎯 {opinion.get('conclusion', '')}")
 
     st.markdown("### 🚦 Semáforo sanitario")
     cols = st.columns(len(semaforo))
