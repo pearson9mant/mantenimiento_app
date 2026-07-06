@@ -242,28 +242,52 @@ def mostrar_panel_inteligente_preventivo():
         for i, area in enumerate(areas):
             with cols[i % 3]:
     
+                color_area = area.get("color", "verde")
+    
                 fondo = {
                     "verde": "#ecfdf5",
                     "amarillo": "#fffbeb",
                     "rojo": "#fef2f2",
-                }.get(area.get("color", "verde"), "#ecfdf5")
+                }.get(color_area, "#ecfdf5")
+    
+                borde = {
+                    "verde": "#bbf7d0",
+                    "amarillo": "#fde68a",
+                    "rojo": "#fecaca",
+                }.get(color_area, "#bbf7d0")
+    
+                if color_area == "verde":
+                    valoracion = "Área estable. Mantener seguimiento habitual."
+                elif color_area == "amarillo":
+                    valoracion = "Conviene reducir preventivos abiertos para mantener la instalación estable."
+                else:
+                    valoracion = "Área prioritaria. Revisar actuaciones pendientes cuanto antes."
     
                 st.markdown(
                     f"""
                     <div style="
                         background:{fondo};
-                        border:1px solid #e5e7eb;
+                        border:1px solid {borde};
                         border-radius:18px;
-                        padding:18px;
-                        min-height:180px;
+                        padding:20px;
+                        min-height:230px;
+                        margin-bottom:16px;
                     ">
-                        <h4>{area.get("icono", "🟢")} {area.get("area", "-")}</h4>
-                        <h2>{area.get("score", 0)}%</h2>
+                        <h3>{area.get("icono", "🟢")} {area.get("area", "-")}</h3>
     
-                        <b>Estado:</b> {area.get("estado", "-")}<br>
-                        <b>Total:</b> {area.get("total", 0)}<br>
-                        <b>Abiertos:</b> {area.get("abiertas", 0)}<br>
-                        <b>Vencidos:</b> {area.get("vencidas", 0)}
+                        <h1>{area.get("score", 0)}%</h1>
+    
+                        <h4>{area.get("estado", "-")}</h4>
+    
+                        <hr>
+    
+                        <p>📋 <b>Total:</b> {area.get("total", 0)}</p>
+                        <p>🔧 <b>Abiertos:</b> {area.get("abiertas", 0)}</p>
+                        <p>⏰ <b>Vencidos:</b> {area.get("vencidas", 0)}</p>
+    
+                        <hr>
+    
+                        <p><b>Valoración:</b><br>{valoracion}</p>
                     </div>
                     """,
                     unsafe_allow_html=True
