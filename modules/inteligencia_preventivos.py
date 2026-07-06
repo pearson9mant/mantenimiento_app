@@ -195,7 +195,7 @@ def evaluar_areas_preventivas(centro=None):
         params.append(centro)
 
     df = leer_df_preventivos(f"""
-        SELECT area, estado, fecha_programada
+        SELECT area, estado, fecha_programada, prioridad
         FROM ordenes_trabajo
         WHERE UPPER(COALESCE(origen,'')) = 'PREVENTIVO'
         {filtro}
