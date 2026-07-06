@@ -16,6 +16,8 @@ from modules.inventario import (
 
 from modules.preventivo import checklist_preventivo_completo
 
+from ui.ui_legionella import obtener_checklist_correctivo_legionella
+
 from ui.ui_ot_controles import (
     mostrar_checklist_preventivo_operario,
     mostrar_ejecucion_legionella_operario,
@@ -152,6 +154,7 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
 
     return True
 
+
 def mostrar_tarjeta_ot(
     fila,
     materiales_select,
@@ -256,62 +259,24 @@ def mostrar_tarjeta_ot(
         except Exception as e:
             st.error(f"📷 Error mostrando fotos: {e}")
 
-      
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
-        
         if es_ot_preventiva(origen, desc):
-            try:
-                from ui.ui_operario import mostrar_checklist_preventivo_operario
-        
-                mostrar_checklist_preventivo_operario(
-                    num_ot=num_ot,
-                    desc=desc,
-                    operario=operario
-                )
-        
-            except Exception as e:
-                st.error("No se ha podido cargar el checklist preventivo.")
-                st.exception(e)
-        
-        elif es_ot_legionella(area, origen, desc):
-            try:
-                from ui.ui_operario import (
-                    mostrar_ejecucion_legionella_operario,
-                    mostrar_checklist_correctivo_legionella_operario,
-                )
-        
-                if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
-                    mostrar_checklist_correctivo_legionella_operario(
-                        num_ot=num_ot,
-                        centro=centro,
-                        edificio=edificio,
-                        espacio=espacio,
-                        desc=desc
-                    )
-                else:
-                    mostrar_ejecucion_legionella_operario(
-                        id_orden=id_orden,
-                        num_ot=num_ot,
-                        desc=desc,
-                        centro=centro,
-                        edificio=edificio,
-                        espacio=espacio,
-                        operario=operario,
-                    )
-        
-            except Exception as e:
-                st.error("No se ha podido cargar el control de Legionella.")
-                st.exception(e)
+            mostrar_checklist_preventivo_operario(
+                num_ot=num_ot,
+                desc=desc,
+                operario=operario
+            )
 
-        if es_ot_preventiva(origen, desc):
-            mostrar_checklist_preventivo_operario(num_ot, desc, operario)
-        
         elif es_ot_legionella(area, origen, desc):
             if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
                 mostrar_checklist_correctivo_legionella_operario(
-                    num_ot, centro, edificio, espacio, desc
+                    num_ot=num_ot,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    desc=desc
                 )
             else:
                 mostrar_ejecucion_legionella_operario(
