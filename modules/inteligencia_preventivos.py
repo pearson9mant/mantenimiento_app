@@ -190,6 +190,7 @@ def construir_panel_preventivo(centro=None):
 
     estado = diagnosticar_preventivos_global(centro)
     prioridades = obtener_prioridades_preventivas(centro, limite=5)
+    areas = evaluar_areas_preventivas(centro)
 
     prioridad_hoy = None
 
