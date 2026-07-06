@@ -169,3 +169,87 @@ def obtener_prioridades_preventivas(centro=None, limite=5):
         })
 
     return prioridades
+
+# ======================================================
+# PANEL INTELIGENTE PREVENTIVO
+# ======================================================
+
+def _color_a_icono(color):
+    if color == "rojo":
+        return "🔴"
+    if color == "amarillo":
+        return "🟠"
+    return "🟢"
+
+
+def construir_panel_preventivo(centro=None):
+    """
+    Capa preparada para UI, Gerencia y futura pantalla diaria.
+    No modifica datos.
+    """
+
+    estado = diagnosticar_preventivos_global(centro)
+    prioridades = obtener_prioridades_preventivas(centro, limite=5)
+
+    prioridad_hoy = None
+
+    if prioridades:
+        p = prioridades[0]
+        prioridad_hoy = {
+            "titulo": p.get("descripcion", "Preventivo prioritario"),
+            "numero_ot": p.get("numero_ot", ""),
+            "centro": p.get("centro", ""),
+            "edificio": p.get("edificio", ""),
+            "espacio": p.get("espacio", ""),
+            "area": p.get("area", ""),
+            "fecha_programada": p.get("fecha_programada", ""),
+            "accion": p.get("accion", "Realizar preventivo y completar checklist."),
+            "motivo": "Es el preventivo abierto más prioritario según fecha y planificación.",
+        }
+
+    semaforo = [
+        {
+            "nombre": "Vencidos",
+            "color": "rojo" if estado.get("vencidas", 0) > 0 else "verde",
+            "icono": "🔴" if estado.get("vencidas", 0) > 0 else "🟢",
+            "estado": f"{estado.get('vencidas', 0)} vencido(s)",
+            "score": max(0, 100 - estado.get("vencidas", 0) * 20),
+            "mensaje": "Preventivos fuera de plazo.",
+        },
+        {
+            "nombre": "Próximos",
+            "color": "amarillo" if estado.get("proximas", 0) > 0 else "verde",
+            "icono": "🟠" if estado.get("proximas", 0) > 0 else "🟢",
+            "estado": f"{estado.get('proximas', 0)} próximos",
+            "score": max(0, 100 - estado.get("proximas", 0) * 5),
+            "mensaje": "Preventivos próximos 7 días.",
+        },
+        {
+            "nombre": "Abiertos",
+            "color": "amarillo" if estado.get("abiertas", 0) > 0 else "verde",
+            "icono": "🟠" if estado.get("abiertas", 0) > 0 else "🟢",
+            "estado": f"{estado.get('abiertas', 0)} abiertos",
+            "score": max(0, 100 - estado.get("abiertas", 0) * 3),
+            "mensaje": "Preventivos pendientes.",
+        },
+    ]
+
+    return {
+        "resumen": {
+            "centro": centro or "Todos",
+            "estado": estado.get("estado", ""),
+            "color": estado.get("color", "verde"),
+            "icono": _color_a_icono(estado.get("color", "verde")),
+            "score": estado.get("score", 0),
+            "total": estado.get("total", 0),
+            "abiertas": estado.get("abiertas", 0),
+            "finalizadas": estado.get("finalizadas", 0),
+            "vencidas": estado.get("vencidas", 0),
+            "proximas": estado.get("proximas", 0),
+            "recomendacion": estado.get("recomendacion", ""),
+            "diagnostico": estado.get("diagnostico", []),
+        },
+        "semaforo": semaforo,
+        "prioridad_hoy": prioridad_hoy,
+        "prioridades": prioridades,
+    }
