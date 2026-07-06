@@ -17,8 +17,8 @@ from modules.inventario import (
 from modules.preventivo import checklist_preventivo_completo
 
 from ui.ui_ot_controles import (
-    mostrar_ejecucion_legionella_operario,
     mostrar_checklist_preventivo_operario,
+    mostrar_ejecucion_legionella_operario,
     mostrar_checklist_correctivo_legionella_operario,
 )
 
