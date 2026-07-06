@@ -16,7 +16,11 @@ from modules.inventario import (
 
 from modules.preventivo import checklist_preventivo_completo
 
-from ui.ui_legionella import obtener_checklist_correctivo_legionella
+from ui.ui_legionella import (
+    obtener_checklist_correctivo_legionella,
+    mostrar_ejecucion_legionella_operario,
+    mostrar_checklist_correctivo_legionella_operario,
+)
 
 
 def normalizar_txt(valor):
