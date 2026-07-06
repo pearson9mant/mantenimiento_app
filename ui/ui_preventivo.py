@@ -165,6 +165,7 @@ def mostrar_panel_inteligente_preventivo():
     semaforo = panel["semaforo"]
     prioridad_hoy = panel["prioridad_hoy"]
     prioridades = panel["prioridades"]
+    areas = panel["areas"]
 
     color = resumen.get("color", "verde")
     score = resumen.get("score", 0)
