@@ -2367,27 +2367,55 @@ def mostrar_panel_inteligente_legionella():
     c7.metric("Informes", resumen.get("informes", 0))
     c8.metric("Normativa", f"{resumen.get('normativa', 0)}%")
 
-    st.markdown("### 🧠 Opinión técnica")
+    st.markdown("## 🧠 Opinión técnica")
 
-    st.info(
-        f"**Estado general:** {estado_txt}\n\n"
-        f"**Índice sanitario:** {score}%\n\n"
-        f"**Cobertura normativa:** {resumen.get('normativa', 0)}%"
-    )
+    estado_icono = {
+        "rojo": "🔴",
+        "amarillo": "🟠",
+        "verde": "🟢"
+    }.get(color, "⚪")
     
-    st.markdown("#### Resumen técnico")
+    with st.container(border=True):
     
+        st.markdown(
+            f"""
+    ### {estado_icono} Estado general
+    
+    # {estado_txt}
+    """
+        )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.metric(
+            "Índice sanitario",
+            f"{score}%"
+        )
+
+    with c2:
+        st.metric(
+            "Cobertura normativa",
+            f"{resumen.get('normativa',0)}%"
+        )
+
+    st.markdown("---")
+
+    st.markdown("#### 📝 Resumen técnico")
+
     parrafos = opinion.get("parrafos", [])
-    
-    for parrafo in parrafos[1:4]:
-        st.markdown(f"• {parrafo}")
-    
+
+    for p in parrafos[1:4]:
+        st.markdown(f"• {p}")
+
+    st.markdown("---")
+
     if color == "rojo":
-        st.error(opinion.get("conclusion", ""))
+        st.error(f"🎯 {opinion.get('conclusion','')}")
     elif color == "amarillo":
-        st.warning(opinion.get("conclusion", ""))
+        st.warning(f"🎯 {opinion.get('conclusion','')}")
     else:
-        st.success(opinion.get("conclusion", ""))
+        st.success(f"🎯 {opinion.get('conclusion','')}")
 
     st.markdown("### 🚦 Semáforo sanitario")
     cols = st.columns(len(semaforo))
