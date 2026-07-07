@@ -77,6 +77,9 @@ def mostrar_corazon_sistema():
             st.markdown(
                 f"**Prioridad:** {prioridad.get('prioridad','')}"
             )
+            st.markdown(
+                f"**Tipo de prioridad:** {prioridad.get('tipo_prioridad','-')}"
+            )
 
             st.markdown(
                 f"**Puntuación IA:** {prioridad.get('score',0)}/100"
