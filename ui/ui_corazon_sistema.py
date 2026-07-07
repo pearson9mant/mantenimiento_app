@@ -7,7 +7,15 @@ def mostrar_corazon_sistema():
 
     st.title("❤️ Corazón del Sistema")
 
-    panel = diagnosticar_corazon_sistema()
+    centro_sel = st.selectbox(
+        "Centro",
+        ["Todos", "Pearson 22", "Pearson 9"],
+        key="corazon_centro"
+    )
+
+    centro_motor = None if centro_sel == "Todos" else centro_sel
+    
+    panel = diagnosticar_corazon_sistema(centro=centro_motor)
 
     color = panel.get("color", "verde")
     score = panel.get("score_global", 0)
