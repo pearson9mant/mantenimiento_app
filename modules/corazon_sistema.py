@@ -456,6 +456,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
     grupos = construir_grupos_inteligentes(prioridades)
     ruta = construir_ruta_inteligente(grupos)
     carga_edificios = construir_carga_por_edificio(prioridades)
+    datos_incompletos = detectar_datos_incompletos(prioridades)
 
     prioridad_hoy = prioridades[0] if prioridades else None
 
