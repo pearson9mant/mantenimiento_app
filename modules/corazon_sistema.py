@@ -122,7 +122,7 @@ def puntuar_orden(row):
     return score, motivos
 
 
-def construir_prioridades_globales(centro=None, operario=None, limite=10):
+def construir_prioridades_globales(centro=None, operario=None, limite=100):
     df = obtener_ordenes_abiertas_corazon(centro, operario)
 
     if df.empty:
