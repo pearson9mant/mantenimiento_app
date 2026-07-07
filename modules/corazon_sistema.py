@@ -294,6 +294,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
 
     prioridades = construir_prioridades_globales(centro, operario, limite=10)
     grupos = construir_grupos_inteligentes(prioridades)
+    ruta = construir_ruta_inteligente(grupos)
 
     prioridad_hoy = prioridades[0] if prioridades else None
 
@@ -320,6 +321,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         "preventivo": preventivo,
         "legionella": legionella_panel,
         "grupos": grupos,
+        "ruta": ruta,
     }
 
 import streamlit as st
