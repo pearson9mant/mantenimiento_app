@@ -318,7 +318,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         estado = "Colegio bajo control"
         mensaje = "La situación general es estable. Mantener ritmo de cierre y seguimiento."
 
-    prioridades = construir_prioridades_globales(centro, operario, limite=10)
+    prioridades = construir_prioridades_globales(centro, operario, limite=100)
     grupos = construir_grupos_inteligentes(prioridades)
     ruta = construir_ruta_inteligente(grupos)
 
