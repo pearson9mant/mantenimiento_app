@@ -157,6 +157,48 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
 
     return prioridades[:limite]
 
+def construir_grupos_inteligentes(prioridades):
+
+    grupos = {}
+
+    for p in prioridades:
+
+        clave = (
+            p.get("centro", ""),
+            p.get("edificio", ""),
+        )
+
+        grupos.setdefault(clave, []).append(p)
+
+    resultado = []
+
+    for (centro, edificio), lista in grupos.items():
+
+        score = max(x["score"] for x in lista)
+
+        resultado.append({
+
+            "centro": centro,
+            "edificio": edificio,
+            "cantidad": len(lista),
+            "score": score,
+            "trabajos": lista
+
+        })
+
+    resultado.sort(
+
+        key=lambda x: (
+            x["score"],
+            x["cantidad"]
+        ),
+
+        reverse=True
+
+    )
+
+    return resultado
+
 
 def diagnosticar_corazon_sistema(centro=None, operario=None):
     df = obtener_ordenes_abiertas_corazon(centro, operario)
