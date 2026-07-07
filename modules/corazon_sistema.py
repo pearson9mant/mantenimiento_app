@@ -119,7 +119,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
     prioridades = []
 
     for _, row in df.iterrows():
-        score = puntuar_orden(row)
+        score, motivos = puntuar_orden(row)
 
         prioridades.append({
             "score": score,
@@ -135,6 +135,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
             "estado": row.get("estado", ""),
             "accion": "Atender esta actuación antes que el resto.",
             "motivo": "El sistema la considera prioritaria por origen, área, prioridad y riesgo operativo.",
+            "motivos": motivos,
         })
 
     prioridades.sort(key=lambda x: x["score"], reverse=True)
