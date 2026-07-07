@@ -170,7 +170,7 @@ def mostrar_corazon_sistema():
 
     st.subheader("🏫 Carga por edificio")
     
-    for e in datos.get("carga_edificios", []):
+    for e in panel.get("carga_edificios", []):
     
         if e["color"] == "verde":
             icono = "🟢"
