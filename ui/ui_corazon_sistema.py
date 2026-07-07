@@ -165,6 +165,52 @@ def mostrar_corazon_sistema():
             "|",
             p["edificio"],
         )
+
+    st.divider()
+
+    st.subheader("🏫 Carga por edificio")
+    
+    for e in datos.get("carga_edificios", []):
+    
+        if e["color"] == "verde":
+            icono = "🟢"
+        elif e["color"] == "amarillo":
+            icono = "🟠"
+        else:
+            icono = "🔴"
+    
+        with st.container(border=True):
+    
+            st.markdown(
+                f"### {icono} {e['centro']} · {e['edificio']}"
+            )
+    
+            c1, c2, c3 = st.columns(3)
+    
+            with c1:
+                st.metric("Salud", f"{e['salud']}%")
+    
+            with c2:
+                st.metric("Actuaciones", e["total"])
+    
+            with c3:
+                st.metric("Estado", e["estado"])
+    
+            st.progress(e["salud"] / 100)
+    
+            c1, c2, c3, c4 = st.columns(4)
+    
+            c1.metric("🦠 Sanitarias", e["sanitarias"])
+            c2.metric("🛠 Preventivas", e["preventivas"])
+            c3.metric("🚨 Urgentes", e["urgentes"])
+            c4.metric("📋 Otras", e["incidencias"])
+    
+            if e["color"] == "verde":
+                st.success("El edificio presenta una carga de trabajo estable.")
+            elif e["color"] == "amarillo":
+                st.warning("Conviene planificar actuaciones agrupadas.")
+            else:
+                st.error("Edificio con elevada carga de trabajo. Priorizar recursos.")
     st.divider()
 
     st.subheader("🚦 Ranking general")
