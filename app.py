@@ -892,7 +892,10 @@ if perfil == "admin":
         pantalla_colegio()
         
     elif seccion == "Gestión espacios":
-        pantalla_gestion_aulas() 
+        pantalla_gestion_aulas()
+
+    elif seccion == "Corazón sistema":
+        mostrar_corazon_sistema()
 
     
         
