@@ -199,6 +199,32 @@ def construir_grupos_inteligentes(prioridades):
 
     return resultado
 
+def construir_ruta_inteligente(grupos, limite=5):
+    ruta = []
+
+    for g in grupos[:limite]:
+        trabajos = g.get("trabajos", [])
+
+        tipos = {}
+        for t in trabajos:
+            tipo = t.get("tipo_prioridad", "Otros")
+            tipos[tipo] = tipos.get(tipo, 0) + 1
+
+        ruta.append({
+            "centro": g.get("centro", ""),
+            "edificio": g.get("edificio", ""),
+            "cantidad": g.get("cantidad", 0),
+            "score": g.get("score", 0),
+            "tipos": tipos,
+            "trabajos": trabajos,
+            "mensaje": (
+                f"Concentrar trabajos en {g.get('edificio', '')} "
+                f"permite resolver {g.get('cantidad', 0)} actuaciones en una misma zona."
+            )
+        })
+
+    return ruta
+
 
 def diagnosticar_corazon_sistema(centro=None, operario=None):
     df = obtener_ordenes_abiertas_corazon(centro, operario)
