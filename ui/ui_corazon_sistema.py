@@ -120,6 +120,7 @@ def mostrar_corazon_sistema():
 
             with st.expander(
                 f"{p.get('score',0)}/100 · "
+                f"{p.get('tipo_prioridad','-')} · "
                 f"{p.get('numero_ot','')} · "
                 f"{p.get('titulo','')}"
             ):
