@@ -2,7 +2,6 @@ from datetime import date
 import pandas as pd
 
 from database.db import conectar, _sql
-
 from modules.inteligencia_preventivos import construir_panel_preventivo
 from modules.inteligencia_legionella import construir_panel_sanitario_legionella
 
@@ -14,6 +13,7 @@ ESTADOS_CIERRE = [
     "cerrado",
     "cancelada",
     "cancelado",
+    "cerrado definitivo",
 ]
 
 
@@ -29,6 +29,38 @@ def leer_df_corazon(sql, params=()):
 
 def normalizar(valor):
     return str(valor or "").strip().lower()
+
+
+def normalizar_edificio(edificio):
+    e = str(edificio or "").strip()
+
+    if not e or e.lower() in ["nan", "none", "-", "sin edificio"]:
+        return "Sin edificio"
+
+    e_low = e.lower()
+    e_low = e_low.replace(".", "")
+    e_low = e_low.replace("edif", "")
+    e_low = e_low.replace("edificio", "")
+    e_low = e_low.replace(" ", "")
+    e_low = e_low.replace("-", "")
+    e_low = e_low.replace("_", "")
+
+    if "infantil" in e_low or "primaria" in e_low:
+        return "Edif. Infantil/Primaria"
+
+    if "llar" in e_low:
+        return "Edif. Llar (Anexo)"
+
+    if e_low in ["a", "edifa"]:
+        return "Edif. A"
+
+    if e_low in ["b", "edifb"]:
+        return "Edif. B"
+
+    if e_low in ["c", "edifc"]:
+        return "Edif. C"
+
+    return e
 
 
 def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
@@ -53,27 +85,29 @@ def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
     if df.empty:
         return df
 
-    estados_cierre = [
-        "finalizada",
-        "finalizado",
-        "cerrada",
-        "cerrado",
-        "cancelada",
-        "cancelado",
-        "cerrado definitivo",
-    ]
-
     estados = df["estado"].fillna("").astype(str).str.strip().str.lower()
-
-    df_abiertas = df[
-        ~estados.isin(estados_cierre)
-    ].copy()
-
-    return df_abiertas
+    return df[~estados.isin(ESTADOS_CIERRE)].copy()
 
 
-from datetime import date
-import pandas as pd
+def calcular_tipo_prioridad(row):
+    area = str(row.get("area", "") or "").lower()
+    origen = str(row.get("origen", "") or "").lower()
+    descripcion = str(row.get("descripcion", "") or "").lower()
+    prioridad = str(row.get("prioridad", "") or "").lower()
+
+    if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
+        return "Sanitaria"
+
+    if "urgente" in prioridad:
+        return "Urgente"
+
+    if "alta" in prioridad:
+        return "Alta"
+
+    if str(row.get("origen", "") or "").upper() == "PREVENTIVO":
+        return "Preventiva"
+
+    return "Incidencia"
 
 
 def puntuar_orden(row):
@@ -85,9 +119,6 @@ def puntuar_orden(row):
     prioridad = normalizar(row.get("prioridad"))
     descripcion = normalizar(row.get("descripcion"))
 
-    # -----------------------------
-    # Prioridad principal
-    # -----------------------------
     if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
         score += 95
         motivos.append("Riesgo sanitario / Legionella.")
@@ -112,9 +143,6 @@ def puntuar_orden(row):
         score += 40
         motivos.append("Orden abierta pendiente de gestión.")
 
-    # -----------------------------
-    # Riesgos detectados
-    # -----------------------------
     if "fuga" in descripcion or "agua" in descripcion or "perdida" in descripcion:
         score += 10
         motivos.append("Posible afectación por agua.")
@@ -127,9 +155,6 @@ def puntuar_orden(row):
         score += 6
         motivos.append("Afecta a climatización o confort.")
 
-    # -----------------------------
-    # Antigüedad de la OT
-    # -----------------------------
     fecha_txt = (
         row.get("fecha")
         or row.get("fecha_creacion")
@@ -146,15 +171,12 @@ def puntuar_orden(row):
             if dias >= 90:
                 score += 25
                 motivos.append(f"Abierta desde hace {dias} días.")
-
             elif dias >= 60:
                 score += 18
                 motivos.append(f"Pendiente desde hace {dias} días.")
-
             elif dias >= 30:
                 score += 12
                 motivos.append(f"Más de un mes abierta ({dias} días).")
-
             elif dias >= 15:
                 score += 6
                 motivos.append(f"{dias} días sin resolver.")
@@ -162,9 +184,6 @@ def puntuar_orden(row):
     except Exception:
         pass
 
-    # -----------------------------
-    # Límite máximo
-    # -----------------------------
     score = min(score, 100)
 
     return score, motivos
@@ -180,28 +199,16 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
 
     for _, row in df.iterrows():
         score, motivos = puntuar_orden(row)
-    
+        edificio_normalizado = normalizar_edificio(row.get("edificio", ""))
+
         prioridades.append({
             "score": score,
-    
-            "tipo_prioridad": (
-                "Sanitaria"
-                if "legionella" in str(row.get("area", "")).lower()
-                or "legionella" in str(row.get("origen", "")).lower()
-                or "legionella" in str(row.get("descripcion", "")).lower()
-                else "Urgente"
-                if "urgente" in str(row.get("prioridad", "")).lower()
-                else "Alta"
-                if "alta" in str(row.get("prioridad", "")).lower()
-                else "Preventiva"
-                if str(row.get("origen", "")).upper() == "PREVENTIVO"
-                else "Incidencia"
-            ),
-    
+            "tipo_prioridad": calcular_tipo_prioridad(row),
             "numero_ot": row.get("numero_ot", ""),
             "titulo": row.get("descripcion", ""),
             "centro": row.get("centro", ""),
-            "edificio": row.get("edificio", ""),
+            "edificio": edificio_normalizado,
+            "edificio_original": row.get("edificio", ""),
             "espacio": row.get("espacio", ""),
             "area": row.get("area", ""),
             "origen": row.get("origen", ""),
@@ -212,33 +219,17 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
             "motivo": "El sistema la considera prioritaria por origen, área, prioridad y riesgo operativo.",
             "motivos": motivos,
         })
-    
+
     prioridades.sort(key=lambda x: x["score"], reverse=True)
-    print("========== CORAZÓN ==========")
-    print("OT leídas:", len(df))
-    
-    try:
-        print(df[[
-            "numero_ot",
-            "estado",
-            "centro",
-            "edificio",
-            "origen"
-        ]].to_string())
-    except Exception:
-        pass
-    
-    print("=============================")
     return prioridades[:limite]
 
-def construir_grupos_inteligentes(prioridades):
 
+def construir_grupos_inteligentes(prioridades):
     grupos = {}
 
     for p in prioridades:
-
         clave = (
-            p.get("centro", ""),
+            p.get("centro", "") or "Sin centro",
             normalizar_edificio(p.get("edificio", "")),
         )
 
@@ -247,31 +238,23 @@ def construir_grupos_inteligentes(prioridades):
     resultado = []
 
     for (centro, edificio), lista in grupos.items():
-
-        score = max(x["score"] for x in lista)
+        score = max(x.get("score", 0) for x in lista)
 
         resultado.append({
-
             "centro": centro,
             "edificio": edificio,
             "cantidad": len(lista),
             "score": score,
-            "trabajos": lista
-
+            "trabajos": lista,
         })
 
     resultado.sort(
-
-        key=lambda x: (
-            x["score"],
-            x["cantidad"]
-        ),
-
+        key=lambda x: (x["score"], x["cantidad"]),
         reverse=True
-
     )
 
     return resultado
+
 
 def construir_ruta_inteligente(grupos, limite=5):
     ruta = []
@@ -284,20 +267,23 @@ def construir_ruta_inteligente(grupos, limite=5):
             tipo = t.get("tipo_prioridad", "Otros")
             tipos[tipo] = tipos.get(tipo, 0) + 1
 
+        edificio = g.get("edificio", "") or "Sin edificio"
+
         ruta.append({
             "centro": g.get("centro", ""),
-            "edificio": g.get("edificio", ""),
+            "edificio": edificio,
             "cantidad": g.get("cantidad", 0),
             "score": g.get("score", 0),
             "tipos": tipos,
             "trabajos": trabajos,
             "mensaje": (
-                f"Concentrar trabajos en {g.get('edificio', '')} "
-                f"permite resolver {g.get('cantidad', 0)} actuaciones en una misma zona."
+                f"Concentrar trabajos en {edificio} permite resolver "
+                f"{g.get('cantidad', 0)} actuaciones en una misma zona."
             )
         })
 
     return ruta
+
 
 def construir_carga_por_edificio(prioridades):
     edificios = {}
@@ -320,7 +306,10 @@ def construir_carga_por_edificio(prioridades):
             }
 
         edificios[clave]["total"] += 1
-        edificios[clave]["score_max"] = max(edificios[clave]["score_max"], p.get("score", 0))
+        edificios[clave]["score_max"] = max(
+            edificios[clave]["score_max"],
+            p.get("score", 0)
+        )
 
         tipo = p.get("tipo_prioridad", "")
 
@@ -355,8 +344,8 @@ def construir_carga_por_edificio(prioridades):
             e["color"] = "rojo"
 
     resultado.sort(key=lambda x: (x["salud"], -x["total"]))
-
     return resultado
+
 
 def detectar_datos_incompletos(prioridades):
     avisos = []
@@ -402,14 +391,17 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         descripcion = df["descripcion"].fillna("").astype(str).str.lower()
 
         preventivos = len(df[origen == "PREVENTIVO"])
+
         legionella = len(df[
             (origen == "LEGIONELLA")
             | (area == "legionella")
             | (descripcion.str.contains("legionella", na=False))
         ])
+
         incidencias = len(df[
             origen.isin(["APP", "OUTLOOK", "PROFESORES", "EXTERNA"])
         ])
+
         urgentes = len(df[
             prioridad.str.contains("urgente|alta", case=False, na=False)
         ])
@@ -487,138 +479,3 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         "carga_edificios": carga_edificios,
         "datos_incompletos": datos_incompletos,
     }
-
-import streamlit as st
-
-from config import CENTROS
-from modules.corazon_sistema import diagnosticar_corazon_sistema
-
-
-def mostrar_corazon_sistema():
-    st.markdown("## ❤️ Corazón del Sistema")
-
-    centro_panel = st.selectbox(
-        "Centro",
-        ["Todos"] + CENTROS,
-        key="corazon_centro"
-    )
-
-    centro_motor = None if centro_panel == "Todos" else centro_panel
-
-    panel = diagnosticar_corazon_sistema(centro=centro_motor)
-
-    color = panel.get("color", "verde")
-    score = panel.get("score_global", 0)
-
-    if color == "rojo":
-        st.error(f"🔴 Estado global · {score}% · {panel.get('estado', '')}")
-    elif color == "amarillo":
-        st.warning(f"🟠 Estado global · {score}% · {panel.get('estado', '')}")
-    else:
-        st.success(f"🟢 Estado global · {score}% · {panel.get('estado', '')}")
-
-    st.markdown(f"**{panel.get('mensaje', '')}**")
-
-    kpis = panel.get("kpis", {})
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("OT abiertas", kpis.get("abiertas", 0))
-    c2.metric("Incidencias", kpis.get("incidencias", 0))
-    c3.metric("Preventivos", kpis.get("preventivos", 0))
-    c4.metric("Legionella", kpis.get("legionella", 0))
-    c5.metric("Alta/Urgente", kpis.get("urgentes", 0))
-
-    st.markdown("### 🧠 Índices principales")
-
-    i1, i2, i3 = st.columns(3)
-    i1.metric("Operativo", f"{panel.get('score_operativo', 0)}%")
-    i2.metric("Preventivo", f"{panel.get('score_preventivo', 0)}%")
-    i3.metric("Sanitario", f"{panel.get('score_legionella', 0)}%")
-
-    st.markdown("## 🎯 Si hoy solo hicieras una cosa...")
-
-    prioridad = panel.get("prioridad_hoy")
-
-    with st.container(border=True):
-        if prioridad:
-            st.markdown(f"### ⭐ {prioridad.get('numero_ot', '')}")
-            st.markdown(f"## {prioridad.get('titulo', '')}")
-
-            st.caption(
-                f"{prioridad.get('centro', '')} · "
-                f"{prioridad.get('edificio', '')} · "
-                f"{prioridad.get('espacio', '')}"
-            )
-
-            st.markdown(f"**Área:** {prioridad.get('area', '-')}")
-            st.markdown(f"**Origen:** {prioridad.get('origen', '-')}")
-            st.markdown(f"**Prioridad:** {prioridad.get('prioridad', '-')}")
-            st.markdown(f"**Puntuación:** {prioridad.get('score', 0)}/100")
-
-            st.info(prioridad.get("accion", "Atender actuación."))
-
-            st.markdown("#### 🧠 Motivo")
-            st.markdown(prioridad.get("motivo", ""))
-        else:
-            st.success("No hay actuaciones prioritarias pendientes.")
-
-    st.markdown("## 🚦 Prioridades globales")
-
-    prioridades = panel.get("prioridades", [])
-
-    if not prioridades:
-        st.success("No hay trabajos pendientes prioritarios.")
-    else:
-        for i, p in enumerate(prioridades, start=1):
-            with st.expander(
-                f"{i}. {p.get('score', 0)}/100 · "
-                f"{p.get('numero_ot', '')} · "
-                f"{p.get('origen', '')} · "
-                f"{p.get('area', '')}",
-                expanded=False
-            ):
-                st.markdown(f"### {p.get('titulo', '')}")
-                st.caption(
-                    f"{p.get('centro', '')} · "
-                    f"{p.get('edificio', '')} · "
-                    f"{p.get('espacio', '')}"
-                )
-
-                st.markdown(f"**Estado:** {p.get('estado', '-')}")
-                st.markdown(f"**Prioridad:** {p.get('prioridad', '-')}")
-                st.markdown(f"**Operario:** {p.get('operario', '-')}")
-                st.info(p.get("accion", ""))
-                st.caption(p.get("motivo", ""))
-
-    st.markdown("---")
-
-def normalizar_edificio(edificio):
-    e = str(edificio or "").strip()
-
-    if not e or e.lower() in ["nan", "none", "-", "sin edificio"]:
-        return "Sin edificio"
-
-    e_low = e.lower()
-    e_low = e_low.replace(".", "")
-    e_low = e_low.replace("edif", "")
-    e_low = e_low.replace("edificio", "")
-    e_low = e_low.replace(" ", "")
-    e_low = e_low.replace("-", "")
-    e_low = e_low.replace("_", "")
-
-    if "infantil" in e_low or "primaria" in e_low:
-        return "Edif. Infantil/Primaria"
-
-    if "llar" in e_low:
-        return "Edif. Llar (Anexo)"
-
-    if e_low in ["a", "edifa"]:
-        return "Edif. A"
-
-    if e_low in ["b", "edifb"]:
-        return "Edif. B"
-
-    if e_low in ["c", "edifc"]:
-        return "Edif. C"
-
-    return e
