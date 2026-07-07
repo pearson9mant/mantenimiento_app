@@ -267,6 +267,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         mensaje = "La situación general es estable. Mantener ritmo de cierre y seguimiento."
 
     prioridades = construir_prioridades_globales(centro, operario, limite=10)
+    grupos = construir_grupos_inteligentes(prioridades)
 
     prioridad_hoy = prioridades[0] if prioridades else None
 
@@ -292,6 +293,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         "prioridades": prioridades,
         "preventivo": preventivo,
         "legionella": legionella_panel,
+        "grupos": grupos,
     }
 
 import streamlit as st
