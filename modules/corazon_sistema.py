@@ -358,6 +358,33 @@ def construir_carga_por_edificio(prioridades):
 
     return resultado
 
+def detectar_datos_incompletos(prioridades):
+    avisos = []
+
+    for p in prioridades:
+        edificio = normalizar_edificio(p.get("edificio", ""))
+        espacio = str(p.get("espacio", "") or "").strip()
+
+        if edificio == "Sin edificio":
+            avisos.append({
+                "numero_ot": p.get("numero_ot", ""),
+                "titulo": p.get("titulo", ""),
+                "centro": p.get("centro", ""),
+                "campo": "edificio",
+                "mensaje": "Esta OT no tiene edificio informado.",
+            })
+
+        if not espacio or espacio.lower() in ["nan", "none", "-"]:
+            avisos.append({
+                "numero_ot": p.get("numero_ot", ""),
+                "titulo": p.get("titulo", ""),
+                "centro": p.get("centro", ""),
+                "campo": "espacio",
+                "mensaje": "Esta OT no tiene espacio informado.",
+            })
+
+    return avisos
+
 
 def diagnosticar_corazon_sistema(centro=None, operario=None):
     df = obtener_ordenes_abiertas_corazon(centro, operario)
