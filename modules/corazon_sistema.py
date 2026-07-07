@@ -72,6 +72,10 @@ def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
     return df_abiertas
 
 
+from datetime import date
+import pandas as pd
+
+
 def puntuar_orden(row):
     score = 0
     motivos = []
@@ -81,6 +85,9 @@ def puntuar_orden(row):
     prioridad = normalizar(row.get("prioridad"))
     descripcion = normalizar(row.get("descripcion"))
 
+    # -----------------------------
+    # Prioridad principal
+    # -----------------------------
     if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
         score += 95
         motivos.append("Riesgo sanitario / Legionella.")
@@ -105,9 +112,12 @@ def puntuar_orden(row):
         score += 40
         motivos.append("Orden abierta pendiente de gestión.")
 
+    # -----------------------------
+    # Riesgos detectados
+    # -----------------------------
     if "fuga" in descripcion or "agua" in descripcion or "perdida" in descripcion:
         score += 10
-        motivos.append("Posible afectación por agua o fuga.")
+        motivos.append("Posible afectación por agua.")
 
     if "eléctr" in descripcion or "electric" in descripcion:
         score += 8
@@ -117,6 +127,44 @@ def puntuar_orden(row):
         score += 6
         motivos.append("Afecta a climatización o confort.")
 
+    # -----------------------------
+    # Antigüedad de la OT
+    # -----------------------------
+    fecha_txt = (
+        row.get("fecha")
+        or row.get("fecha_creacion")
+        or row.get("fecha_alta")
+        or ""
+    )
+
+    try:
+        fecha_ot = pd.to_datetime(fecha_txt, errors="coerce")
+
+        if pd.notna(fecha_ot):
+            dias = (pd.Timestamp(date.today()) - fecha_ot).days
+
+            if dias >= 90:
+                score += 25
+                motivos.append(f"Abierta desde hace {dias} días.")
+
+            elif dias >= 60:
+                score += 18
+                motivos.append(f"Pendiente desde hace {dias} días.")
+
+            elif dias >= 30:
+                score += 12
+                motivos.append(f"Más de un mes abierta ({dias} días).")
+
+            elif dias >= 15:
+                score += 6
+                motivos.append(f"{dias} días sin resolver.")
+
+    except Exception:
+        pass
+
+    # -----------------------------
+    # Límite máximo
+    # -----------------------------
     score = min(score, 100)
 
     return score, motivos
