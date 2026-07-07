@@ -374,24 +374,25 @@ def construir_panel_preventivo(centro=None):
         },
     ]
 
-    return {
-        "resumen": {
-            "centro": centro or "Todos",
-            "estado": estado.get("estado", ""),
-            "color": estado.get("color", "verde"),
-            "icono": _color_a_icono(estado.get("color", "verde")),
-            "score": estado.get("score", 0),
-            "total": estado.get("total", 0),
-            "abiertas": estado.get("abiertas", 0),
-            "finalizadas": estado.get("finalizadas", 0),
-            "vencidas": estado.get("vencidas", 0),
-            "proximas": estado.get("proximas", 0),
-            "recomendacion": estado.get("recomendacion", ""),
-            "diagnostico": estado.get("diagnostico", []),
-        },
-        "prioridad_hoy": prioridad_hoy,
-        "recomendacion_inteligente": recomendacion_inteligente,
-        "prioridades": prioridades,
-        "areas": areas,
-            }
+        return {
+            "resumen": {
+                "centro": centro or "Todos",
+                "estado": estado.get("estado", ""),
+                "color": estado.get("color", "verde"),
+                "icono": _color_a_icono(estado.get("color", "verde")),
+                "score": estado.get("score", 0),
+                "total": estado.get("total", 0),
+                "abiertas": estado.get("abiertas", 0),
+                "finalizadas": estado.get("finalizadas", 0),
+                "vencidas": estado.get("vencidas", 0),
+                "proximas": estado.get("proximas", 0),
+                "recomendacion": estado.get("recomendacion", ""),
+                "diagnostico": estado.get("diagnostico", []),
+            },
+            "semaforo": semaforo,
+            "prioridad_hoy": prioridad_hoy,
+            "recomendacion_inteligente": recomendacion_inteligente,
+            "prioridades": prioridades,
+            "areas": areas,
+        }
 
