@@ -166,7 +166,21 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
         })
     
     prioridades.sort(key=lambda x: x["score"], reverse=True)
-
+    print("========== CORAZÓN ==========")
+    print("OT leídas:", len(df))
+    
+    try:
+        print(df[[
+            "numero_ot",
+            "estado",
+            "centro",
+            "edificio",
+            "origen"
+        ]].to_string())
+    except Exception:
+        pass
+    
+    print("=============================")
     return prioridades[:limite]
 
 def construir_grupos_inteligentes(prioridades):
