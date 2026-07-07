@@ -562,3 +562,22 @@ def mostrar_corazon_sistema():
                 st.caption(p.get("motivo", ""))
 
     st.markdown("---")
+
+def normalizar_edificio(edificio):
+    e = str(edificio or "").strip()
+
+    equivalencias = {
+        "Infantil/Primaria": "Edif. Infantil/Primaria",
+        "Edif Infantil/Primaria": "Edif. Infantil/Primaria",
+        "Edif. Infantil Primaria": "Edif. Infantil/Primaria",
+
+        "Llar": "Edif. Llar (Anexo)",
+        "Edif. Llar": "Edif. Llar (Anexo)",
+        "Llar (Anexo)": "Edif. Llar (Anexo)",
+
+        "A": "Edif. A",
+        "B": "Edif. B",
+        "C": "Edif. C",
+    }
+
+    return equivalencias.get(e, e)
