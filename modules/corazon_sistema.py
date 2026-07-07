@@ -239,7 +239,7 @@ def construir_grupos_inteligentes(prioridades):
 
         clave = (
             p.get("centro", ""),
-            p.get("edificio", ""),
+            normalizar_edificio(p.get("edificio", "")),
         )
 
         grupos.setdefault(clave, []).append(p)
