@@ -229,7 +229,21 @@ def mostrar_panel_inteligente_preventivo():
             st.markdown(f"**Área:** {prioridad_hoy.get('area', '-')}")
             st.markdown(f"**Fecha programada:** {prioridad_hoy.get('fecha_programada', '-')}")
             st.info(prioridad_hoy.get("accion", "Realizar preventivo."))
-            st.caption(prioridad_hoy.get("motivo", ""))
+
+            st.markdown("#### 🧠 ¿Por qué recomienda esta actuación?")
+            
+            st.markdown(
+                f"**Motivo:** {recomendacion_inteligente.get('motivo', '')}"
+            )
+            
+            st.markdown(
+                f"**Riesgo si no se actúa:** {recomendacion_inteligente.get('riesgo', '')}"
+            )
+            
+            st.markdown(
+                f"**Beneficio esperado:** {recomendacion_inteligente.get('beneficio', '')}"
+            )
+            
         else:
             st.success("No hay preventivos prioritarios pendientes.")
 
