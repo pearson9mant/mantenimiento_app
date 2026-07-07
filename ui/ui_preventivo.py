@@ -162,7 +162,7 @@ def mostrar_panel_inteligente_preventivo():
     panel = construir_panel_preventivo(centro_motor)
 
     resumen = panel["resumen"]
-    semaforo = panel["semaforo"]
+    semaforo = panel.get("semaforo", [])
     prioridad_hoy = panel["prioridad_hoy"]
     prioridades = panel["prioridades"]
     areas = panel["areas"]
