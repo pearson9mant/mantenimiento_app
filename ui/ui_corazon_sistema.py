@@ -144,12 +144,14 @@ def mostrar_corazon_sistema():
                     )
                 )
 
-                st.caption(
-                    p.get(
-                        "motivo",
-                        ""
-                    )
-                )
+                motivos = p.get("motivos", [])
+
+                if motivos:
+                    st.markdown("#### 🧠 Motivos")
+                    for m in motivos:
+                        st.markdown(f"• {m}")
+                else:
+                    st.caption(p.get("motivo", ""))
 
     else:
 
