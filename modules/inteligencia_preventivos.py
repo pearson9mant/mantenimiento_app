@@ -24,12 +24,15 @@ def leer_df_preventivos(sql, params=()):
         conn.close()
 
 
-def diagnosticar_preventivos_global(centro=None):
-    """
-    Motor inteligente preventivo.
-    Solo lee datos. No modifica nada.
-    """
+def _color_a_icono(color):
+    if color == "rojo":
+        return "🔴"
+    if color == "amarillo":
+        return "🟠"
+    return "🟢"
 
+
+def diagnosticar_preventivos_global(centro=None):
     params = []
     filtro_centro = ""
 
@@ -53,30 +56,30 @@ def diagnosticar_preventivos_global(centro=None):
     finalizadas = 0
 
     if not ots.empty:
-        estado = ots["estado"].fillna("").astype(str).str.lower()
+        estados = ots["estado"].fillna("").astype(str).str.lower()
 
-        finalizadas = len(ots[estado.isin(ESTADOS_CIERRE)])
-        abiertas_df = ots[~estado.isin(ESTADOS_CIERRE)].copy()
+        finalizadas = len(ots[estados.isin(ESTADOS_CIERRE)])
+        abiertas_df = ots[~estados.isin(ESTADOS_CIERRE)].copy()
         abiertas = len(abiertas_df)
 
         if "fecha_programada" in abiertas_df.columns:
-            abiertas_df["fecha_programada_dt"] = pd.to_datetime(
+            fechas = pd.to_datetime(
                 abiertas_df["fecha_programada"],
                 errors="coerce"
             )
 
             vencidas = len(
-                abiertas_df[
-                    abiertas_df["fecha_programada_dt"].notna()
-                    & (abiertas_df["fecha_programada_dt"] < hoy)
+                fechas[
+                    fechas.notna()
+                    & (fechas < hoy)
                 ]
             )
 
             proximas = len(
-                abiertas_df[
-                    abiertas_df["fecha_programada_dt"].notna()
-                    & (abiertas_df["fecha_programada_dt"] >= hoy)
-                    & (abiertas_df["fecha_programada_dt"] <= hoy + pd.Timedelta(days=7))
+                fechas[
+                    fechas.notna()
+                    & (fechas >= hoy)
+                    & (fechas <= hoy + pd.Timedelta(days=7))
                 ]
             )
 
@@ -90,9 +93,13 @@ def diagnosticar_preventivos_global(centro=None):
         color = "rojo"
         estado_txt = "Preventivos vencidos"
         recomendacion = "Atender primero los preventivos vencidos."
-    elif proximas > 0:
+    elif score < 70:
         color = "amarillo"
         estado_txt = "Seguimiento preventivo"
+        recomendacion = "Reducir preventivos abiertos para mejorar el índice."
+    elif proximas > 0:
+        color = "amarillo"
+        estado_txt = "Preventivos próximos"
         recomendacion = "Programar los preventivos próximos de esta semana."
     else:
         color = "verde"
@@ -170,23 +177,8 @@ def obtener_prioridades_preventivas(centro=None, limite=5):
 
     return prioridades
 
-# ======================================================
-# PANEL INTELIGENTE PREVENTIVO
-# ======================================================
-
-def _color_a_icono(color):
-    if color == "rojo":
-        return "🔴"
-    if color == "amarillo":
-        return "🟠"
-    return "🟢"
 
 def evaluar_areas_preventivas(centro=None):
-    """
-    Evalúa el estado preventivo por áreas.
-    Solo interpreta datos. No modifica nada.
-    """
-
     params = []
     filtro = ""
 
@@ -227,16 +219,15 @@ def evaluar_areas_preventivas(centro=None):
 
         for _, fila in abiertas.iterrows():
             prioridad = str(fila.get("prioridad", "") or "").lower()
-        
+
             if "alta" in prioridad or "urgente" in prioridad:
                 score -= 8
             elif "media" in prioridad:
                 score -= 5
             else:
                 score -= 3
-        
+
         score -= vencidas * 20
-        
         score = max(0, min(100, int(score)))
 
         if score >= 85:
@@ -266,6 +257,7 @@ def evaluar_areas_preventivas(centro=None):
     resultado.sort(key=lambda x: x["score"])
 
     return resultado
+
 
 def generar_recomendacion_preventiva(prioridad_hoy, areas):
     if not prioridad_hoy:
@@ -312,21 +304,11 @@ def generar_recomendacion_preventiva(prioridad_hoy, areas):
 
 
 def construir_panel_preventivo(centro=None):
-    """
-    Capa preparada para UI, Gerencia y futura pantalla diaria.
-    No modifica datos.
-    """
-
     estado = diagnosticar_preventivos_global(centro)
     prioridades = obtener_prioridades_preventivas(centro, limite=5)
     areas = evaluar_areas_preventivas(centro)
 
     prioridad_hoy = None
-    recomendacion_inteligente = {
-        "motivo": "",
-        "riesgo": "",
-        "beneficio": "",
-    }
 
     if prioridades:
         p = prioridades[0]
@@ -374,25 +356,24 @@ def construir_panel_preventivo(centro=None):
         },
     ]
 
-        return {
-            "resumen": {
-                "centro": centro or "Todos",
-                "estado": estado.get("estado", ""),
-                "color": estado.get("color", "verde"),
-                "icono": _color_a_icono(estado.get("color", "verde")),
-                "score": estado.get("score", 0),
-                "total": estado.get("total", 0),
-                "abiertas": estado.get("abiertas", 0),
-                "finalizadas": estado.get("finalizadas", 0),
-                "vencidas": estado.get("vencidas", 0),
-                "proximas": estado.get("proximas", 0),
-                "recomendacion": estado.get("recomendacion", ""),
-                "diagnostico": estado.get("diagnostico", []),
-            },
-            "semaforo": semaforo,
-            "prioridad_hoy": prioridad_hoy,
-            "recomendacion_inteligente": recomendacion_inteligente,
-            "prioridades": prioridades,
-            "areas": areas,
-        }
-
+    return {
+        "resumen": {
+            "centro": centro or "Todos",
+            "estado": estado.get("estado", ""),
+            "color": estado.get("color", "verde"),
+            "icono": _color_a_icono(estado.get("color", "verde")),
+            "score": estado.get("score", 0),
+            "total": estado.get("total", 0),
+            "abiertas": estado.get("abiertas", 0),
+            "finalizadas": estado.get("finalizadas", 0),
+            "vencidas": estado.get("vencidas", 0),
+            "proximas": estado.get("proximas", 0),
+            "recomendacion": estado.get("recomendacion", ""),
+            "diagnostico": estado.get("diagnostico", []),
+        },
+        "semaforo": semaforo,
+        "prioridad_hoy": prioridad_hoy,
+        "recomendacion_inteligente": recomendacion_inteligente,
+        "prioridades": prioridades,
+        "areas": areas,
+    }
