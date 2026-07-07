@@ -62,6 +62,7 @@ def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
 
 def puntuar_orden(row):
     score = 0
+    motivos = []
 
     area = normalizar(row.get("area"))
     origen = normalizar(row.get("origen"))
@@ -70,32 +71,43 @@ def puntuar_orden(row):
 
     if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
         score += 95
+        motivos.append("Riesgo sanitario / Legionella.")
 
     elif "urgente" in prioridad:
         score += 90
+        motivos.append("Prioridad urgente.")
 
     elif "alta" in prioridad:
         score += 75
+        motivos.append("Prioridad alta.")
 
     elif origen == "preventivo":
         score += 60
+        motivos.append("Actuación preventiva pendiente.")
 
     elif origen in ["app", "outlook", "profesores", "externa"]:
         score += 55
+        motivos.append("Incidencia o actuación externa abierta.")
 
     else:
         score += 40
+        motivos.append("Orden abierta pendiente de gestión.")
 
-    if "fuga" in descripcion or "agua" in descripcion:
+    if "fuga" in descripcion or "agua" in descripcion or "perdida" in descripcion:
         score += 10
+        motivos.append("Posible afectación por agua o fuga.")
 
     if "eléctr" in descripcion or "electric" in descripcion:
         score += 8
+        motivos.append("Posible riesgo eléctrico.")
 
     if "clima" in descripcion or "aire" in descripcion:
         score += 6
+        motivos.append("Afecta a climatización o confort.")
 
-    return min(score, 100)
+    score = min(score, 100)
+
+    return score, motivos
 
 
 def construir_prioridades_globales(centro=None, operario=None, limite=10):
