@@ -322,6 +322,11 @@ def construir_panel_preventivo(centro=None):
     areas = evaluar_areas_preventivas(centro)
 
     prioridad_hoy = None
+    recomendacion_inteligente = {
+        "motivo": "",
+        "riesgo": "",
+        "beneficio": "",
+    }
 
     if prioridades:
         p = prioridades[0]
