@@ -485,6 +485,7 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         "grupos": grupos,
         "ruta": ruta,
         "carga_edificios": carga_edificios,
+        "datos_incompletos": datos_incompletos,
     }
 
 import streamlit as st
