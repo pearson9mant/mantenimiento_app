@@ -267,6 +267,49 @@ def evaluar_areas_preventivas(centro=None):
 
     return resultado
 
+def generar_recomendacion_preventiva(prioridad_hoy, areas):
+    if not prioridad_hoy:
+        return {
+            "motivo": "No hay actuaciones preventivas prioritarias pendientes.",
+            "riesgo": "Riesgo preventivo bajo.",
+            "beneficio": "Mantener seguimiento habitual.",
+        }
+
+    area_ot = str(prioridad_hoy.get("area") or "").strip()
+    area_info = None
+
+    for a in areas:
+        if str(a.get("area") or "").strip().lower() == area_ot.lower():
+            area_info = a
+            break
+
+    abiertos = area_info.get("abiertas", 0) if area_info else 0
+    vencidos = area_info.get("vencidas", 0) if area_info else 0
+    score = area_info.get("score", 100) if area_info else 100
+
+    if vencidos > 0:
+        motivo = f"El área de {area_ot} tiene preventivos vencidos y requiere actuación prioritaria."
+        riesgo = "Si no se actúa, puede aumentar el riesgo de averías o incumplimiento de planificación."
+        beneficio = "Cerrar esta actuación ayudará a recuperar el control preventivo del área."
+    elif abiertos >= 5:
+        motivo = f"El área de {area_ot} acumula varias actuaciones abiertas."
+        riesgo = "Una carga elevada de preventivos abiertos puede generar retrasos y correctivas futuras."
+        beneficio = "Reducirá la carga pendiente y mejorará el índice preventivo."
+    elif score < 85:
+        motivo = f"El área de {area_ot} está en seguimiento preventivo."
+        riesgo = "Conviene actuar antes de que la carga pendiente se convierta en vencida."
+        beneficio = "Ayudará a estabilizar el mantenimiento del área."
+    else:
+        motivo = "Es la actuación preventiva abierta más prioritaria según fecha y planificación."
+        riesgo = "Riesgo bajo si se mantiene el ritmo de ejecución."
+        beneficio = "Mantiene el mantenimiento preventivo al día."
+
+    return {
+        "motivo": motivo,
+        "riesgo": riesgo,
+        "beneficio": beneficio,
+    }
+
 
 def construir_panel_preventivo(centro=None):
     """
@@ -293,6 +336,11 @@ def construir_panel_preventivo(centro=None):
             "accion": p.get("accion", "Realizar preventivo y completar checklist."),
             "motivo": "Es el preventivo abierto más prioritario según fecha y planificación.",
         }
+
+    recomendacion_inteligente = generar_recomendacion_preventiva(
+        prioridad_hoy,
+        areas
+    )
 
     semaforo = [
         {
@@ -336,9 +384,9 @@ def construir_panel_preventivo(centro=None):
             "recomendacion": estado.get("recomendacion", ""),
             "diagnostico": estado.get("diagnostico", []),
         },
-        "semaforo": semaforo,
         "prioridad_hoy": prioridad_hoy,
+        "recomendacion_inteligente": recomendacion_inteligente,
         "prioridades": prioridades,
         "areas": areas,
-    }
+            }
 
