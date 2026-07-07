@@ -109,6 +109,46 @@ def mostrar_corazon_sistema():
         )
 
     st.divider()
+    
+    st.subheader("📍 Ruta inteligente de trabajo")
+    
+    ruta = panel.get("ruta", [])
+    
+    if not ruta:
+        st.info("Todavía no hay suficientes datos para proponer una ruta inteligente.")
+    else:
+        for i, tramo in enumerate(ruta, start=1):
+            with st.container(border=True):
+                st.markdown(
+                    f"### {i}. 🏫 {tramo.get('centro', '')} · {tramo.get('edificio', '')}"
+                )
+    
+                st.metric(
+                    "Actuaciones agrupadas",
+                    tramo.get("cantidad", 0)
+                )
+    
+                st.markdown(f"**Prioridad máxima:** {tramo.get('score', 0)}/100")
+                st.info(tramo.get("mensaje", ""))
+    
+                tipos = tramo.get("tipos", {})
+    
+                if tipos:
+                    st.markdown("#### Tipos de trabajo")
+                    for tipo, cantidad in tipos.items():
+                        st.markdown(f"• **{tipo}:** {cantidad}")
+    
+                trabajos = tramo.get("trabajos", [])
+    
+                with st.expander("Ver trabajos incluidos", expanded=False):
+                    for t in trabajos:
+                        st.markdown(
+                            f"• **{t.get('numero_ot', '')}** · "
+                            f"{t.get('tipo_prioridad', '')} · "
+                            f"{t.get('titulo', '')}"
+                        )
+
+    st.divider()
 
     st.subheader("🚦 Ranking general")
 
