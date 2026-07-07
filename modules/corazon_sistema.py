@@ -120,9 +120,24 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
 
     for _, row in df.iterrows():
         score, motivos = puntuar_orden(row)
-
+    
         prioridades.append({
             "score": score,
+    
+            "tipo_prioridad": (
+                "Sanitaria"
+                if "legionella" in str(row.get("area", "")).lower()
+                or "legionella" in str(row.get("origen", "")).lower()
+                or "legionella" in str(row.get("descripcion", "")).lower()
+                else "Urgente"
+                if "urgente" in str(row.get("prioridad", "")).lower()
+                else "Alta"
+                if "alta" in str(row.get("prioridad", "")).lower()
+                else "Preventiva"
+                if str(row.get("origen", "")).upper() == "PREVENTIVO"
+                else "Incidencia"
+            ),
+    
             "numero_ot": row.get("numero_ot", ""),
             "titulo": row.get("descripcion", ""),
             "centro": row.get("centro", ""),
@@ -137,7 +152,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=10):
             "motivo": "El sistema la considera prioritaria por origen, área, prioridad y riesgo operativo.",
             "motivos": motivos,
         })
-
+    
     prioridades.sort(key=lambda x: x["score"], reverse=True)
 
     return prioridades[:limite]
