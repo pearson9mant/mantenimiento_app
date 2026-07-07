@@ -46,18 +46,30 @@ def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
     df = leer_df_corazon(f"""
         SELECT *
         FROM ordenes_trabajo
-        WHERE LOWER(COALESCE(estado,'')) NOT IN (
-            'finalizada',
-            'finalizado',
-            'cerrada',
-            'cerrado',
-            'cancelada',
-            'cancelado'
-        )
+        WHERE 1=1
         {filtro}
     """, tuple(params))
 
-    return df
+    if df.empty:
+        return df
+
+    estados_cierre = [
+        "finalizada",
+        "finalizado",
+        "cerrada",
+        "cerrado",
+        "cancelada",
+        "cancelado",
+        "cerrado definitivo",
+    ]
+
+    estados = df["estado"].fillna("").astype(str).str.strip().str.lower()
+
+    df_abiertas = df[
+        ~estados.isin(estados_cierre)
+    ].copy()
+
+    return df_abiertas
 
 
 def puntuar_orden(row):
