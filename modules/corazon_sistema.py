@@ -299,6 +299,65 @@ def construir_ruta_inteligente(grupos, limite=5):
 
     return ruta
 
+def construir_carga_por_edificio(prioridades):
+    edificios = {}
+
+    for p in prioridades:
+        centro = p.get("centro", "") or "Sin centro"
+        edificio = p.get("edificio", "") or "Sin edificio"
+        clave = (centro, edificio)
+
+        if clave not in edificios:
+            edificios[clave] = {
+                "centro": centro,
+                "edificio": edificio,
+                "total": 0,
+                "score_max": 0,
+                "sanitarias": 0,
+                "preventivas": 0,
+                "incidencias": 0,
+                "urgentes": 0,
+            }
+
+        edificios[clave]["total"] += 1
+        edificios[clave]["score_max"] = max(edificios[clave]["score_max"], p.get("score", 0))
+
+        tipo = p.get("tipo_prioridad", "")
+
+        if tipo == "Sanitaria":
+            edificios[clave]["sanitarias"] += 1
+        elif tipo == "Preventiva":
+            edificios[clave]["preventivas"] += 1
+        elif tipo in ["Urgente", "Alta"]:
+            edificios[clave]["urgentes"] += 1
+        else:
+            edificios[clave]["incidencias"] += 1
+
+    resultado = list(edificios.values())
+
+    for e in resultado:
+        score = 100
+        score -= e["total"] * 3
+        score -= e["sanitarias"] * 8
+        score -= e["urgentes"] * 6
+        score = max(0, min(100, score))
+
+        e["salud"] = score
+
+        if score >= 85:
+            e["estado"] = "Controlado"
+            e["color"] = "verde"
+        elif score >= 60:
+            e["estado"] = "Seguimiento"
+            e["color"] = "amarillo"
+        else:
+            e["estado"] = "Carga alta"
+            e["color"] = "rojo"
+
+    resultado.sort(key=lambda x: (x["salud"], -x["total"]))
+
+    return resultado
+
 
 def diagnosticar_corazon_sistema(centro=None, operario=None):
     df = obtener_ordenes_abiertas_corazon(centro, operario)
