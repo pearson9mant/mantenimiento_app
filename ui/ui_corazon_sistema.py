@@ -4,7 +4,6 @@ from modules.corazon_sistema import diagnosticar_corazon_sistema
 
 
 def mostrar_corazon_sistema():
-
     st.title("❤️ Corazón del Sistema")
 
     centro_sel = st.selectbox(
@@ -14,114 +13,84 @@ def mostrar_corazon_sistema():
     )
 
     centro_motor = None if centro_sel == "Todos" else centro_sel
-    
     panel = diagnosticar_corazon_sistema(centro=centro_motor)
 
     color = panel.get("color", "verde")
     score = panel.get("score_global", 0)
 
-    if color == "verde":
-        st.success(f"Estado global: {score}%")
+    if color == "rojo":
+        st.error(f"🔴 Estado global · {score}% · {panel.get('estado', '')}")
     elif color == "amarillo":
-        st.warning(f"Estado global: {score}%")
+        st.warning(f"🟠 Estado global · {score}% · {panel.get('estado', '')}")
     else:
-        st.error(f"Estado global: {score}%")
+        st.success(f"🟢 Estado global · {score}% · {panel.get('estado', '')}")
 
-    st.markdown(panel.get("mensaje", ""))
+    st.markdown(f"**{panel.get('mensaje', '')}**")
 
     st.divider()
 
     st.subheader("📊 Indicadores principales")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-
     kpis = panel.get("kpis", {})
 
-    with c1:
-        st.metric("OT", kpis.get("ot", 0))
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("OT abiertas", kpis.get("abiertas", 0))
+    c2.metric("Incidencias", kpis.get("incidencias", 0))
+    c3.metric("Preventivos", kpis.get("preventivos", 0))
+    c4.metric("Legionella", kpis.get("legionella", 0))
+    c5.metric("Alta/Urgente", kpis.get("urgentes", 0))
 
-    with c2:
-        st.metric("Incidencias", kpis.get("incidencias", 0))
+    st.subheader("🧠 Índices principales")
 
-    with c3:
-        st.metric("Preventivos", kpis.get("preventivos", 0))
-
-    with c4:
-        st.metric("Legionella", kpis.get("legionella", 0))
-
-    with c5:
-        st.metric("Urgentes", kpis.get("urgentes", 0))
+    i1, i2, i3 = st.columns(3)
+    i1.metric("Operativo", f"{panel.get('score_operativo', 0)}%")
+    i2.metric("Preventivo", f"{panel.get('score_preventivo', 0)}%")
+    i3.metric("Sanitario", f"{panel.get('score_legionella', 0)}%")
 
     st.divider()
 
-    prioridad = panel.get("prioridad_hoy")
-
     st.subheader("🎯 Si hoy solo hicieras una cosa...")
 
-    if prioridad:
+    prioridad = panel.get("prioridad_hoy")
 
-        with st.container(border=True):
-
-            st.markdown(f"### ⭐ {prioridad.get('numero_ot','')}")
-
-            st.markdown(
-                f"## {prioridad.get('titulo','Sin prioridad')}"
-            )
+    with st.container(border=True):
+        if prioridad:
+            st.markdown(f"### ⭐ {prioridad.get('numero_ot', '')}")
+            st.markdown(f"## {prioridad.get('titulo', 'Sin prioridad')}")
 
             st.caption(
-                f"{prioridad.get('centro','')} · "
-                f"{prioridad.get('edificio','')} · "
-                f"{prioridad.get('espacio','')}"
+                f"{prioridad.get('centro', '')} · "
+                f"{prioridad.get('edificio', '')} · "
+                f"{prioridad.get('espacio', '')}"
             )
 
-            st.markdown(
-                f"**Origen:** {prioridad.get('origen','')}"
-            )
+            st.markdown(f"**Origen:** {prioridad.get('origen', '-')}")
+            st.markdown(f"**Área:** {prioridad.get('area', '-')}")
+            st.markdown(f"**Prioridad:** {prioridad.get('prioridad', '-')}")
+            st.markdown(f"**Tipo de prioridad:** {prioridad.get('tipo_prioridad', '-')}")
+            st.markdown(f"**Puntuación IA:** {prioridad.get('score', 0)}/100")
 
-            st.markdown(
-                f"**Área:** {prioridad.get('area','')}"
-            )
-
-            st.markdown(
-                f"**Prioridad:** {prioridad.get('prioridad','')}"
-            )
-            st.markdown(
-                f"**Tipo de prioridad:** {prioridad.get('tipo_prioridad','-')}"
-            )
-
-            st.markdown(
-                f"**Puntuación IA:** {prioridad.get('score',0)}/100"
-            )
-
-            st.info(
-                prioridad.get(
-                    "accion",
-                    "Realizar actuación."
-                )
-            )
+            st.info(prioridad.get("accion", "Realizar actuación."))
 
             st.markdown("### 🧠 Motivos de la decisión")
 
             motivos = prioridad.get("motivos", [])
-            
+
             if motivos:
                 for m in motivos:
                     st.markdown(f"• {m}")
             else:
                 st.write(prioridad.get("motivo", ""))
 
-    else:
-
-        st.success(
-            "No existen actuaciones prioritarias."
-        )
+        else:
+            st.success("No existen actuaciones prioritarias.")
 
     st.divider()
-    
+
     st.subheader("📍 Ruta inteligente de trabajo")
-    
+
     ruta = panel.get("ruta", [])
-    
+
     if not ruta:
         st.info("Todavía no hay suficientes datos para proponer una ruta inteligente.")
     else:
@@ -130,24 +99,20 @@ def mostrar_corazon_sistema():
                 st.markdown(
                     f"### {i}. 🏫 {tramo.get('centro', '')} · {tramo.get('edificio', '')}"
                 )
-    
-                st.metric(
-                    "Actuaciones agrupadas",
-                    tramo.get("cantidad", 0)
-                )
-    
+
+                st.metric("Actuaciones agrupadas", tramo.get("cantidad", 0))
                 st.markdown(f"**Prioridad máxima:** {tramo.get('score', 0)}/100")
                 st.info(tramo.get("mensaje", ""))
-    
+
                 tipos = tramo.get("tipos", {})
-    
+
                 if tipos:
                     st.markdown("#### Tipos de trabajo")
                     for tipo, cantidad in tipos.items():
                         st.markdown(f"• **{tipo}:** {cantidad}")
-    
+
                 trabajos = tramo.get("trabajos", [])
-    
+
                 with st.expander("Ver trabajos incluidos", expanded=False):
                     for t in trabajos:
                         st.markdown(
@@ -155,109 +120,100 @@ def mostrar_corazon_sistema():
                             f"{t.get('tipo_prioridad', '')} · "
                             f"{t.get('titulo', '')}"
                         )
-    st.divider()
-
-    st.subheader("🛠 Diagnóstico IA")
-    
-    st.write("OT analizadas:", len(panel["prioridades"]))
-    
-    for p in panel["prioridades"][:30]:
-        st.write(
-            p["numero_ot"],
-            "|",
-            p["estado"],
-            "|",
-            p["origen"],
-            "|",
-            p["centro"],
-            "|",
-            p["edificio"],
-        )
 
     st.divider()
 
     st.subheader("🏫 Carga por edificio")
-    
-    for e in panel.get("carga_edificios", []):
-    
-        if e["color"] == "verde":
-            icono = "🟢"
-        elif e["color"] == "amarillo":
-            icono = "🟠"
-        else:
-            icono = "🔴"
-    
-        with st.container(border=True):
-    
-            st.markdown(
-                f"### {icono} {e['centro']} · {e['edificio']}"
-            )
-    
-            c1, c2, c3 = st.columns(3)
-    
-            with c1:
-                st.metric("Salud", f"{e['salud']}%")
-    
-            with c2:
-                st.metric("Actuaciones", e["total"])
-    
-            with c3:
-                st.metric("Estado", e["estado"])
-    
-            st.progress(e["salud"] / 100)
-    
-            c1, c2, c3, c4 = st.columns(4)
-    
-            c1.metric("🦠 Sanitarias", e["sanitarias"])
-            c2.metric("🛠 Preventivas", e["preventivas"])
-            c3.metric("🚨 Urgentes", e["urgentes"])
-            c4.metric("📋 Otras", e["incidencias"])
-    
-            if e["color"] == "verde":
-                st.success("El edificio presenta una carga de trabajo estable.")
-            elif e["color"] == "amarillo":
-                st.warning("Conviene planificar actuaciones agrupadas.")
+
+    carga_edificios = panel.get("carga_edificios", [])
+
+    if not carga_edificios:
+        st.info("No hay carga por edificio disponible.")
+    else:
+        for e in carga_edificios:
+            color_edificio = e.get("color", "verde")
+
+            if color_edificio == "rojo":
+                icono = "🔴"
+            elif color_edificio == "amarillo":
+                icono = "🟠"
             else:
-                st.error("Edificio con elevada carga de trabajo. Priorizar recursos.")
+                icono = "🟢"
+
+            with st.container(border=True):
+                st.markdown(
+                    f"### {icono} {e.get('centro', '')} · {e.get('edificio', '')}"
+                )
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Salud", f"{e.get('salud', 0)}%")
+                c2.metric("Actuaciones", e.get("total", 0))
+                c3.metric("Estado", e.get("estado", "-"))
+
+                st.progress(e.get("salud", 0) / 100)
+
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("🦠 Sanitarias", e.get("sanitarias", 0))
+                c2.metric("🛠 Preventivas", e.get("preventivas", 0))
+                c3.metric("🚨 Urgentes", e.get("urgentes", 0))
+                c4.metric("📋 Otras", e.get("incidencias", 0))
+
+                if color_edificio == "verde":
+                    st.success("El edificio presenta una carga de trabajo estable.")
+                elif color_edificio == "amarillo":
+                    st.warning("Conviene planificar actuaciones agrupadas.")
+                else:
+                    st.error("Edificio con elevada carga de trabajo. Priorizar recursos.")
+
     st.divider()
+
+    datos_incompletos = panel.get("datos_incompletos", [])
+
+    if datos_incompletos:
+        with st.expander("⚠️ Datos incompletos detectados", expanded=False):
+            st.warning(
+                "Hay OT con edificio o espacio incompleto. Conviene corregirlas para que el Corazón agrupe mejor."
+            )
+
+            for aviso in datos_incompletos[:30]:
+                st.markdown(
+                    f"• **{aviso.get('numero_ot', '')}** · "
+                    f"{aviso.get('campo', '')} · "
+                    f"{aviso.get('mensaje', '')}"
+                )
+                st.caption(
+                    f"{aviso.get('centro', '')} · {aviso.get('titulo', '')}"
+                )
 
     st.subheader("🚦 Ranking general")
 
     prioridades = panel.get("prioridades", [])
 
-    if prioridades:
-
+    if not prioridades:
+        st.success("No existen prioridades.")
+    else:
         for p in prioridades:
-
             with st.expander(
-                f"{p.get('score',0)}/100 · "
-                f"{p.get('tipo_prioridad','-')} · "
-                f"{p.get('numero_ot','')} · "
-                f"{p.get('titulo','')}"
+                f"{p.get('score', 0)}/100 · "
+                f"{p.get('tipo_prioridad', '-')} · "
+                f"{p.get('numero_ot', '')} · "
+                f"{p.get('titulo', '')}",
+                expanded=False
             ):
+                st.markdown(f"### {p.get('titulo', '')}")
 
-                st.write(
-                    f"Origen: {p.get('origen','')}"
+                st.caption(
+                    f"{p.get('centro', '')} · "
+                    f"{p.get('edificio', '')} · "
+                    f"{p.get('espacio', '')}"
                 )
 
-                st.write(
-                    f"Centro: {p.get('centro','')}"
-                )
-
-                st.write(
-                    f"Área: {p.get('area','')}"
-                )
-
-                st.write(
-                    f"Estado: {p.get('estado','')}"
-                )
-
-                st.info(
-                    p.get(
-                        "accion",
-                        ""
-                    )
-                )
+                st.markdown(f"**Origen:** {p.get('origen', '-')}")
+                st.markdown(f"**Área:** {p.get('area', '-')}")
+                st.markdown(f"**Estado:** {p.get('estado', '-')}")
+                st.markdown(f"**Prioridad:** {p.get('prioridad', '-')}")
+                st.markdown(f"**Operario:** {p.get('operario', '-')}")
+                st.info(p.get("accion", ""))
 
                 motivos = p.get("motivos", [])
 
@@ -268,8 +224,4 @@ def mostrar_corazon_sistema():
                 else:
                     st.caption(p.get("motivo", ""))
 
-    else:
-
-        st.success(
-            "No existen prioridades."
-        )
+    st.markdown("---")
