@@ -147,7 +147,24 @@ def mostrar_corazon_sistema():
                             f"{t.get('tipo_prioridad', '')} · "
                             f"{t.get('titulo', '')}"
                         )
+    st.divider()
 
+    st.subheader("🛠 Diagnóstico IA")
+    
+    st.write("OT analizadas:", len(panel["prioridades"]))
+    
+    for p in panel["prioridades"][:30]:
+        st.write(
+            p["numero_ot"],
+            "|",
+            p["estado"],
+            "|",
+            p["origen"],
+            "|",
+            p["centro"],
+            "|",
+            p["edificio"],
+        )
     st.divider()
 
     st.subheader("🚦 Ranking general")
