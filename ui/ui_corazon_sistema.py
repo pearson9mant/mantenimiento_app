@@ -89,14 +89,15 @@ def mostrar_corazon_sistema():
                 )
             )
 
-            st.markdown("### 🧠 Motivo")
+            st.markdown("### 🧠 Motivos de la decisión")
 
-            st.write(
-                prioridad.get(
-                    "motivo",
-                    ""
-                )
-            )
+            motivos = prioridad.get("motivos", [])
+            
+            if motivos:
+                for m in motivos:
+                    st.markdown(f"• {m}")
+            else:
+                st.write(prioridad.get("motivo", ""))
 
     else:
 
