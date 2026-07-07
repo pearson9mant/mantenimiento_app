@@ -579,6 +579,10 @@ def mostrar_menu_admin():
         if st.button("🏢\nEmpresas externas", key="btn_empresas_externas", use_container_width=True):
             st.session_state["seccion_actual"] = "Empresas externas"
             st.rerun()
+
+        if st.button("❤️\nCorazón sistema", key="btn_corazon_sistema", use_container_width=True):
+            st.session_state["seccion_actual"] = "Corazón sistema"
+            st.rerun()
     
 
     with col5:
