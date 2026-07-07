@@ -304,7 +304,7 @@ def construir_carga_por_edificio(prioridades):
 
     for p in prioridades:
         centro = p.get("centro", "") or "Sin centro"
-        edificio = p.get("edificio", "") or "Sin edificio"
+        edificio = normalizar_edificio(p.get("edificio", "")) or "Sin edificio"
         clave = (centro, edificio)
 
         if clave not in edificios:
