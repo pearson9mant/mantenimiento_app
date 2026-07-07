@@ -566,18 +566,30 @@ def mostrar_corazon_sistema():
 def normalizar_edificio(edificio):
     e = str(edificio or "").strip()
 
-    equivalencias = {
-        "Infantil/Primaria": "Edif. Infantil/Primaria",
-        "Edif Infantil/Primaria": "Edif. Infantil/Primaria",
-        "Edif. Infantil Primaria": "Edif. Infantil/Primaria",
+    if not e or e.lower() in ["nan", "none", "-", "sin edificio"]:
+        return "Sin edificio"
 
-        "Llar": "Edif. Llar (Anexo)",
-        "Edif. Llar": "Edif. Llar (Anexo)",
-        "Llar (Anexo)": "Edif. Llar (Anexo)",
+    e_low = e.lower()
+    e_low = e_low.replace(".", "")
+    e_low = e_low.replace("edif", "")
+    e_low = e_low.replace("edificio", "")
+    e_low = e_low.replace(" ", "")
+    e_low = e_low.replace("-", "")
+    e_low = e_low.replace("_", "")
 
-        "A": "Edif. A",
-        "B": "Edif. B",
-        "C": "Edif. C",
-    }
+    if "infantil" in e_low or "primaria" in e_low:
+        return "Edif. Infantil/Primaria"
 
-    return equivalencias.get(e, e)
+    if "llar" in e_low:
+        return "Edif. Llar (Anexo)"
+
+    if e_low in ["a", "edifa"]:
+        return "Edif. A"
+
+    if e_low in ["b", "edifb"]:
+        return "Edif. B"
+
+    if e_low in ["c", "edifc"]:
+        return "Edif. C"
+
+    return e
