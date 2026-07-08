@@ -3347,6 +3347,7 @@ def pantalla_legionella():
 
                 if st.button("💾 Crear tarea sobre este punto", use_container_width=True):
                     crear_tarea_legionella_manual(
+                        fila_punto["id"],
                         centro_tarea,
                         edificio_tarea,
                         fila_punto["instalacion"],
