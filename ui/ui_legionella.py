@@ -3005,8 +3005,12 @@ def pantalla_legionella():
 
             for _, row in df_filtrado.iterrows():
                 estado = "Activo" if int(row["activo"] or 0) == 1 else "Inactivo"
+                tipo_plan = str(row.get("tipo_planificacion") or "Automática")
+
+                icono_plan = "⭐ Especial" if tipo_plan == "Especial" else "🤖 Automática"
+                
                 titulo = (
-                    f"{row['estado_control']} · {row['centro']} · {row['edificio']} · "
+                    f"{row['estado_control']} · {icono_plan} · {row['centro']} · {row['edificio']} · "
                     f"{row['punto']} · {row['tarea']} · {row['proxima_fecha']} · {estado}"
                 )
 
