@@ -68,39 +68,68 @@ def mostrar_ejecucion_legionella_operario(
         tarea = "Control sala ACS"
 
     # -------------------------------------------------
-    # Buscar punto Legionella de forma inteligente
+    # Buscar punto Legionella de forma segura
+    # 1) Primero por id_punto_legionella
+    # 2) Si no existe, por nombre de punto como respaldo
     # -------------------------------------------------
-    
-    puntos_df = leer_df(
-        """
-        SELECT *
-        FROM legionella_puntos
-        WHERE centro = ?
-          AND activo = 1
-        ORDER BY id DESC
-        """,
-        (centro,),
-    )
-    
-    if not puntos_df.empty:
-    
-        puntos_df = puntos_df[
-            puntos_df["nombre_punto"]
-            .fillna("")
-            .str.lower()
-            .str.strip()
-            == str(punto_nombre).lower().strip()
-        ]
-    
-    if puntos_df.empty:
-    
-        st.warning(
-            f"No se ha encontrado el punto '{punto_nombre}'."
+
+    punto = None
+
+    try:
+        vinculacion = obtener_vinculacion_ot(
+            numero_ot=num_ot,
+            id_orden=id_orden
         )
-    
-        return False
-    
-    punto = puntos_df.iloc[0].to_dict()
+
+        id_punto_legionella = vinculacion.get("id_punto_legionella")
+
+        if id_punto_legionella:
+            puntos_df = leer_df(
+                """
+                SELECT *
+                FROM legionella_puntos
+                WHERE id = ?
+                  AND activo = 1
+                ORDER BY id DESC
+                """,
+                (int(id_punto_legionella),),
+            )
+
+            if not puntos_df.empty:
+                punto = puntos_df.iloc[0].to_dict()
+
+    except Exception:
+        punto = None
+
+    if punto is None:
+        puntos_df = leer_df(
+            """
+            SELECT *
+            FROM legionella_puntos
+            WHERE centro = ?
+              AND activo = 1
+            ORDER BY id DESC
+            """,
+            (centro,),
+        )
+
+        if not puntos_df.empty:
+            puntos_df = puntos_df[
+                puntos_df["nombre_punto"]
+                .fillna("")
+                .str.lower()
+                .str.strip()
+                == str(punto_nombre).lower().strip()
+            ]
+
+        if puntos_df.empty:
+            st.warning(
+                f"No se ha encontrado el punto '{punto_nombre}'. "
+                "Revisa que esta OT esté vinculada al punto Legionella."
+            )
+            return False
+
+        punto = puntos_df.iloc[0].to_dict()
 
     st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
     st.caption(f"🧪 Tarea: {tarea}")
