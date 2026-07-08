@@ -3545,13 +3545,6 @@ def pantalla_legionella():
                             key=f"terminales_{row['id']}"
                         )
 
-                        ubicacion_exacta_edit = st.text_input(
-                            "📍 Ubicación exacta",
-                            value=str(row.get("ubicacion_exacta", "") or ""),
-                            placeholder="Ej: Planta baja · WC profesores · Grifo lavabo derecha",
-                            key=f"ubicacion_exacta_{row['id']}"
-                        )
-
                         plano_pdf = st.file_uploader(
                             "🗺️ Plano ubicación punto",
                             type=["pdf"],
