@@ -146,6 +146,7 @@ def asegurar_columnas_planificacion_legionella():
         ("generar_ot", "INTEGER DEFAULT 1"),
         ("consigna_minima", "REAL DEFAULT 60"),
         ("controla_consigna", "INTEGER DEFAULT 1"),
+        ("tipo_planificacion", "TEXT DEFAULT 'Automática'"),
     ]
 
     for columna, tipo in columnas:
