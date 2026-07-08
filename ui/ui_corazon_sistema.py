@@ -37,6 +37,31 @@ def mostrar_corazon_sistema():
 
     centro_motor = None if centro_sel == "Todos" else centro_sel
     panel = diagnosticar_corazon_sistema(centro=centro_motor)
+    ot_abierta = st.session_state.get("corazon_ot_abierta")
+
+    if ot_abierta:
+        st.markdown("## 🛠 Trabajar OT desde el Corazón")
+    
+        if st.button("⬅ Volver al Corazón", key="volver_corazon_desde_ot"):
+            st.session_state.pop("corazon_ot_abierta", None)
+            st.rerun()
+    
+        fila_ot = obtener_fila_ot_por_numero(ot_abierta)
+    
+        if not fila_ot:
+            st.error("No se ha encontrado la OT seleccionada.")
+            st.stop()
+    
+        materiales_select = obtener_materiales_para_select()
+    
+        mostrar_tarjeta_ot(
+            fila=fila_ot,
+            materiales_select=materiales_select,
+            operario_sel=str(fila_ot[10] or ""),
+            modo="corazon"
+        )
+    
+        st.stop()
 
     color = panel.get("color", "verde")
     score = panel.get("score_global", 0)
