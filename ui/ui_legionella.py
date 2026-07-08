@@ -585,12 +585,17 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
     return total > 0
 
 
-def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
+def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=None):
     if not centro or not edificio or not punto or not tarea:
         return False
 
+    from modules.ordenes import vincular_origen_ot
+
     if str(tarea).startswith("CORRECTIVO LEGIONELLA"):
-        descripcion = f"{tarea} - {punto}\n\n⚠️ Correctivo Legionella: completar checklist interactivo antes de cerrar."
+        descripcion = (
+            f"{tarea} - {punto}\n\n"
+            "⚠️ Correctivo Legionella: completar checklist interactivo antes de cerrar."
+        )
     else:
         descripcion = f"Control Legionella - {tarea} - {punto}"
 
@@ -631,7 +636,15 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None):
         ""
     )
 
-    crear_orden(datos_orden)
+    numero_creado = crear_orden(datos_orden) or numero_ot
+
+    if punto_id:
+        vincular_origen_ot(
+            numero_ot=numero_creado,
+            origen_tabla="legionella_puntos",
+            origen_id=int(punto_id),
+            id_punto_legionella=int(punto_id),
+        )
 
     return True
 
