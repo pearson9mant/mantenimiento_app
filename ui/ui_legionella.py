@@ -1125,6 +1125,7 @@ def generar_ots_legionella_planificadas():
             fila["punto"],
             fila["tarea"],
             fila["operario"],
+            punto_id=fila.get("punto_id"),
         )
 
         if creada:
