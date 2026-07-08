@@ -5,6 +5,26 @@ from database.db import conectar, _sql
 from ui.ui_ot import mostrar_tarjeta_ot
 from modules.inventario import obtener_materiales_para_select
 
+def obtener_fila_ot_por_numero(numero_ot):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT *
+            FROM ordenes_trabajo
+            WHERE numero_ot = ?
+            LIMIT 1
+        """), (numero_ot,))
+
+        fila = cur.fetchone()
+    except Exception:
+        fila = None
+    finally:
+        conn.close()
+
+    return fila
+
 
 def mostrar_corazon_sistema():
     st.title("❤️ Corazón del Sistema")
