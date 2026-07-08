@@ -1104,7 +1104,7 @@ def calcular_estado_control(proxima_fecha):
 
 def generar_ots_legionella_planificadas():
     df = leer_df("""
-        SELECT id, centro, edificio, punto, tarea, frecuencia_dias, proxima_fecha, operario
+        SELECT id, punto_id, centro, edificio, punto, tarea, frecuencia_dias, proxima_fecha, operario
         FROM legionella_tareas
         WHERE activo = 1
           AND generar_ot = 1
