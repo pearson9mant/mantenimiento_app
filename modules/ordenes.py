@@ -5,6 +5,7 @@ try:
     from modules.telegram_alertas import enviar_telegram
 except Exception:
     enviar_telegram = None
+
 try:
     from modules.espacios_historial import registrar_historial_espacio
 except Exception:
@@ -22,16 +23,21 @@ ESTADOS_VALIDOS = [
     "En ejecución",
     "Cerrado"
 ]
+
 _COLUMNAS_ORDENES_ASEGURADAS = False
 _TABLA_CONTADOR_ASEGURADA = False
 _TABLA_FOTOS_ASEGURADA = False
 
+
 # =====================================================
-# ASEGURAR COLUMNAS OBSERVACIONES / EXTERNAS
+# ASEGURAR COLUMNAS
 # =====================================================
 
 def _add_column_seguro(cursor, tabla, columna, tipo):
-    _add_column(cursor, tabla, columna, tipo)
+    try:
+        _add_column(cursor, tabla, columna, tipo)
+    except Exception:
+        pass
 
 
 def asegurar_columnas_observaciones_estado():
@@ -62,6 +68,13 @@ def asegurar_columnas_observaciones_estado():
         ("coste_estimado", "REAL DEFAULT 0"),
         ("coste_final", "REAL DEFAULT 0"),
         ("foto", "TEXT"),
+
+        # VINCULACIÓN SEGURA DEL CORAZÓN DEL SISTEMA
+        ("origen_tabla", "TEXT"),
+        ("origen_id", "INTEGER"),
+        ("id_punto_legionella", "INTEGER"),
+        ("id_preventivo", "INTEGER"),
+        ("id_incidencia", "INTEGER"),
     ]
 
     for tabla in tablas:
@@ -183,6 +196,8 @@ def asegurar_tabla_contador_ot():
     conn.commit()
     conn.close()
 
+    _TABLA_CONTADOR_ASEGURADA = True
+
 
 def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
     asegurar_tabla_contador_ot()
@@ -257,6 +272,119 @@ def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
         return "EXT"
 
     return "INC"
+
+
+# =====================================================
+# VINCULACIÓN ORIGEN OT
+# =====================================================
+
+def vincular_origen_ot(
+    numero_ot,
+    origen_tabla=None,
+    origen_id=None,
+    id_punto_legionella=None,
+    id_preventivo=None,
+    id_incidencia=None,
+):
+    """
+    Vincula una OT con su origen real.
+    Permite que el Corazón del Sistema abra la OT sin depender de textos.
+    """
+
+    asegurar_columnas_observaciones_estado()
+
+    if not numero_ot:
+        return False
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET origen_tabla = ?,
+                origen_id = ?,
+                id_punto_legionella = ?,
+                id_preventivo = ?,
+                id_incidencia = ?
+            WHERE numero_ot = ?
+        """), (
+            origen_tabla,
+            origen_id,
+            id_punto_legionella,
+            id_preventivo,
+            id_incidencia,
+            numero_ot,
+        ))
+
+        conn.commit()
+        ok = True
+
+    except Exception:
+        ok = False
+
+    finally:
+        conn.close()
+
+    return ok
+
+
+def obtener_vinculacion_ot(numero_ot=None, id_orden=None):
+    """
+    Devuelve la vinculación de una OT, si existe.
+    """
+
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        if id_orden is not None:
+            cursor.execute(_sql("""
+                SELECT origen_tabla,
+                       origen_id,
+                       id_punto_legionella,
+                       id_preventivo,
+                       id_incidencia
+                FROM ordenes_trabajo
+                WHERE id = ?
+            """), (id_orden,))
+        else:
+            cursor.execute(_sql("""
+                SELECT origen_tabla,
+                       origen_id,
+                       id_punto_legionella,
+                       id_preventivo,
+                       id_incidencia
+                FROM ordenes_trabajo
+                WHERE numero_ot = ?
+            """), (numero_ot,))
+
+        fila = cursor.fetchone()
+
+    except Exception:
+        fila = None
+
+    finally:
+        conn.close()
+
+    if not fila:
+        return {
+            "origen_tabla": None,
+            "origen_id": None,
+            "id_punto_legionella": None,
+            "id_preventivo": None,
+            "id_incidencia": None,
+        }
+
+    return {
+        "origen_tabla": fila[0],
+        "origen_id": fila[1],
+        "id_punto_legionella": fila[2],
+        "id_preventivo": fila[3],
+        "id_incidencia": fila[4],
+    }
 
 
 # =====================================================
@@ -358,7 +486,6 @@ def crear_orden(datos):
     telefono_empresa = datos[17] if len(datos) > 17 else ""
     email_empresa = datos[18] if len(datos) > 18 else ""
 
-    # Formato nuevo completo
     if len(datos) > 27:
         fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
         fecha_realizacion = datos[20] if len(datos) > 20 else ""
@@ -370,7 +497,6 @@ def crear_orden(datos):
         coste_final = datos[26] if len(datos) > 26 else 0
         observaciones_estado = datos[27] if len(datos) > 27 else ""
     else:
-        # Compatibilidad con formato anterior
         fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
         fecha_realizacion = datos[20] if len(datos) > 20 else ""
         trabajo_a_realizar = ""
@@ -486,6 +612,8 @@ def crear_orden(datos):
         tipo_orden
     )
 
+    return numero_ot
+
 
 def obtener_ordenes():
     asegurar_columnas_observaciones_estado()
@@ -493,7 +621,6 @@ def obtener_ordenes():
     conn = conectar()
     cursor = conn.cursor()
 
-    # Devuelve 26 columnas para no romper ui/ui_ordenes.py actual
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
@@ -506,7 +633,6 @@ def obtener_ordenes():
     """)
 
     datos = cursor.fetchall()
-
     conn.close()
     return datos
 
@@ -517,7 +643,6 @@ def obtener_historico():
     conn = conectar()
     cursor = conn.cursor()
 
-    # Devuelve 28 columnas para no romper histórico actual
     cursor.execute("""
         SELECT id, numero_ot, descripcion, estado, fecha_creacion,
                centro, edificio, espacio, area, prioridad, operario, origen,
@@ -531,7 +656,6 @@ def obtener_historico():
     """)
 
     datos = cursor.fetchall()
-
     conn.close()
     return datos
 
@@ -550,7 +674,6 @@ def obtener_ordenes_operario(operario):
 
     centro = mapa_operario_centro.get(operario)
 
-    # Devuelve 26 columnas para no romper ui_operario / ui_ordenes
     if centro:
         cursor.execute(_sql("""
             SELECT id, numero_ot, descripcion, estado, fecha_creacion,
@@ -576,7 +699,6 @@ def obtener_ordenes_operario(operario):
         """)
 
     datos = cursor.fetchall()
-
     conn.close()
     return datos
 
@@ -598,7 +720,6 @@ def obtener_detalle_orden_externa(id_orden):
     """), (id_orden,))
 
     fila = cursor.fetchone()
-
     conn.close()
 
     if not fila:
@@ -726,7 +847,8 @@ def finalizar_orden(id_orden, observaciones=""):
                email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
                trabajo_a_realizar, trabajo_realizado, firma_operario,
                fecha_firma_operario, coste_estimado, coste_final,
-               observaciones_estado
+               observaciones_estado,
+               origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -742,7 +864,8 @@ def finalizar_orden(id_orden, observaciones=""):
             email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
             trabajo_a_realizar, trabajo_realizado, firma_operario,
             fecha_firma_operario, coste_estimado, coste_final,
-            observaciones_estado
+            observaciones_estado,
+            origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia
         ) = orden
 
         if tipo_orden == "Externa":
@@ -788,9 +911,14 @@ def finalizar_orden(id_orden, observaciones=""):
                 fecha_firma_operario,
                 coste_estimado,
                 coste_final,
-                observaciones_estado
+                observaciones_estado,
+                origen_tabla,
+                origen_id,
+                id_punto_legionella,
+                id_preventivo,
+                id_incidencia
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -821,8 +949,14 @@ def finalizar_orden(id_orden, observaciones=""):
             fecha_firma_operario,
             coste_estimado,
             coste_final,
-            observaciones_estado
+            observaciones_estado,
+            origen_tabla,
+            origen_id,
+            id_punto_legionella,
+            id_preventivo,
+            id_incidencia
         ))
+
         if registrar_historial_espacio is not None:
             try:
                 registrar_historial_espacio(
@@ -841,17 +975,12 @@ def finalizar_orden(id_orden, observaciones=""):
             except Exception:
                 pass
 
-        # =====================================================
-        # MOTOR INVENTARIO INTELIGENTE
-        # Si esta OT viene de inventario, liberamos el elemento
-        # =====================================================
         try:
             origen_txt = str(origen or "").upper()
             descripcion_txt = str(descripcion or "")
 
             if origen_txt == "INVENTARIO":
                 import re
-
                 match = re.search(r"OT origen:\s*INV-(\d+)", descripcion_txt)
 
                 if match:
@@ -943,7 +1072,7 @@ def crear_correctiva_desde_ot(
         f"{descripcion_defecto}"
     )
 
-    crear_orden((
+    numero_creado = crear_orden((
         numero_ot,
         descripcion,
         "Abierta",
@@ -974,7 +1103,9 @@ def crear_correctiva_desde_ot(
         ""
     ))
 
-    return True, f"Correctiva creada correctamente: {numero_ot}"
+    return True, f"Correctiva creada correctamente: {numero_creado or numero_ot}"
+
+
 # =====================================================
 # FOTOS OT
 # =====================================================
@@ -1060,7 +1191,6 @@ def obtener_fotos_ot(numero_ot):
     """), (numero_ot,))
 
     datos = cursor.fetchall()
-
     conn.close()
 
     return datos
