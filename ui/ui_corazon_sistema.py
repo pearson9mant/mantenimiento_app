@@ -5,6 +5,7 @@ from database.db import conectar, _sql
 from ui.ui_ot import mostrar_tarjeta_ot
 from modules.inventario import obtener_materiales_para_select
 
+
 def obtener_fila_ot_por_numero(numero_ot):
     conn = conectar()
     cur = conn.cursor()
@@ -16,7 +17,6 @@ def obtener_fila_ot_por_numero(numero_ot):
             WHERE numero_ot = ?
             LIMIT 1
         """), (numero_ot,))
-
         fila = cur.fetchone()
     except Exception:
         fila = None
@@ -24,6 +24,19 @@ def obtener_fila_ot_por_numero(numero_ot):
         conn.close()
 
     return fila
+
+
+def boton_abrir_ot(numero_ot, key_extra=""):
+    if not numero_ot:
+        return
+
+    if st.button(
+        "🔎 Abrir y trabajar esta OT",
+        key=f"abrir_corazon_{numero_ot}_{key_extra}",
+        use_container_width=True
+    ):
+        st.session_state["corazon_ot_abierta"] = numero_ot
+        st.rerun()
 
 
 def mostrar_corazon_sistema():
@@ -37,30 +50,31 @@ def mostrar_corazon_sistema():
 
     centro_motor = None if centro_sel == "Todos" else centro_sel
     panel = diagnosticar_corazon_sistema(centro=centro_motor)
+
     ot_abierta = st.session_state.get("corazon_ot_abierta")
 
     if ot_abierta:
         st.markdown("## 🛠 Trabajar OT desde el Corazón")
-    
+
         if st.button("⬅ Volver al Corazón", key="volver_corazon_desde_ot"):
             st.session_state.pop("corazon_ot_abierta", None)
             st.rerun()
-    
+
         fila_ot = obtener_fila_ot_por_numero(ot_abierta)
-    
+
         if not fila_ot:
             st.error("No se ha encontrado la OT seleccionada.")
             st.stop()
-    
+
         materiales_select = obtener_materiales_para_select()
-    
+
         mostrar_tarjeta_ot(
             fila=fila_ot,
             materiales_select=materiales_select,
             operario_sel=str(fila_ot[10] or ""),
             modo="corazon"
         )
-    
+
         st.stop()
 
     color = panel.get("color", "verde")
@@ -112,8 +126,17 @@ def mostrar_corazon_sistema():
             st.info(prioridad.get("accion", "Realizar actuación."))
 
             with st.expander("🧠 Ver motivos"):
-                for m in prioridad.get("motivos", []):
-                    st.markdown(f"• {m}")
+                motivos = prioridad.get("motivos", [])
+                if motivos:
+                    for m in motivos:
+                        st.markdown(f"• {m}")
+                else:
+                    st.caption(prioridad.get("motivo", ""))
+
+            boton_abrir_ot(
+                prioridad.get("numero_ot", ""),
+                key_extra="prioridad_hoy"
+            )
         else:
             st.success("No existen actuaciones prioritarias.")
 
@@ -148,11 +171,15 @@ def mostrar_corazon_sistema():
                             st.markdown(f"• **{tipo}:** {cantidad}")
 
                     with st.expander("Ver trabajos incluidos"):
-                        for t in tramo.get("trabajos", []):
+                        for j, t in enumerate(tramo.get("trabajos", []), start=1):
                             st.markdown(
                                 f"• **{t.get('numero_ot', '')}** · "
                                 f"{t.get('tipo_prioridad', '')} · "
                                 f"{t.get('titulo', '')}"
+                            )
+                            boton_abrir_ot(
+                                t.get("numero_ot", ""),
+                                key_extra=f"ruta_{i}_{j}"
                             )
 
     with tab2:
@@ -196,7 +223,7 @@ def mostrar_corazon_sistema():
         if not prioridades:
             st.success("No existen prioridades.")
         else:
-            for p in prioridades:
+            for i, p in enumerate(prioridades, start=1):
                 with st.expander(
                     f"{p.get('score', 0)}/100 · "
                     f"{p.get('tipo_prioridad', '-')} · "
@@ -223,6 +250,11 @@ def mostrar_corazon_sistema():
                         st.markdown("#### 🧠 Motivos")
                         for m in motivos:
                             st.markdown(f"• {m}")
+
+                    boton_abrir_ot(
+                        p.get("numero_ot", ""),
+                        key_extra=f"ranking_{i}"
+                    )
 
     with tab4:
         st.subheader("⚠️ Datos incompletos")
