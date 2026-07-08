@@ -1968,6 +1968,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     )
     
 def crear_tarea_legionella_manual(
+    punto_id,
     centro,
     edificio,
     instalacion,
@@ -1997,6 +1998,7 @@ def crear_tarea_legionella_manual(
     ejecutar("""
         INSERT INTO legionella_tareas
         (
+            punto_id,
             centro,
             edificio,
             instalacion,
@@ -2018,9 +2020,10 @@ def crear_tarea_legionella_manual(
         )
         VALUES
         (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?
         )
     """, (
+        int(punto_id),
         centro,
         edificio,
         instalacion,
@@ -2036,7 +2039,7 @@ def crear_tarea_legionella_manual(
         1 if generar_ot else 0,
         consigna_minima,
         controla_consigna,
-        "Tarea creada manualmente"
+        "Tarea especial creada manualmente"
     ))
 
 def asegurar_columnas_plano_legionella():
