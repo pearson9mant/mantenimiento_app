@@ -66,26 +66,39 @@ def mostrar_ejecucion_legionella_operario(
     if tarea_txt.lower() in ["sala acs completa", "control sala acs"]:
         tarea = "Control sala ACS"
 
+    # -------------------------------------------------
+    # Buscar punto Legionella de forma inteligente
+    # -------------------------------------------------
+    
     puntos_df = leer_df(
         """
         SELECT *
         FROM legionella_puntos
         WHERE centro = ?
-          AND edificio = ?
-          AND nombre_punto = ?
           AND activo = 1
         ORDER BY id DESC
         """,
-        (centro, edificio, punto_nombre),
+        (centro,),
     )
-
+    
+    if not puntos_df.empty:
+    
+        puntos_df = puntos_df[
+            puntos_df["nombre_punto"]
+            .fillna("")
+            .str.lower()
+            .str.strip()
+            == str(punto_nombre).lower().strip()
+        ]
+    
     if puntos_df.empty:
+    
         st.warning(
-            "No se ha encontrado el punto de Legionella asociado a esta OT. "
-            "Puedes revisar el punto en el módulo Legionella."
+            f"No se ha encontrado el punto '{punto_nombre}'."
         )
+    
         return False
-
+    
     punto = puntos_df.iloc[0].to_dict()
 
     st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
