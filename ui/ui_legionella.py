@@ -2020,9 +2020,9 @@ def crear_tarea_legionella_manual(
             observaciones,
             tipo_planificacion
         )
-        VALUES
+                VALUES
         (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, ?
         )
     """, (
         int(punto_id),
