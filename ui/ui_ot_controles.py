@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date
+from modules.ordenes import obtener_vinculacion_ot
 
 from modules.preventivo import (
     obtener_checklist_preventivo,
