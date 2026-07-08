@@ -1363,6 +1363,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
                 punto_nombre,
                 f"CORRECTIVO LEGIONELLA - {tarea} - {resultado}",
                 operario,
+                punto_id=punto_id,
             )
 
     return estado, resultado
