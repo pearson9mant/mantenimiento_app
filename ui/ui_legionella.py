@@ -3255,7 +3255,7 @@ def pantalla_legionella():
                     st.success("Punto creado correctamente.")
                     st.rerun()
 
-        with st.expander("📋 Crear tarea sobre un punto existente", expanded=False):
+        with st.expander("➕ Añadir tarea especial", expanded=False):
             puntos_tarea = obtener_puntos_legionella_admin()
 
             if puntos_tarea.empty:
