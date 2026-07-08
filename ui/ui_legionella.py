@@ -3594,7 +3594,7 @@ def pantalla_legionella():
                             nombre_edit,
                             ubicacion_edit,
                             numero_terminales_edit,
-                            ubicacion_exacta_edit,
+                            str(row.get("ubicacion_exacta", "") or ""),
                             observaciones_edit,
                             activo_edit,
                             plano_nombre,
