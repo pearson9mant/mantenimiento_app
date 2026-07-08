@@ -1,6 +1,9 @@
 import streamlit as st
 
 from modules.corazon_sistema import diagnosticar_corazon_sistema
+from database.db import conectar, _sql
+from ui.ui_ot import mostrar_tarjeta_ot
+from modules.inventario import obtener_materiales_para_select
 
 
 def mostrar_corazon_sistema():
