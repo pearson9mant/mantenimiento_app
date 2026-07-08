@@ -2022,7 +2022,7 @@ def crear_tarea_legionella_manual(
         )
         VALUES
         (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?,?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?
         )
     """, (
         int(punto_id),
@@ -2041,7 +2041,7 @@ def crear_tarea_legionella_manual(
         1 if generar_ot else 0,
         consigna_minima,
         controla_consigna,
-        "Tarea especial creada manualmente"
+        "Tarea especial creada manualmente",
         "Especial"
     ))
 
