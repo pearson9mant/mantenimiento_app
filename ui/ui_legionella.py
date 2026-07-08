@@ -2017,7 +2017,8 @@ def crear_tarea_legionella_manual(
             generar_ot,
             consigna_minima,
             controla_consigna,
-            observaciones
+            observaciones,
+            tipo_planificacion
         )
         VALUES
         (
@@ -2041,6 +2042,7 @@ def crear_tarea_legionella_manual(
         consigna_minima,
         controla_consigna,
         "Tarea especial creada manualmente"
+        "Especial"
     ))
 
 def asegurar_columnas_plano_legionella():
