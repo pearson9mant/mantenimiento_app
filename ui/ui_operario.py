@@ -518,9 +518,11 @@ def pantalla_operario():
         o for o in ordenes_operario
         if o[3] in ["Abierta", "En curso", "Pendiente material"]
     ]
-
+    
+    st.markdown("## 📋 Mis órdenes")
+    
     filtro_origen_operario = st.radio(
-        "Filtrar trabajos",
+        "",
         ["Todas", "Incidencias", "Preventivo", "Legionella", "☀️ Verano"],
         horizontal=True,
         key="filtro_origen_operario"
