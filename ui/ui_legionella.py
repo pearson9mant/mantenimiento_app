@@ -823,8 +823,6 @@ def sembrar_planificacion_legionella(fecha_inicio):
             
             if tarea in [
                 "Cloro residual",
-                "Revisión visual",
-                "Purga",
                 "Control AFS",
                 "Control ACS terminal",
                 "Control sala ACS",
