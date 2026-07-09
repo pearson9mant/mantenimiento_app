@@ -2019,13 +2019,13 @@ def crear_tarea_legionella_manual(
             tipo_planificacion,
             consigna_minima,
             controla_consigna,
-            observaciones,
-            tipo_planificacion
+            observaciones
         )
-               VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL,
-                    ?, ?, 1, 1, 'AUTOMATICA', ?, ?, ?
-                )
+        VALUES
+        (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL,
+            ?, ?, 1, ?, ?, ?, ?, ?
+        )
     """, (
         int(punto_id),
         centro,
@@ -2041,10 +2041,10 @@ def crear_tarea_legionella_manual(
         date.today().strftime("%Y-%m-%d"),
         operario,
         1 if generar_ot else 0,
+        "Especial",
         consigna_minima,
         controla_consigna,
         "Tarea especial creada manualmente",
-        "Especial"
     ))
 
 def asegurar_columnas_plano_legionella():
