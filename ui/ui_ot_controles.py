@@ -386,85 +386,16 @@ def mostrar_ejecucion_legionella_operario(
             )
 
     elif tarea == "Choque térmico":
-        tipo_control = "Choque térmico"
-        unidad = "ºC"
-
-        st.markdown("### 🔥 Procedimiento de choque térmico")
-
-        st.info(
-            "Registra la temperatura alcanzada y confirma los pasos básicos "
-            "antes de guardar el control."
+        resultado_procedimiento = mostrar_procedimiento_choque_termico(
+            id_orden=id_orden,
+            terminales=terminales
         )
 
-        aviso_realizado = st.checkbox(
-            "Dirección / usuarios avisados",
-            key=f"choque_aviso_{id_orden}"
-        )
-
-        instalacion_fuera_servicio = st.checkbox(
-            "Instalación controlada durante la actuación",
-            key=f"choque_fuera_servicio_{id_orden}"
-        )
-
-        valor = st.number_input(
-            "Temperatura máxima alcanzada en acumulador ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=70.0,
-            step=0.1,
-            key=f"choque_temp_acum_{id_orden}"
-        )
-
-        valor_2 = st.number_input(
-            "Temperatura máxima alcanzada en terminal ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=65.0,
-            step=0.1,
-            key=f"choque_temp_terminal_{id_orden}"
-        )
-
-        tiempo_mantenimiento = st.number_input(
-            "Tiempo mantenido por encima de consigna (minutos)",
-            min_value=0,
-            max_value=240,
-            value=30,
-            step=5,
-            key=f"choque_tiempo_{id_orden}"
-        )
-
-        terminales_purgados = st.number_input(
-            "Terminales purgados",
-            min_value=0,
-            max_value=terminales,
-            value=terminales,
-            step=1,
-            key=f"choque_terminales_{id_orden}"
-        )
-
-        purga_realizada = terminales_purgados >= terminales
-        revision_visual_ok = st.checkbox(
-            "Sin incidencias visibles durante la actuación",
-            key=f"choque_revision_{id_orden}"
-        )
-
-        if valor < 70:
-            st.error("La temperatura del acumulador no alcanza 70 ºC.")
-
-        if terminales_purgados < terminales:
-            st.warning(
-                f"Solo se han purgado {terminales_purgados} de {terminales} terminales."
-            )
-
-        checklist_choque = [
-            "Aviso realizado: Sí" if aviso_realizado else "Aviso realizado: No",
-            "Instalación controlada: Sí" if instalacion_fuera_servicio else "Instalación controlada: No",
-            f"Temperatura acumulador: {valor} ºC",
-            f"Temperatura terminal: {valor_2} ºC",
-            f"Tiempo mantenimiento: {tiempo_mantenimiento} min",
-            f"Terminales purgados: {terminales_purgados}/{terminales}",
-            "Sin incidencias visibles: Sí" if revision_visual_ok else "Sin incidencias visibles: No",
-        ]
+        tipo_control = resultado_procedimiento["tipo_control"]
+        unidad = resultado_procedimiento["unidad"]
+        valor = resultado_procedimiento["valor"]
+        valor_2 = resultado_procedimiento["valor_2"]
+        valor_3 = resultado_procedimiento["valor_3"]
 
     elif tarea == "Revisión visual":
         tipo_control = "Revisión visual"
