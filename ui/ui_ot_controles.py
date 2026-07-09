@@ -152,296 +152,54 @@ def mostrar_ejecucion_legionella_operario(
     if terminales > 1:
         st.info(f"🚿 Terminales incluidos en este punto: {terminales}")
 
-    valor = None
-    valor_2 = None
-    valor_3 = None
-    unidad = ""
-    tipo_control = tarea
+        resultado_procedimiento = None
 
-    purga_realizada = False
-    aireador_limpio = False
-    revision_visual_ok = False
-    terminales_revisados = terminales
-
-    if tarea == "Temperatura acumulador":
-        tipo_control = "Temperatura acumulador"
-        unidad = "ºC"
-        valor = st.number_input(
-            "Temperatura acumulador ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=60.0,
-            step=0.1,
-            key=f"leg_valor_{id_orden}"
-        )
-
-    elif tarea == "Control sala ACS":
-        tipo_control = "Control sala ACS"
-        unidad = "ºC"
-
-        st.info("Control conjunto de sala ACS: acumulador, impulsión y retorno.")
-
-        valor = st.number_input(
-            "Temperatura acumulador ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=60.0,
-            step=0.1,
-            key=f"leg_acum_{id_orden}"
-        )
-
-        valor_2 = st.number_input(
-            "Temperatura impulsión ACS ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=50.0,
-            step=0.1,
-            key=f"leg_impulsion_{id_orden}"
-        )
-
-        valor_3 = st.number_input(
-            "Temperatura retorno ACS ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=50.0,
-            step=0.1,
-            key=f"leg_retorno_{id_orden}"
-        )
-
-    elif tarea == "Temperatura retorno":
-        tipo_control = "Temperatura retorno"
-        unidad = "ºC"
-        valor = st.number_input(
-            "Temperatura retorno ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=50.0,
-            step=0.1,
-            key=f"leg_valor_{id_orden}"
-        )
-
-    elif tarea == "Temperatura punto terminal":
-        tipo_control = "Temperatura punto terminal"
-        unidad = "ºC"
-        valor = st.number_input(
-            "Temperatura punto terminal ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=45.0,
-            step=0.1,
-            key=f"leg_valor_{id_orden}"
-        )
-
-    elif tarea == "Cloro residual":
-        tipo_control = "Cloro residual"
-        unidad = "mg/L"
-        valor = st.number_input(
-            "Cloro residual libre mg/L",
-            min_value=0.0,
-            max_value=5.0,
-            value=0.5,
-            step=0.01,
-            key=f"leg_valor_{id_orden}"
-        )
-
-    elif tarea == "Control AFS":
-        tipo_control = "Control AFS"
-        unidad = "ºC / mg/L"
-
-        valor = st.number_input(
-            "Temperatura AFS ºC",
-            min_value=0.0,
-            max_value=50.0,
-            value=18.0,
-            step=0.1,
-            key=f"leg_temp_afs_{id_orden}"
-        )
-
-        valor_2 = st.number_input(
-            "Cloro residual libre mg/L",
-            min_value=0.0,
-            max_value=5.0,
-            value=0.5,
-            step=0.01,
-            key=f"leg_cloro_afs_{id_orden}"
-        )
-
-        purga_realizada = st.checkbox(
-            "Purga realizada",
-            key=f"leg_purga_afs_{id_orden}"
-        )
-
-        aireador_limpio = st.checkbox(
-            "Aireador limpio/desinfectado",
-            key=f"leg_aireador_afs_{id_orden}"
-        )
-
-        revision_visual_ok = st.checkbox(
-            "Revisión visual correcta",
-            key=f"leg_revision_afs_{id_orden}"
-        )
-
-        terminales_revisados = st.number_input(
-            "Terminales revisados",
-            min_value=0,
-            max_value=terminales,
-            value=terminales,
-            step=1,
-            key=f"terminales_rev_afs_{id_orden}"
-        )
-
-        if terminales_revisados < terminales:
-            st.warning(
-                f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
-            )
-
-    elif tarea == "Control ACS terminal":
-        tipo_control = "Control ACS terminal"
-        unidad = "ºC"
-
-        valor = st.number_input(
-            "Temperatura ACS terminal ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=50.0,
-            step=0.1,
-            key=f"leg_temp_acs_{id_orden}"
-        )
-
-        purga_realizada = st.checkbox(
-            "Purga realizada",
-            key=f"leg_purga_acs_{id_orden}"
-        )
-
-        aireador_limpio = st.checkbox(
-            "Aireador limpio/desinfectado",
-            key=f"leg_aireador_acs_{id_orden}"
-        )
-
-        revision_visual_ok = st.checkbox(
-            "Revisión visual correcta",
-            key=f"leg_revision_acs_{id_orden}"
-        )
-
-        terminales_revisados = st.number_input(
-            "Terminales revisados",
-            min_value=0,
-            max_value=terminales,
-            value=terminales,
-            step=1,
-            key=f"terminales_rev_acs_{id_orden}"
-        )
-
-        if terminales_revisados < terminales:
-            st.warning(
-                f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
-            )
-
-    elif tarea == "Control punto terminal completo":
-        tipo_control = "Control punto terminal completo"
-        unidad = "Control completo"
-
-        valor = st.number_input(
-            "Temperatura AFS ºC",
-            min_value=0.0,
-            max_value=50.0,
-            value=18.0,
-            step=0.1,
-            key=f"leg_temp_afs_completo_{id_orden}"
-        )
-
-        valor_2 = st.number_input(
-            "Cloro residual libre mg/L",
-            min_value=0.0,
-            max_value=5.0,
-            value=0.5,
-            step=0.01,
-            key=f"leg_cloro_completo_{id_orden}"
-        )
-
-        valor_3 = st.number_input(
-            "Temperatura ACS terminal ºC",
-            min_value=0.0,
-            max_value=100.0,
-            value=50.0,
-            step=0.1,
-            key=f"leg_temp_acs_completo_{id_orden}"
-        )
-
-        purga_realizada = st.checkbox(
-            "Purga realizada",
-            key=f"leg_purga_completo_{id_orden}"
-        )
-
-        aireador_limpio = st.checkbox(
-            "Aireador limpio/desinfectado",
-            key=f"leg_aireador_completo_{id_orden}"
-        )
-
-        revision_visual_ok = st.checkbox(
-            "Revisión visual correcta",
-            key=f"leg_revision_completo_{id_orden}"
-        )
-
-        terminales_revisados = st.number_input(
-            "Terminales revisados",
-            min_value=0,
-            max_value=terminales,
-            value=terminales,
-            step=1,
-            key=f"terminales_rev_completo_{id_orden}"
-        )
-
-        if terminales_revisados < terminales:
-            st.warning(
-                f"Solo se han revisado {terminales_revisados} de {terminales} terminales"
-            )
-
-    elif tarea == "Choque térmico":
-        resultado_procedimiento = mostrar_procedimiento_choque_termico(
-            id_orden=id_orden,
-            terminales=terminales
-        )
-
+        if tarea == "Control sala ACS":
+            resultado_procedimiento = mostrar_control_sala_acs(id_orden)
+    
+        elif tarea in [
+            "Temperatura acumulador",
+            "Temperatura retorno",
+            "Temperatura punto terminal",
+            "Temperatura impulsión ACS",
+        ]:
+            resultado_procedimiento = mostrar_temperatura_simple(id_orden, tarea)
+    
+        elif tarea == "Cloro residual":
+            resultado_procedimiento = mostrar_cloro_residual(id_orden)
+    
+        elif tarea == "Control AFS":
+            resultado_procedimiento = mostrar_control_afs(id_orden, terminales)
+    
+        elif tarea == "Control ACS terminal":
+            resultado_procedimiento = mostrar_control_acs_terminal(id_orden, terminales)
+    
+        elif tarea == "Control punto terminal completo":
+            resultado_procedimiento = mostrar_control_terminal_completo(id_orden, terminales)
+    
+        elif tarea == "Choque térmico":
+            resultado_procedimiento = mostrar_procedimiento_choque_termico(id_orden, terminales)
+    
+        elif tarea == "Revisión visual":
+            resultado_procedimiento = mostrar_revision_visual(id_orden)
+    
+        elif tarea == "Purga":
+            resultado_procedimiento = mostrar_purga(id_orden)
+    
+        elif tarea in [
+            "Limpieza y desinfección acumulador",
+            "Limpieza y desinfección depósito AFCH",
+        ]:
+            resultado_procedimiento = mostrar_limpieza_desinfeccion(id_orden, tarea)
+    
+        else:
+            resultado_procedimiento = mostrar_control_generico(id_orden, tarea)
+    
         tipo_control = resultado_procedimiento["tipo_control"]
         unidad = resultado_procedimiento["unidad"]
         valor = resultado_procedimiento["valor"]
         valor_2 = resultado_procedimiento["valor_2"]
         valor_3 = resultado_procedimiento["valor_3"]
-
-    elif tarea == "Revisión visual":
-        tipo_control = "Revisión visual"
-        unidad = "OK/KO"
-        correcto = st.radio(
-            "Resultado revisión visual",
-            ["Correcto", "Deficiente"],
-            horizontal=True,
-            key=f"leg_revision_{id_orden}"
-        )
-        valor = 1 if correcto == "Correcto" else 0
-
-    elif tarea == "Purga":
-        tipo_control = "Purga"
-        unidad = "Sí/No"
-        purga = st.radio(
-            "Purga realizada",
-            ["Sí", "No"],
-            horizontal=True,
-            key=f"leg_purga_{id_orden}"
-        )
-        valor = 1 if purga == "Sí" else 0
-
-    else:
-        tipo_control = tarea
-        unidad = ""
-        valor = st.number_input(
-            "Valor del control",
-            min_value=0.0,
-            max_value=999.0,
-            value=0.0,
-            step=0.1,
-            key=f"leg_valor_{id_orden}"
-        )
 
     fecha_control = st.date_input(
         "Fecha del control",
@@ -467,13 +225,18 @@ def mostrar_ejecucion_legionella_operario(
     ):
         observaciones_finales = observaciones_leg or ""
 
-        if tarea == "Control sala ACS":
+        if not resultado_procedimiento.get("valido", True):
+            for error in resultado_procedimiento.get("errores", []):
+                st.error(error)
+            return False
+
+        obs_extra = resultado_procedimiento.get("observaciones_extra", "")
+
+        if obs_extra:
             observaciones_finales = (
                 observaciones_finales
-                + f"\nControl sala ACS: "
-                + f"Acumulador: {valor} ºC | "
-                + f"Impulsión: {valor_2} ºC | "
-                + f"Retorno: {valor_3} ºC"
+                + "\n"
+                + obs_extra
             ).strip()
 
         if tarea == "Choque térmico":
