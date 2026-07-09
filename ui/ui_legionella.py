@@ -2016,15 +2016,16 @@ def crear_tarea_legionella_manual(
             operario,
             activo,
             generar_ot,
+            tipo_planificacion,
             consigna_minima,
             controla_consigna,
             observaciones,
             tipo_planificacion
         )
-                VALUES
-        (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, ?
-        )
+               VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL,
+                    ?, ?, 1, 1, 'AUTOMATICA', ?, ?, ?
+                )
     """, (
         int(punto_id),
         centro,
