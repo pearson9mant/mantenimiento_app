@@ -554,7 +554,7 @@ def pantalla_operario():
         st.success("No tienes órdenes pendientes.")
 
     else:
-        st.markdown("## ⚡ Trabajo rápido")
+        st.markdown("## 📋 Mis órdenes")
 
         for fila in ordenes_operario:
             mostrar_tarjeta_ot(
