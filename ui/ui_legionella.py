@@ -2980,17 +2980,6 @@ def pantalla_legionella():
                 lambda x: calcular_estado_control(x) if pd.notna(x) else "Sin fecha"
             )
 
-            total = len(df_plan)
-            toca = len(df_plan[df_plan["estado_control"] == "🔴 TOCA"])
-            proximo = len(df_plan[df_plan["estado_control"] == "🟠 PRÓXIMO"])
-            ok = len(df_plan[df_plan["estado_control"] == "🟢 OK"])
-
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Planificados", total)
-            c2.metric("🔴 Toca", toca)
-            c3.metric("🟠 Próximo", proximo)
-            c4.metric("🟢 OK", ok)
-
             centro_f = st.selectbox(
                 "Filtrar centro planificación",
                 ["Todos"] + sorted(df_plan["centro"].dropna().unique().tolist()),
@@ -3001,6 +2990,16 @@ def pantalla_legionella():
 
             if centro_f != "Todos":
                 df_filtrado = df_filtrado[df_filtrado["centro"] == centro_f]
+            total = len(df_filtrado)
+            toca = len(df_filtrado[df_filtrado["estado_control"] == "🔴 TOCA"])
+            proximo = len(df_filtrado[df_filtrado["estado_control"] == "🟠 PRÓXIMO"])
+            ok = len(df_filtrado[df_filtrado["estado_control"] == "🟢 OK"])
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Planificados", total)
+            c2.metric("🔴 Toca", toca)
+            c3.metric("🟠 Próximo", proximo)
+            c4.metric("🟢 OK", ok)
 
             st.markdown("### Controles planificados")
 
