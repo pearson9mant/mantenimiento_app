@@ -185,7 +185,10 @@ def mostrar_ejecucion_legionella_operario(
         resultado_procedimiento = mostrar_revision_visual(id_orden)
 
     elif tarea == "Purga":
-        resultado_procedimiento = mostrar_purga(id_orden)
+        resultado_procedimiento = mostrar_purga(
+            id_orden,
+            punto
+        )
 
     elif tarea in [
         "Limpieza y desinfección acumulador",
