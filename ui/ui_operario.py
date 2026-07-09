@@ -512,17 +512,6 @@ def pantalla_operario():
         operario_sel=operario_sel
     )
 
-    st.markdown("### 📈 Mi resumen")
-
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Mis OT", kpis["total"])
-    k2.metric("✅ Hechas hoy", kpis["hechas"])
-    k3.metric("🔄 En curso", kpis["en_proceso"])
-    k4.metric("⏳ Pendientes", kpis["faltan"])
-    k5.metric("📈 Rendimiento hoy", f'{kpis["rendimiento"]}%')
-
-    st.markdown("---")
-
     materiales_select = obtener_materiales_para_select()
 
     ordenes_operario = [
