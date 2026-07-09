@@ -77,8 +77,6 @@ def mostrar_ejecucion_legionella_operario(
 
     tarea_txt = str(tarea or "").strip()
 
-    if tarea_txt.lower() in ["sala acs completa", "control sala acs"]:
-        tarea = "Control sala ACS"
 
     # -------------------------------------------------
     # Buscar punto Legionella de forma segura
