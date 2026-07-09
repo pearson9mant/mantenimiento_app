@@ -505,24 +505,17 @@ def mostrar_ejecucion_legionella_operario(
             ).strip()
 
         if tarea == "Choque térmico":
-            if not aviso_realizado:
-                st.error("Falta confirmar que dirección / usuarios han sido avisados.")
-                return False
 
-            if not instalacion_fuera_servicio:
-                st.error("Falta confirmar que la instalación está controlada.")
+            if not resultado_procedimiento["valido"]:
+                for error in resultado_procedimiento["errores"]:
+                    st.error(error)
                 return False
-
-            if valor < 70:
-                st.error("No se puede guardar como choque térmico correcto: acumulador inferior a 70 ºC.")
-                return False
-
-            if terminales_purgados < terminales:
-                st.error("No se puede cerrar: faltan terminales por purgar.")
-                return False
-
-            if not revision_visual_ok:
-                st.warning("Se guardará el choque térmico con incidencia visible registrada.")
+        
+            observaciones_finales = (
+                observaciones_finales
+                + "\n"
+                + resultado_procedimiento["observaciones_extra"]
+            ).strip()
 
         estado, resultado = registrar_control(
             fecha_control.strftime("%Y-%m-%d"),
