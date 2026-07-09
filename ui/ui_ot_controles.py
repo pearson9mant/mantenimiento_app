@@ -532,6 +532,13 @@ def mostrar_ejecucion_legionella_operario(
                 + f"Retorno: {valor_3} ºC"
             ).strip()
 
+        if tarea == "Choque térmico":
+            observaciones_finales = (
+                observaciones_finales
+                + "\nProcedimiento choque térmico: "
+                + " | ".join(checklist_choque)
+            ).strip()
+
         if tarea in [
             "Control AFS",
             "Control ACS terminal",
