@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 from modules.ordenes import obtener_vinculacion_ot
+from ui.procedimientos_legionella import mostrar_procedimiento_choque_termico
 
 from modules.preventivo import (
     obtener_checklist_preventivo,
