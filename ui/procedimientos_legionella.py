@@ -174,16 +174,103 @@ def mostrar_revision_visual(id_orden):
     return _base("Revisión visual", "OK/KO", valor)
 
 
-def mostrar_purga(id_orden):
-    purga = st.radio(
-        "Purga realizada",
-        ["Sí", "No"],
-        horizontal=True,
-        key=f"leg_purga_{id_orden}"
+def mostrar_purga(id_orden, punto):
+    st.markdown("### 🚰 Procedimiento de purga")
+
+    tipo_punto = str(punto.get("tipo_punto", "") or "").lower()
+    instalacion = str(punto.get("instalacion", "") or "").upper()
+
+    purga_realizada = st.checkbox(
+        "☑ Purga realizada",
+        key=f"purga_realizada_{id_orden}"
     )
 
-    valor = 1 if purga == "Sí" else 0
-    return _base("Purga", "Sí/No", valor)
+    agua_transparente = st.checkbox(
+        "☑ Agua transparente",
+        value=True,
+        key=f"purga_agua_{id_orden}"
+    )
+
+    valor = None
+    unidad = ""
+
+    # ------------------------------------------------
+    # ACS
+    # ------------------------------------------------
+
+    if "acs" in instalacion or tipo_punto in [
+        "acumulador",
+        "acumulador_solar",
+        "deposito",
+        "deposito_solar"
+    ]:
+
+        unidad = "ºC"
+
+        valor = st.number_input(
+            "🌡 Temperatura alcanzada",
+            min_value=0.0,
+            max_value=100.0,
+            value=55.0,
+            step=0.1,
+            key=f"purga_temp_{id_orden}"
+        )
+
+    # ------------------------------------------------
+    # AFCH
+    # ------------------------------------------------
+
+    else:
+
+        unidad = "mg/L"
+
+        valor = st.number_input(
+            "🧪 Cloro residual",
+            min_value=0.0,
+            max_value=5.0,
+            value=0.5,
+            step=0.01,
+            key=f"purga_cloro_{id_orden}"
+        )
+
+    observaciones = st.text_area(
+        "📝 Observaciones",
+        key=f"purga_obs_{id_orden}"
+    )
+
+    foto = st.file_uploader(
+        "📷 Foto opcional",
+        type=["jpg", "jpeg", "png"],
+        key=f"purga_foto_{id_orden}"
+    )
+
+    errores = []
+
+    if not purga_realizada:
+        errores.append("Debe confirmar que la purga se ha realizado.")
+
+    if not agua_transparente:
+        errores.append("El agua no es transparente.")
+
+    observaciones_extra = (
+        f"Purga realizada: {'Sí' if purga_realizada else 'No'} | "
+        f"Agua transparente: {'Sí' if agua_transparente else 'No'}"
+    )
+
+    if observaciones:
+        observaciones_extra += f" | {observaciones}"
+
+    return {
+        "tipo_control": "Purga",
+        "unidad": unidad,
+        "valor": valor,
+        "valor_2": None,
+        "valor_3": None,
+        "foto": foto,
+        "observaciones_extra": observaciones_extra,
+        "valido": len(errores) == 0,
+        "errores": errores,
+    }
 
 
 def mostrar_procedimiento_choque_termico(id_orden, terminales):
