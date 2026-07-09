@@ -1,7 +1,19 @@
 import streamlit as st
 from datetime import date
 from modules.ordenes import obtener_vinculacion_ot
-from ui.procedimientos_legionella import mostrar_procedimiento_choque_termico
+from ui.procedimientos_legionella import (
+    mostrar_control_sala_acs,
+    mostrar_temperatura_simple,
+    mostrar_cloro_residual,
+    mostrar_control_afs,
+    mostrar_control_acs_terminal,
+    mostrar_control_terminal_completo,
+    mostrar_revision_visual,
+    mostrar_purga,
+    mostrar_procedimiento_choque_termico,
+    mostrar_limpieza_desinfeccion,
+    mostrar_control_generico,
+)
 
 from modules.preventivo import (
     obtener_checklist_preventivo,
