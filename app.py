@@ -38,6 +38,10 @@ from ui.ui_recordatorios import (
 from ui.ui_pedidos_material import ui_pedidos_material
 from ui.ui_manual_app import pantalla_manual_app
 from ui.ui_panel_legionella import pantalla_panel_legionella
+from ui.ui_operario import (
+    pantalla_operario,
+    pantalla_operario_prueba,
+)
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
@@ -946,7 +950,7 @@ else:
         pantalla_operario()
 
     elif seccion == "Órdenes":
-        pantalla_operario()
+        pantalla_operario_prueba()
         
     elif seccion == "Inventario espacios":
         pantalla_colegio(modo="inventario")
