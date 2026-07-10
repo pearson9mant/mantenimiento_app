@@ -574,7 +574,15 @@ def pantalla_operario():
 
     st.markdown("---")
 
-    with st.expander("📁 Mi histórico", expanded=False):
+    abrir_historico = st.session_state.pop(
+        "abrir_historico_operario",
+        False
+    )
+    
+    with st.expander(
+        "📁 Mi histórico",
+        expanded=abrir_historico
+    ):
 
         if not historico_operario:
             st.info("No hay trabajos finalizados todavía.")
