@@ -651,7 +651,7 @@ def mostrar_menu_operario():
 # OPERARIOS
 # ===========================
 st.markdown(
-    f"<div class='info-user'>Operario: {operario}</div>",
+    f"<div class='info-user'>Operario: {st.session_state.get('operario_activo', st.session_state.get('usuario', 'Operario'))}</div>",
     unsafe_allow_html=True
 )
 
