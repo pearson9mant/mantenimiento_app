@@ -927,3 +927,51 @@ def pantalla_operario(modo="ordenes"):
                         f"📷 No se pudieron cargar "
                         f"las fotos: {e}"
                     )
+
+def pantalla_operario_prueba():
+    st.title("📋 Mis órdenes")
+    
+    operario_sel = str(
+        st.session_state.get("operario_activo", "")
+        or ""
+    ).strip()
+
+    if not operario_sel:
+        st.warning("No hay operario seleccionado.")
+        return
+
+    st.info(f"Operario: {operario_sel}")
+
+    try:
+        ordenes = obtener_ordenes_operario(operario_sel)
+    except Exception as e:
+        st.error("Error consultando las órdenes.")
+        st.exception(e)
+        return
+
+    ordenes = filtrar_seguridad_operario(
+        ordenes,
+        operario_sel
+    )
+
+    ordenes = [
+        o for o in ordenes
+        if len(o) > 3
+        and str(o[3] or "").strip()
+        in ["Abierta", "En curso", "Pendiente material"]
+    ]
+
+    st.success(
+        f"Consulta correcta. Órdenes encontradas: {len(ordenes)}"
+    )
+
+    for fila in ordenes[:10]:
+        try:
+            st.markdown(
+                f"**{fila[1]}** · {fila[3]}  \n"
+                f"{fila[5]} · {fila[6]} · {fila[7]}  \n"
+                f"{fila[2]}"
+            )
+            st.markdown("---")
+        except Exception:
+            continue
