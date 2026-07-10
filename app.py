@@ -939,7 +939,7 @@ else:
         ui_pedidos_material()
 
     elif seccion == "Histórico":
-    pantalla_operario(modo="historico")
+        pantalla_operario(modo="historico")
 
     # -----------------------------------------------------
     # PERFIL INVENTARIO
