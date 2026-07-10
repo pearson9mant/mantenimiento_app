@@ -15,6 +15,7 @@ from modules.inventario_aulas import (
     guardar_o_actualizar_espacio,
     guardar_foto_espacio,
     eliminar_inventario_espacio,
+    eliminar_elemento_inventario_espacio,
     guardar_correctivo_inventario,
     limpiar_correctivo_inventario,
     clonar_inventario_espacio,
@@ -370,6 +371,9 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
         st.info("Este espacio todavía no tiene inventario.")
         return
 
+    perfil = str(st.session_state.get("perfil", "") or "").strip().lower()
+    es_admin = perfil in ["admin", "administracion", "administración"]
+
     for item in inventario:
         (
             id_inv,
@@ -395,7 +399,9 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             coste_estimado,
             *extra
         ) = item
+
         cantidad_afectada = 0
+
         if extra:
             try:
                 cantidad_afectada = int(extra[0] or 0)
@@ -409,15 +415,28 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
             texto_afectado = f" · {cantidad_afectada} afectado(s)"
 
         with st.expander(
-            f"{icono} {elemento or '-'} · {cantidad or 0} uds{texto_afectado} · {estado_inv or '-'}",
+            f"{icono} {elemento or '-'} · {cantidad or 0} uds"
+            f"{texto_afectado} · {estado_inv or '-'}",
             expanded=False
         ):
-            st.caption(f"Revisado por {operario or '-'} · {fecha_revision or '-'}")
+            st.caption(
+                f"Revisado por {operario or '-'} · "
+                f"{fecha_revision or '-'}"
+            )
 
             if numero_ot_correctiva:
-                st.warning(f"🟠 OT correctiva asociada: {numero_ot_correctiva}")
+                st.warning(
+                    f"🟠 OT correctiva asociada: "
+                    f"{numero_ot_correctiva}"
+                )
 
-            opciones_estado = ["Correcto", "Regular", "Dañado", "Falta", "Retirar"]
+            opciones_estado = [
+                "Correcto",
+                "Regular",
+                "Dañado",
+                "Falta",
+                "Retirar"
+            ]
 
             c1, c2 = st.columns(2)
 
@@ -429,6 +448,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     value=int(cantidad or 0),
                     key=f"edit_cantidad_{clave_base}_{id_inv}"
                 )
+
                 nueva_cantidad_afectada = st.number_input(
                     "Cantidad afectada",
                     min_value=0,
@@ -442,7 +462,11 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 )
 
             with c2:
-                estado_actual = estado_inv if estado_inv in opciones_estado else "Correcto"
+                estado_actual = (
+                    estado_inv
+                    if estado_inv in opciones_estado
+                    else "Correcto"
+                )
 
                 nuevo_estado = st.selectbox(
                     "Estado",
@@ -467,6 +491,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
 
             if nueva_foto is not None:
                 st.image(nueva_foto, width=180)
+
                 foto_final = guardar_foto_espacio(
                     nueva_foto,
                     centro,
@@ -474,23 +499,37 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     espacio,
                     elemento
                 )
+
             elif foto:
                 try:
                     st.image(foto, width=220)
                 except Exception:
                     st.caption("Foto no disponible.")
 
-            if st.button(
-                "💾 Guardar cambios",
-                key=f"guardar_edit_inv_{clave_base}_{id_inv}",
-                use_container_width=True
-            ):
+            col_guardar, col_borrar = st.columns(2)
+
+            with col_guardar:
+                guardar_cambios = st.button(
+                    "💾 Guardar cambios",
+                    key=f"guardar_edit_inv_{clave_base}_{id_inv}",
+                    use_container_width=True
+                )
+
+            with col_borrar:
+                solicitar_borrado = st.button(
+                    "🗑️ Eliminar elemento",
+                    key=f"solicitar_borrar_inv_{clave_base}_{id_inv}",
+                    use_container_width=True
+                )
+
+            if guardar_cambios:
                 if numero_ot_correctiva and nuevo_estado == "Correcto":
                     st.warning(
                         "No puedes marcar este elemento como Correcto "
                         "mientras tenga una OT correctiva asociada."
                     )
                     st.stop()
+
                 ok = guardar_o_actualizar_espacio(
                     centro=centro,
                     edificio=edificio,
@@ -505,7 +544,10 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     unidad=unidad or "cm",
                     observaciones=nuevas_obs,
                     foto=foto_final,
-                    operario=st.session_state.get("operario_activo", ""),
+                    operario=st.session_state.get(
+                        "operario_activo",
+                        ""
+                    ),
                 )
 
                 if ok:
@@ -514,129 +556,255 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 else:
                     st.error("No se pudo actualizar el elemento.")
 
-            st.markdown("---")
-            st.markdown("### 🏷️ Ficha técnica del activo")
-
-            datos_activo = _obtener_datos_activo(id_inv)
-
-            try:
-                vida_util_valor = int(datos_activo["vida_util_anios"] or 0)
-            except Exception:
-                vida_util_valor = 0
-
-            try:
-                coste_estimado_valor = float(datos_activo["coste_estimado"] or 0)
-            except Exception:
-                coste_estimado_valor = 0.0
-
-            t1, t2 = st.columns(2)
-
-            with t1:
-                fabricante_nuevo = st.text_input(
-                    "Fabricante",
-                    value=str(datos_activo["fabricante"] or ""),
-                    key=f"activo_fabricante_{clave_base}_{id_inv}"
-                )
-
-                modelo_nuevo = st.text_input(
-                    "Modelo",
-                    value=str(datos_activo["modelo"] or ""),
-                    key=f"activo_modelo_{clave_base}_{id_inv}"
-                )
-
-                numero_serie_nuevo = st.text_input(
-                    "Nº de serie",
-                    value=str(datos_activo["numero_serie"] or ""),
-                    key=f"activo_serie_{clave_base}_{id_inv}"
-                )
-
-            with t2:
-                proveedor_nuevo = st.text_input(
-                    "Proveedor",
-                    value=str(datos_activo["proveedor"] or ""),
-                    key=f"activo_proveedor_{clave_base}_{id_inv}"
-                )
-
-                fecha_instalacion_nueva = st.text_input(
-                    "Fecha instalación",
-                    value=str(datos_activo["fecha_instalacion"] or ""),
-                    placeholder="AAAA-MM-DD",
-                    key=f"activo_fecha_inst_{clave_base}_{id_inv}"
-                )
-
-                vida_util_nueva = st.number_input(
-                    "Vida útil estimada (años)",
-                    min_value=0,
-                    step=1,
-                    value=vida_util_valor,
-                    key=f"activo_vida_{clave_base}_{id_inv}"
-                )
-
-            coste_estimado_nuevo = st.number_input(
-                "Coste estimado (€)",
-                min_value=0.0,
-                step=1.0,
-                value=coste_estimado_valor,
-                key=f"activo_coste_{clave_base}_{id_inv}"
+            key_confirmar_borrado = (
+                f"confirmar_borrar_elemento_{clave_base}_{id_inv}"
             )
 
-            if st.button(
-                "💾 Guardar ficha técnica",
-                key=f"guardar_ficha_tecnica_{clave_base}_{id_inv}",
-                use_container_width=True
-            ):
-                ok_activo = guardar_o_actualizar_activo(
-                    id_inventario=id_inv,
-                    centro=centro,
-                    edificio=edificio,
-                    espacio=espacio,
-                    elemento=elemento,
-                    fabricante=fabricante_nuevo,
-                    modelo=modelo_nuevo,
-                    numero_serie=numero_serie_nuevo,
-                    fecha_instalacion=fecha_instalacion_nueva,
-                    proveedor=proveedor_nuevo,
-                    vida_util_anios=vida_util_nueva,
-                    coste_estimado=coste_estimado_nuevo,
+            if solicitar_borrado:
+                st.session_state[key_confirmar_borrado] = True
+                st.rerun()
+
+            if st.session_state.get(key_confirmar_borrado, False):
+                st.warning(
+                    f"¿Seguro que quieres eliminar '{elemento}' del "
+                    "inventario de este espacio?"
                 )
 
-                if ok_activo:
-                    st.success("Ficha técnica actualizada correctamente.")
+                if numero_ot_correctiva:
+                    st.error(
+                        "Este elemento tiene una OT correctiva asociada. "
+                        "Finaliza o desvincula primero la OT para conservar "
+                        "la trazabilidad."
+                    )
+
+                col_confirmar, col_cancelar = st.columns(2)
+
+                with col_confirmar:
+                    confirmar_borrado = st.button(
+                        "✅ Sí, eliminar",
+                        key=f"confirmar_borrar_inv_{clave_base}_{id_inv}",
+                        use_container_width=True,
+                        disabled=bool(numero_ot_correctiva)
+                    )
+
+                with col_cancelar:
+                    cancelar_borrado = st.button(
+                        "Cancelar",
+                        key=f"cancelar_borrar_inv_{clave_base}_{id_inv}",
+                        use_container_width=True
+                    )
+
+                if confirmar_borrado:
+                    ok_borrar = eliminar_elemento_inventario_espacio(
+                        id_inv
+                    )
+
+                    st.session_state[key_confirmar_borrado] = False
+
+                    if ok_borrar:
+                        st.success("Elemento eliminado correctamente.")
+                        st.rerun()
+                    else:
+                        st.error("No se pudo eliminar el elemento.")
+
+                if cancelar_borrado:
+                    st.session_state[key_confirmar_borrado] = False
                     st.rerun()
-                else:
-                    st.error("No se pudo guardar la ficha técnica.")
 
-            st.markdown("---")
+            # -------------------------------------------------
+            # FICHA TÉCNICA
+            # Solo Administración. Queda cerrada por defecto.
+            # -------------------------------------------------
+            if es_admin:
+                st.markdown("---")
 
+                with st.expander(
+                    "🏷️ Ficha técnica del activo",
+                    expanded=False
+                ):
+                    datos_activo = _obtener_datos_activo(id_inv)
+
+                    try:
+                        vida_util_valor = int(
+                            datos_activo["vida_util_anios"] or 0
+                        )
+                    except Exception:
+                        vida_util_valor = 0
+
+                    try:
+                        coste_estimado_valor = float(
+                            datos_activo["coste_estimado"] or 0
+                        )
+                    except Exception:
+                        coste_estimado_valor = 0.0
+
+                    t1, t2 = st.columns(2)
+
+                    with t1:
+                        fabricante_nuevo = st.text_input(
+                            "Fabricante",
+                            value=str(
+                                datos_activo["fabricante"] or ""
+                            ),
+                            key=(
+                                f"activo_fabricante_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                        modelo_nuevo = st.text_input(
+                            "Modelo",
+                            value=str(
+                                datos_activo["modelo"] or ""
+                            ),
+                            key=(
+                                f"activo_modelo_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                        numero_serie_nuevo = st.text_input(
+                            "Nº de serie",
+                            value=str(
+                                datos_activo["numero_serie"] or ""
+                            ),
+                            key=(
+                                f"activo_serie_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                    with t2:
+                        proveedor_nuevo = st.text_input(
+                            "Proveedor",
+                            value=str(
+                                datos_activo["proveedor"] or ""
+                            ),
+                            key=(
+                                f"activo_proveedor_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                        fecha_instalacion_nueva = st.text_input(
+                            "Fecha instalación",
+                            value=str(
+                                datos_activo["fecha_instalacion"] or ""
+                            ),
+                            placeholder="AAAA-MM-DD",
+                            key=(
+                                f"activo_fecha_inst_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                        vida_util_nueva = st.number_input(
+                            "Vida útil estimada (años)",
+                            min_value=0,
+                            step=1,
+                            value=vida_util_valor,
+                            key=(
+                                f"activo_vida_"
+                                f"{clave_base}_{id_inv}"
+                            )
+                        )
+
+                    coste_estimado_nuevo = st.number_input(
+                        "Coste estimado (€)",
+                        min_value=0.0,
+                        step=1.0,
+                        value=coste_estimado_valor,
+                        key=(
+                            f"activo_coste_"
+                            f"{clave_base}_{id_inv}"
+                        )
+                    )
+
+                    if st.button(
+                        "💾 Guardar ficha técnica",
+                        key=(
+                            f"guardar_ficha_tecnica_"
+                            f"{clave_base}_{id_inv}"
+                        ),
+                        use_container_width=True
+                    ):
+                        ok_activo = guardar_o_actualizar_activo(
+                            id_inventario=id_inv,
+                            centro=centro,
+                            edificio=edificio,
+                            espacio=espacio,
+                            elemento=elemento,
+                            fabricante=fabricante_nuevo,
+                            modelo=modelo_nuevo,
+                            numero_serie=numero_serie_nuevo,
+                            fecha_instalacion=fecha_instalacion_nueva,
+                            proveedor=proveedor_nuevo,
+                            vida_util_anios=vida_util_nueva,
+                            coste_estimado=coste_estimado_nuevo,
+                        )
+
+                        if ok_activo:
+                            st.success(
+                                "Ficha técnica actualizada "
+                                "correctamente."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "No se pudo guardar la ficha técnica."
+                            )
+
+            # -------------------------------------------------
+            # CORRECTIVO DESDE EL ELEMENTO
+            # -------------------------------------------------
             if nuevo_estado in ["Dañado", "Falta", "Retirar"]:
+                st.markdown("---")
+
                 if numero_ot_correctiva:
                     st.warning(
                         f"🟠 Correctivo pendiente\n\n"
                         f"OT asociada: {numero_ot_correctiva}\n\n"
-                        "El elemento se desbloqueará automáticamente cuando esta OT se finalice."
+                        "El elemento se desbloqueará automáticamente "
+                        "cuando esta OT se finalice."
                     )
-                
+
                 else:
-                    st.warning("Este elemento necesita correctivo.")
-                
+                    st.warning(
+                        "Este elemento necesita correctivo."
+                    )
+
                     descripcion_defecto = st.text_area(
                         "Descripción del correctivo",
-                        value=f"{elemento} en estado {nuevo_estado}. {nuevas_obs}",
-                        key=f"correctivo_desc_{clave_base}_{id_inv}"
+                        value=(
+                            f"{elemento} en estado {nuevo_estado}. "
+                            f"{nuevas_obs}"
+                        ).strip(),
+                        key=(
+                            f"correctivo_desc_"
+                            f"{clave_base}_{id_inv}"
+                        )
                     )
-                
+
                     confirmar_correctivo = st.checkbox(
                         "Crear OT correctiva para este elemento",
-                        key=f"crear_correctivo_inv_{clave_base}_{id_inv}"
+                        key=(
+                            f"crear_correctivo_inv_"
+                            f"{clave_base}_{id_inv}"
+                        )
                     )
-                
+
                     if st.button(
                         "🛠️ Crear correctivo",
-                        key=f"btn_correctivo_inv_{clave_base}_{id_inv}",
+                        key=(
+                            f"btn_correctivo_inv_"
+                            f"{clave_base}_{id_inv}"
+                        ),
                         use_container_width=True
                     ):
                         if not confirmar_correctivo:
-                            st.warning("Marca primero la casilla de confirmación.")
+                            st.warning(
+                                "Marca primero la casilla de confirmación."
+                            )
                         else:
                             ok, mensaje = crear_correctiva_desde_ot(
                                 centro=centro,
@@ -644,26 +812,35 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                                 espacio=espacio,
                                 area="Mantenimiento",
                                 prioridad="Media",
-                                operario=st.session_state.get("operario_activo", ""),
+                                operario=st.session_state.get(
+                                    "operario_activo",
+                                    ""
+                                ),
                                 descripcion_defecto=descripcion_defecto,
                                 numero_ot_origen=f"INV-{id_inv}",
                                 origen="INVENTARIO",
                                 solicitante="Inventario espacio",
                             )
-                
+
                             if ok:
                                 numero_ot_generada = (
                                     str(mensaje or "")
-                                    .replace("Correctiva creada correctamente:", "")
+                                    .replace(
+                                        "Correctiva creada correctamente:",
+                                        ""
+                                    )
                                     .strip()
                                 )
-                
+
                                 guardar_correctivo_inventario(
                                     id_elemento=id_inv,
                                     numero_ot=numero_ot_generada
                                 )
-                
-                                st.success(f"OT correctiva creada: {numero_ot_generada}")
+
+                                st.success(
+                                    f"OT correctiva creada: "
+                                    f"{numero_ot_generada}"
+                                )
                                 st.rerun()
                             else:
                                 st.error(mensaje)
