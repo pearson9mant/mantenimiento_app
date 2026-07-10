@@ -40,15 +40,45 @@ def boton_abrir_ot(numero_ot, key_extra=""):
 
 
 def mostrar_corazon_sistema():
-    st.title("❤️ Corazón del Sistema")
-
-    centro_sel = st.selectbox(
-        "Centro",
-        ["Todos", "Pearson 22", "Pearson 9"],
-        key="corazon_centro"
-    )
-
-    centro_motor = None if centro_sel == "Todos" else centro_sel
+    perfil = str(st.session_state.get("perfil", "") or "").strip().lower()
+    operario = str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("usuario")
+        or ""
+    ).strip()
+    
+    st.title("🎯 Prioridades")
+    
+    if perfil == "operario":
+        operario_normalizado = (
+            operario.lower()
+            .replace(".", "")
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", "")
+        )
+    
+        if "luis" in operario_normalizado or "lozano" in operario_normalizado:
+            centro_motor = "Pearson 9"
+            st.caption("📍 Centro asignado: Pearson 9")
+    
+        elif "almeda" in operario_normalizado or "juanantonio" in operario_normalizado:
+            centro_motor = "Pearson 22"
+            st.caption("📍 Centro asignado: Pearson 22")
+    
+        else:
+            st.error("No se ha podido determinar el centro asignado a este operario.")
+            return
+    
+    else:
+        centro_sel = st.selectbox(
+            "Centro",
+            ["Todos", "Pearson 22", "Pearson 9"],
+            key="corazon_centro"
+        )
+    
+        centro_motor = None if centro_sel == "Todos" else centro_sel
+    
     panel = diagnosticar_corazon_sistema(centro=centro_motor)
 
     ot_abierta = st.session_state.get("corazon_ot_abierta")
