@@ -911,24 +911,40 @@ elif perfil == "gerencia":
 
 
 else:
-    st.caption(f"{operario_activo}")
+    st.caption(f"👷 {operario_activo}")
 
+    # -----------------------------------------------------
+    # SEGURIDAD DEL PERFIL INVENTARIO
+    # -----------------------------------------------------
     if perfil == "inventario" and seccion not in [
         "Inventario",
         "Inventario aulas",
         "Preventivo aulas",
         "Gestión espacios",
-        "Pedidos material"
+        "Pedidos material",
     ]:
         st.warning("Este usuario solo tiene acceso a Inventario.")
         st.stop()
 
-    if seccion == "Resumen":
-        pantalla_resumen_operario()
+    # -----------------------------------------------------
+    # PERFIL OPERARIO
+    # -----------------------------------------------------
+    if seccion == "Prioridades":
+        mostrar_corazon_sistema()
 
     elif seccion == "Órdenes":
         pantalla_operario()
 
+    elif seccion == "Pedidos material":
+        ui_pedidos_material()
+
+    elif seccion == "Histórico":
+        st.session_state["abrir_historico_operario"] = True
+        pantalla_operario()
+
+    # -----------------------------------------------------
+    # PERFIL INVENTARIO
+    # -----------------------------------------------------
     elif seccion == "Inventario":
         pantalla_inventario()
 
@@ -937,15 +953,12 @@ else:
 
     elif seccion == "Preventivo aulas":
         pantalla_preventivo_aulas()
-        
-    elif seccion == "Pedidos material":
-        ui_pedidos_material()
 
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas()
 
-    elif seccion == "Colegio":
-        pantalla_colegio()
+    else:
+        st.warning("La sección seleccionada no está disponible.")
 
 
 pintar_footer()
