@@ -462,10 +462,18 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
 
 
 def pantalla_operario(modo="ordenes"):
-    st.title("👷 Operario")
+    solo_historico = modo == "historico"
+
+    if solo_historico:
+        st.title("📁 Mi histórico")
+    else:
+        st.title("👷 Operario")
 
     if st.session_state.get("vista_operario", False):
-        if st.button("🔙 Volver a administración"):
+        if st.button(
+            "🔙 Volver a administración",
+            key="volver_admin_pantalla_operario"
+        ):
             st.session_state["vista_operario"] = False
             st.rerun()
 
@@ -481,7 +489,11 @@ def pantalla_operario(modo="ordenes"):
 
     st.info(f"Operario: {operario_sel}")
 
-    if puede_ver_legionella_operario(operario_sel):
+    # -----------------------------------------------------
+    # ACCESO DIRECTO A LEGIONELLA
+    # Solo aparece dentro de Órdenes, nunca en Histórico
+    # -----------------------------------------------------
+    if not solo_historico and puede_ver_legionella_operario(operario_sel):
         zona_operario = st.radio(
             "Zona de trabajo",
             ["📋 Mis órdenes", "💧 Control Legionella"],
@@ -496,181 +508,226 @@ def pantalla_operario(modo="ordenes"):
             except Exception as e:
                 st.error("No se ha podido abrir el módulo de Legionella.")
                 st.exception(e)
+
             return
 
-    ordenes_operario = obtener_ordenes_operario(operario_sel.strip())
-    ordenes_operario = filtrar_seguridad_operario(ordenes_operario, operario_sel)
+    # -----------------------------------------------------
+    # CARGAR DATOS DEL OPERARIO
+    # -----------------------------------------------------
+    try:
+        ordenes_operario = obtener_ordenes_operario(
+            operario_sel.strip()
+        )
+    except Exception:
+        ordenes_operario = []
+
+    ordenes_operario = filtrar_seguridad_operario(
+        ordenes_operario,
+        operario_sel
+    )
 
     try:
         historico = obtener_historico()
     except Exception:
         historico = []
 
-    kpis = calcular_kpis_operario(
-        ordenes_operario,
-        historico=historico,
-        operario_sel=operario_sel
-    )
-    solo_historico = modo == "historico"
-
-    materiales_select = obtener_materiales_para_select()
-
-    ordenes_operario = [
-        o for o in ordenes_operario
-        if o[3] in ["Abierta", "En curso", "Pendiente material"]
-    ]
-    
-    st.markdown("## 📋 Mis órdenes")
-    
-    filtro_origen_operario = st.radio(
-        "",
-        ["Todas", "Incidencias", "Preventivo", "Legionella", "☀️ Verano"],
-        horizontal=True,
-        key="filtro_origen_operario"
-    )
-
-    if filtro_origen_operario == "Preventivo":
-        ordenes_operario = [
-            o for o in ordenes_operario
-            if len(o) > 11 and str(o[11] or "").strip().upper() == "PREVENTIVO"
-        ]
-
-    elif filtro_origen_operario == "Legionella":
-        ordenes_operario = [
-            o for o in ordenes_operario
-            if len(o) > 11 and str(o[11] or "").strip().upper() == "LEGIONELLA"
-        ]
-
-    elif filtro_origen_operario == "☀️ Verano":
-        ordenes_operario = [
-            o for o in ordenes_operario
-            if len(o) > 11 and str(o[11] or "").strip().upper() == "VERANO"
-        ]
-
-    elif filtro_origen_operario == "Incidencias":
-        ordenes_operario = [
-            o for o in ordenes_operario
-            if len(o) > 11 and str(o[11] or "").strip().upper() in ["APP", "OUTLOOK", "PROFESORES"]
-        ]
-
-    if not ordenes_operario:
-        st.success("No tienes órdenes pendientes.")
-
-    else:
-        st.markdown("## 📋 Mis órdenes")
-
-        for fila in ordenes_operario:
-            mostrar_tarjeta_ot(
-                fila=fila,
-                materiales_select=materiales_select,
-                operario_sel=operario_sel,
-                modo="operario"
-            )
-
     historico_operario = [
         h for h in historico
-        if normalizar_operario_nombre(h[10])
+        if len(h) > 10
+        and normalizar_operario_nombre(h[10])
         == normalizar_operario_nombre(operario_sel)
     ]
 
-    st.markdown("---")
+    # =====================================================
+    # MODO ÓRDENES
+    # =====================================================
+    if not solo_historico:
+        materiales_select = obtener_materiales_para_select()
 
-    abrir_historico = st.session_state.pop(
-        "abrir_historico_operario",
-        False
-    )
-    
-    with st.expander(
-        "📁 Mi histórico",
-        expanded=abrir_historico
-    ):
+        ordenes_activas = [
+            o for o in ordenes_operario
+            if len(o) > 3
+            and o[3] in [
+                "Abierta",
+                "En curso",
+                "Pendiente material"
+            ]
+        ]
 
-        if not historico_operario:
-            st.info("No hay trabajos finalizados todavía.")
+        st.markdown("## 📋 Mis órdenes")
+
+        filtro_origen_operario = st.radio(
+            "",
+            [
+                "Todas",
+                "Incidencias",
+                "Preventivo",
+                "Legionella",
+                "☀️ Verano"
+            ],
+            horizontal=True,
+            key="filtro_origen_operario"
+        )
+
+        if filtro_origen_operario == "Preventivo":
+            ordenes_activas = [
+                o for o in ordenes_activas
+                if len(o) > 11
+                and str(o[11] or "").strip().upper() == "PREVENTIVO"
+            ]
+
+        elif filtro_origen_operario == "Legionella":
+            ordenes_activas = [
+                o for o in ordenes_activas
+                if len(o) > 11
+                and str(o[11] or "").strip().upper() == "LEGIONELLA"
+            ]
+
+        elif filtro_origen_operario == "☀️ Verano":
+            ordenes_activas = [
+                o for o in ordenes_activas
+                if len(o) > 11
+                and str(o[11] or "").strip().upper() == "VERANO"
+            ]
+
+        elif filtro_origen_operario == "Incidencias":
+            ordenes_activas = [
+                o for o in ordenes_activas
+                if len(o) > 11
+                and str(o[11] or "").strip().upper()
+                in ["APP", "OUTLOOK", "PROFESORES"]
+            ]
+
+        if not ordenes_activas:
+            st.success("No tienes órdenes pendientes.")
 
         else:
-            for h in reversed(historico_operario[-50:]):
-
-                try:
-                    (
-                        id_hist,
-                        num_ot_hist,
-                        desc_hist,
-                        estado_hist,
-                        fecha_hist,
-                        centro_hist,
-                        edificio_hist,
-                        espacio_hist,
-                        area_hist,
-                        prioridad_hist,
-                        operario_hist,
-                        origen_hist,
-                        solicitante_hist,
-                        fecha_origen_hist,
-                        fecha_cierre_hist,
-                        observaciones_cierre_hist,
-                        foto_hist,
-                        *resto
-                    ) = h
-
-                except Exception:
-                    continue
-
-                titulo_hist = (
-                    f"✅ {num_ot_hist} | "
-                    f"{centro_hist or '-'} · {espacio_hist or '-'}"
+            for fila in ordenes_activas:
+                mostrar_tarjeta_ot(
+                    fila=fila,
+                    materiales_select=materiales_select,
+                    operario_sel=operario_sel,
+                    modo="operario"
                 )
 
-                with st.expander(titulo_hist, expanded=False):
+    # =====================================================
+    # FUNCIÓN INTERNA PARA MOSTRAR EL HISTÓRICO
+    # =====================================================
+    def mostrar_listado_historico():
+        if not historico_operario:
+            st.info("No hay trabajos finalizados todavía.")
+            return
 
-                    st.markdown(f"### ✅ {num_ot_hist}")
-                    st.markdown(desc_hist)
+        for h in reversed(historico_operario[-50:]):
+            try:
+                (
+                    id_hist,
+                    num_ot_hist,
+                    desc_hist,
+                    estado_hist,
+                    fecha_hist,
+                    centro_hist,
+                    edificio_hist,
+                    espacio_hist,
+                    area_hist,
+                    prioridad_hist,
+                    operario_hist,
+                    origen_hist,
+                    solicitante_hist,
+                    fecha_origen_hist,
+                    fecha_cierre_hist,
+                    observaciones_cierre_hist,
+                    foto_hist,
+                    *resto
+                ) = h
 
-                    st.caption(
-                        f"🏢 {centro_hist or '-'} · "
-                        f"{edificio_hist or '-'} · "
-                        f"{espacio_hist or '-'}"
+            except Exception:
+                continue
+
+            titulo_hist = (
+                f"✅ {num_ot_hist} | "
+                f"{centro_hist or '-'} · "
+                f"{espacio_hist or '-'}"
+            )
+
+            with st.expander(titulo_hist, expanded=False):
+                st.markdown(f"### ✅ {num_ot_hist}")
+                st.markdown(desc_hist)
+
+                st.caption(
+                    f"🏢 {centro_hist or '-'} · "
+                    f"{edificio_hist or '-'} · "
+                    f"{espacio_hist or '-'}"
+                )
+
+                st.caption(
+                    f"📅 Cierre: {fecha_cierre_hist or '-'}"
+                )
+
+                if observaciones_cierre_hist:
+                    st.info(
+                        f"📝 {observaciones_cierre_hist}"
                     )
 
-                    st.caption(f"📅 Cierre: {fecha_cierre_hist or '-'}")
+                try:
+                    fotos_db = obtener_fotos_ot(num_ot_hist)
 
-                    if observaciones_cierre_hist:
-                        st.info(f"📝 {observaciones_cierre_hist}")
+                    if fotos_db:
+                        cols_fotos = st.columns(3)
 
-                    try:
-                        fotos_db = obtener_fotos_ot(num_ot_hist)
+                        for i, (
+                            nombre_foto,
+                            foto_data
+                        ) in enumerate(fotos_db):
 
-                        if fotos_db:
-                            cols_fotos = st.columns(3)
+                            with cols_fotos[i % 3]:
+                                st.image(
+                                    bytes(foto_data),
+                                    caption=f"Foto {i + 1}",
+                                    use_container_width=True
+                                )
 
-                            for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-                                with cols_fotos[i % 3]:
+                    elif foto_hist:
+                        fotos = str(foto_hist).split("|")
+                        cols_fotos = st.columns(3)
+
+                        for i, ruta_foto in enumerate(fotos):
+                            ruta_foto = str(
+                                ruta_foto
+                            ).strip()
+
+                            if not ruta_foto:
+                                continue
+
+                            with cols_fotos[i % 3]:
+                                try:
                                     st.image(
-                                        bytes(foto_data),
+                                        ruta_foto,
                                         caption=f"Foto {i + 1}",
                                         use_container_width=True
                                     )
 
-                        elif foto_hist:
-                            fotos = str(foto_hist).split("|")
-                            cols_fotos = st.columns(3)
+                                except Exception as e:
+                                    st.caption(
+                                        f"📷 Foto no disponible: {e}"
+                                    )
 
-                            for i, ruta_foto in enumerate(fotos):
-                                ruta_foto = str(ruta_foto).strip()
+                except Exception as e:
+                    st.caption(
+                        f"📷 Error fotos histórico: {e}"
+                    )
 
-                                if not ruta_foto:
-                                    continue
+    # =====================================================
+    # PRESENTACIÓN DEL HISTÓRICO
+    # =====================================================
+    if solo_historico:
+        mostrar_listado_historico()
 
-                                with cols_fotos[i % 3]:
-                                    try:
-                                        st.image(
-                                            ruta_foto,
-                                            caption=f"Foto {i + 1}",
-                                            use_container_width=True
-                                        )
+    else:
+        st.markdown("---")
 
-                                    except Exception as e:
-                                        st.caption(f"📷 Foto no disponible: {e}")
-
-                    except Exception as e:
-                        st.caption(f"📷 Error fotos histórico: {e}")
+        with st.expander(
+            "📁 Mi histórico",
+            expanded=False
+        ):
+            mostrar_listado_historico()
