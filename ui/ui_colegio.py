@@ -41,7 +41,13 @@ def _clave_ficha(centro, edificio, planta, espacio):
     )
 
 
-def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuaciones"):
+def _abrir_ficha_desde_colegio(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    bloque="actuaciones"
+):
     st.session_state["colegio_ficha_seleccionada"] = {
         "centro": centro,
         "edificio": edificio,
@@ -49,7 +55,13 @@ def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuac
         "espacio": espacio,
     }
 
-    clave = _clave_ficha(centro, edificio, planta, espacio)
+    clave = _clave_ficha(
+        centro,
+        edificio,
+        planta,
+        espacio
+    )
+
     st.session_state[f"bloque_ficha_{clave}"] = bloque
     st.session_state["colegio_ver_arbol"] = False
     st.rerun()
@@ -58,7 +70,11 @@ def _abrir_ficha_desde_colegio(centro, edificio, planta, espacio, bloque="actuac
 def _mostrar_boton_arbol_y_ficha():
     st.markdown("---")
 
-    if st.button("🌳 Ver árbol", use_container_width=True):
+    if st.button(
+        "🌳 Ver árbol",
+        use_container_width=True,
+        key="colegio_boton_ver_arbol"
+    ):
         st.session_state["colegio_ver_arbol"] = not st.session_state.get(
             "colegio_ver_arbol",
             False
@@ -69,10 +85,13 @@ def _mostrar_boton_arbol_y_ficha():
         st.markdown("---")
         mostrar_arbol_colegio()
 
-    ficha = st.session_state.get("colegio_ficha_seleccionada")
+    ficha = st.session_state.get(
+        "colegio_ficha_seleccionada"
+    )
 
     if ficha:
         st.markdown("---")
+
         ficha_espacio_basica(
             centro=ficha["centro"],
             edificio=ficha["edificio"],
@@ -81,58 +100,107 @@ def _mostrar_boton_arbol_y_ficha():
         )
 
 
-def pantalla_colegio():
-    st.markdown("## 🏫 Colegio")
-    st.caption("Centro de control por centro, edificio, planta y espacio.")
+def pantalla_colegio(modo="completo"):
+    solo_inventario = str(modo or "").strip().lower() == "inventario"
 
-    solo_actividad = st.checkbox(
-        "Mostrar solo espacios con actividad pendiente",
-        value=False,
-        key="colegio_solo_incidencias"
-    )
+    # =====================================================
+    # CABECERA SEGÚN EL MODO
+    # =====================================================
+    if solo_inventario:
+        st.markdown("## 🧾 Inventario de espacios")
 
-    centros = obtener_centros_espacios()
-    centros_visibles = obtener_centros_visibles_usuario()
+        st.caption(
+            "Selecciona un espacio para revisar, añadir, editar "
+            "o eliminar elementos de su inventario."
+        )
 
-    centros = [c for c in centros if c in centros_visibles]
+        solo_actividad = False
+
+    else:
+        st.markdown("## 🏫 Colegio")
+
+        st.caption(
+            "Centro de control por centro, edificio, planta y espacio."
+        )
+
+        solo_actividad = st.checkbox(
+            "Mostrar solo espacios con actividad pendiente",
+            value=False,
+            key="colegio_solo_incidencias"
+        )
+
+    # =====================================================
+    # CENTROS VISIBLES PARA EL USUARIO
+    # =====================================================
+    try:
+        centros = obtener_centros_espacios()
+    except Exception:
+        centros = []
+
+    try:
+        centros_visibles = obtener_centros_visibles_usuario()
+    except Exception:
+        centros_visibles = []
+
+    centros = [
+        centro
+        for centro in centros
+        if centro in centros_visibles
+    ]
 
     if not centros:
-        st.info("No hay centros visibles para este usuario.")
+        st.info(
+            "No hay centros visibles para este usuario."
+        )
         return
 
     centro = st.selectbox(
         "🏢 Centro",
         centros,
-        key="colegio_rapido_centro"
+        key=f"colegio_rapido_centro_{modo}"
     )
 
-    edificios = obtener_edificios_espacios(centro)
+    # =====================================================
+    # EDIFICIO
+    # =====================================================
+    try:
+        edificios = obtener_edificios_espacios(centro)
+    except Exception:
+        edificios = []
 
     if not edificios:
-        st.info("No hay edificios configurados para este centro.")
+        st.info(
+            "No hay edificios configurados para este centro."
+        )
         return
 
     edificio = st.selectbox(
         "🏫 Edificio",
         edificios,
-        key=f"colegio_rapido_edificio_{centro}"
+        key=f"colegio_rapido_edificio_{modo}_{centro}"
     )
 
     # =====================================================
     # MODO CENTRO DE CONTROL
+    # Solo disponible en la pantalla completa
     # =====================================================
-    if solo_actividad:
+    if solo_actividad and not solo_inventario:
         mapa_actividad = obtener_mapa_actividad(
             centro=centro,
             edificio=edificio
         )
 
         if not mapa_actividad:
-            st.success("🟢 No hay actividad pendiente en este edificio.")
+            st.success(
+                "🟢 No hay actividad pendiente en este edificio."
+            )
+
             _mostrar_boton_arbol_y_ficha()
             return
 
-        st.markdown("### 📋 Actividad pendiente por planta")
+        st.markdown(
+            "### 📋 Actividad pendiente por planta"
+        )
 
         for planta, items in mapa_actividad.items():
             st.markdown(f"#### 📍 {planta}")
@@ -140,13 +208,19 @@ def pantalla_colegio():
             for item in items:
                 espacio = item.get("espacio", "")
                 actuaciones = item.get("actuaciones", [])
-                preventivos_pend = item.get("preventivos_pendientes", [])
+                preventivos_pend = item.get(
+                    "preventivos_pendientes",
+                    []
+                )
                 legionella = item.get("legionella", {})
-                tiene_legionella = item.get("tiene_legionella", False)
+                tiene_legionella = item.get(
+                    "tiene_legionella",
+                    False
+                )
 
-                # -------------------------
+                # -----------------------------------------
                 # OT ABIERTAS
-                # -------------------------
+                # -----------------------------------------
                 for a in actuaciones:
                     (
                         id_ot,
@@ -165,14 +239,20 @@ def pantalla_colegio():
                     with c_info:
                         st.markdown(
                             f"🔴 **{espacio}**  \n"
-                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
+                            f"`{numero_ot or '-'}` · "
+                            f"{prioridad or '-'} · "
+                            f"{area or '-'}  \n"
                             f"{descripcion or '-'}"
                         )
 
                     with c_btn:
                         if st.button(
                             "Abrir",
-                            key=f"abrir_ot_colegio_{id_ot}_{numero_ot}_{planta}_{espacio}",
+                            key=(
+                                f"abrir_ot_colegio_"
+                                f"{id_ot}_{numero_ot}_"
+                                f"{planta}_{espacio}"
+                            ),
                             use_container_width=True
                         ):
                             _abrir_ficha_desde_colegio(
@@ -183,14 +263,24 @@ def pantalla_colegio():
                                 "actuaciones"
                             )
 
-                # -------------------------
+                # -----------------------------------------
                 # PREVENTIVOS
-                # -------------------------
+                # -----------------------------------------
                 for p in preventivos_pend:
                     try:
-                        id_prev, fecha_prev, operario_prev, estado_prev, obs_prev, num_prev = p
+                        (
+                            id_prev,
+                            fecha_prev,
+                            operario_prev,
+                            estado_prev,
+                            obs_prev,
+                            num_prev
+                        ) = p
+
                     except Exception:
                         id_prev = ""
+                        fecha_prev = ""
+                        operario_prev = ""
                         estado_prev = ""
                         obs_prev = ""
                         num_prev = ""
@@ -199,15 +289,20 @@ def pantalla_colegio():
 
                     with c_info:
                         st.markdown(
-                            f"🔴 **{espacio}**  \n"
-                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
-                            f"{descripcion or '-'}"
+                            f"🛠️ **{espacio}**  \n"
+                            f"`{num_prev or '-'}` · "
+                            f"{estado_prev or '-'} · "
+                            f"{operario_prev or '-'}  \n"
+                            f"{obs_prev or 'Preventivo pendiente'}"
                         )
 
                     with c_btn:
                         if st.button(
                             "Abrir",
-                            key=f"abrir_prev_colegio_{id_prev}_{planta}_{espacio}",
+                            key=(
+                                f"abrir_prev_colegio_"
+                                f"{id_prev}_{planta}_{espacio}"
+                            ),
                             use_container_width=True
                         ):
                             _abrir_ficha_desde_colegio(
@@ -218,20 +313,41 @@ def pantalla_colegio():
                                 "preventivos"
                             )
 
-                # -------------------------
+                # -----------------------------------------
                 # LEGIONELLA
-                # -------------------------
+                # -----------------------------------------
                 if tiene_legionella:
-                    color_leg = str(legionella.get("color") or "").lower()
-                    estado_leg = legionella.get("estado") or "Legionella"
-                    puntos = legionella.get("puntos") or 0
-                    tareas = legionella.get("tareas") or 0
-                    inc_leg = legionella.get("incidencias_abiertas") or 0
+                    color_leg = str(
+                        legionella.get("color") or ""
+                    ).lower()
+
+                    estado_leg = (
+                        legionella.get("estado")
+                        or "Legionella"
+                    )
+
+                    puntos = (
+                        legionella.get("puntos")
+                        or 0
+                    )
+
+                    tareas = (
+                        legionella.get("tareas")
+                        or 0
+                    )
+
+                    inc_leg = (
+                        legionella.get(
+                            "incidencias_abiertas"
+                        )
+                        or 0
+                    )
 
                     icono_leg = "🦠"
 
                     if color_leg == "rojo":
                         icono_leg = "🔴🦠"
+
                     elif color_leg == "amarillo":
                         icono_leg = "🟠🦠"
 
@@ -239,15 +355,20 @@ def pantalla_colegio():
 
                     with c_info:
                         st.markdown(
-                            f"🔴 **{espacio}**  \n"
-                            f"`{numero_ot or '-'}` · {prioridad or '-'} · {area or '-'}  \n"
-                            f"{descripcion or '-'}"
+                            f"{icono_leg} **{espacio}**  \n"
+                            f"{estado_leg} · "
+                            f"{puntos} puntos · "
+                            f"{tareas} tareas · "
+                            f"{inc_leg} incidencias"
                         )
 
                     with c_btn:
                         if st.button(
                             "Abrir",
-                            key=f"abrir_leg_colegio_{planta}_{espacio}",
+                            key=(
+                                f"abrir_leg_colegio_"
+                                f"{planta}_{espacio}"
+                            ),
                             use_container_width=True
                         ):
                             _abrir_ficha_desde_colegio(
@@ -262,42 +383,112 @@ def pantalla_colegio():
         return
 
     # =====================================================
-    # MODO NORMAL
+    # SELECCIÓN DE PLANTA
     # =====================================================
-    plantas = obtener_plantas_espacios(centro, edificio)
+    try:
+        plantas = obtener_plantas_espacios(
+            centro,
+            edificio
+        )
+    except Exception:
+        plantas = []
 
     if not plantas:
-        st.info("No hay plantas en este edificio.")
+        st.info(
+            "No hay plantas en este edificio."
+        )
         return
 
     planta = st.selectbox(
         "📍 Planta",
         plantas,
-        key=f"colegio_rapido_planta_{centro}_{edificio}"
+        key=(
+            f"colegio_rapido_planta_"
+            f"{modo}_{centro}_{edificio}"
+        )
     )
 
-    espacios_datos = obtener_espacios_por_planta(
-        centro,
-        edificio,
-        planta
-    )
+    # =====================================================
+    # SELECCIÓN DE ESPACIO
+    # =====================================================
+    try:
+        espacios_datos = obtener_espacios_por_planta(
+            centro,
+            edificio,
+            planta
+        )
+    except Exception:
+        espacios_datos = []
 
-    espacios = [e[0] for e in espacios_datos]
+    espacios = [
+        fila[0]
+        for fila in espacios_datos
+        if fila and fila[0]
+    ]
 
     if not espacios:
-        st.info("No hay espacios en esta planta.")
+        st.info(
+            "No hay espacios en esta planta."
+        )
         return
 
     espacio = st.selectbox(
         "🚪 Espacio",
         espacios,
-        key=f"colegio_rapido_espacio_{centro}_{edificio}_{planta}"
+        key=(
+            f"colegio_rapido_espacio_"
+            f"{modo}_{centro}_{edificio}_{planta}"
+        )
     )
 
+    # =====================================================
+    # MODO INVENTARIO DE ESPACIOS
+    # No carga diagnóstico, OT, preventivos, historial
+    # ni Legionella.
+    # =====================================================
+    if solo_inventario:
+        st.markdown("---")
+
+        st.markdown(
+            f"### 📦 {espacio}"
+        )
+
+        st.caption(
+            f"{centro} · {edificio} · {planta}"
+        )
+
+        try:
+            mostrar_inventario_espacio(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio
+            )
+
+        except Exception as error:
+            st.error(
+                "No se ha podido cargar el inventario "
+                "de este espacio."
+            )
+
+            st.exception(error)
+
+        return
+
+    # =====================================================
+    # MODO COMPLETO DEL COLEGIO
+    # =====================================================
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        if st.button("🔵 Abrir ficha del espacio", use_container_width=True):
+        if st.button(
+            "🔵 Abrir ficha del espacio",
+            use_container_width=True,
+            key=(
+                f"abrir_ficha_espacio_"
+                f"{centro}_{edificio}_{planta}_{espacio}"
+            )
+        ):
             _abrir_ficha_desde_colegio(
                 centro,
                 edificio,
@@ -307,7 +498,14 @@ def pantalla_colegio():
             )
 
     with c2:
-        if st.button("📦 Inventario directo", use_container_width=True):
+        if st.button(
+            "📦 Inventario directo",
+            use_container_width=True,
+            key=(
+                f"inventario_directo_"
+                f"{centro}_{edificio}_{planta}_{espacio}"
+            )
+        ):
             _abrir_ficha_desde_colegio(
                 centro,
                 edificio,
@@ -317,21 +515,36 @@ def pantalla_colegio():
             )
 
     with c3:
-        if st.button("🌳 Ver árbol", use_container_width=True):
-            st.session_state["colegio_ver_arbol"] = not st.session_state.get(
-                "colegio_ver_arbol",
-                False
+        if st.button(
+            "🌳 Ver árbol",
+            use_container_width=True,
+            key=(
+                f"ver_arbol_colegio_"
+                f"{centro}_{edificio}_{planta}"
+            )
+        ):
+            st.session_state["colegio_ver_arbol"] = (
+                not st.session_state.get(
+                    "colegio_ver_arbol",
+                    False
+                )
             )
             st.rerun()
 
-    if st.session_state.get("colegio_ver_arbol", False):
+    if st.session_state.get(
+        "colegio_ver_arbol",
+        False
+    ):
         st.markdown("---")
         mostrar_arbol_colegio()
 
-    ficha = st.session_state.get("colegio_ficha_seleccionada")
+    ficha = st.session_state.get(
+        "colegio_ficha_seleccionada"
+    )
 
     if ficha:
         st.markdown("---")
+
         ficha_espacio_basica(
             centro=ficha["centro"],
             edificio=ficha["edificio"],
@@ -340,14 +553,34 @@ def pantalla_colegio():
         )
 
 
-def ficha_espacio_basica(centro, edificio, planta, espacio):
-    clave = _clave_ficha(centro, edificio, planta, espacio)
+def ficha_espacio_basica(
+    centro,
+    edificio,
+    planta,
+    espacio
+):
+    clave = _clave_ficha(
+        centro,
+        edificio,
+        planta,
+        espacio
+    )
 
-    estado = obtener_estado_espacio(centro, edificio, espacio)
+    estado = obtener_estado_espacio(
+        centro,
+        edificio,
+        espacio
+    )
+
     icono = icono_estado_espacio(estado)
 
-    st.markdown(f"### {icono} {espacio}")
-    st.caption(f"{centro} · {edificio} · {planta}")
+    st.markdown(
+        f"### {icono} {espacio}"
+    )
+
+    st.caption(
+        f"{centro} · {edificio} · {planta}"
+    )
 
     info = diagnosticar_espacio(
         centro=centro,
@@ -356,27 +589,68 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
     )
 
     if info["color"] == "verde":
-        st.success(f"🟢 {info['estado']}")
+        st.success(
+            f"🟢 {info['estado']}"
+        )
+
     elif info["color"] == "amarillo":
-        st.warning(f"🟠 {info['estado']}")
+        st.warning(
+            f"🟠 {info['estado']}"
+        )
+
     else:
-        st.error(f"🔴 {info['estado']}")
+        st.error(
+            f"🔴 {info['estado']}"
+        )
 
-    st.markdown("### 🧠 Asistente técnico")
-    st.markdown("**Situación actual**")
+    st.markdown(
+        "### 🧠 Asistente técnico"
+    )
 
-    for linea in info.get("diagnostico", []):
-        st.markdown(f"• {linea}")
+    st.markdown(
+        "**Situación actual**"
+    )
 
-    st.markdown("**Siguiente actuación**")
-    st.info(info.get("recomendacion", "No es necesaria ninguna actuación inmediata."))
+    for linea in info.get(
+        "diagnostico",
+        []
+    ):
+        st.markdown(
+            f"• {linea}"
+        )
+
+    st.markdown(
+        "**Siguiente actuación**"
+    )
+
+    st.info(
+        info.get(
+            "recomendacion",
+            "No es necesaria ninguna actuación inmediata."
+        )
+    )
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric("Trabajos", info.get("trabajos", 0))
-    c2.metric("Activos", info.get("activos", 0))
-    c3.metric("Dañados", info.get("danados", 0))
-    c4.metric("Correctivos", info.get("correctivos", 0))
+    c1.metric(
+        "Trabajos",
+        info.get("trabajos", 0)
+    )
+
+    c2.metric(
+        "Activos",
+        info.get("activos", 0)
+    )
+
+    c3.metric(
+        "Dañados",
+        info.get("danados", 0)
+    )
+
+    c4.metric(
+        "Correctivos",
+        info.get("correctivos", 0)
+    )
 
     st.markdown("---")
 
@@ -388,7 +662,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             key=f"ver_actuaciones_{clave}",
             use_container_width=True
         ):
-            st.session_state[f"bloque_ficha_{clave}"] = "actuaciones"
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "actuaciones"
+
             st.rerun()
 
         if st.button(
@@ -396,7 +673,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             key=f"ver_inventario_{clave}",
             use_container_width=True
         ):
-            st.session_state[f"bloque_ficha_{clave}"] = "inventario"
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "inventario"
+
             st.rerun()
 
         if st.button(
@@ -404,7 +684,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             key=f"ver_legionella_{clave}",
             use_container_width=True
         ):
-            st.session_state[f"bloque_ficha_{clave}"] = "legionella"
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "legionella"
+
             st.rerun()
 
     with c2:
@@ -413,7 +696,10 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             key=f"ver_preventivos_{clave}",
             use_container_width=True
         ):
-            st.session_state[f"bloque_ficha_{clave}"] = "preventivos"
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "preventivos"
+
             st.rerun()
 
         if st.button(
@@ -421,15 +707,23 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             key=f"ver_historial_{clave}",
             use_container_width=True
         ):
-            st.session_state[f"bloque_ficha_{clave}"] = "historial"
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "historial"
+
             st.rerun()
 
-    bloque = st.session_state.get(f"bloque_ficha_{clave}", "")
+    bloque = st.session_state.get(
+        f"bloque_ficha_{clave}",
+        ""
+    )
 
     st.markdown("---")
 
     if bloque == "actuaciones":
-        st.markdown("### 📋 Trabajos del espacio")
+        st.markdown(
+            "### 📋 Trabajos del espacio"
+        )
 
         actuaciones = obtener_actuaciones_espacio(
             centro,
@@ -438,9 +732,14 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         )
 
         if not actuaciones:
-            st.info("No hay trabajos abiertos en este espacio.")
+            st.info(
+                "No hay trabajos abiertos en este espacio."
+            )
+
         else:
-            materiales_select = obtener_materiales_para_select()
+            materiales_select = (
+                obtener_materiales_para_select()
+            )
 
             for a in actuaciones:
                 (
@@ -483,7 +782,9 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                 )
 
     elif bloque == "inventario":
-        st.markdown("### 📦 Inventario del espacio")
+        st.markdown(
+            "### 📦 Inventario del espacio"
+        )
 
         mostrar_inventario_espacio(
             centro=centro,
@@ -493,7 +794,9 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         )
 
     elif bloque == "preventivos":
-        st.markdown("### 📅 Preventivos")
+        st.markdown(
+            "### 📅 Preventivos"
+        )
 
         preventivos = obtener_preventivos_espacio(
             centro,
@@ -502,11 +805,23 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         )
 
         if not preventivos:
-            st.info("No hay preventivos registrados en este espacio.")
+            st.info(
+                "No hay preventivos registrados "
+                "en este espacio."
+            )
+
         else:
             for p in preventivos:
                 try:
-                    id_prev, fecha, operario, estado_prev, observaciones, numero_ot_preventiva = p
+                    (
+                        id_prev,
+                        fecha,
+                        operario,
+                        estado_prev,
+                        observaciones,
+                        numero_ot_preventiva
+                    ) = p
+
                 except Exception:
                     continue
 
@@ -521,7 +836,9 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                     st.caption(observaciones)
 
     elif bloque == "legionella":
-        st.markdown("### 🦠 Legionella")
+        st.markdown(
+            "### 🦠 Legionella"
+        )
 
         info = diagnosticar_espacio(
             centro=centro,
@@ -529,48 +846,112 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
             espacio=espacio
         )
 
-        legionella = info.get("legionella", {})
+        legionella = info.get(
+            "legionella",
+            {}
+        )
 
         if not legionella.get("aplica"):
-            st.info("Este espacio no tiene controles de Legionella asociados.")
+            st.info(
+                "Este espacio no tiene controles "
+                "de Legionella asociados."
+            )
+
         else:
-            color = str(legionella.get("color") or "").lower()
-            estado_leg = legionella.get("estado") or "Legionella"
+            color = str(
+                legionella.get("color")
+                or ""
+            ).lower()
+
+            estado_leg = (
+                legionella.get("estado")
+                or "Legionella"
+            )
 
             if color == "rojo":
-                st.error(f"🔴 {estado_leg}")
+                st.error(
+                    f"🔴 {estado_leg}"
+                )
+
             elif color == "amarillo":
-                st.warning(f"🟠 {estado_leg}")
+                st.warning(
+                    f"🟠 {estado_leg}"
+                )
+
             else:
-                st.success(f"🟢 {estado_leg}")
+                st.success(
+                    f"🟢 {estado_leg}"
+                )
 
             c1, c2, c3 = st.columns(3)
 
-            c1.metric("Puntos", legionella.get("puntos") or 0)
-            c2.metric("Tareas", legionella.get("tareas") or 0)
-            c3.metric("Incidencias", legionella.get("incidencias_abiertas") or 0)
+            c1.metric(
+                "Puntos",
+                legionella.get("puntos") or 0
+            )
 
-            ultimo = legionella.get("ultimo_control") or "-"
-            proximo = legionella.get("proximo_control") or "-"
+            c2.metric(
+                "Tareas",
+                legionella.get("tareas") or 0
+            )
 
-            st.caption(f"Último control: {ultimo}")
-            st.caption(f"Próximo control: {proximo}")
+            c3.metric(
+                "Incidencias",
+                legionella.get(
+                    "incidencias_abiertas"
+                ) or 0
+            )
 
-            diagnostico = legionella.get("diagnostico") or []
-            recomendaciones = legionella.get("recomendaciones") or []
+            ultimo = (
+                legionella.get("ultimo_control")
+                or "-"
+            )
+
+            proximo = (
+                legionella.get("proximo_control")
+                or "-"
+            )
+
+            st.caption(
+                f"Último control: {ultimo}"
+            )
+
+            st.caption(
+                f"Próximo control: {proximo}"
+            )
+
+            diagnostico = (
+                legionella.get("diagnostico")
+                or []
+            )
+
+            recomendaciones = (
+                legionella.get("recomendaciones")
+                or []
+            )
 
             if diagnostico:
-                st.markdown("**Diagnóstico Legionella**")
+                st.markdown(
+                    "**Diagnóstico Legionella**"
+                )
+
                 for d in diagnostico:
-                    st.markdown(f"• {d}")
+                    st.markdown(
+                        f"• {d}"
+                    )
 
             if recomendaciones:
-                st.markdown("**Recomendaciones**")
+                st.markdown(
+                    "**Recomendaciones**"
+                )
+
                 for r in recomendaciones:
                     st.info(r)
 
     elif bloque == "historial":
-        st.markdown("### 📋 Historial técnico")
+        st.markdown(
+            "### 📋 Historial técnico"
+        )
 
         historial = obtener_historial_tecnico_espacio(
             centro,
@@ -579,7 +960,11 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         )
 
         if not historial:
-            st.info("No hay historial técnico registrado en este espacio.")
+            st.info(
+                "No hay historial técnico registrado "
+                "en este espacio."
+            )
+
         else:
             for h in historial[:10]:
                 (
@@ -606,10 +991,15 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
                     f"{area or '-'} · "
                     f"OT `{numero_ot or '-'}`"
                 )
-                st.caption(descripcion or "")
+
+                st.caption(
+                    descripcion or ""
+                )
 
     else:
-        st.info("Elige qué quieres abrir de este espacio.")
+        st.info(
+            "Elige qué quieres abrir de este espacio."
+        )
 
     st.markdown("---")
 
@@ -618,8 +1008,14 @@ def ficha_espacio_basica(centro, edificio, planta, espacio):
         key=f"cerrar_ficha_{clave}",
         use_container_width=True
     ):
-        st.session_state["colegio_ficha_seleccionada"] = None
-        st.session_state[f"bloque_ficha_{clave}"] = ""
+        st.session_state[
+            "colegio_ficha_seleccionada"
+        ] = None
+
+        st.session_state[
+            f"bloque_ficha_{clave}"
+        ] = ""
+
         st.rerun()
 
 
