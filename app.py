@@ -947,6 +947,9 @@ else:
 
     elif seccion == "Órdenes":
         pantalla_operario()
+        
+    elif seccion == "Inventario espacios":
+        pantalla_colegio()
 
     elif seccion == "Pedidos material":
         ui_pedidos_material()
