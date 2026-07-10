@@ -17,7 +17,6 @@ from modules.inventario_aulas import (
     eliminar_inventario_espacio,
     eliminar_elemento_inventario_espacio,
     guardar_correctivo_inventario,
-    limpiar_correctivo_inventario,
     clonar_inventario_espacio,
 )
 
@@ -43,6 +42,20 @@ def _icono_estado(estado):
     if estado == "Regular":
         return "🟡"
     return "🟢"
+
+
+def _es_admin():
+    perfil = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    return perfil in [
+        "admin",
+        "administracion",
+        "administración",
+    ]
 
 
 def _opciones_elementos():
@@ -146,7 +159,7 @@ def _plantilla_inventario_por_espacio(espacio):
             ("Congelador", 1),
         ]
 
-    if "aula" in texto:
+    if "aula" in texto or texto[:1].isdigit() or texto.startswith("i"):
         return [
             ("Mesa alumno", 25),
             ("Silla alumno", 25),
@@ -263,9 +276,7 @@ def _mostrar_lista_preparada_editable(
 
 
 def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
-    perfil = str(st.session_state.get("perfil", "")).lower()
-
-    if perfil not in ["admin", "administracion", "administración"]:
+    if not _es_admin():
         return
 
     if not inventario:
@@ -319,7 +330,10 @@ def _mostrar_reinicio_admin(centro, edificio, espacio, inventario, clave_base):
 
 
 def _obtener_datos_activo(id_inv):
-    activo = obtener_activo_por_inventario(id_inv)
+    try:
+        activo = obtener_activo_por_inventario(id_inv)
+    except Exception:
+        activo = None
 
     if activo:
         (
@@ -371,8 +385,7 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
         st.info("Este espacio todavía no tiene inventario.")
         return
 
-    perfil = str(st.session_state.get("perfil", "") or "").strip().lower()
-    es_admin = perfil in ["admin", "administracion", "administración"]
+    es_admin = _es_admin()
 
     for item in inventario:
         (
@@ -1179,14 +1192,15 @@ def mostrar_inventario_espacio(centro, edificio, planta, espacio):
         clave_base=clave_base
     )
 
-    _mostrar_copiar_inventario(
-        centro=centro,
-        edificio=edificio,
-        planta=planta,
-        espacio=espacio,
-        inventario=inventario,
-        clave_base=clave_base
-    )
+    if _es_admin():
+        _mostrar_copiar_inventario(
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio,
+            inventario=inventario,
+            clave_base=clave_base
+        )
 
     _mostrar_asistente_inventario(
         centro=centro,
