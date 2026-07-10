@@ -461,7 +461,7 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
     ]
 
 
-def pantalla_operario():
+def pantalla_operario(modo="ordenes"):
     st.title("👷 Operario")
 
     if st.session_state.get("vista_operario", False):
