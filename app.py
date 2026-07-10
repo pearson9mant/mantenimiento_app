@@ -939,8 +939,7 @@ else:
         ui_pedidos_material()
 
     elif seccion == "Histórico":
-        st.session_state["abrir_historico_operario"] = True
-        pantalla_operario()
+    pantalla_operario(modo="historico")
 
     # -----------------------------------------------------
     # PERFIL INVENTARIO
