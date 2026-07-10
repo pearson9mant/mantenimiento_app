@@ -511,6 +511,7 @@ def pantalla_operario(modo="ordenes"):
         historico=historico,
         operario_sel=operario_sel
     )
+    solo_historico = modo == "historico"
 
     materiales_select = obtener_materiales_para_select()
 
