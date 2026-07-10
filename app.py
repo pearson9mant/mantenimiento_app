@@ -656,7 +656,7 @@ def mostrar_menu_operario():
     )
     
     col1, col2 = st.columns(2)
-    
+
     with col1:
         if st.button(
             "🎯\nPrioridades",
@@ -675,9 +675,19 @@ def mostrar_menu_operario():
             st.session_state["seccion_actual"] = "Órdenes"
             st.rerun()
     
+    
     col3, col4 = st.columns(2)
     
     with col3:
+        if st.button(
+            "🧾\nInventario espacios",
+            key="btn_inventario_espacios_operario",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Inventario espacios"
+            st.rerun()
+    
+    with col4:
         if st.button(
             "📦\nMaterial",
             key="btn_material_operario",
@@ -686,9 +696,12 @@ def mostrar_menu_operario():
             st.session_state["seccion_actual"] = "Pedidos material"
             st.rerun()
     
-    with col4:
+    
+    col5 = st.columns(1)[0]
+    
+    with col5:
         if st.button(
-            "📁\nHistórico",
+            "📁 Histórico",
             key="btn_historico_operario",
             use_container_width=True
         ):
