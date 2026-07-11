@@ -2,8 +2,7 @@ import streamlit as st
 
 from modules.corazon_sistema import diagnosticar_corazon_sistema
 from database.db import conectar, _sql
-from ui.ui_ot import mostrar_tarjeta_ot
-from modules.inventario import obtener_materiales_para_select
+from ui.ui_trabajar_ot import pantalla_trabajar_ot
 
 
 def obtener_fila_ot_por_numero(numero_ot):
@@ -84,25 +83,21 @@ def mostrar_corazon_sistema():
     ot_abierta = st.session_state.get("corazon_ot_abierta")
 
     if ot_abierta:
-        st.markdown("## 🛠 Trabajar OT desde el Corazón")
-
-        if st.button("⬅ Volver al Corazón", key="volver_corazon_desde_ot"):
-            st.session_state.pop("corazon_ot_abierta", None)
-            st.rerun()
-
         fila_ot = obtener_fila_ot_por_numero(ot_abierta)
 
         if not fila_ot:
+            st.session_state.pop("corazon_ot_abierta", None)
             st.error("No se ha encontrado la OT seleccionada.")
             st.stop()
 
-        materiales_select = obtener_materiales_para_select()
-
-        mostrar_tarjeta_ot(
+        pantalla_trabajar_ot(
             fila=fila_ot,
-            materiales_select=materiales_select,
             operario_sel=str(fila_ot[10] or ""),
-            modo="corazon"
+            modo="corazon",
+            clave_ot_abierta="corazon_ot_abierta",
+            texto_volver="⬅ Volver a Prioridades",
+            key_boton_volver="volver_corazon_desde_ot",
+            titulo="## 🛠 Trabajar OT desde Prioridades",
         )
 
         st.stop()
