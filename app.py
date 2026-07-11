@@ -947,7 +947,7 @@ else:
     # PERFIL OPERARIO
     # -----------------------------------------------------
     if seccion == "Prioridades":
-        pantalla_resumen_operario()
+        mostrar_corazon_sistema()
 
     elif seccion == "Órdenes":
         pantalla_operario()
