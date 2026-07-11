@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import date
 from pathlib import Path
-from ui.ui_ot import mostrar_tarjeta_ot
+from ui.ui_trabajar_ot import pantalla_trabajar_ot
 
 from modules.ordenes import (
     obtener_ordenes_operario,
@@ -15,7 +15,6 @@ from modules.ordenes import (
 )
 
 from modules.inventario import (
-    obtener_materiales_para_select,
     obtener_material_por_codigo,
     registrar_movimiento_inventario
 )
@@ -716,33 +715,14 @@ def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
     except Exception:
         numero_ot = ""
 
-    st.markdown(
-        f"## 🛠️ Trabajar OT {numero_ot or ''}"
-    )
-
-    if st.button(
-        "⬅ Volver al listado de órdenes",
-        key="volver_listado_ordenes_operario",
-        use_container_width=True
-    ):
-        st.session_state.pop("operario_ot_abierta_id", None)
-        st.rerun()
-
-    # Los materiales solo se consultan cuando hay una OT abierta.
-    try:
-        materiales_select = obtener_materiales_para_select()
-    except Exception as e:
-        materiales_select = []
-        st.caption(
-            f"No se pudo cargar el selector de materiales: {e}"
-        )
-
-    # Se mantiene la función y toda su lógica actual sin modificarla.
-    mostrar_tarjeta_ot(
+    pantalla_trabajar_ot(
         fila=fila_abierta,
-        materiales_select=materiales_select,
         operario_sel=operario_sel,
-        modo="operario"
+        modo="operario",
+        clave_ot_abierta="operario_ot_abierta_id",
+        texto_volver="⬅ Volver al listado de órdenes",
+        key_boton_volver="volver_listado_ordenes_operario",
+        titulo=f"## 🛠️ Trabajar OT {numero_ot or ''}",
     )
 
 
