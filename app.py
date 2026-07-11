@@ -950,7 +950,7 @@ else:
         pantalla_operario()
 
     elif seccion == "Órdenes":
-        pantalla_operario_prueba()
+        pantalla_operario()
         
     elif seccion == "Inventario espacios":
         pantalla_colegio(modo="inventario")
