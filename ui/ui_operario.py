@@ -461,10 +461,297 @@ def filtrar_seguridad_operario(ordenes, operario_sel):
     ]
 
 
+def cargar_ordenes_activas_operario(operario_sel):
+    """
+    Consulta únicamente las órdenes del operario y devuelve las activas.
+    No carga fotos, materiales, checklists ni controles asociados.
+    """
+    ordenes_operario = obtener_ordenes_operario(operario_sel)
+
+    ordenes_operario = filtrar_seguridad_operario(
+        ordenes_operario,
+        operario_sel
+    )
+
+    return [
+        o for o in ordenes_operario
+        if len(o) > 3
+        and str(o[3] or "").strip()
+        in [
+            "Abierta",
+            "En curso",
+            "Pendiente material"
+        ]
+    ]
+
+
+def buscar_ot_operario_por_id(ordenes, id_ot):
+    """Localiza una única OT por su ID dentro de las órdenes permitidas."""
+    if id_ot is None:
+        return None
+
+    for fila in ordenes or []:
+        try:
+            if int(fila[0]) == int(id_ot):
+                return fila
+        except (TypeError, ValueError, IndexError):
+            continue
+
+    return None
+
+
+def filtrar_ordenes_activas_operario(ordenes_activas, filtro):
+    """Aplica los filtros del listado sin cargar el detalle de las OT."""
+    if filtro == "Preventivo":
+        return [
+            o for o in ordenes_activas
+            if len(o) > 11
+            and str(o[11] or "").strip().upper() == "PREVENTIVO"
+        ]
+
+    if filtro == "Legionella":
+        return [
+            o for o in ordenes_activas
+            if len(o) > 11
+            and str(o[11] or "").strip().upper() == "LEGIONELLA"
+        ]
+
+    if filtro == "☀️ Verano":
+        return [
+            o for o in ordenes_activas
+            if len(o) > 11
+            and str(o[11] or "").strip().upper() == "VERANO"
+        ]
+
+    if filtro == "Incidencias":
+        return [
+            o for o in ordenes_activas
+            if len(o) > 11
+            and str(o[11] or "").strip().upper()
+            in [
+                "APP",
+                "OUTLOOK",
+                "PROFESORES"
+            ]
+        ]
+
+    return ordenes_activas
+
+
+def mostrar_resumen_ot_operario(fila):
+    """
+    Muestra una fila ligera de la OT.
+    No llama a mostrar_tarjeta_ot ni prepara controles internos.
+    """
+    try:
+        id_ot = fila[0]
+        numero_ot = fila[1]
+        descripcion = fila[2]
+        estado = fila[3]
+        centro_ot = fila[5]
+        edificio_ot = fila[6]
+        espacio_ot = fila[7]
+        prioridad_ot = fila[9]
+        origen_ot = fila[11] if len(fila) > 11 else ""
+    except (TypeError, IndexError):
+        return
+
+    estado_txt = str(estado or "").strip()
+    prioridad_txt = str(prioridad_ot or "").strip()
+    origen_txt = str(origen_ot or "").strip()
+
+    icono_estado = {
+        "Abierta": "🔴",
+        "En curso": "🟠",
+        "Pendiente material": "📦",
+    }.get(estado_txt, "⚪")
+
+    icono_prioridad = {
+        "Urgente": "🚨",
+        "Alta": "🔴",
+        "Media": "🟠",
+        "Baja": "🟢",
+    }.get(prioridad_txt, "⚪")
+
+    descripcion_corta = (
+        str(descripcion or "")
+        .replace("\n", " ")
+        .strip()
+    )
+
+    if len(descripcion_corta) > 120:
+        descripcion_corta = descripcion_corta[:120].rstrip() + "..."
+
+    with st.container(border=True):
+        st.markdown(
+            f"### {icono_estado} {numero_ot or '-'}"
+        )
+
+        st.markdown(
+            f"{icono_prioridad} **{prioridad_txt or '-'}** · "
+            f"{estado_txt or '-'}"
+        )
+
+        st.caption(
+            f"🏢 {centro_ot or '-'} · "
+            f"{edificio_ot or '-'} · "
+            f"{espacio_ot or '-'}"
+        )
+
+        if origen_txt:
+            st.caption(f"Origen: {origen_txt}")
+
+        st.markdown(descripcion_corta or "Sin descripción.")
+
+        if st.button(
+            "🔎 Abrir y trabajar esta OT",
+            key=f"abrir_ot_operario_{id_ot}",
+            use_container_width=True
+        ):
+            try:
+                st.session_state["operario_ot_abierta_id"] = int(id_ot)
+            except (TypeError, ValueError):
+                st.error("No se ha podido abrir esta orden.")
+            else:
+                st.rerun()
+
+
+def pantalla_listado_ordenes_operario(operario_sel, ordenes_activas):
+    """Pantalla ligera: filtros, paginación y resúmenes de OT."""
+    st.markdown("## 📋 Mis órdenes")
+
+    filtro_origen_operario = st.radio(
+        "",
+        [
+            "Todas",
+            "Incidencias",
+            "Preventivo",
+            "Legionella",
+            "☀️ Verano"
+        ],
+        horizontal=True,
+        key="filtro_origen_operario"
+    )
+
+    ordenes_filtradas = filtrar_ordenes_activas_operario(
+        ordenes_activas,
+        filtro_origen_operario
+    )
+
+    if not ordenes_filtradas:
+        st.success("No tienes órdenes pendientes en este filtro.")
+        return
+
+    elementos_por_pagina = 15
+    total_ordenes = len(ordenes_filtradas)
+
+    total_paginas = max(
+        1,
+        (total_ordenes + elementos_por_pagina - 1)
+        // elementos_por_pagina
+    )
+
+    pagina_guardada = int(
+        st.session_state.get("pagina_ordenes_operario", 1) or 1
+    )
+
+    if pagina_guardada > total_paginas:
+        st.session_state["pagina_ordenes_operario"] = total_paginas
+
+    if total_paginas > 1:
+        pagina = st.number_input(
+            "Página de órdenes",
+            min_value=1,
+            max_value=total_paginas,
+            value=min(pagina_guardada, total_paginas),
+            step=1,
+            key="pagina_ordenes_operario"
+        )
+    else:
+        pagina = 1
+
+    inicio = (int(pagina) - 1) * elementos_por_pagina
+    fin = inicio + elementos_por_pagina
+    ordenes_pagina = ordenes_filtradas[inicio:fin]
+
+    st.caption(
+        f"Mostrando {inicio + 1}–"
+        f"{min(fin, total_ordenes)} "
+        f"de {total_ordenes} órdenes."
+    )
+
+    for fila in ordenes_pagina:
+        mostrar_resumen_ot_operario(fila)
+
+
+def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
+    """
+    Pantalla de detalle: carga y construye una sola OT completa.
+    Toda la lógica existente continúa dentro de mostrar_tarjeta_ot().
+    """
+    id_ot_abierta = st.session_state.get("operario_ot_abierta_id")
+
+    fila_abierta = buscar_ot_operario_por_id(
+        ordenes_activas,
+        id_ot_abierta
+    )
+
+    if fila_abierta is None:
+        st.session_state.pop("operario_ot_abierta_id", None)
+        st.warning(
+            "La OT seleccionada ya no está disponible o ya ha sido finalizada."
+        )
+
+        if st.button(
+            "⬅ Volver al listado de órdenes",
+            key="volver_listado_ot_no_disponible",
+            use_container_width=True
+        ):
+            st.rerun()
+
+        return
+
+    try:
+        numero_ot = fila_abierta[1]
+    except Exception:
+        numero_ot = ""
+
+    st.markdown(
+        f"## 🛠️ Trabajar OT {numero_ot or ''}"
+    )
+
+    if st.button(
+        "⬅ Volver al listado de órdenes",
+        key="volver_listado_ordenes_operario",
+        use_container_width=True
+    ):
+        st.session_state.pop("operario_ot_abierta_id", None)
+        st.rerun()
+
+    # Los materiales solo se consultan cuando hay una OT abierta.
+    try:
+        materiales_select = obtener_materiales_para_select()
+    except Exception as e:
+        materiales_select = []
+        st.caption(
+            f"No se pudo cargar el selector de materiales: {e}"
+        )
+
+    # Se mantiene la función y toda su lógica actual sin modificarla.
+    mostrar_tarjeta_ot(
+        fila=fila_abierta,
+        materiales_select=materiales_select,
+        operario_sel=operario_sel,
+        modo="operario"
+    )
+
+
 def pantalla_operario(modo="ordenes"):
     solo_historico = str(modo or "").strip().lower() == "historico"
 
+    # Al entrar en histórico nunca se conserva una OT abierta.
     if solo_historico:
+        st.session_state.pop("operario_ot_abierta_id", None)
         st.title("📁 Mi histórico")
     else:
         st.title("👷 Operario")
@@ -478,6 +765,7 @@ def pantalla_operario(modo="ordenes"):
             key="volver_admin_pantalla_operario"
         ):
             st.session_state["vista_operario"] = False
+            st.session_state.pop("operario_ot_abierta_id", None)
             st.rerun()
 
     # =====================================================
@@ -504,14 +792,19 @@ def pantalla_operario(modo="ordenes"):
 
     # =====================================================
     # MODO ÓRDENES
-    # No consulta ni procesa el histórico
+    # Listado ligero o una única OT abierta
     # =====================================================
     if not solo_historico:
+        id_ot_abierta = st.session_state.get(
+            "operario_ot_abierta_id"
+        )
 
-        # -------------------------------------------------
-        # ACCESO DIRECTO A LEGIONELLA
-        # -------------------------------------------------
-        if puede_ver_legionella_operario(operario_sel):
+        # Legionella se ofrece únicamente desde el listado.
+        # Al trabajar una OT no se construyen otras pantallas.
+        if (
+            id_ot_abierta is None
+            and puede_ver_legionella_operario(operario_sel)
+        ):
             zona_operario = st.radio(
                 "Zona de trabajo",
                 [
@@ -535,11 +828,8 @@ def pantalla_operario(modo="ordenes"):
 
                 return
 
-        # -------------------------------------------------
-        # CARGAR ÚNICAMENTE ÓRDENES DEL OPERARIO
-        # -------------------------------------------------
         try:
-            ordenes_operario = obtener_ordenes_operario(
+            ordenes_activas = cargar_ordenes_activas_operario(
                 operario_sel
             )
         except Exception as e:
@@ -549,139 +839,17 @@ def pantalla_operario(modo="ordenes"):
             st.caption(str(e))
             return
 
-        ordenes_operario = filtrar_seguridad_operario(
-            ordenes_operario,
-            operario_sel
-        )
-
-        ordenes_activas = [
-            o for o in ordenes_operario
-            if len(o) > 3
-            and str(o[3] or "").strip()
-            in [
-                "Abierta",
-                "En curso",
-                "Pendiente material"
-            ]
-        ]
-
-        st.markdown("## 📋 Mis órdenes")
-
-        filtro_origen_operario = st.radio(
-            "",
-            [
-                "Todas",
-                "Incidencias",
-                "Preventivo",
-                "Legionella",
-                "☀️ Verano"
-            ],
-            horizontal=True,
-            key="filtro_origen_operario"
-        )
-
-        # -------------------------------------------------
-        # FILTROS
-        # -------------------------------------------------
-        if filtro_origen_operario == "Preventivo":
-            ordenes_activas = [
-                o for o in ordenes_activas
-                if len(o) > 11
-                and str(o[11] or "").strip().upper()
-                == "PREVENTIVO"
-            ]
-
-        elif filtro_origen_operario == "Legionella":
-            ordenes_activas = [
-                o for o in ordenes_activas
-                if len(o) > 11
-                and str(o[11] or "").strip().upper()
-                == "LEGIONELLA"
-            ]
-
-        elif filtro_origen_operario == "☀️ Verano":
-            ordenes_activas = [
-                o for o in ordenes_activas
-                if len(o) > 11
-                and str(o[11] or "").strip().upper()
-                == "VERANO"
-            ]
-
-        elif filtro_origen_operario == "Incidencias":
-            ordenes_activas = [
-                o for o in ordenes_activas
-                if len(o) > 11
-                and str(o[11] or "").strip().upper()
-                in [
-                    "APP",
-                    "OUTLOOK",
-                    "PROFESORES"
-                ]
-            ]
-
-        if not ordenes_activas:
-            st.success("No tienes órdenes pendientes.")
+        if id_ot_abierta is not None:
+            pantalla_trabajar_ot_operario(
+                operario_sel,
+                ordenes_activas
+            )
             return
 
-        # -------------------------------------------------
-        # PAGINACIÓN DE ÓRDENES
-        # Evita renderizar todas las tarjetas simultáneamente
-        # -------------------------------------------------
-        elementos_por_pagina = 15
-        total_ordenes = len(ordenes_activas)
-
-        total_paginas = max(
-            1,
-            (
-                total_ordenes
-                + elementos_por_pagina
-                - 1
-            ) // elementos_por_pagina
+        pantalla_listado_ordenes_operario(
+            operario_sel,
+            ordenes_activas
         )
-
-        if total_paginas > 1:
-            pagina = st.number_input(
-                "Página de órdenes",
-                min_value=1,
-                max_value=total_paginas,
-                value=1,
-                step=1,
-                key="pagina_ordenes_operario"
-            )
-        else:
-            pagina = 1
-
-        inicio = (
-            int(pagina) - 1
-        ) * elementos_por_pagina
-
-        fin = inicio + elementos_por_pagina
-
-        ordenes_pagina = ordenes_activas[
-            inicio:fin
-        ]
-
-        st.caption(
-            f"Mostrando {inicio + 1}–"
-            f"{min(fin, total_ordenes)} "
-            f"de {total_ordenes} órdenes."
-        )
-
-        try:
-            materiales_select = (
-                obtener_materiales_para_select()
-            )
-        except Exception:
-            materiales_select = []
-
-        for fila in ordenes_pagina:
-            mostrar_tarjeta_ot(
-                fila=fila,
-                materiales_select=materiales_select,
-                operario_sel=operario_sel,
-                modo="operario"
-            )
-
         return
 
     # =====================================================
