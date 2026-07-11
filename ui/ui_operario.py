@@ -1095,3 +1095,10 @@ def pantalla_operario(modo="ordenes"):
                         f"📷 No se pudieron cargar "
                         f"las fotos: {e}"
                     )
+
+# =====================================================
+# COMPATIBILIDAD CON APP.PY
+# Mantiene el nombre anterior esperado por la aplicación
+# =====================================================
+def pantalla_operario_prueba(modo="ordenes"):
+    return pantalla_operario(modo=modo)
