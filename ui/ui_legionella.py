@@ -1271,25 +1271,6 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         consigna_minima = 0
         controla_consigna = 0
 
-    # =====================================================
-    # PURGA PENDIENTE
-    # Si la purga no se ha realizado, no se guarda el control
-    # como ejecutado, no se crea incidencia y no se genera
-    # una segunda OT correctiva. La OT actual permanece abierta.
-    # =====================================================
-    if str(tipo_control or "").strip() == "Purga":
-        try:
-            purga_realizada = int(float(valor)) == 1
-        except Exception:
-            purga_realizada = False
-
-        if not purga_realizada:
-            return (
-                "ERROR",
-                "La purga no se ha realizado. "
-                "La OT permanece abierta hasta completar la purga."
-            )
-
     estado, resultado = evaluar_resultado(
         tipo_control,
         valor,
