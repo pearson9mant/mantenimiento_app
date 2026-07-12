@@ -16,7 +16,7 @@ from modules.inventario import (
 
 from modules.preventivo import checklist_preventivo_completo
 
-from ui.ui_legionella import obtener_checklist_correctivo_legionella
+from ui.ui_legionella_correctivos import correctivo_legionella_completo
 
 from ui.ui_ot_controles import (
     mostrar_checklist_preventivo_operario,
@@ -136,18 +136,7 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
     desc_txt = str(desc or "").upper()
 
     if "CORRECTIVO LEGIONELLA" in desc_txt:
-        checklist = obtener_checklist_correctivo_legionella(num_ot)
-
-        if not checklist:
-            return False
-
-        causa = str(checklist.get("causa_detectada") or "").strip()
-
-        return (
-            causa != ""
-            and bool(checklist.get("nueva_medicion", 0))
-            and float(checklist.get("temperatura_final", 0) or 0) >= 50
-        )
+        return correctivo_legionella_completo(num_ot, desc)
 
     if es_ot_legionella(area, origen, desc):
         return st.session_state.get(f"legionella_guardada_{id_orden}", False)
