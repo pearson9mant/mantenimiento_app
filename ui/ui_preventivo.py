@@ -414,6 +414,364 @@ def mostrar_panel_inteligente_preventivo():
 
     st.markdown("---")
 
+def obtener_historico_preventivos():
+    """
+    Recupera las OT preventivas finalizadas y las enlaza con su
+    planificación original para obtener planta, tarea y frecuencia.
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT
+            h.id,
+            h.numero_ot,
+            h.descripcion,
+            h.fecha_creacion,
+            h.fecha_cierre,
+            h.centro,
+            h.edificio,
+            COALESCE(pr.planta, ''),
+            h.espacio,
+            h.area,
+            h.operario,
+            h.observaciones_cierre,
+            COALESCE(pr.tarea, ''),
+            COALESCE(pr.frecuencia, '')
+        FROM historico_ordenes h
+        LEFT JOIN preventivo_registros pr
+            ON pr.numero_ot = h.numero_ot
+        WHERE UPPER(COALESCE(h.origen, '')) = 'PREVENTIVO'
+           OR UPPER(COALESCE(h.descripcion, '')) LIKE '[PREVENTIVO]%'
+        ORDER BY h.id DESC
+    """))
+
+    datos = cursor.fetchall()
+    conn.close()
+
+    return datos
+
+
+def obtener_checklist_historico_preventivo(numero_ot):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT
+                item,
+                hecho,
+                fecha_hecho,
+                operario,
+                COALESCE(estado_revision, ''),
+                COALESCE(observaciones_revision, ''),
+                COALESCE(numero_ot_correctiva, '')
+            FROM preventivo_checklist
+            WHERE numero_ot = ?
+            ORDER BY id ASC
+        """), (numero_ot,))
+
+        datos = cursor.fetchall()
+
+    except Exception:
+        conn.rollback()
+
+        # Compatibilidad con checklists antiguos
+        cursor.execute(_sql("""
+            SELECT
+                item,
+                hecho,
+                fecha_hecho,
+                operario,
+                '',
+                COALESCE(observaciones, ''),
+                ''
+            FROM preventivo_checklist
+            WHERE numero_ot = ?
+            ORDER BY id ASC
+        """), (numero_ot,))
+
+        datos = cursor.fetchall()
+
+    conn.close()
+    return datos
+
+
+def mostrar_historico_preventivo():
+    st.markdown("### 📚 Histórico de mantenimiento preventivo")
+
+    ot_abierta = st.session_state.get(
+        "historico_preventivo_ot_abierta"
+    )
+
+    historico = obtener_historico_preventivos()
+
+    if not historico:
+        st.info("Todavía no hay preventivos finalizados.")
+        return
+
+    # ==================================================
+    # DETALLE DE UNA SOLA REVISIÓN
+    # ==================================================
+    if ot_abierta:
+        fila = next(
+            (
+                h for h in historico
+                if str(h[1]) == str(ot_abierta)
+            ),
+            None
+        )
+
+        if fila is None:
+            st.session_state.pop(
+                "historico_preventivo_ot_abierta",
+                None
+            )
+            st.rerun()
+
+        (
+            id_historico,
+            numero_ot,
+            descripcion,
+            fecha_creacion,
+            fecha_cierre,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            area,
+            operario,
+            observaciones_cierre,
+            tarea,
+            frecuencia,
+        ) = fila
+
+        if st.button(
+            "⬅ Volver al histórico preventivo",
+            key="volver_historico_preventivo",
+            use_container_width=True
+        ):
+            st.session_state.pop(
+                "historico_preventivo_ot_abierta",
+                None
+            )
+            st.rerun()
+
+        st.markdown(f"## {numero_ot}")
+
+        st.markdown(
+            f"""
+**Tarea:** {tarea or descripcion or "-"}  
+🏢 **Centro:** {centro or "-"}  
+🏫 **Edificio:** {edificio or "-"}  
+🧱 **Planta:** {planta or "-"}  
+📍 **Espacio:** {espacio or "-"}  
+🔧 **Área:** {area or "-"}  
+🔁 **Frecuencia:** {frecuencia or "-"}  
+👷 **Operario:** {operario or "-"}  
+📅 **Fecha de cierre:** {fecha_cierre or "-"}
+"""
+        )
+
+        if observaciones_cierre:
+            st.markdown("#### Observaciones de cierre")
+            st.info(str(observaciones_cierre))
+
+        checks = obtener_checklist_historico_preventivo(
+            numero_ot
+        )
+
+        st.markdown("### ✅ Checklist realizado")
+
+        if not checks:
+            st.info(
+                "Esta OT no tiene checklist guardado o pertenece "
+                "al sistema preventivo anterior."
+            )
+            return
+
+        correctos = 0
+        revisar = 0
+        averias = 0
+
+        for check in checks:
+            (
+                item,
+                hecho,
+                fecha_hecho,
+                operario_check,
+                estado_revision,
+                observaciones_revision,
+                numero_ot_correctiva,
+            ) = check
+
+            estado = str(estado_revision or "").strip()
+
+            if not estado and bool(hecho):
+                estado = "Correcto"
+
+            if estado == "Correcto":
+                icono = "✅"
+                correctos += 1
+            elif estado == "Revisar":
+                icono = "🟡"
+                revisar += 1
+            elif estado == "Avería":
+                icono = "🔴"
+                averias += 1
+            else:
+                icono = "⚪"
+
+            with st.container(border=True):
+                st.markdown(f"**{icono} {item}**")
+                st.caption(
+                    f"Estado: {estado or 'Sin estado'} · "
+                    f"Fecha: {fecha_hecho or '-'} · "
+                    f"Operario: {operario_check or operario or '-'}"
+                )
+
+                if observaciones_revision:
+                    st.write(observaciones_revision)
+
+                if numero_ot_correctiva:
+                    st.warning(
+                        f"🔧 Correctiva vinculada: "
+                        f"{numero_ot_correctiva}"
+                    )
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Puntos", len(checks))
+        c2.metric("✅ Correctos", correctos)
+        c3.metric("🟡 Revisar", revisar)
+        c4.metric("🔴 Averías", averias)
+
+        return
+
+    # ==================================================
+    # LISTADO LIGERO
+    # ==================================================
+    centros = sorted({
+        str(fila[5])
+        for fila in historico
+        if fila[5]
+    })
+
+    areas = sorted({
+        str(fila[9])
+        for fila in historico
+        if fila[9]
+    })
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        centro_filtro = st.selectbox(
+            "Centro",
+            ["Todos"] + centros,
+            key="hist_prev_centro"
+        )
+
+    with col2:
+        area_filtro = st.selectbox(
+            "Área",
+            ["Todas"] + areas,
+            key="hist_prev_area"
+        )
+
+    buscar = st.text_input(
+        "Buscar por OT, tarea, espacio u operario",
+        key="hist_prev_buscar"
+    ).strip().lower()
+
+    filtrado = []
+
+    for fila in historico:
+        numero_ot = str(fila[1] or "")
+        descripcion = str(fila[2] or "")
+        centro = str(fila[5] or "")
+        planta = str(fila[7] or "")
+        espacio = str(fila[8] or "")
+        area = str(fila[9] or "")
+        operario = str(fila[10] or "")
+        tarea = str(fila[12] or "")
+
+        if centro_filtro != "Todos" and centro != centro_filtro:
+            continue
+
+        if area_filtro != "Todas" and area != area_filtro:
+            continue
+
+        texto_busqueda = " ".join([
+            numero_ot,
+            descripcion,
+            centro,
+            planta,
+            espacio,
+            area,
+            operario,
+            tarea,
+        ]).lower()
+
+        if buscar and buscar not in texto_busqueda:
+            continue
+
+        filtrado.append(fila)
+
+    st.caption(
+        f"Preventivos encontrados: {len(filtrado)}"
+    )
+
+    if not filtrado:
+        st.info("No hay resultados con estos filtros.")
+        return
+
+    for fila in filtrado[:100]:
+        (
+            id_historico,
+            numero_ot,
+            descripcion,
+            fecha_creacion,
+            fecha_cierre,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            area,
+            operario,
+            observaciones_cierre,
+            tarea,
+            frecuencia,
+        ) = fila
+
+        with st.container(border=True):
+            st.markdown(
+                f"### ✅ {numero_ot} · {tarea or descripcion}"
+            )
+
+            st.caption(
+                f"📅 {fecha_cierre or '-'} · "
+                f"🏢 {centro or '-'} · "
+                f"{edificio or '-'} · "
+                f"{planta or '-'} · "
+                f"{espacio or '-'}"
+            )
+
+            st.markdown(
+                f"**Área:** {area or '-'} · "
+                f"**Frecuencia:** {frecuencia or '-'} · "
+                f"**Operario:** {operario or '-'}"
+            )
+
+            if st.button(
+                "🔎 Ver revisión y checklist",
+                key=f"abrir_hist_prev_{id_historico}",
+                use_container_width=True
+            ):
+                st.session_state[
+                    "historico_preventivo_ot_abierta"
+                ] = numero_ot
+                st.rerun()
+
 
 def pantalla_preventivo():
     asegurar_columnas_preventivo()
