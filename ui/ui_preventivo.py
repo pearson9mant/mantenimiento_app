@@ -781,11 +781,12 @@ def pantalla_preventivo():
     
     mostrar_panel_inteligente_preventivo()
 
-    tab1, tab2, tab3, tab4 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
             "➕ Crear tarea",
             "📋 Tareas",
             "📅 Planificación",
+            "📚 Histórico",
             "🏫 Preventivo aulas",
         ]
     )
@@ -1415,4 +1416,7 @@ def pantalla_preventivo():
                     )
 
     with tab4:
+        mostrar_historico_preventivo()
+
+    with tab5:
         pantalla_preventivo_aulas()
