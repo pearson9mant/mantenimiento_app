@@ -664,17 +664,18 @@ def pantalla_preventivo():
                         cursor.execute(_sql("""
                             INSERT INTO preventivo_tareas
                             (
-                                centro, edificio, espacio, area,
+                                centro, edificio, planta, espacio, area,
                                 tarea, frecuencia,
                                 ultima_fecha, proxima_fecha,
                                 operario, activo, observaciones, foto,
                                 tipo, prioridad, duracion_prevista,
                                 material_necesario, empresa_externa, fecha_limite
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)
                         """), (
                             centro,
                             edificio,
+                            planta,
                             espacio,
                             area,
                             tarea,
