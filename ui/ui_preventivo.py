@@ -886,9 +886,18 @@ def pantalla_preventivo():
                             )
 
                             if actualizado:
-                                st.success(
-                                    "Planificación actualizada correctamente."
-                                )
+                                generadas = generar_ots_preventivo_si_toca()
+                            
+                                if generadas > 0:
+                                    st.success(
+                                        f"Planificación guardada y {generadas} OT preventiva(s) "
+                                        "generada(s) automáticamente."
+                                    )
+                                else:
+                                    st.success(
+                                        "Planificación actualizada correctamente."
+                                    )
+                            
                                 st.rerun()
 
                         except Exception as e:
