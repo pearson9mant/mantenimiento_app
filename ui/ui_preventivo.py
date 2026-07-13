@@ -204,7 +204,15 @@ def operario_por_centro(centro):
     return OPERARIOS[0] if OPERARIOS else ""
 
 
-def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuencia):
+def existe_preventivo_duplicado(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    area,
+    tarea,
+    frecuencia
+):
     conn = conectar()
     cursor = conn.cursor()
 
@@ -213,6 +221,7 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
         FROM preventivo_tareas
         WHERE centro = ?
           AND edificio = ?
+          AND COALESCE(planta, '') = ?
           AND espacio = ?
           AND area = ?
           AND tarea = ?
@@ -221,6 +230,7 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
     """), (
         centro,
         edificio,
+        str(planta or ""),
         espacio,
         area,
         tarea,
@@ -228,8 +238,8 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
     ))
 
     total = cursor.fetchone()[0]
-
     conn.close()
+
     return total > 0
 
 def actualizar_planificacion_preventivo(
