@@ -705,7 +705,7 @@ def pantalla_preventivo():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, centro, edificio, espacio, area, tarea,
+            SELECT id, centro, edificio, planta, espacio, area, tarea,
                    frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto,
                    tipo, prioridad, duracion_prevista, material_necesario,
                    empresa_externa, fecha_limite
@@ -721,7 +721,7 @@ def pantalla_preventivo():
         else:
             for t in tareas:
                 (
-                    id_tarea, centro, edificio, espacio, area,
+                    id_tarea, centro, edificio, planta, espacio, area,
                     tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto,
                     tipo, prioridad, duracion_prevista, material_necesario,
                     empresa_externa, fecha_limite
@@ -734,7 +734,7 @@ def pantalla_preventivo():
                 ):
                     st.markdown(
                         f"""
-                        🏢 {centro} · {edificio} · {espacio}  
+                         🏢 {centro} · {edificio} · {planta} · {espacio} 
                         🔧 Área: {area}  
                         🧩 Tipo: {tipo or 'Preventivo'}  
                         🚦 Prioridad: {prioridad or 'Media'}  
