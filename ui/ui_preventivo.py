@@ -690,5 +690,238 @@ def pantalla_preventivo():
             else:
                 st.info("No hay preventivos pendientes")
 
+    with tab3:
+        st.markdown("### 📅 Planificación preventiva")
+
+        st.info(
+            "Desde aquí puedes programar la próxima fecha, la frecuencia, "
+            "el operario y activar o desactivar cada mantenimiento."
+        )
+
+        conn = conectar()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                id,
+                centro,
+                edificio,
+                espacio,
+                area,
+                tarea,
+                frecuencia,
+                proxima_fecha,
+                operario,
+                activo
+            FROM preventivo_tareas
+            ORDER BY centro, edificio, espacio, tarea
+        """)
+
+        planificaciones = cursor.fetchall()
+        conn.close()
+
+        if not planificaciones:
+            st.info("No hay tareas preventivas para planificar.")
+
+        else:
+            centros_plan = sorted({
+                str(fila[1])
+                for fila in planificaciones
+                if fila[1]
+            })
+
+            centro_filtro_plan = st.selectbox(
+                "Filtrar centro",
+                ["Todos"] + centros_plan,
+                key="filtro_plan_preventivo_centro"
+            )
+
+            planificaciones_filtradas = planificaciones
+
+            if centro_filtro_plan != "Todos":
+                planificaciones_filtradas = [
+                    fila
+                    for fila in planificaciones
+                    if str(fila[1]) == centro_filtro_plan
+                ]
+
+            activas = len([
+                fila for fila in planificaciones_filtradas
+                if bool(fila[9])
+            ])
+
+            inactivas = len(planificaciones_filtradas) - activas
+
+            hoy = date.today()
+
+            vencidas = 0
+
+            for fila in planificaciones_filtradas:
+                try:
+                    fecha_plan = date.fromisoformat(str(fila[7]))
+                    if bool(fila[9]) and fecha_plan <= hoy:
+                        vencidas += 1
+                except Exception:
+                    pass
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            c1.metric("Planificadas", len(planificaciones_filtradas))
+            c2.metric("Activas", activas)
+            c3.metric("Inactivas", inactivas)
+            c4.metric("Vencidas", vencidas)
+
+            st.markdown("---")
+
+            frecuencias_disponibles = [
+                "Semanal",
+                "Mensual",
+                "Trimestral",
+                "Semestral",
+                "Anual",
+            ]
+
+            for fila in planificaciones_filtradas:
+                (
+                    tarea_id,
+                    centro,
+                    edificio,
+                    espacio,
+                    area,
+                    tarea,
+                    frecuencia,
+                    proxima_fecha,
+                    operario,
+                    activo,
+                ) = fila
+
+                titulo = (
+                    f"{centro} · {edificio} · {espacio} · "
+                    f"{tarea} · Próxima: {proxima_fecha or '-'}"
+                )
+
+                with st.expander(titulo, expanded=False):
+                    st.caption(
+                        f"🔧 Área: {area or '-'} · "
+                        f"👷 Operario: {operario or '-'}"
+                    )
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        frecuencia_actual = (
+                            frecuencia
+                            if frecuencia in frecuencias_disponibles
+                            else "Mensual"
+                        )
+
+                        frecuencia_editada = st.selectbox(
+                            "Frecuencia",
+                            frecuencias_disponibles,
+                            index=frecuencias_disponibles.index(
+                                frecuencia_actual
+                            ),
+                            key=f"plan_prev_frecuencia_{tarea_id}"
+                        )
+
+                        try:
+                            fecha_actual = date.fromisoformat(
+                                str(proxima_fecha)
+                            )
+                        except Exception:
+                            fecha_actual = date.today()
+
+                        proxima_fecha_editada = st.date_input(
+                            "Próxima fecha",
+                            value=fecha_actual,
+                            key=f"plan_prev_fecha_{tarea_id}"
+                        )
+
+                    with col2:
+                        operario_actual = (
+                            operario
+                            if operario in OPERARIOS
+                            else operario_por_centro(centro)
+                        )
+
+                        indice_operario = (
+                            OPERARIOS.index(operario_actual)
+                            if operario_actual in OPERARIOS
+                            else 0
+                        )
+
+                        operario_editado = st.selectbox(
+                            "Operario",
+                            OPERARIOS,
+                            index=indice_operario,
+                            key=f"plan_prev_operario_{tarea_id}"
+                        )
+
+                        if operario_editado == "Otro":
+                            operario_editado = st.text_input(
+                                "Nombre operario",
+                                value=str(operario or ""),
+                                key=f"plan_prev_operario_otro_{tarea_id}"
+                            )
+
+                        activo_editado = st.checkbox(
+                            "Planificación activa",
+                            value=bool(activo),
+                            key=f"plan_prev_activo_{tarea_id}"
+                        )
+
+                    if st.button(
+                        "💾 Guardar planificación",
+                        key=f"guardar_plan_prev_{tarea_id}",
+                        use_container_width=True
+                    ):
+                        try:
+                            actualizado = actualizar_planificacion_preventivo(
+                                tarea_id=tarea_id,
+                                frecuencia=frecuencia_editada,
+                                proxima_fecha=proxima_fecha_editada.strftime(
+                                    "%Y-%m-%d"
+                                ),
+                                operario=operario_editado,
+                                activo=activo_editado
+                            )
+
+                            if actualizado:
+                                st.success(
+                                    "Planificación actualizada correctamente."
+                                )
+                                st.rerun()
+
+                        except Exception as e:
+                            st.error(
+                                f"No se ha podido actualizar: {e}"
+                            )
+
+            st.markdown("---")
+
+            if st.button(
+                "⚙️ Generar OTs preventivas que tocan hoy",
+                key="generar_ots_desde_planificacion_preventiva",
+                use_container_width=True
+            ):
+                try:
+                    generadas = generar_ots_preventivo_si_toca()
+
+                    if generadas > 0:
+                        st.success(
+                            f"Se han generado {generadas} OT preventivas."
+                        )
+                    else:
+                        st.info(
+                            "No hay preventivos pendientes de generar."
+                        )
+
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(
+                        f"No se han podido generar las OT: {e}"
+                    )
+
     with tab4:
         pantalla_preventivo_aulas()
