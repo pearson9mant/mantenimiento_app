@@ -19,7 +19,8 @@ from ui.procedimientos_legionella import (
 
 from modules.preventivo import (
     obtener_checklist_preventivo,
-    actualizar_checklist_preventivo,
+    obtener_checklist_preventivo_detallado,
+    actualizar_item_checklist_preventivo,
     crear_checklist_preventivo,
 )
 
