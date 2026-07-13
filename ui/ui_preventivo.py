@@ -442,12 +442,33 @@ def pantalla_preventivo():
             key=f"prev_edificio_{centro}"
         )
 
-        espacios_disponibles = obtener_espacios(edificio, centro)
-
+        plantas_disponibles = obtener_plantas_espacios(
+            centro,
+            edificio
+        )
+        
+        if not plantas_disponibles:
+            plantas_disponibles = ["Sin planta"]
+        
+        planta = st.selectbox(
+            "Planta",
+            plantas_disponibles,
+            key=f"prev_planta_{centro}_{edificio}"
+        )
+        
+        espacios_disponibles = obtener_espacios_por_planta(
+            centro,
+            edificio,
+            planta
+        )
+        
+        if not espacios_disponibles:
+            espacios_disponibles = ["Otro"]
+        
         espacio_sel = st.selectbox(
             "Espacio",
             espacios_disponibles,
-            key=f"prev_espacio_{centro}_{edificio}"
+            key=f"prev_espacio_{centro}_{edificio}_{planta}"
         )
 
         if espacio_sel == "Otro":
