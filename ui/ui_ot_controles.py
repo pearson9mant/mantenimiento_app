@@ -279,7 +279,7 @@ def mostrar_ejecucion_legionella_operario(
 def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
     st.markdown("### ✅ Checklist preventivo")
 
-    checks = obtener_checklist_preventivo(num_ot)
+    checks = obtener_checklist_preventivo_detallado(num_ot)
 
     if not checks:
         crear_checklist_preventivo(
@@ -288,13 +288,24 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             limpiar_tarea_preventiva(desc),
             operario
         )
-        checks = obtener_checklist_preventivo(num_ot)
+
+        checks = obtener_checklist_preventivo_detallado(num_ot)
 
     if not checks:
         st.warning("No se ha podido crear el checklist preventivo.")
         return False
 
-    hechos = 0
+    total = len(checks)
+    completados = 0
+    averias = 0
+    pendientes_revision = 0
+
+    opciones_estado = [
+        "",
+        "Correcto",
+        "Revisar",
+        "Avería",
+    ]
 
     for check in checks:
         (
@@ -305,37 +316,121 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             hecho,
             fecha_hecho,
             operario_check,
-            observaciones_check
+            observaciones_antiguas,
+            estado_revision,
+            observaciones_revision,
+            crear_correctivo,
+            numero_ot_correctiva,
         ) = check
 
-        valor_actual = bool(hecho)
+        estado_guardado = str(estado_revision or "").strip()
 
-        nuevo_valor = st.checkbox(
-            item,
-            value=valor_actual,
-            key=f"check_operario_prev_{num_ot}_{id_check}"
-        )
+        # Compatibilidad con checklists antiguos:
+        # si ya estaba marcado como hecho, se considera correcto.
+        if not estado_guardado and bool(hecho):
+            estado_guardado = "Correcto"
 
-        if nuevo_valor != valor_actual:
-            actualizar_checklist_preventivo(
-                id_check,
-                nuevo_valor,
-                nombre_operario_actual() or operario
+        with st.container(border=True):
+            st.markdown(f"#### {item}")
+
+            indice_estado = (
+                opciones_estado.index(estado_guardado)
+                if estado_guardado in opciones_estado
+                else 0
             )
 
-        if nuevo_valor:
-            hechos += 1
+            nuevo_estado = st.radio(
+                "Resultado",
+                opciones_estado,
+                index=indice_estado,
+                horizontal=True,
+                format_func=lambda valor: {
+                    "": "⚪ Pendiente",
+                    "Correcto": "✅ Correcto",
+                    "Revisar": "🟡 Revisar",
+                    "Avería": "🔴 Avería",
+                }.get(valor, valor),
+                key=f"prev_estado_{num_ot}_{id_check}",
+            )
 
-    total = len(checks)
-    st.caption(f"Checklist: {hechos}/{total} completado")
+            nueva_observacion = st.text_area(
+                "Observaciones",
+                value=str(
+                    observaciones_revision
+                    or observaciones_antiguas
+                    or ""
+                ),
+                key=f"prev_obs_{num_ot}_{id_check}",
+                placeholder=(
+                    "Describe lo revisado o la avería detectada."
+                ),
+            )
 
-    if hechos == total:
-        st.success("Checklist completado. Ya puedes finalizar la OT.")
+            crear_correctiva_nueva = False
+
+            if nuevo_estado == "Avería":
+                crear_correctiva_nueva = st.checkbox(
+                    "🔧 Crear OT correctiva para esta avería",
+                    value=bool(crear_correctivo),
+                    key=f"prev_crear_corr_{num_ot}_{id_check}",
+                )
+
+                if numero_ot_correctiva:
+                    st.success(
+                        f"Correctiva creada: {numero_ot_correctiva}"
+                    )
+
+            if st.button(
+                "💾 Guardar este punto",
+                key=f"prev_guardar_item_{num_ot}_{id_check}",
+                use_container_width=True,
+            ):
+                actualizado = actualizar_item_checklist_preventivo(
+                    id_check=id_check,
+                    estado_revision=nuevo_estado,
+                    observaciones_revision=nueva_observacion,
+                    crear_correctivo=crear_correctiva_nueva,
+                    operario=nombre_operario_actual() or operario,
+                )
+
+                if actualizado:
+                    st.success("Punto guardado correctamente.")
+                    st.rerun()
+                else:
+                    st.error("No se ha podido guardar este punto.")
+
+        if nuevo_estado:
+            completados += 1
+
+        if nuevo_estado == "Avería":
+            averias += 1
+
+        if nuevo_estado == "Revisar":
+            pendientes_revision += 1
+
+    st.caption(
+        f"Checklist: {completados}/{total} completado · "
+        f"🟡 Revisar: {pendientes_revision} · "
+        f"🔴 Averías: {averias}"
+    )
+
+    if completados == total:
+        if averias > 0:
+            st.warning(
+                "Checklist completado con averías detectadas. "
+                "Revisa las observaciones antes de finalizar."
+            )
+        else:
+            st.success(
+                "Checklist completado. Ya puedes finalizar la OT."
+            )
+
         return True
 
-    st.warning("Faltan puntos del checklist por marcar.")
+    st.warning(
+        "Todos los puntos deben tener un resultado antes de finalizar."
+    )
     return False
-
 
 def mostrar_checklist_correctivo_legionella_operario(num_ot, centro, edificio, espacio, desc):
     if "CORRECTIVO LEGIONELLA" not in str(desc or "").upper():
