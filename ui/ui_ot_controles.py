@@ -302,6 +302,8 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
     averias = 0
     pendientes_revision = 0
 
+    datos_para_guardar = []
+
     opciones_estado = [
         "",
         "Correcto",
@@ -325,10 +327,11 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             numero_ot_correctiva,
         ) = check
 
-        estado_guardado = str(estado_revision or "").strip()
+        estado_guardado = str(
+            estado_revision or ""
+        ).strip()
 
-        # Compatibilidad con checklists antiguos:
-        # si ya estaba marcado como hecho, se considera correcto.
+        # Compatibilidad con checklists antiguos
         if not estado_guardado and bool(hecho):
             estado_guardado = "Correcto"
 
@@ -382,24 +385,12 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
                         f"Correctiva creada: {numero_ot_correctiva}"
                     )
 
-            if st.button(
-                "💾 Guardar este punto",
-                key=f"prev_guardar_item_{num_ot}_{id_check}",
-                use_container_width=True,
-            ):
-                actualizado = actualizar_item_checklist_preventivo(
-                    id_check=id_check,
-                    estado_revision=nuevo_estado,
-                    observaciones_revision=nueva_observacion,
-                    crear_correctivo=crear_correctiva_nueva,
-                    operario=nombre_operario_actual() or operario,
-                )
-
-                if actualizado:
-                    st.success("Punto guardado correctamente.")
-                    st.rerun()
-                else:
-                    st.error("No se ha podido guardar este punto.")
+            datos_para_guardar.append({
+                "id_check": id_check,
+                "estado_revision": nuevo_estado,
+                "observaciones_revision": nueva_observacion,
+                "crear_correctivo": crear_correctiva_nueva,
+            })
 
         if nuevo_estado:
             completados += 1
@@ -416,6 +407,33 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         f"🔴 Averías: {averias}"
     )
 
+    if st.button(
+        "💾 Guardar checklist preventivo",
+        key=f"guardar_checklist_completo_{num_ot}",
+        use_container_width=True,
+        type="primary",
+    ):
+        try:
+            guardado = guardar_checklist_preventivo_completo(
+                items=datos_para_guardar,
+                operario=nombre_operario_actual() or operario,
+            )
+
+            if guardado:
+                st.success(
+                    "Checklist preventivo guardado correctamente."
+                )
+                st.rerun()
+            else:
+                st.error(
+                    "No se ha podido guardar el checklist."
+                )
+
+        except Exception as e:
+            st.error(
+                f"Error guardando el checklist: {e}"
+            )
+
     if completados == total:
         if averias > 0:
             st.warning(
@@ -423,17 +441,22 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             )
 
             st.info(
-                "Solo se crearán correctivas para los puntos de avería "
-                "donde hayas marcado la casilla correspondiente."
+                "Guarda primero el checklist. Después crea las "
+                "correctivas marcadas."
             )
 
             if st.button(
                 "🔧 Crear correctivas marcadas",
                 key=f"prev_generar_correctivas_{num_ot}",
                 use_container_width=True,
-                type="primary",
             ):
                 try:
+                    # Asegura que las selecciones actuales estén guardadas
+                    guardar_checklist_preventivo_completo(
+                        items=datos_para_guardar,
+                        operario=nombre_operario_actual() or operario,
+                    )
+
                     creadas, mensajes = (
                         crear_correctivas_checklist_preventivo(num_ot)
                     )
@@ -451,8 +474,8 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
 
                     else:
                         st.info(
-                            "No hay correctivas nuevas pendientes de crear. "
-                            "Puede que ya estén creadas o que no se haya "
+                            "No hay correctivas nuevas pendientes. "
+                            "Puede que ya estén creadas o no se haya "
                             "marcado la casilla."
                         )
 
@@ -463,7 +486,8 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
 
         else:
             st.success(
-                "Checklist completado. Ya puedes finalizar la OT."
+                "Checklist completado. Guarda los cambios antes "
+                "de finalizar la OT."
             )
 
         return True
