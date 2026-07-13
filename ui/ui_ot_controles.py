@@ -22,6 +22,7 @@ from modules.preventivo import (
     obtener_checklist_preventivo_detallado,
     actualizar_item_checklist_preventivo,
     crear_checklist_preventivo,
+    crear_correctivas_checklist_preventivo,
 )
 
 from ui.ui_legionella import (
