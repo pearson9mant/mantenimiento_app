@@ -467,13 +467,21 @@ def pantalla_preventivo():
 
         st.info(f"📅 Próxima fecha calculada automáticamente: {proxima_fecha}")
 
-        with st.form("form_preventivo", clear_on_submit=True):
-            area = st.selectbox("Área", AREAS, key="prev_area")
-            tareas_disponibles = TAREAS_PREVENTIVAS_POR_AREA.get(
-                area,
-                TAREAS_PREVENTIVAS_POR_AREA["General"]
-            )
-
+        area = st.selectbox(
+            "Área",
+            AREAS,
+            key="prev_area"
+        )
+        
+        tareas_disponibles = TAREAS_PREVENTIVAS_POR_AREA.get(
+            area,
+            TAREAS_PREVENTIVAS_POR_AREA["General"]
+        )
+        
+        with st.form(
+            key=f"form_preventivo_{area}",
+            clear_on_submit=True
+        ):
             tipo = st.selectbox(
                 "Tipo de preventivo",
                 ["Preventivo", "Normativo", "Inspección", "Limpieza", "Calibración", "Lubricación"],
