@@ -456,11 +456,17 @@ def pantalla_preventivo():
             key=f"prev_planta_{centro}_{edificio}"
         )
         
-        espacios_disponibles = obtener_espacios_por_planta(
+        espacios_encontrados = obtener_espacios_por_planta(
             centro,
             edificio,
             planta
         )
+        
+        espacios_disponibles = [
+            fila[0]
+            for fila in espacios_encontrados
+            if fila and fila[0]
+        ]
         
         if not espacios_disponibles:
             espacios_disponibles = ["Otro"]
