@@ -995,6 +995,7 @@ def pantalla_preventivo():
                     duplicado = existe_preventivo_duplicado(
                         centro,
                         edificio,
+                        planta,
                         espacio,
                         area,
                         tarea,
