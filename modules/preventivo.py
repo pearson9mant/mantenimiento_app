@@ -203,7 +203,14 @@ def obtener_items_checklist_por_tarea(tarea):
     ]
 
 
-def existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
+def existe_ot_preventiva_abierta(
+    tarea_id,
+    tarea,
+    centro,
+    edificio,
+    planta,
+    espacio
+):
     conn = conectar()
     cursor = conn.cursor()
 
@@ -216,6 +223,7 @@ def existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
           AND descripcion = ?
           AND centro = ?
           AND edificio = ?
+          AND COALESCE(planta, '') = ?
           AND espacio = ?
           AND estado NOT IN ('Finalizada', 'Cerrado', 'Cancelada')
     """), (
@@ -223,6 +231,7 @@ def existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
         texto_buscar,
         centro,
         edificio,
+        str(planta or ""),
         espacio
     ))
 
