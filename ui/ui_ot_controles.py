@@ -21,6 +21,7 @@ from modules.preventivo import (
     obtener_checklist_preventivo,
     obtener_checklist_preventivo_detallado,
     actualizar_item_checklist_preventivo,
+    guardar_checklist_preventivo_completo,
     crear_checklist_preventivo,
     crear_correctivas_checklist_preventivo,
 )
