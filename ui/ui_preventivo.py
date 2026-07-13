@@ -1231,7 +1231,7 @@ def pantalla_preventivo():
 
             activas = len([
                 fila for fila in planificaciones_filtradas
-                if bool(fila[9])
+                if bool(fila[10])
             ])
 
             inactivas = len(planificaciones_filtradas) - activas
