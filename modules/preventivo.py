@@ -502,7 +502,7 @@ def generar_ots_preventivo_si_toca():
     generadas = 0
 
     cursor.execute("""
-        SELECT id, centro, edificio, espacio, area, tarea,
+        SELECT id, centro, edificio, planta, espacio, area, tarea,
                frecuencia, ultima_fecha, proxima_fecha, operario,
                tipo, prioridad, duracion_prevista,
                material_necesario, empresa_externa, fecha_limite
@@ -514,7 +514,7 @@ def generar_ots_preventivo_si_toca():
 
     for t in tareas:
         (
-            tarea_id, centro, edificio, espacio, area, tarea,
+            tarea_id, centro, edificio, planta, espacio, area, tarea,
             frecuencia, ultima_fecha, proxima_fecha, operario,
             tipo, prioridad, duracion_prevista,
             material_necesario, empresa_externa, fecha_limite
@@ -526,7 +526,7 @@ def generar_ots_preventivo_si_toca():
             proxima_fecha = hoy
 
         if str(proxima_fecha) <= hoy:
-            if existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, espacio):
+            if existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, planta, espacio):
                 continue
 
             numero = obtener_siguiente_numero_ot(centro, "PREV")
@@ -548,6 +548,7 @@ Fecha límite: {fecha_limite or '-'}
                 "Abierta",
                 centro,
                 edificio,
+                planta,
                 espacio,
                 area,
                 prioridad or "Media",
@@ -570,18 +571,20 @@ Fecha límite: {fecha_limite or '-'}
                     numero_ot,
                     centro,
                     edificio,
+                    planta,
                     espacio,
                     area,
                     tarea,
                     frecuencia,
                     operario
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """), (
                 tarea_id,
                 numero,
                 centro,
                 edificio,
+                planta,
                 espacio,
                 area,
                 tarea,
