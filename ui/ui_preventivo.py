@@ -469,6 +469,10 @@ def pantalla_preventivo():
 
         with st.form("form_preventivo", clear_on_submit=True):
             area = st.selectbox("Área", AREAS, key="prev_area")
+            tareas_disponibles = TAREAS_PREVENTIVAS_POR_AREA.get(
+                area,
+                TAREAS_PREVENTIVAS_POR_AREA["General"]
+            )
 
             tipo = st.selectbox(
                 "Tipo de preventivo",
