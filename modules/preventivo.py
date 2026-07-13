@@ -262,6 +262,7 @@ def crear_checklist_preventivo(numero_ot, tarea_id, tarea, operario):
 
 
 def obtener_checklist_preventivo(numero_ot):
+    asegurar_columnas_checklist_preventivo()
     conn = conectar()
     cursor = conn.cursor()
 
