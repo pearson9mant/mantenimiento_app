@@ -10,19 +10,100 @@ from ui.preventivo_aulas import pantalla_preventivo_aulas
 from modules.inteligencia_preventivos import construir_panel_preventivo
 
 
-TAREAS_PREVENTIVAS = [
-    "Revisar cuadro eléctrico",
-    "Revisar enchufes",
-    "Revisar iluminación",
-    "Revisar luces de emergencia",
-    "Revisar baños",
-    "Revisar grifos",
-    "Revisar cisternas",
-    "Revisar desagües",
-    "Revisar split aire acondicionado",
-    "Revisar o lipiar placas solares",
-    "Otra",
-]
+TAREAS_PREVENTIVAS_POR_AREA = {
+    "Electricidad": [
+        "Revisar cuadro eléctrico",
+        "Revisar magnetotérmicos",
+        "Revisar diferenciales",
+        "Revisar enchufes",
+        "Revisar interruptores",
+        "Revisar iluminación",
+        "Revisar luces de emergencia",
+        "Revisar canaletas y cableado visible",
+        "Otra",
+    ],
+
+    "Fontanería": [
+        "Revisar baños",
+        "Revisar grifos",
+        "Revisar cisternas",
+        "Revisar fluxores",
+        "Revisar desagües",
+        "Revisar fugas visibles",
+        "Revisar fregaderos",
+        "Otra",
+    ],
+
+    "Climatización": [
+        "Revisar split aire acondicionado",
+        "Limpiar filtros de climatización",
+        "Revisar desagüe de condensados",
+        "Comprobar funcionamiento frío/calor",
+        "Revisar unidad exterior",
+        "Revisar soportes y vibraciones",
+        "Otra",
+    ],
+
+    "Iluminación": [
+        "Revisar iluminación",
+        "Revisar luminarias",
+        "Revisar luces de emergencia",
+        "Revisar interruptores y pulsadores",
+        "Otra",
+    ],
+
+    "Equipamiento": [
+        "Revisar mesas y sillas",
+        "Revisar mobiliario",
+        "Revisar puertas y manetas",
+        "Revisar ventanas y persianas",
+        "Revisar pizarras",
+        "Otra",
+    ],
+
+    "Informática": [
+        "Revisar pantalla / proyector",
+        "Revisar conexiones HDMI",
+        "Revisar ordenador",
+        "Revisar red y conectividad",
+        "Revisar altavoces",
+        "Otra",
+    ],
+
+    "ACS": [
+        "Revisar acumulador ACS",
+        "Revisar retorno ACS",
+        "Revisar bomba de recirculación",
+        "Revisar válvulas",
+        "Revisar aislamiento",
+        "Otra",
+    ],
+
+    "Jardinería": [
+        "Revisar sistema de riego",
+        "Revisar programador de riego",
+        "Revisar árboles y ramas",
+        "Revisar zonas verdes",
+        "Otra",
+    ],
+
+    "Seguridad": [
+        "Revisar puertas de emergencia",
+        "Revisar señalización",
+        "Revisar cierres y accesos",
+        "Revisar elementos de protección",
+        "Otra",
+    ],
+
+    "General": [
+        "Revisión visual general",
+        "Comprobación de funcionamiento",
+        "Limpieza preventiva",
+        "Lubricación",
+        "Ajuste",
+        "Otra",
+    ],
+}
 
 
 def asegurar_columnas_preventivo():
