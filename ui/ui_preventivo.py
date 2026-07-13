@@ -511,8 +511,8 @@ def pantalla_preventivo():
 
             tarea_sel = st.selectbox(
                 "Tarea preventiva",
-                TAREAS_PREVENTIVAS,
-                key="prev_tarea_select"
+                tareas_disponibles,
+                key=f"prev_tarea_select_{area}"
             )
 
             if tarea_sel == "Otra":
