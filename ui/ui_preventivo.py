@@ -1189,6 +1189,7 @@ def pantalla_preventivo():
                 id,
                 centro,
                 edificio,
+                planta,
                 espacio,
                 area,
                 tarea,
@@ -1197,7 +1198,7 @@ def pantalla_preventivo():
                 operario,
                 activo
             FROM preventivo_tareas
-            ORDER BY centro, edificio, espacio, tarea
+            ORDER BY centro, edificio, planta, espacio, tarea
         """)
 
         planificaciones = cursor.fetchall()
@@ -1269,6 +1270,7 @@ def pantalla_preventivo():
                     tarea_id,
                     centro,
                     edificio,
+                    planta,
                     espacio,
                     area,
                     tarea,
@@ -1279,8 +1281,8 @@ def pantalla_preventivo():
                 ) = fila
 
                 titulo = (
-                    f"{centro} · {edificio} · {espacio} · "
-                    f"{tarea} · Próxima: {proxima_fecha or '-'}"
+                    f"{centro} · {edificio} · {planta or '-'} · "
+                    f"{espacio} · {tarea} · Próxima: {proxima_fecha or '-'}"
                 )
 
                 with st.expander(titulo, expanded=False):
