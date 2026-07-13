@@ -562,45 +562,109 @@ def obtener_edificios_espacios(centro):
 def obtener_plantas_espacios(centro, edificio):
     crear_tabla_espacios()
 
+    centro_buscado = normalizar_comparacion(centro)
+    edificio_buscado = normalizar_comparacion(edificio)
+
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT DISTINCT planta
+        SELECT centro, edificio, planta
         FROM espacios
         WHERE activo = 1
-          AND centro = ?
-          AND edificio = ?
           AND planta IS NOT NULL
           AND planta <> ''
         ORDER BY planta
-    """), (centro, edificio))
+    """))
 
-    datos = [fila[0] for fila in cur.fetchall()]
+    filas = cur.fetchall()
     conn.close()
-    return datos
+
+    plantas = []
+
+    for centro_db, edificio_db, planta_db in filas:
+        if normalizar_comparacion(centro_db) != centro_buscado:
+            continue
+
+        if normalizar_comparacion(edificio_db) != edificio_buscado:
+            continue
+
+        planta_txt = normalizar_texto(planta_db)
+
+        if planta_txt and planta_txt not in plantas:
+            plantas.append(planta_txt)
+
+    # Si todavía no hay espacios cargados, usa las plantas base.
+    if not plantas:
+        for centro_base, edificios_base in PLANTAS_BASE.items():
+            if normalizar_comparacion(centro_base) != centro_buscado:
+                continue
+
+            for edificio_base, plantas_base in edificios_base.items():
+                if (
+                    normalizar_comparacion(edificio_base)
+                    == edificio_buscado
+                ):
+                    plantas = list(plantas_base)
+                    break
+
+    return plantas
 
 
 def obtener_espacios_por_planta(centro, edificio, planta):
     crear_tabla_espacios()
 
+    centro_buscado = normalizar_comparacion(centro)
+    edificio_buscado = normalizar_comparacion(edificio)
+    planta_buscada = normalizar_comparacion(planta)
+
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT espacio, tipo
+        SELECT centro, edificio, planta, espacio, tipo
         FROM espacios
         WHERE activo = 1
-          AND centro = ?
-          AND edificio = ?
-          AND planta = ?
           AND espacio IS NOT NULL
           AND espacio <> ''
         ORDER BY espacio
-    """), (centro, edificio, planta))
+    """))
 
-    datos = cur.fetchall()
+    filas = cur.fetchall()
     conn.close()
+
+    datos = []
+
+    for (
+        centro_db,
+        edificio_db,
+        planta_db,
+        espacio_db,
+        tipo_db,
+    ) in filas:
+
+        if normalizar_comparacion(centro_db) != centro_buscado:
+            continue
+
+        if normalizar_comparacion(edificio_db) != edificio_buscado:
+            continue
+
+        if normalizar_comparacion(planta_db) != planta_buscada:
+            continue
+
+        espacio_txt = normalizar_texto(espacio_db)
+        tipo_txt = normalizar_texto(tipo_db)
+
+        if not espacio_txt:
+            continue
+
+        if not any(
+            normalizar_comparacion(fila[0])
+            == normalizar_comparacion(espacio_txt)
+            for fila in datos
+        ):
+            datos.append((espacio_txt, tipo_txt))
+
     return datos
 
 
