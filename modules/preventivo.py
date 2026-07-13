@@ -367,6 +367,89 @@ def actualizar_item_checklist_preventivo(
 
     return True
 
+def guardar_checklist_preventivo_completo(items, operario=""):
+    """
+    Guarda todos los puntos del checklist en una sola operación.
+
+    items debe ser una lista de diccionarios:
+    {
+        "id_check": 1,
+        "estado_revision": "Correcto",
+        "observaciones_revision": "",
+        "crear_correctivo": False,
+    }
+    """
+    asegurar_columnas_checklist_preventivo()
+
+    if not items:
+        return False
+
+    estados_validos = [
+        "",
+        "Correcto",
+        "Revisar",
+        "Avería",
+    ]
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        for item in items:
+            id_check = int(item["id_check"])
+
+            estado_revision = str(
+                item.get("estado_revision") or ""
+            ).strip()
+
+            observaciones_revision = str(
+                item.get("observaciones_revision") or ""
+            ).strip()
+
+            crear_correctivo = bool(
+                item.get("crear_correctivo", False)
+            )
+
+            if estado_revision not in estados_validos:
+                raise ValueError(
+                    f"Estado preventivo no válido: {estado_revision}"
+                )
+
+            hecho = 1 if estado_revision else 0
+            fecha_hecho = hoy_str() if hecho else ""
+
+            if estado_revision != "Avería":
+                crear_correctivo = False
+
+            cursor.execute(_sql("""
+                UPDATE preventivo_checklist
+                SET estado_revision = ?,
+                    observaciones_revision = ?,
+                    crear_correctivo = ?,
+                    hecho = ?,
+                    fecha_hecho = ?,
+                    operario = ?
+                WHERE id = ?
+            """), (
+                estado_revision,
+                observaciones_revision,
+                1 if crear_correctivo else 0,
+                hecho,
+                fecha_hecho,
+                operario,
+                id_check
+            ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 def actualizar_checklist_preventivo(id_check, hecho, operario=""):
     conn = conectar()
