@@ -1242,8 +1242,9 @@ def pantalla_preventivo():
 
             for fila in planificaciones_filtradas:
                 try:
-                    fecha_plan = date.fromisoformat(str(fila[7]))
-                    if bool(fila[9]) and fecha_plan <= hoy:
+                    fecha_plan = date.fromisoformat(str(fila[8]))
+
+                    if bool(fila[10]) and fecha_plan <= hoy:
                         vencidas += 1
                 except Exception:
                     pass
