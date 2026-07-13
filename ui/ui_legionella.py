@@ -1246,6 +1246,21 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     if valor is None:
         return "ERROR", "Valor no válido. No se ha guardado el registro."
 
+    # PURGA PENDIENTE:
+    # no se guarda como realizada y no crea otra OT correctiva
+    if str(tipo_control or "").strip() == "Purga":
+        try:
+            purga_realizada = int(float(valor)) == 1
+        except Exception:
+            purga_realizada = False
+
+        if not purga_realizada:
+            return (
+                "ERROR",
+                "La purga sigue pendiente. "
+                "Realízala antes de guardar y finalizar esta OT."
+            )
+
     # Buscar consigna configurada para esta tarea/punto
     consigna_minima = 0
     controla_consigna = 0
