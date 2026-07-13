@@ -415,18 +415,57 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         f"🔴 Averías: {averias}"
     )
 
-    if completados == total:
-        if averias > 0:
-            st.warning(
-                "Checklist completado con averías detectadas. "
-                "Revisa las observaciones antes de finalizar."
-            )
-        else:
-            st.success(
-                "Checklist completado. Ya puedes finalizar la OT."
-            )
-
-        return True
+        if completados == total:
+            if averias > 0:
+                st.warning(
+                    "Checklist completado con averías detectadas."
+                )
+    
+                st.info(
+                    "Solo se crearán correctivas para los puntos de avería "
+                    "donde hayas marcado la casilla correspondiente."
+                )
+    
+                if st.button(
+                    "🔧 Crear correctivas marcadas",
+                    key=f"prev_generar_correctivas_{num_ot}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    try:
+                        creadas, mensajes = (
+                            crear_correctivas_checklist_preventivo(num_ot)
+                        )
+    
+                        if creadas > 0:
+                            st.success(
+                                f"Se han creado {creadas} OT correctiva(s)."
+                            )
+    
+                            for mensaje in mensajes:
+                                if mensaje:
+                                    st.caption(str(mensaje))
+    
+                            st.rerun()
+    
+                        else:
+                            st.info(
+                                "No hay correctivas nuevas pendientes de crear. "
+                                "Puede que ya estén creadas o que no se haya "
+                                "marcado la casilla."
+                            )
+    
+                    except Exception as e:
+                        st.error(
+                            f"No se han podido crear las correctivas: {e}"
+                        )
+    
+            else:
+                st.success(
+                    "Checklist completado. Ya puedes finalizar la OT."
+                )
+    
+            return True
 
     st.warning(
         "Todos los puntos deben tener un resultado antes de finalizar."
