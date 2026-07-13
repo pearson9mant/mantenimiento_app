@@ -6,6 +6,37 @@ from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
 def hoy_str():
     return datetime.now().strftime("%Y-%m-%d")
 
+def asegurar_columnas_checklist_preventivo():
+    """
+    Amplía el checklist preventivo sin eliminar el sistema anterior.
+    Mantiene la columna 'hecho' para compatibilidad.
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+
+    columnas = [
+        ("estado_revision", "TEXT DEFAULT ''"),
+        ("observaciones_revision", "TEXT DEFAULT ''"),
+        ("crear_correctivo", "INTEGER DEFAULT 0"),
+        ("numero_ot_correctiva", "TEXT DEFAULT ''"),
+    ]
+
+    try:
+        for columna, tipo in columnas:
+            try:
+                cursor.execute(
+                    f"""
+                    ALTER TABLE preventivo_checklist
+                    ADD COLUMN {columna} {tipo}
+                    """
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
+    finally:
+        conn.close()
+
 
 def sumar_frecuencia(fecha, frecuencia):
     fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
