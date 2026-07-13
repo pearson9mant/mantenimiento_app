@@ -278,6 +278,91 @@ def obtener_checklist_preventivo(numero_ot):
     conn.close()
     return datos
 
+def obtener_checklist_preventivo_detallado(numero_ot):
+    asegurar_columnas_checklist_preventivo()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT
+            id,
+            numero_ot,
+            tarea_id,
+            item,
+            hecho,
+            fecha_hecho,
+            operario,
+            observaciones,
+            estado_revision,
+            observaciones_revision,
+            crear_correctivo,
+            numero_ot_correctiva
+        FROM preventivo_checklist
+        WHERE numero_ot = ?
+        ORDER BY id ASC
+    """), (numero_ot,))
+
+    datos = cursor.fetchall()
+
+    conn.close()
+    return datos
+
+
+def actualizar_item_checklist_preventivo(
+    id_check,
+    estado_revision,
+    observaciones_revision="",
+    crear_correctivo=False,
+    operario=""
+):
+    asegurar_columnas_checklist_preventivo()
+
+    estado_revision = str(estado_revision or "").strip()
+
+    estados_validos = [
+        "",
+        "Correcto",
+        "Revisar",
+        "Avería",
+    ]
+
+    if estado_revision not in estados_validos:
+        return False
+
+    hecho = 1 if estado_revision else 0
+    fecha_hecho = hoy_str() if hecho else ""
+
+    if estado_revision != "Avería":
+        crear_correctivo = False
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        UPDATE preventivo_checklist
+        SET estado_revision = ?,
+            observaciones_revision = ?,
+            crear_correctivo = ?,
+            hecho = ?,
+            fecha_hecho = ?,
+            operario = ?
+        WHERE id = ?
+    """), (
+        estado_revision,
+        str(observaciones_revision or "").strip(),
+        1 if crear_correctivo else 0,
+        hecho,
+        fecha_hecho,
+        operario,
+        id_check
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return True
+
 
 def actualizar_checklist_preventivo(id_check, hecho, operario=""):
     conn = conectar()
