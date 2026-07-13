@@ -148,6 +148,42 @@ def existe_preventivo_duplicado(centro, edificio, espacio, area, tarea, frecuenc
     conn.close()
     return total > 0
 
+def actualizar_planificacion_preventivo(
+    tarea_id,
+    frecuencia,
+    proxima_fecha,
+    operario,
+    activo
+):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE preventivo_tareas
+            SET frecuencia = ?,
+                proxima_fecha = ?,
+                operario = ?,
+                activo = ?
+            WHERE id = ?
+        """), (
+            frecuencia,
+            proxima_fecha,
+            operario,
+            1 if activo else 0,
+            int(tarea_id)
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 def mostrar_panel_inteligente_preventivo():
     st.markdown("## 🛠 Centro de Control Preventivo")
 
