@@ -66,22 +66,21 @@ def asegurar_columnas_preventivo():
 
 def ejecutar_preventivos_automaticos():
     """
-    Ejecuta la generación automática de OTs preventivas al entrar en la pantalla.
-    Solo se ejecuta una vez por sesión para no repetir procesos en cada rerun.
+    Comprueba automáticamente las planificaciones preventivas.
+    La protección contra duplicados está en generar_ots_preventivo_si_toca().
     """
-    if st.session_state.get("preventivos_auto_ejecutados"):
-        return
-
     try:
         n = generar_ots_preventivo_si_toca()
-        st.session_state["preventivos_auto_ejecutados"] = True
 
         if n > 0:
-            st.toast(f"🔧 Se han generado {n} OTs preventivas automáticamente")
+            st.toast(
+                f"🔧 Se han generado {n} OTs preventivas automáticamente"
+            )
 
     except Exception as e:
-        st.session_state["preventivos_auto_ejecutados"] = True
-        st.warning(f"No se pudieron generar preventivos automáticos: {e}")
+        st.warning(
+            f"No se pudieron generar preventivos automáticos: {e}"
+        )
 
 
 def limpiar_nombre_archivo(texto):
