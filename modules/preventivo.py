@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
 from database.db import conectar, _sql
-from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
+from modules.ordenes import (
+    crear_orden,
+    obtener_siguiente_numero_ot,
+    crear_correctiva_desde_ot,
+)
 
 
 def hoy_str():
@@ -507,3 +511,124 @@ Fecha límite: {fecha_limite or '-'}
     conn.close()
 
     return generadas
+
+def crear_correctivas_checklist_preventivo(numero_ot):
+    """
+    Crea una OT correctiva por cada punto del checklist marcado como:
+    - estado_revision = Avería
+    - crear_correctivo = 1
+    - todavía sin OT correctiva asociada
+
+    Devuelve:
+        (cantidad_creadas, mensajes)
+    """
+    asegurar_columnas_checklist_preventivo()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT
+                pc.id,
+                pc.tarea_id,
+                pc.item,
+                pc.observaciones_revision,
+                pc.numero_ot_correctiva,
+                pt.centro,
+                pt.edificio,
+                pt.espacio,
+                pt.area,
+                pt.prioridad,
+                pt.operario
+            FROM preventivo_checklist pc
+            LEFT JOIN preventivo_tareas pt
+                ON pt.id = pc.tarea_id
+            WHERE pc.numero_ot = ?
+              AND pc.estado_revision = 'Avería'
+              AND pc.crear_correctivo = 1
+              AND TRIM(COALESCE(pc.numero_ot_correctiva, '')) = ''
+            ORDER BY pc.id ASC
+        """), (numero_ot,))
+
+        averias = cursor.fetchall()
+
+    finally:
+        conn.close()
+
+    creadas = 0
+    mensajes = []
+
+    for averia in averias:
+        (
+            id_check,
+            tarea_id,
+            item,
+            observaciones_revision,
+            numero_ot_correctiva,
+            centro,
+            edificio,
+            espacio,
+            area,
+            prioridad,
+            operario,
+        ) = averia
+
+        descripcion_defecto = str(item or "").strip()
+
+        if observaciones_revision:
+            descripcion_defecto += (
+                f"\n\nObservaciones del preventivo: "
+                f"{observaciones_revision}"
+            )
+
+        ok, mensaje = crear_correctiva_desde_ot(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+            area=area or "Mantenimiento",
+            prioridad=prioridad or "Media",
+            operario=operario or "",
+            descripcion_defecto=descripcion_defecto,
+            numero_ot_origen=numero_ot,
+            origen="Preventivo",
+            solicitante="Operarios",
+        )
+
+        if not ok:
+            mensajes.append(mensaje)
+            continue
+
+        numero_correctiva = ""
+
+        texto_mensaje = str(mensaje or "")
+
+        if ":" in texto_mensaje:
+            numero_correctiva = texto_mensaje.split(":")[-1].strip()
+
+        conn = conectar()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(_sql("""
+                UPDATE preventivo_checklist
+                SET numero_ot_correctiva = ?
+                WHERE id = ?
+            """), (
+                numero_correctiva,
+                int(id_check)
+            ))
+
+            conn.commit()
+
+        except Exception:
+            conn.rollback()
+            raise
+
+        finally:
+            conn.close()
+
+        creadas += 1
+        mensajes.append(mensaje)
+
+    return creadas, mensajes
