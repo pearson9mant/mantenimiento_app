@@ -7,30 +7,40 @@ from modules.ordenes import (
 )
 
 
+_ESTRUCTURA_PREVENTIVO_ASEGURADA = False
+
+
 def hoy_str():
     return datetime.now().strftime("%Y-%m-%d")
 
-def asegurar_columnas_checklist_preventivo():
+def asegurar_estructura_preventivo():
     """
-    Amplía el checklist preventivo sin eliminar el sistema anterior.
-    Mantiene la columna 'hecho' para compatibilidad.
+    Asegura una sola vez por proceso las columnas nuevas del módulo.
+    No elimina ni renombra columnas existentes.
     """
+    global _ESTRUCTURA_PREVENTIVO_ASEGURADA
+
+    if _ESTRUCTURA_PREVENTIVO_ASEGURADA:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
-    columnas = [
-        ("estado_revision", "TEXT DEFAULT ''"),
-        ("observaciones_revision", "TEXT DEFAULT ''"),
-        ("crear_correctivo", "INTEGER DEFAULT 0"),
-        ("numero_ot_correctiva", "TEXT DEFAULT ''"),
+    cambios = [
+        ("preventivo_checklist", "estado_revision", "TEXT DEFAULT ''"),
+        ("preventivo_checklist", "observaciones_revision", "TEXT DEFAULT ''"),
+        ("preventivo_checklist", "crear_correctivo", "INTEGER DEFAULT 0"),
+        ("preventivo_checklist", "numero_ot_correctiva", "TEXT DEFAULT ''"),
+        ("preventivo_tareas", "planta", "TEXT DEFAULT ''"),
+        ("preventivo_registros", "planta", "TEXT DEFAULT ''"),
     ]
 
     try:
-        for columna, tipo in columnas:
+        for tabla, columna, tipo in cambios:
             try:
                 cursor.execute(
                     f"""
-                    ALTER TABLE preventivo_checklist
+                    ALTER TABLE {tabla}
                     ADD COLUMN {columna} {tipo}
                     """
                 )
@@ -38,8 +48,14 @@ def asegurar_columnas_checklist_preventivo():
             except Exception:
                 conn.rollback()
 
+        _ESTRUCTURA_PREVENTIVO_ASEGURADA = True
+
     finally:
         conn.close()
+
+
+def asegurar_columnas_checklist_preventivo():
+    asegurar_estructura_preventivo()
 
 
 def sumar_frecuencia(fecha, frecuencia):
@@ -211,37 +227,59 @@ def existe_ot_preventiva_abierta(
     planta,
     espacio
 ):
+    """
+    Comprueba primero la vinculación tarea_id -> numero_ot.
+    """
+    asegurar_estructura_preventivo()
+
     conn = conectar()
     cursor = conn.cursor()
 
-    texto_buscar = f"[PREVENTIVO] {tarea}"
+    try:
+        cursor.execute(_sql("""
+            SELECT COUNT(*)
+            FROM preventivo_registros pr
+            INNER JOIN ordenes_trabajo ot
+                ON ot.numero_ot = pr.numero_ot
+            WHERE pr.tarea_id = ?
+              AND LOWER(COALESCE(ot.estado, ''))
+                  NOT IN ('finalizada', 'finalizado', 'cerrada', 'cerrado', 'cancelada', 'cancelado')
+        """), (int(tarea_id),))
 
-    cursor.execute(_sql("""
-        SELECT COUNT(*)
-        FROM ordenes_trabajo
-        WHERE origen = ?
-          AND descripcion = ?
-          AND centro = ?
-          AND edificio = ?
-          AND COALESCE(planta, '') = ?
-          AND espacio = ?
-          AND estado NOT IN ('Finalizada', 'Cerrado', 'Cancelada')
-    """), (
-        "PREVENTIVO",
-        texto_buscar,
-        centro,
-        edificio,
-        str(planta or ""),
-        espacio
-    ))
+        total = int(cursor.fetchone()[0] or 0)
 
-    total = cursor.fetchone()[0]
+        if total > 0:
+            return True
 
-    conn.close()
-    return total > 0
+        texto_buscar = f"[PREVENTIVO] {tarea}"
+
+        cursor.execute(_sql("""
+            SELECT COUNT(*)
+            FROM ordenes_trabajo
+            WHERE origen = ?
+              AND descripcion = ?
+              AND centro = ?
+              AND edificio = ?
+              AND espacio = ?
+              AND LOWER(COALESCE(estado, ''))
+                  NOT IN ('finalizada', 'finalizado', 'cerrada', 'cerrado', 'cancelada', 'cancelado')
+        """), (
+            "PREVENTIVO",
+            texto_buscar,
+            centro,
+            edificio,
+            espacio
+        ))
+
+        return int(cursor.fetchone()[0] or 0) > 0
+
+    finally:
+        conn.close()
 
 
 def crear_checklist_preventivo(numero_ot, tarea_id, tarea, operario):
+    asegurar_estructura_preventivo()
+
     items = obtener_items_checklist_por_tarea(tarea)
 
     conn = conectar()
@@ -495,6 +533,8 @@ def checklist_preventivo_completo(numero_ot):
 
 
 def generar_ots_preventivo_si_toca():
+    asegurar_estructura_preventivo()
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -535,6 +575,7 @@ def generar_ots_preventivo_si_toca():
 
             observaciones_ot = f"""
 Tipo preventivo: {tipo or 'Preventivo'}
+Planta: {planta or '-'}
 Frecuencia: {frecuencia or '-'}
 Duración prevista: {duracion_prevista or '-'}
 Material necesario: {material_necesario or '-'}
@@ -548,7 +589,6 @@ Fecha límite: {fecha_limite or '-'}
                 "Abierta",
                 centro,
                 edificio,
-                planta,
                 espacio,
                 area,
                 prioridad or "Media",
@@ -632,6 +672,7 @@ def crear_correctivas_checklist_preventivo(numero_ot):
                 pc.numero_ot_correctiva,
                 pt.centro,
                 pt.edificio,
+                pt.planta,
                 pt.espacio,
                 pt.area,
                 pt.prioridad,
@@ -663,6 +704,7 @@ def crear_correctivas_checklist_preventivo(numero_ot):
             numero_ot_correctiva,
             centro,
             edificio,
+            planta,
             espacio,
             area,
             prioridad,
@@ -670,6 +712,9 @@ def crear_correctivas_checklist_preventivo(numero_ot):
         ) = averia
 
         descripcion_defecto = str(item or "").strip()
+
+        if planta:
+            descripcion_defecto = f"Planta: {planta}\n{descripcion_defecto}"
 
         if observaciones_revision:
             descripcion_defecto += (
