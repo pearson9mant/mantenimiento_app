@@ -5,7 +5,10 @@ from pathlib import Path
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from database.db import conectar, _sql
 from modules.preventivo import generar_ots_preventivo_si_toca
-from modules.ubicaciones import obtener_espacios
+from modules.espacios import (
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
 from ui.preventivo_aulas import pantalla_preventivo_aulas
 from modules.inteligencia_preventivos import construir_panel_preventivo
 
