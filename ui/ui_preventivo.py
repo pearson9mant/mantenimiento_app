@@ -120,7 +120,8 @@ def asegurar_columnas_preventivo():
         "duracion_prevista": "TEXT",
         "material_necesario": "TEXT",
         "empresa_externa": "TEXT",
-        "fecha_limite": "TEXT"
+        "fecha_limite": "TEXT",
+        "planta": "TEXT"
     }
 
     try:
