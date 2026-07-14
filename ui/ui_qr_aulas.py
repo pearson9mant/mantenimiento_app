@@ -18,8 +18,6 @@ def pantalla_qr_aulas():
     )
 
     aulas = obtener_aulas_para_qr()
-    st.write("DEBUG LLAR:")
-    st.write(obtener_espacios_llar_debug())
 
     if not aulas:
         st.warning("No hay aulas registradas.")
