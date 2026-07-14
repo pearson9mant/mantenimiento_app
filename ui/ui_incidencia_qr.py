@@ -213,11 +213,8 @@ def pantalla_incidencia_qr():
         return
 
     descripcion = st.text_area(
-        "¿Qué ocurre?",
-        placeholder=(
-            "Describe brevemente la incidencia. "
-            "Ejemplo: la persiana no sube."
-        ),
+        "📝 ¿Qué ocurre en este espacio?",
+        placeholder="Describe brevemente el problema observado.",
         height=150,
         key=f"qr_descripcion_{codigo_espacio}",
     )
@@ -260,7 +257,7 @@ def pantalla_incidencia_qr():
                     )
 
     if st.button(
-        "📨 Enviar incidencia",
+        "✅ Enviar aviso",
         key=f"qr_enviar_{codigo_espacio}",
         use_container_width=True,
         type="primary",
