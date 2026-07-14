@@ -1,7 +1,9 @@
 import streamlit as st
 from datetime import datetime
 
-from modules.espacios import obtener_espacio_por_id
+from modules.espacios import (
+    obtener_espacio_por_codigo,
+)
 from modules.ordenes import (
     crear_orden,
     obtener_siguiente_numero_ot,
