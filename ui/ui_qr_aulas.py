@@ -1,10 +1,29 @@
 import streamlit as st
+import io
+import qrcode
 
 from modules.espacios import obtener_aulas_para_qr
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
+def generar_qr(url):
+    qr = qrcode.QRCode(
+        version=2,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=2,
+    )
 
+    qr.add_data(url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return buffer
 
 def pantalla_qr_aulas():
     st.markdown("## 📱 QR de aulas")
