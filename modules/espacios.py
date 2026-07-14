@@ -985,3 +985,22 @@ def obtener_espacio_por_codigo(codigo):
 
     conn.close()
     return fila
+
+def obtener_aulas_para_qr():
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT codigo, centro, edificio, planta, espacio
+        FROM espacios
+        WHERE activo = 1
+        AND LOWER(tipo) = 'aula'
+        ORDER BY codigo
+    """))
+
+    datos = cur.fetchall()
+
+    conn.close()
+    return datos
