@@ -155,8 +155,7 @@ def pantalla_incidencia_qr():
     if int(activo or 0) != 1:
         st.error("Este espacio está desactivado.")
         return
-     
-    
+
     tipo_normalizado = str(tipo or "").strip().lower()
 
     if "aula" not in tipo_normalizado:
@@ -165,112 +164,175 @@ def pantalla_incidencia_qr():
         )
         return
 
+    clave_envio = f"incidencia_qr_enviada_{codigo_espacio}"
+
+    incidencia_enviada = st.session_state.get(
+        clave_envio,
+        ""
+    )
+
+    # =====================================================
+    # CABECERA PERSONALIZADA
+    # =====================================================
+
     st.markdown(
         """
-        <div class="qr-cabecera">
-            <div class="qr-titulo">🛠️ Comunicar incidencia</div>
-            <div class="qr-subtitulo">
-                Colegio Abat Oliba Loreto
-            </div>
-        </div>
+<div class="qr-cabecera">
+    <div class="qr-titulo">Comunicar una incidencia</div>
+    <div class="qr-subtitulo">
+        Servicio de Mantenimiento · Colegio Abat Oliba Loreto
+    </div>
+</div>
         """,
         unsafe_allow_html=True,
     )
 
     st.markdown(
         f"""
-        <div class="qr-espacio">
-            <div class="qr-espacio-nombre">📍 {espacio}</div>
-            <div class="qr-ubicacion">
-                {centro} · {edificio} · {planta}
-            </div>
-        </div>
+<div class="qr-espacio">
+    <div style="
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+    ">
+        Aula seleccionada
+    </div>
+
+    <div class="qr-espacio-nombre">
+        {espacio}
+    </div>
+
+    <div class="qr-ubicacion">
+        {centro} · {edificio}<br>
+        {planta}
+    </div>
+</div>
         """,
         unsafe_allow_html=True,
     )
 
-    clave_envio = f"incidencia_qr_enviada_{codigo_espacio}"
-
-    incidencia_enviada = st.session_state.get(clave_envio, "")
+    # =====================================================
+    # CONFIRMACIÓN FINAL
+    # =====================================================
 
     if incidencia_enviada:
         st.markdown(
             f"""
-            <div class="qr-confirmacion">
-                <div style="
-                    font-size: 48px;
-                    margin-bottom: 8px;
-                ">
-                    ✅
-                </div>
+<div style="
+    background: linear-gradient(145deg, #ecfdf5 0%, #f0fdf4 100%);
+    border: 2px solid #86efac;
+    border-radius: 26px;
+    padding: 34px 26px;
+    text-align: center;
+    box-shadow: 0 14px 34px rgba(22, 101, 52, 0.12);
+    margin-top: 10px;
+">
+    <div style="
+        width: 74px;
+        height: 74px;
+        line-height: 74px;
+        margin: 0 auto 18px auto;
+        border-radius: 50%;
+        background: #22c55e;
+        color: white;
+        font-size: 40px;
+        font-weight: 900;
+        box-shadow: 0 8px 20px rgba(34, 197, 94, 0.28);
+    ">
+        ✓
+    </div>
 
-                <div class="qr-confirmacion-titulo">
-                    Aviso enviado correctamente
-                </div>
+    <div style="
+        font-size: 27px;
+        font-weight: 950;
+        color: #14532d;
+        margin-bottom: 12px;
+    ">
+        Aviso enviado correctamente
+    </div>
 
-                <div style="
-                    margin-top: 12px;
-                    color: #166534;
-                    font-size: 16px;
-                    font-weight: 700;
-                ">
-                    Gracias por comunicar la incidencia.
-                </div>
+    <div style="
+        color: #166534;
+        font-size: 17px;
+        font-weight: 800;
+        margin-bottom: 10px;
+    ">
+        Gracias por comunicar la incidencia.
+    </div>
 
-                <div style="
-                    margin-top: 10px;
-                    color: #334155;
-                    font-size: 15px;
-                    line-height: 1.5;
-                ">
-                    El departamento de mantenimiento ha recibido el aviso
-                    y lo revisará lo antes posible.
-                </div>
+    <div style="
+        color: #334155;
+        font-size: 15px;
+        line-height: 1.6;
+        max-width: 470px;
+        margin: 0 auto;
+    ">
+        El departamento de mantenimiento ha recibido el aviso
+        y lo revisará lo antes posible.
+    </div>
 
-                <div style="
-                    margin-top: 20px;
-                    font-size: 14px;
-                    color: #64748b;
-                    font-weight: 700;
-                ">
-                    Referencia
-                </div>
+    <div style="
+        margin: 26px auto 0 auto;
+        padding: 16px 20px;
+        max-width: 350px;
+        background: white;
+        border: 1px solid #bbf7d0;
+        border-radius: 16px;
+    ">
+        <div style="
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        ">
+            Número de referencia
+        </div>
 
-                <div style="
-                    margin-top: 4px;
-                    font-size: 22px;
-                    font-weight: 900;
-                    color: #0f172a;
-                ">
-                    {incidencia_enviada}
-                </div>
+        <div style="
+            color: #0f172a;
+            font-size: 24px;
+            font-weight: 950;
+        ">
+            {incidencia_enviada}
+        </div>
+    </div>
 
-                <div style="
-                    margin-top: 18px;
-                    color: #64748b;
-                    font-size: 13px;
-                ">
-                    No es necesario volver a enviar el mismo aviso.
-                </div>
-            </div>
+    <div style="
+        margin-top: 20px;
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.5;
+    ">
+        No es necesario volver a enviar el mismo aviso.
+    </div>
+</div>
 
-            <div style="
-                text-align: center;
-                margin-top: 22px;
-                color: #64748b;
-                font-size: 12px;
-                line-height: 1.5;
-            ">
-                Colegio Abat Oliba Loreto<br>
-                Sistema Integral de Mantenimiento
-            </div>
+<div style="
+    text-align: center;
+    margin-top: 22px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.6;
+">
+    Colegio Abat Oliba Loreto<br>
+    Sistema Integral de Mantenimiento
+</div>
             """,
             unsafe_allow_html=True,
         )
         return
 
+    # =====================================================
+    # FORMULARIO
+    # =====================================================
+
     descripcion = st.text_area(
-        "📝 ¿Qué ocurre en este espacio?",
+        "¿Qué ocurre en este espacio?",
         placeholder="Describe brevemente el problema observado.",
         height=150,
         key=f"qr_descripcion_{codigo_espacio}",
@@ -292,19 +354,23 @@ def pantalla_incidencia_qr():
                 f"Puedes añadir un máximo de {MAX_FOTOS} fotografías."
             )
             error_fotos = True
+
         else:
             columnas = st.columns(2)
 
             for indice, foto in enumerate(fotos):
                 if foto.size > MAX_MB_FOTO * 1024 * 1024:
                     st.warning(
-                        f"La fotografía {foto.name} supera {MAX_MB_FOTO} MB."
+                        f"La fotografía {foto.name} supera "
+                        f"{MAX_MB_FOTO} MB."
                     )
                     error_fotos = True
                     continue
 
                 contenido = foto.getvalue()
-                fotos_validas.append((foto.name, contenido))
+                fotos_validas.append(
+                    (foto.name, contenido)
+                )
 
                 with columnas[indice % 2]:
                     st.image(
@@ -314,29 +380,44 @@ def pantalla_incidencia_qr():
                     )
 
     if st.button(
-        "✅ Enviar aviso",
+        "Enviar aviso",
         key=f"qr_enviar_{codigo_espacio}",
         use_container_width=True,
         type="primary",
     ):
-        descripcion_limpia = str(descripcion or "").strip()
+        descripcion_limpia = str(
+            descripcion or ""
+        ).strip()
 
         if not descripcion_limpia:
-            st.warning("Describe brevemente qué ocurre.")
+            st.warning(
+                "Describe brevemente qué ocurre."
+            )
             return
 
         if error_fotos:
-            st.error("Revisa las fotografías antes de enviar.")
+            st.error(
+                "Revisa las fotografías antes de enviar."
+            )
             return
 
         operario = operario_por_centro(centro)
-        numero_ot = obtener_siguiente_numero_ot(centro, "INC")
-        fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        numero_ot = obtener_siguiente_numero_ot(
+            centro,
+            "INC"
+        )
+
+        fecha_origen = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
         nombres_fotos = []
 
         try:
-            for indice, (nombre_original, contenido) in enumerate(
+            for indice, (
+                nombre_original,
+                contenido,
+            ) in enumerate(
                 fotos_validas,
                 start=1,
             ):
@@ -354,7 +435,8 @@ def pantalla_incidencia_qr():
 
         except Exception as error:
             st.error(
-                f"No se pudieron guardar las fotografías: {error}"
+                "No se pudieron guardar las fotografías: "
+                f"{error}"
             )
             return
 
@@ -362,7 +444,8 @@ def pantalla_incidencia_qr():
 
         observaciones_origen = (
             "Incidencia comunicada mediante QR del aula.\n"
-            f"Código de espacio: {codigo_espacio or id_espacio_db}\n"
+            f"Código de espacio: "
+            f"{codigo_espacio or id_espacio_db}\n"
             f"Planta: {planta or '-'}"
         )
 
@@ -384,11 +467,13 @@ def pantalla_incidencia_qr():
         )
 
         try:
-            crear_orden(datos_orden)
+            with st.spinner("Enviando aviso..."):
+                crear_orden(datos_orden)
 
         except Exception as error:
             st.error(
-                f"No se ha podido crear la incidencia: {error}"
+                "No se ha podido crear la incidencia: "
+                f"{error}"
             )
             return
 
