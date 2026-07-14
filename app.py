@@ -746,7 +746,13 @@ except Exception:
 
 
 params = st.query_params
+
 modo = params.get("modo")
+qr = params.get("qr")
+
+if qr == "1":
+    pantalla_incidencia_qr()
+    st.stop()
 
 if modo == "incidencias":
     pantalla_incidencias_profesores()
