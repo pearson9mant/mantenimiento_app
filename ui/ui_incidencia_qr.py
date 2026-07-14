@@ -155,7 +155,9 @@ def pantalla_incidencia_qr():
     if int(activo or 0) != 1:
         st.error("Este espacio está desactivado.")
         return
-
+    st.write("Código:", codigo_espacio)
+    st.write("Espacio:", espacio)
+    st.write("Tipo:", tipo)
     tipo_normalizado = str(tipo or "").strip().lower()
 
     if "aula" not in tipo_normalizado:
