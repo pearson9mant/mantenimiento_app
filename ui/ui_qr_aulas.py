@@ -1,20 +1,45 @@
 import io
+import re
+from urllib.parse import quote
 
 import qrcode
 import streamlit as st
+from reportlab.lib.colors import HexColor, black, white
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 from modules.espacios import obtener_aulas_para_qr
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
 
+AZUL_OSCURO = HexColor("#0f2a5f")
+AZUL = HexColor("#1d4ed8")
+AZUL_CLARO = HexColor("#eaf2ff")
+AMARILLO = HexColor("#f4b41a")
+GRIS = HexColor("#475569")
+GRIS_CLARO = HexColor("#e2e8f0")
 
-def generar_qr(url):
+
+def limpiar_nombre_archivo(texto):
+    texto = str(texto or "").strip()
+    texto = re.sub(r"[^a-zA-Z0-9_-]+", "_", texto)
+    return texto.strip("_") or "qr_aulas"
+
+
+def construir_enlace_qr(codigo):
+    codigo = quote(str(codigo or "").strip())
+    return f"{URL_BASE_APP}/?qr=1&codigo={codigo}"
+
+
+def generar_qr_png(url, box_size=10, border=2):
     qr = qrcode.QRCode(
-        version=2,
+        version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=8,
-        border=2,
+        box_size=box_size,
+        border=border,
     )
 
     qr.add_data(url)
@@ -29,7 +54,286 @@ def generar_qr(url):
     imagen.save(buffer, format="PNG")
     buffer.seek(0)
 
-    return buffer
+    return buffer.getvalue()
+
+
+def dibujar_texto_centrado(
+    pdf,
+    texto,
+    x_centro,
+    y,
+    fuente="Helvetica",
+    tamano=9,
+    color=black,
+):
+    pdf.setFont(fuente, tamano)
+    pdf.setFillColor(color)
+    pdf.drawCentredString(x_centro, y, str(texto or ""))
+
+
+def dibujar_pegatina(
+    pdf,
+    x,
+    y,
+    ancho,
+    alto,
+    codigo,
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    radio = 5 * mm
+
+    # Fondo y borde.
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1.2)
+    pdf.roundRect(x, y, ancho, alto, radio, stroke=1, fill=1)
+
+    # Cabecera.
+    alto_cabecera = 18 * mm
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.roundRect(
+        x,
+        y + alto - alto_cabecera,
+        ancho,
+        alto_cabecera,
+        radio,
+        stroke=0,
+        fill=1,
+    )
+    # Rectángulo para que la parte inferior de la cabecera quede recta.
+    pdf.rect(
+        x,
+        y + alto - alto_cabecera,
+        ancho,
+        alto_cabecera - radio,
+        stroke=0,
+        fill=1,
+    )
+
+    x_centro = x + ancho / 2
+
+    dibujar_texto_centrado(
+        pdf,
+        "LORETO",
+        x_centro,
+        y + alto - 7.2 * mm,
+        fuente="Helvetica-Bold",
+        tamano=13,
+        color=white,
+    )
+    dibujar_texto_centrado(
+        pdf,
+        "MANTENIMIENTO",
+        x_centro,
+        y + alto - 12.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=11,
+        color=AMARILLO,
+    )
+    dibujar_texto_centrado(
+        pdf,
+        "Sistema Integral de Mantenimiento",
+        x_centro,
+        y + alto - 16.1 * mm,
+        fuente="Helvetica",
+        tamano=6.7,
+        color=white,
+    )
+
+    # Aula.
+    dibujar_texto_centrado(
+        pdf,
+        "AULA",
+        x_centro,
+        y + alto - 25 * mm,
+        fuente="Helvetica-Bold",
+        tamano=8,
+        color=AZUL_OSCURO,
+    )
+
+    nombre_espacio = str(espacio or "").upper()
+    tamano_aula = 21 if len(nombre_espacio) <= 5 else 16
+    dibujar_texto_centrado(
+        pdf,
+        nombre_espacio,
+        x_centro,
+        y + alto - 33.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=tamano_aula,
+        color=AZUL_OSCURO,
+    )
+
+    # QR.
+    enlace = construir_enlace_qr(codigo)
+    qr_bytes = generar_qr_png(enlace, box_size=11, border=2)
+    qr_reader = ImageReader(io.BytesIO(qr_bytes))
+
+    tamano_qr = min(41 * mm, ancho - 24 * mm)
+    x_qr = x + (ancho - tamano_qr) / 2
+    y_qr = y + 30 * mm
+
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1)
+    pdf.roundRect(
+        x_qr - 2 * mm,
+        y_qr - 2 * mm,
+        tamano_qr + 4 * mm,
+        tamano_qr + 4 * mm,
+        3 * mm,
+        stroke=1,
+        fill=1,
+    )
+
+    pdf.drawImage(
+        qr_reader,
+        x_qr,
+        y_qr,
+        width=tamano_qr,
+        height=tamano_qr,
+        preserveAspectRatio=True,
+        mask="auto",
+    )
+
+    # Acción principal.
+    alto_accion = 10 * mm
+    y_accion = y + 16.5 * mm
+
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.roundRect(
+        x + 7 * mm,
+        y_accion,
+        ancho - 14 * mm,
+        alto_accion,
+        3 * mm,
+        stroke=0,
+        fill=1,
+    )
+
+    dibujar_texto_centrado(
+        pdf,
+        "Comunicar una incidencia",
+        x_centro,
+        y_accion + 3.4 * mm,
+        fuente="Helvetica-Bold",
+        tamano=9.2,
+        color=white,
+    )
+
+    # Instrucción.
+    dibujar_texto_centrado(
+        pdf,
+        "Escanea con la cámara del móvil",
+        x_centro,
+        y + 11.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=6.8,
+        color=AZUL_OSCURO,
+    )
+    dibujar_texto_centrado(
+        pdf,
+        "No necesitas ninguna aplicación",
+        x_centro,
+        y + 8.2 * mm,
+        fuente="Helvetica",
+        tamano=6.4,
+        color=AZUL,
+    )
+
+    # Pie.
+    dibujar_texto_centrado(
+        pdf,
+        "Gracias por ayudarnos a cuidar nuestro colegio",
+        x_centro,
+        y + 3.9 * mm,
+        fuente="Helvetica-Oblique",
+        tamano=5.9,
+        color=GRIS,
+    )
+
+    # Código técnico, muy discreto.
+    pdf.setFont("Helvetica", 4.8)
+    pdf.setFillColor(HexColor("#94a3b8"))
+    pdf.drawRightString(
+        x + ancho - 3 * mm,
+        y + 2.1 * mm,
+        str(codigo or ""),
+    )
+
+
+def generar_pdf_pegatinas(aulas):
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+
+    ancho_pagina, alto_pagina = A4
+
+    margen_x = 8 * mm
+    margen_y = 8 * mm
+    separacion_x = 5 * mm
+    separacion_y = 5 * mm
+
+    columnas = 2
+    filas = 3
+
+    ancho_pegatina = (
+        ancho_pagina
+        - (2 * margen_x)
+        - ((columnas - 1) * separacion_x)
+    ) / columnas
+
+    alto_pegatina = (
+        alto_pagina
+        - (2 * margen_y)
+        - ((filas - 1) * separacion_y)
+    ) / filas
+
+    por_pagina = columnas * filas
+
+    for indice, fila in enumerate(aulas):
+        if indice > 0 and indice % por_pagina == 0:
+            pdf.showPage()
+
+        posicion = indice % por_pagina
+        columna = posicion % columnas
+        fila_pagina = posicion // columnas
+
+        x = margen_x + columna * (ancho_pegatina + separacion_x)
+        y = (
+            alto_pagina
+            - margen_y
+            - alto_pegatina
+            - fila_pagina * (alto_pegatina + separacion_y)
+        )
+
+        (
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+        ) = fila
+
+        dibujar_pegatina(
+            pdf,
+            x,
+            y,
+            ancho_pegatina,
+            alto_pegatina,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+        )
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def pantalla_qr_aulas():
@@ -37,7 +341,8 @@ def pantalla_qr_aulas():
 
     st.info(
         "Aquí aparecen las aulas registradas en el catálogo central. "
-        "Puedes abrir el formulario público de cada aula para comprobarlo."
+        "Puedes probar cada formulario, descargar un QR individual "
+        "o generar un PDF listo para imprimir."
     )
 
     aulas = obtener_aulas_para_qr()
@@ -59,6 +364,27 @@ def pantalla_qr_aulas():
         "Centro",
         ["Todos"] + centros,
         key="qr_aulas_filtro_centro",
+    )
+
+    aulas_centro = [
+        fila
+        for fila in aulas
+        if (
+            centro_filtro == "Todos"
+            or str(fila[1]) == centro_filtro
+        )
+    ]
+
+    edificios = sorted({
+        str(fila[2])
+        for fila in aulas_centro
+        if len(fila) >= 5 and fila[2]
+    })
+
+    edificio_filtro = st.selectbox(
+        "Edificio",
+        ["Todos"] + edificios,
+        key="qr_aulas_filtro_edificio",
     )
 
     buscar = st.text_input(
@@ -87,6 +413,12 @@ def pantalla_qr_aulas():
         ):
             continue
 
+        if (
+            edificio_filtro != "Todos"
+            and str(edificio) != edificio_filtro
+        ):
+            continue
+
         texto_busqueda = (
             f"{codigo} {centro} {edificio} "
             f"{planta} {espacio}"
@@ -103,6 +435,48 @@ def pantalla_qr_aulas():
         st.info("No hay aulas que coincidan con los filtros.")
         return
 
+    # =====================================================
+    # PDF CON LAS AULAS FILTRADAS
+    # =====================================================
+
+    st.markdown("### 📄 Pegatinas para imprimir")
+
+    st.caption(
+        "El PDF incluye 6 pegatinas por página A4, listas para "
+        "imprimir, recortar y plastificar."
+    )
+
+    nombre_partes = ["QR_Aulas"]
+
+    if centro_filtro != "Todos":
+        nombre_partes.append(centro_filtro)
+
+    if edificio_filtro != "Todos":
+        nombre_partes.append(edificio_filtro)
+
+    nombre_pdf = (
+        limpiar_nombre_archivo("_".join(nombre_partes))
+        + ".pdf"
+    )
+
+    pdf_bytes = generar_pdf_pegatinas(resultados)
+
+    st.download_button(
+        "📄 Descargar PDF de pegatinas",
+        data=pdf_bytes,
+        file_name=nombre_pdf,
+        mime="application/pdf",
+        use_container_width=True,
+        key="descargar_pdf_qr_aulas",
+    )
+
+    st.markdown("---")
+    st.markdown("### 🔎 Comprobar aulas individualmente")
+
+    # =====================================================
+    # LISTADO INDIVIDUAL
+    # =====================================================
+
     for fila in resultados:
         (
             codigo,
@@ -117,13 +491,12 @@ def pantalla_qr_aulas():
         if not codigo:
             continue
 
-        enlace = (
-            f"{URL_BASE_APP}/"
-            f"?qr=1&codigo={codigo}"
+        enlace = construir_enlace_qr(codigo)
+        qr_bytes = generar_qr_png(
+            enlace,
+            box_size=8,
+            border=2,
         )
-
-        qr_buffer = generar_qr(enlace)
-        qr_bytes = qr_buffer.getvalue()
 
         with st.container(border=True):
             st.markdown(f"### 🏫 {espacio}")
