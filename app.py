@@ -614,6 +614,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Gestión espacios"
             st.rerun()
 
+        if st.button(
+            "📱\nQR de aulas",
+            key="btn_qr_aulas",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "QR aulas"
+            st.rerun()
+
 
 
 def mostrar_menu_operario():
