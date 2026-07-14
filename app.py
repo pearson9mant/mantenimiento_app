@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-
+from ui.ui_qr_aulas import pantalla_qr_aulas
 from modules.auth import barra_sesion, USUARIOS
 from database.db import inicializar_db
 from ui.ui_planos_legionella import pantalla_planos_legionella
