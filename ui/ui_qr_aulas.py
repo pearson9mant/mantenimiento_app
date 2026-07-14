@@ -15,56 +15,18 @@ def pantalla_qr_aulas():
     )
 
     aulas = obtener_aulas_para_qr()
-    st.write(aulas)
 
     if not aulas:
-        st.warning("No hay espacios registrados.")
+        st.warning("No hay aulas registradas.")
         return
 
     # La función devuelve:
-    # id, codigo, centro, edificio, planta, espacio
-    aulas_filtradas = []
-
-    for fila in aulas:
-        try:
-            (
-                id_espacio,
-                codigo,
-                centro,
-                edificio,
-                planta,
-                espacio,
-            ) = fila
-        except Exception:
-            continue
-
-        texto_espacio = str(espacio or "").strip().lower()
-
-        # De momento filtramos por nombres habituales de aulas.
-        es_aula = (
-            texto_espacio.startswith("i")
-            or texto_espacio.startswith("eso")
-            or texto_espacio.startswith("bach")
-            or texto_espacio[:1].isdigit()
-            or "aula" in texto_espacio
-        )
-
-        if not es_aula:
-            continue
-
-        aulas_filtradas.append(fila)
-
-    if not aulas_filtradas:
-        st.warning(
-            "No se han reconocido aulas automáticamente. "
-            "Revisa cómo están nombrados los espacios."
-        )
-        return
+    # codigo, centro, edificio, planta, espacio
 
     centros = sorted({
-        str(fila[2])
-        for fila in aulas_filtradas
-        if fila[2]
+        str(fila[1])
+        for fila in aulas
+        if len(fila) >= 5 and fila[1]
     })
 
     centro_filtro = st.selectbox(
@@ -75,15 +37,17 @@ def pantalla_qr_aulas():
 
     buscar = st.text_input(
         "Buscar aula",
-        placeholder="Ejemplo: I3A, ESO 1A, Bach 2B...",
+        placeholder="Ejemplo: I4A, 3A, ESO 1A...",
         key="qr_aulas_buscar"
     ).strip().lower()
 
     resultados = []
 
-    for fila in aulas_filtradas:
+    for fila in aulas:
+        if len(fila) < 5:
+            continue
+
         (
-            id_espacio,
             codigo,
             centro,
             edificio,
@@ -105,9 +69,12 @@ def pantalla_qr_aulas():
 
     st.caption(f"Aulas encontradas: {len(resultados)}")
 
+    if not resultados:
+        st.info("No hay aulas que coincidan con los filtros.")
+        return
+
     for fila in resultados:
         (
-            id_espacio,
             codigo,
             centro,
             edificio,
@@ -116,7 +83,7 @@ def pantalla_qr_aulas():
         ) = fila
 
         enlace = (
-            f"{URL_BASE_APP}/"
+            "https://mantenimiento-app-1.onrender.com/"
             f"?qr=1&codigo={codigo}"
         )
 
@@ -124,7 +91,7 @@ def pantalla_qr_aulas():
             st.markdown(f"### 🏫 {espacio}")
 
             st.caption(
-                f"{centro} · {edificio} · {planta}"
+                f"📍 {centro} · {edificio} · {planta}"
             )
 
             st.code(codigo)
