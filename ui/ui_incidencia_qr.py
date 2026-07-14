@@ -165,188 +165,96 @@ def pantalla_incidencia_qr():
         return
 
     clave_envio = f"incidencia_qr_enviada_{codigo_espacio}"
-
-    incidencia_enviada = st.session_state.get(
-        clave_envio,
-        ""
-    )
-
-    # =====================================================
-    # CABECERA PERSONALIZADA
-    # =====================================================
+    incidencia_enviada = st.session_state.get(clave_envio, "")
 
     st.markdown(
         """
-<div class="qr-cabecera">
-    <div class="qr-titulo">Comunicar una incidencia</div>
-    <div class="qr-subtitulo">
-        Servicio de Mantenimiento · Colegio Abat Oliba Loreto
-    </div>
-</div>
+        <div class="qr-cabecera">
+            <div class="qr-titulo">Comunicar una incidencia</div>
+            <div class="qr-subtitulo">
+                Servicio de Mantenimiento · Colegio Abat Oliba Loreto
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        f"""
-    <div style="
-        background: #f8fafc;
-        border: 1px solid #dbeafe;
-        border-radius: 20px;
-        padding: 22px 18px;
-        margin-bottom: 18px;
-        text-align: center;
-    ">
-        <div style="
-            color: #2563eb;
-            font-size: 13px;
-            font-weight: 900;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        ">
-            Aula seleccionada
-        </div>
-    
-        <div style="
-            font-size: 28px;
-            font-weight: 950;
-            color: #0f172a;
-            margin-bottom: 8px;
-        ">
-            {espacio}
-        </div>
-    
-        <div style="
-            color: #475569;
-            font-size: 15px;
-            font-weight: 700;
-            line-height: 1.6;
-        ">
-            {centro} · {edificio}<br>
-            {planta}
-        </div>
-    </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # =====================================================
-    # CONFIRMACIÓN FINAL
-    # =====================================================
-
-    if incidencia_enviada:
+    with st.container(border=True):
         st.markdown(
-            f"""
-<div style="
-    background: linear-gradient(145deg, #ecfdf5 0%, #f0fdf4 100%);
-    border: 2px solid #86efac;
-    border-radius: 26px;
-    padding: 34px 26px;
-    text-align: center;
-    box-shadow: 0 14px 34px rgba(22, 101, 52, 0.12);
-    margin-top: 10px;
-">
-    <div style="
-        width: 74px;
-        height: 74px;
-        line-height: 74px;
-        margin: 0 auto 18px auto;
-        border-radius: 50%;
-        background: #22c55e;
-        color: white;
-        font-size: 40px;
-        font-weight: 900;
-        box-shadow: 0 8px 20px rgba(34, 197, 94, 0.28);
-    ">
-        ✓
-    </div>
-
-    <div style="
-        font-size: 27px;
-        font-weight: 950;
-        color: #14532d;
-        margin-bottom: 12px;
-    ">
-        Aviso enviado correctamente
-    </div>
-
-    <div style="
-        color: #166534;
-        font-size: 17px;
-        font-weight: 800;
-        margin-bottom: 10px;
-    ">
-        Gracias por comunicar la incidencia.
-    </div>
-
-    <div style="
-        color: #334155;
-        font-size: 15px;
-        line-height: 1.6;
-        max-width: 470px;
-        margin: 0 auto;
-    ">
-        El departamento de mantenimiento ha recibido el aviso
-        y lo revisará lo antes posible.
-    </div>
-
-    <div style="
-        margin: 26px auto 0 auto;
-        padding: 16px 20px;
-        max-width: 350px;
-        background: white;
-        border: 1px solid #bbf7d0;
-        border-radius: 16px;
-    ">
-        <div style="
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 900;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        ">
-            Número de referencia
-        </div>
-
-        <div style="
-            color: #0f172a;
-            font-size: 24px;
-            font-weight: 950;
-        ">
-            {incidencia_enviada}
-        </div>
-    </div>
-
-    <div style="
-        margin-top: 20px;
-        color: #64748b;
-        font-size: 13px;
-        line-height: 1.5;
-    ">
-        No es necesario volver a enviar el mismo aviso.
-    </div>
-</div>
-
-<div style="
-    text-align: center;
-    margin-top: 22px;
-    color: #64748b;
-    font-size: 12px;
-    line-height: 1.6;
-">
-    Colegio Abat Oliba Loreto<br>
-    Sistema Integral de Mantenimiento
-</div>
-            """,
+            "<div style='text-align:center; color:#2563eb; "
+            "font-size:13px; font-weight:900; letter-spacing:1px;'>"
+            "AULA SELECCIONADA</div>",
             unsafe_allow_html=True,
         )
-        return
+        st.markdown(
+            f"<div style='text-align:center; font-size:30px; "
+            f"font-weight:900; color:#0f172a; margin-top:8px;'>"
+            f"{espacio}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='text-align:center; color:#475569; "
+            f"font-size:15px; font-weight:700; line-height:1.6; "
+            f"margin-top:6px;'>"
+            f"{centro} · {edificio}<br>{planta}</div>",
+            unsafe_allow_html=True,
+        )
 
-    # =====================================================
-    # FORMULARIO
-    # =====================================================
+    if incidencia_enviada:
+        st.success("Aviso enviado correctamente")
+
+        with st.container(border=True):
+            st.markdown(
+                "<div style='text-align:center; font-size:54px; "
+                "font-weight:900; color:#22c55e;'>✓</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='text-align:center; font-size:27px; "
+                "font-weight:900; color:#14532d; margin-top:4px;'>"
+                "Aviso enviado correctamente</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='text-align:center; color:#166534; "
+                "font-size:17px; font-weight:800; margin-top:12px;'>"
+                "Gracias por comunicar la incidencia.</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='text-align:center; color:#334155; "
+                "font-size:15px; line-height:1.6; margin-top:10px;'>"
+                "El departamento de mantenimiento ha recibido el aviso "
+                "y lo revisará lo antes posible.</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("---")
+
+            st.markdown(
+                "<div style='text-align:center; color:#64748b; "
+                "font-size:12px; font-weight:900; letter-spacing:1px;'>"
+                "NÚMERO DE REFERENCIA</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<div style='text-align:center; color:#0f172a; "
+                f"font-size:25px; font-weight:900; margin-top:6px;'>"
+                f"{incidencia_enviada}</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='text-align:center; color:#64748b; "
+                "font-size:13px; margin-top:18px;'>"
+                "No es necesario volver a enviar el mismo aviso.</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.caption(
+            "Colegio Abat Oliba Loreto · "
+            "Sistema Integral de Mantenimiento"
+        )
+        return
 
     descripcion = st.text_area(
         "¿Qué ocurre en este espacio?",
@@ -371,7 +279,6 @@ def pantalla_incidencia_qr():
                 f"Puedes añadir un máximo de {MAX_FOTOS} fotografías."
             )
             error_fotos = True
-
         else:
             columnas = st.columns(2)
 
@@ -385,9 +292,7 @@ def pantalla_incidencia_qr():
                     continue
 
                 contenido = foto.getvalue()
-                fotos_validas.append(
-                    (foto.name, contenido)
-                )
+                fotos_validas.append((foto.name, contenido))
 
                 with columnas[indice % 2]:
                     st.image(
@@ -402,20 +307,14 @@ def pantalla_incidencia_qr():
         use_container_width=True,
         type="primary",
     ):
-        descripcion_limpia = str(
-            descripcion or ""
-        ).strip()
+        descripcion_limpia = str(descripcion or "").strip()
 
         if not descripcion_limpia:
-            st.warning(
-                "Describe brevemente qué ocurre."
-            )
+            st.warning("Describe brevemente qué ocurre.")
             return
 
         if error_fotos:
-            st.error(
-                "Revisa las fotografías antes de enviar."
-            )
+            st.error("Revisa las fotografías antes de enviar.")
             return
 
         operario = operario_por_centro(centro)
