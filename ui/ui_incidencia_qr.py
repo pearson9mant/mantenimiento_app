@@ -201,7 +201,6 @@ def pantalla_incidencia_qr():
         )
 
     if incidencia_enviada:
-        st.success("Aviso enviado correctamente")
 
         with st.container(border=True):
             st.markdown(
