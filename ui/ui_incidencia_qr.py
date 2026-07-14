@@ -189,27 +189,44 @@ def pantalla_incidencia_qr():
 
     st.markdown(
         f"""
-<div class="qr-espacio">
     <div style="
-        color: #2563eb;
-        font-size: 13px;
-        font-weight: 900;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin-bottom: 7px;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+        border-radius: 20px;
+        padding: 22px 18px;
+        margin-bottom: 18px;
+        text-align: center;
     ">
-        Aula seleccionada
+        <div style="
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        ">
+            Aula seleccionada
+        </div>
+    
+        <div style="
+            font-size: 28px;
+            font-weight: 950;
+            color: #0f172a;
+            margin-bottom: 8px;
+        ">
+            {espacio}
+        </div>
+    
+        <div style="
+            color: #475569;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.6;
+        ">
+            {centro} · {edificio}<br>
+            {planta}
+        </div>
     </div>
-
-    <div class="qr-espacio-nombre">
-        {espacio}
-    </div>
-
-    <div class="qr-ubicacion">
-        {centro} · {edificio}<br>
-        {planta}
-    </div>
-</div>
         """,
         unsafe_allow_html=True,
     )
