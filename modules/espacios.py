@@ -1033,3 +1033,31 @@ def obtener_aulas_para_qr():
 
     conn.close()
     return datos
+
+def obtener_espacios_llar_debug():
+    crear_tabla_espacios()
+    asegurar_codigos_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo
+        FROM espacios
+        WHERE LOWER(COALESCE(edificio, '')) LIKE '%llar%'
+           OR LOWER(COALESCE(espacio, '')) LIKE '%i1%'
+           OR LOWER(COALESCE(espacio, '')) LIKE '%i2%'
+        ORDER BY edificio, planta, espacio
+    """))
+
+    datos = cur.fetchall()
+    conn.close()
+
+    return datos
