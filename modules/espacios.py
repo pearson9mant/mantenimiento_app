@@ -941,3 +941,28 @@ def ordenar_items_espacios(items):
             str(x.get("espacio", "")).lower()
         )
     )
+
+def obtener_aulas_para_qr():
+    crear_tabla_espacios()
+    asegurar_codigos_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT
+            id,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio
+        FROM espacios
+        WHERE activo = 1
+        ORDER BY id
+    """))
+
+    datos = cur.fetchall()
+
+    conn.close()
+    return datos
