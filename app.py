@@ -5,7 +5,7 @@ from modules.auth import barra_sesion, USUARIOS
 from database.db import inicializar_db
 from ui.ui_planos_legionella import pantalla_planos_legionella
 from ui.ui_corazon_sistema import mostrar_corazon_sistema
-
+from ui.ui_incidencia_qr import pantalla_incidencia_qr
 from ui.ui_panel import pantalla_panel
 from ui.ui_ordenes import pantalla_ordenes
 from ui.ui_ordenes_lectura import pantalla_ordenes_lectura
