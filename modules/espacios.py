@@ -951,21 +951,50 @@ def obtener_aulas_para_qr():
 
     cur.execute(_sql("""
         SELECT
-            id,
             codigo,
             centro,
             edificio,
             planta,
-            espacio
+            espacio,
+            tipo
         FROM espacios
         WHERE activo = 1
-        ORDER BY id
+        ORDER BY centro, edificio, planta, espacio
     """))
 
-    datos = cur.fetchall()
-
+    filas = cur.fetchall()
     conn.close()
-    return datos
+
+    aulas = []
+
+    for fila in filas:
+        codigo, centro, edificio, planta, espacio, tipo = fila
+
+        tipo_txt = str(tipo or "").strip().lower()
+        espacio_txt = str(espacio or "").strip().lower()
+
+        es_aula = (
+            "aula" in tipo_txt
+            or espacio_txt.startswith("i1")
+            or espacio_txt.startswith("i2")
+            or espacio_txt.startswith("i3")
+            or espacio_txt.startswith("i4")
+            or espacio_txt.startswith("i5")
+            or espacio_txt.startswith("eso")
+            or espacio_txt.startswith("bach")
+            or espacio_txt[:1].isdigit()
+        )
+
+        if es_aula:
+            aulas.append((
+                codigo,
+                centro,
+                edificio,
+                planta,
+                espacio,
+            ))
+
+    return aulas
 
 def obtener_espacio_por_codigo(codigo):
     crear_tabla_espacios()
