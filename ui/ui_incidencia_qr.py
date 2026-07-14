@@ -1,9 +1,7 @@
 import streamlit as st
 from datetime import datetime
 
-from modules.espacios import (
-    obtener_espacio_por_codigo,
-)
+from modules.espacios import obtener_espacio_por_codigo
 from modules.ordenes import (
     crear_orden,
     obtener_siguiente_numero_ot,
@@ -25,29 +23,15 @@ def limpiar_nombre_archivo(texto):
 
 
 def operario_por_centro(centro):
-    if str(centro or "").strip() == "Pearson 9":
+    centro = str(centro or "").strip()
+
+    if centro == "Pearson 9":
         return "Luis Lozano"
 
-    if str(centro or "").strip() == "Pearson 22":
+    if centro == "Pearson 22":
         return "J.A. Almeda"
 
     return ""
-
-
-def obtener_id_espacio_qr():
-    params = st.query_params
-
-    valor = (
-        params.get("espacio_id")
-        or params.get("id_espacio")
-        or params.get("id")
-        or ""
-    )
-
-    try:
-        return int(valor)
-    except Exception:
-        return None
 
 
 def mostrar_estilo_formulario_qr():
@@ -140,13 +124,15 @@ def mostrar_estilo_formulario_qr():
 def pantalla_incidencia_qr():
     mostrar_estilo_formulario_qr()
 
-    id_espacio = obtener_id_espacio_qr()
+    codigo = str(
+        st.query_params.get("codigo") or ""
+    ).strip()
 
-    if not id_espacio:
+    if not codigo:
         st.error("El código QR no contiene un espacio válido.")
         return
 
-    espacio_db = obtener_espacio_por_id(id_espacio)
+    espacio_db = obtener_espacio_por_codigo(codigo)
 
     if not espacio_db:
         st.error(
@@ -202,10 +188,9 @@ def pantalla_incidencia_qr():
         unsafe_allow_html=True,
     )
 
-    incidencia_enviada = st.session_state.get(
-        f"incidencia_qr_enviada_{id_espacio}",
-        ""
-    )
+    clave_envio = f"incidencia_qr_enviada_{codigo_espacio}"
+
+    incidencia_enviada = st.session_state.get(clave_envio, "")
 
     if incidencia_enviada:
         st.markdown(
@@ -233,14 +218,14 @@ def pantalla_incidencia_qr():
             "Ejemplo: la persiana no sube."
         ),
         height=150,
-        key=f"qr_descripcion_{id_espacio}",
+        key=f"qr_descripcion_{codigo_espacio}",
     )
 
     fotos = st.file_uploader(
         "Añadir fotografías (opcional)",
         type=["jpg", "jpeg", "png"],
         accept_multiple_files=True,
-        key=f"qr_fotos_{id_espacio}",
+        key=f"qr_fotos_{codigo_espacio}",
     )
 
     fotos_validas = []
@@ -248,9 +233,10 @@ def pantalla_incidencia_qr():
 
     if fotos:
         if len(fotos) > MAX_FOTOS:
-            st.warning(f"Puedes añadir un máximo de {MAX_FOTOS} fotografías.")
+            st.warning(
+                f"Puedes añadir un máximo de {MAX_FOTOS} fotografías."
+            )
             error_fotos = True
-
         else:
             columnas = st.columns(2)
 
@@ -274,7 +260,7 @@ def pantalla_incidencia_qr():
 
     if st.button(
         "📨 Enviar incidencia",
-        key=f"qr_enviar_{id_espacio}",
+        key=f"qr_enviar_{codigo_espacio}",
         use_container_width=True,
         type="primary",
     ):
@@ -312,13 +298,15 @@ def pantalla_incidencia_qr():
                 nombres_fotos.append(nombre_foto)
 
         except Exception as error:
-            st.error(f"No se pudieron guardar las fotografías: {error}")
+            st.error(
+                f"No se pudieron guardar las fotografías: {error}"
+            )
             return
 
         ruta_foto = "|".join(nombres_fotos)
 
         observaciones_origen = (
-            f"Incidencia comunicada mediante QR del aula.\n"
+            "Incidencia comunicada mediante QR del aula.\n"
             f"Código de espacio: {codigo_espacio or id_espacio_db}\n"
             f"Planta: {planta or '-'}"
         )
@@ -344,11 +332,10 @@ def pantalla_incidencia_qr():
             crear_orden(datos_orden)
 
         except Exception as error:
-            st.error(f"No se ha podido crear la incidencia: {error}")
+            st.error(
+                f"No se ha podido crear la incidencia: {error}"
+            )
             return
 
-        st.session_state[
-            f"incidencia_qr_enviada_{id_espacio}"
-        ] = numero_ot
-
+        st.session_state[clave_envio] = numero_ot
         st.rerun()
