@@ -15,6 +15,7 @@ def pantalla_qr_aulas():
     )
 
     aulas = obtener_aulas_para_qr()
+    st.write(aulas)
 
     if not aulas:
         st.warning("No hay espacios registrados.")
