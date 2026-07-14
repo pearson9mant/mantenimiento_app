@@ -1,9 +1,6 @@
 import streamlit as st
 
-from modules.espacios import (
-    obtener_aulas_para_qr,
-    obtener_espacios_llar_debug,
-)
+from modules.espacios import obtener_aulas_para_qr
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
