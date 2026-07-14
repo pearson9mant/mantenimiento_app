@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import unicodedata
 
 from database.db import conectar
@@ -11,6 +11,24 @@ CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
 
 ESTADOS_CERRADOS = ["Finalizada", "Finalizado", "Cerrada", "Cerrado"]
 ESTADOS_MATERIAL = ["Pendiente material", "Esperando material"]
+
+FECHA_INICIO_EVOLUCION = date(2026, 9, 1)
+FECHA_FIN_EVOLUCION = date(2027, 8, 31)
+
+MESES_CURSO_2026_2027 = [
+    ("2026-09", "Sep 26"),
+    ("2026-10", "Oct 26"),
+    ("2026-11", "Nov 26"),
+    ("2026-12", "Dic 26"),
+    ("2027-01", "Ene 27"),
+    ("2027-02", "Feb 27"),
+    ("2027-03", "Mar 27"),
+    ("2027-04", "Abr 27"),
+    ("2027-05", "May 27"),
+    ("2027-06", "Jun 27"),
+    ("2027-07", "Jul 27"),
+    ("2027-08", "Ago 27"),
+]
 
 
 def aplicar_estilo_gerencia():
@@ -34,6 +52,25 @@ def aplicar_estilo_gerencia():
         background: #f8fafc; border: 1px solid #e5e7eb;
         border-radius: 18px; padding: 14px 16px;
         margin-bottom: 14px; color: #334155; font-weight: 700;
+    }
+    .gerencia-evolucion-box {
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 22px;
+        padding: 18px 20px;
+        margin: 14px 0 18px 0;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    .gerencia-evolucion-title {
+        font-size: 22px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .gerencia-evolucion-subtitle {
+        color: #475569;
+        font-size: 14px;
+        font-weight: 600;
     }
     div.stButton > button {
         min-height: 86px; border-radius: 20px; border: 1px solid #e5e7eb;
@@ -708,6 +745,247 @@ def mostrar_resumen_ejecutivo(df, centro):
             )
 
 
+def _serie_mensual_base():
+    return pd.DataFrame({
+        "periodo": [periodo for periodo, _ in MESES_CURSO_2026_2027],
+        "mes": [etiqueta for _, etiqueta in MESES_CURSO_2026_2027],
+    })
+
+
+def _filtrar_curso_2026_2027(df, columna_fecha):
+    if df.empty or columna_fecha not in df.columns:
+        return pd.DataFrame()
+
+    datos = df.copy()
+    datos[columna_fecha] = pd.to_datetime(datos[columna_fecha], errors="coerce")
+
+    inicio = pd.Timestamp(FECHA_INICIO_EVOLUCION)
+    fin_exclusivo = pd.Timestamp(FECHA_FIN_EVOLUCION) + pd.Timedelta(days=1)
+
+    return datos[
+        (datos[columna_fecha] >= inicio)
+        & (datos[columna_fecha] < fin_exclusivo)
+    ].copy()
+
+
+def _es_preventivo_df(df):
+    texto = (
+        df["origen"].fillna("").astype(str)
+        + " "
+        + df["descripcion"].fillna("").astype(str)
+        + " "
+        + df["area"].fillna("").astype(str)
+    ).str.lower()
+
+    return texto.str.contains("preventivo", na=False)
+
+
+def _es_incidencia_df(df):
+    texto = (
+        df["origen"].fillna("").astype(str)
+        + " "
+        + df["descripcion"].fillna("").astype(str)
+        + " "
+        + df["area"].fillna("").astype(str)
+    ).str.lower()
+
+    excluidas = texto.str.contains("preventivo|legionella|verano", na=False)
+    return ~excluidas
+
+
+def obtener_evolucion_mensual(df, centro):
+    base = _serie_mensual_base()
+
+    if df.empty:
+        base["Preventivos realizados"] = 0
+        base["Incidencias creadas"] = 0
+        return base
+
+    datos = df[df["centro"] == centro].copy()
+
+    preventivos = datos[es_cerrada(datos) & _es_preventivo_df(datos)].copy()
+    preventivos = _filtrar_curso_2026_2027(preventivos, "fecha_cierre_dt")
+
+    if not preventivos.empty:
+        preventivos["periodo"] = preventivos["fecha_cierre_dt"].dt.to_period("M").astype(str)
+        preventivos_mes = (
+            preventivos.groupby("periodo")
+            .size()
+            .rename("Preventivos realizados")
+            .reset_index()
+        )
+    else:
+        preventivos_mes = pd.DataFrame(columns=["periodo", "Preventivos realizados"])
+
+    incidencias = datos[_es_incidencia_df(datos)].copy()
+    incidencias = _filtrar_curso_2026_2027(incidencias, "fecha_dt")
+
+    if not incidencias.empty:
+        incidencias["periodo"] = incidencias["fecha_dt"].dt.to_period("M").astype(str)
+        incidencias_mes = (
+            incidencias.groupby("periodo")
+            .size()
+            .rename("Incidencias creadas")
+            .reset_index()
+        )
+    else:
+        incidencias_mes = pd.DataFrame(columns=["periodo", "Incidencias creadas"])
+
+    evolucion = base.merge(preventivos_mes, on="periodo", how="left").merge(
+        incidencias_mes, on="periodo", how="left"
+    )
+
+    evolucion["Preventivos realizados"] = pd.to_numeric(
+        evolucion["Preventivos realizados"], errors="coerce"
+    ).fillna(0).astype(int)
+
+    evolucion["Incidencias creadas"] = pd.to_numeric(
+        evolucion["Incidencias creadas"], errors="coerce"
+    ).fillna(0).astype(int)
+
+    return evolucion
+
+
+def calcular_indice_prevencion(evolucion):
+    if evolucion.empty:
+        return 0
+
+    preventivos = int(evolucion["Preventivos realizados"].sum())
+    incidencias = int(evolucion["Incidencias creadas"].sum())
+
+    if preventivos == 0 and incidencias == 0:
+        return 0
+
+    valor = (preventivos / max(preventivos + incidencias, 1)) * 100
+    return max(0, min(100, round(valor)))
+
+
+def construir_conclusion_evolucion(evolucion):
+    con_datos = evolucion[
+        (evolucion["Preventivos realizados"] > 0)
+        | (evolucion["Incidencias creadas"] > 0)
+    ].copy()
+
+    if con_datos.empty:
+        return (
+            "La evolución comenzará a registrarse en septiembre de 2026. "
+            "A medida que avance el curso, este gráfico mostrará si el aumento "
+            "del mantenimiento preventivo se acompaña de una reducción de incidencias."
+        )
+
+    if len(con_datos) == 1:
+        fila = con_datos.iloc[-1]
+        return (
+            f"En {fila['mes']} se han realizado "
+            f"{int(fila['Preventivos realizados'])} preventivos y se han registrado "
+            f"{int(fila['Incidencias creadas'])} incidencias. La tendencia será más "
+            "representativa cuando existan varios meses consecutivos."
+        )
+
+    actual = con_datos.iloc[-1]
+    anterior = con_datos.iloc[-2]
+
+    cambio_prev = int(actual["Preventivos realizados"] - anterior["Preventivos realizados"])
+    cambio_inc = int(actual["Incidencias creadas"] - anterior["Incidencias creadas"])
+
+    if cambio_prev > 0 and cambio_inc < 0:
+        return (
+            f"En {actual['mes']} aumentaron los preventivos en {cambio_prev} y las "
+            f"incidencias disminuyeron en {abs(cambio_inc)} respecto al mes anterior. "
+            "La evolución es favorable."
+        )
+
+    if cambio_prev < 0 and cambio_inc > 0:
+        return (
+            f"En {actual['mes']} descendieron los preventivos y aumentaron las "
+            "incidencias. Conviene reforzar la planificación preventiva."
+        )
+
+    if cambio_inc < 0:
+        return (
+            f"En {actual['mes']} las incidencias disminuyeron en "
+            f"{abs(cambio_inc)} respecto al mes anterior."
+        )
+
+    return (
+        f"En {actual['mes']} se realizaron {int(actual['Preventivos realizados'])} "
+        f"preventivos y se registraron {int(actual['Incidencias creadas'])} incidencias."
+    )
+
+
+def mostrar_evolucion_mantenimiento(df, centro):
+    st.markdown("""
+    <div class="gerencia-evolucion-box">
+        <div class="gerencia-evolucion-title">📈 Evolución del mantenimiento</div>
+        <div class="gerencia-evolucion-subtitle">
+            Curso 2026/2027 · Preventivos realizados e incidencias creadas
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    evolucion = obtener_evolucion_mensual(df, centro)
+
+    total_preventivos = int(evolucion["Preventivos realizados"].sum())
+    total_incidencias = int(evolucion["Incidencias creadas"].sum())
+    indice = calcular_indice_prevencion(evolucion)
+
+    meses_con_datos = evolucion[
+        (evolucion["Preventivos realizados"] > 0)
+        | (evolucion["Incidencias creadas"] > 0)
+    ]
+
+    if not meses_con_datos.empty:
+        ultimo = meses_con_datos.iloc[-1]
+        ultimo_mes = str(ultimo["mes"])
+        prev_ultimo = int(ultimo["Preventivos realizados"])
+        inc_ultimo = int(ultimo["Incidencias creadas"])
+    else:
+        ultimo_mes = "Sin datos todavía"
+        prev_ultimo = 0
+        inc_ultimo = 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🛠️ Preventivos curso", total_preventivos)
+    c2.metric("⚠️ Incidencias curso", total_incidencias)
+    c3.metric("🛡️ Índice prevención", f"{indice}%")
+    c4.metric(
+        f"📅 {ultimo_mes}",
+        f"{prev_ultimo} / {inc_ultimo}",
+        help="Preventivos realizados / incidencias creadas"
+    )
+
+    grafico = evolucion.set_index("mes")[
+        ["Preventivos realizados", "Incidencias creadas"]
+    ]
+
+    st.line_chart(grafico, use_container_width=True, height=360)
+
+    st.caption(
+        "El objetivo es observar si el aumento de preventivos realizados "
+        "se acompaña de una disminución de las incidencias creadas."
+    )
+
+    conclusion = construir_conclusion_evolucion(evolucion)
+    st.markdown("#### 💬 Lectura de la evolución")
+
+    if total_preventivos == 0 and total_incidencias == 0:
+        st.info(conclusion)
+    elif len(meses_con_datos) >= 2:
+        actual = meses_con_datos.iloc[-1]
+        anterior = meses_con_datos.iloc[-2]
+        favorable = (
+            int(actual["Preventivos realizados"]) >= int(anterior["Preventivos realizados"])
+            and int(actual["Incidencias creadas"]) <= int(anterior["Incidencias creadas"])
+        )
+        if favorable:
+            st.success(conclusion)
+        else:
+            st.warning(conclusion)
+    else:
+        st.info(conclusion)
+
+
+
 def mostrar_menu_centro(df, centro):
     st.markdown(f"<div class='gerencia-section-title'>🏫 {centro}</div>", unsafe_allow_html=True)
 
@@ -715,6 +993,8 @@ def mostrar_menu_centro(df, centro):
         volver_a_centros()
 
     mostrar_resumen_ejecutivo(df, centro)
+
+    mostrar_evolucion_mantenimiento(df, centro)
 
     with st.expander("📊 Indicadores de mantenimiento", expanded=False):
         c1, c2, c3, c4 = st.columns(4)
