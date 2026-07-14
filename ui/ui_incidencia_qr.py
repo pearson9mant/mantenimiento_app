@@ -197,15 +197,72 @@ def pantalla_incidencia_qr():
         st.markdown(
             f"""
             <div class="qr-confirmacion">
+                <div style="
+                    font-size: 48px;
+                    margin-bottom: 8px;
+                ">
+                    ✅
+                </div>
+
                 <div class="qr-confirmacion-titulo">
-                    ✅ Incidencia enviada
+                    Aviso enviado correctamente
                 </div>
-                <div>
-                    Referencia: <b>{incidencia_enviada}</b>
+
+                <div style="
+                    margin-top: 12px;
+                    color: #166534;
+                    font-size: 16px;
+                    font-weight: 700;
+                ">
+                    Gracias por comunicar la incidencia.
                 </div>
-                <div style="margin-top:10px;">
-                    Mantenimiento ha recibido el aviso.
+
+                <div style="
+                    margin-top: 10px;
+                    color: #334155;
+                    font-size: 15px;
+                    line-height: 1.5;
+                ">
+                    El departamento de mantenimiento ha recibido el aviso
+                    y lo revisará lo antes posible.
                 </div>
+
+                <div style="
+                    margin-top: 20px;
+                    font-size: 14px;
+                    color: #64748b;
+                    font-weight: 700;
+                ">
+                    Referencia
+                </div>
+
+                <div style="
+                    margin-top: 4px;
+                    font-size: 22px;
+                    font-weight: 900;
+                    color: #0f172a;
+                ">
+                    {incidencia_enviada}
+                </div>
+
+                <div style="
+                    margin-top: 18px;
+                    color: #64748b;
+                    font-size: 13px;
+                ">
+                    No es necesario volver a enviar el mismo aviso.
+                </div>
+            </div>
+
+            <div style="
+                text-align: center;
+                margin-top: 22px;
+                color: #64748b;
+                font-size: 12px;
+                line-height: 1.5;
+            ">
+                Colegio Abat Oliba Loreto<br>
+                Sistema Integral de Mantenimiento
             </div>
             """,
             unsafe_allow_html=True,
