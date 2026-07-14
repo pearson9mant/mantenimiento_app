@@ -179,26 +179,6 @@ def pantalla_incidencia_qr():
         unsafe_allow_html=True,
     )
 
-    with st.container(border=True):
-        st.markdown(
-            "<div style='text-align:center; color:#2563eb; "
-            "font-size:13px; font-weight:900; letter-spacing:1px;'>"
-            "AULA SELECCIONADA</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div style='text-align:center; font-size:30px; "
-            f"font-weight:900; color:#0f172a; margin-top:8px;'>"
-            f"{espacio}</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div style='text-align:center; color:#475569; "
-            f"font-size:15px; font-weight:700; line-height:1.6; "
-            f"margin-top:6px;'>"
-            f"{centro} · {edificio}<br>{planta}</div>",
-            unsafe_allow_html=True,
-        )
 
     if incidencia_enviada:
 
@@ -254,6 +234,33 @@ def pantalla_incidencia_qr():
             "Sistema Integral de Mantenimiento"
         )
         return
+
+    # =====================================================
+    # TARJETA DEL AULA
+    # =====================================================
+    
+    with st.container(border=True):
+        st.markdown(
+            "<div style='text-align:center; color:#2563eb; "
+            "font-size:13px; font-weight:900; letter-spacing:1px;'>"
+            "AULA SELECCIONADA</div>",
+            unsafe_allow_html=True,
+        )
+    
+        st.markdown(
+            f"<div style='text-align:center; font-size:30px; "
+            f"font-weight:900; color:#0f172a; margin-top:8px;'>"
+            f"{espacio}</div>",
+            unsafe_allow_html=True,
+        )
+    
+        st.markdown(
+            f"<div style='text-align:center; color:#475569; "
+            f"font-size:15px; font-weight:700; line-height:1.6; "
+            f"margin-top:6px;'>"
+            f"{centro} · {edificio}<br>{planta}</div>",
+            unsafe_allow_html=True,
+        )
 
     descripcion = st.text_area(
         "¿Qué ocurre en este espacio?",
