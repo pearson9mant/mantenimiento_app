@@ -1,6 +1,9 @@
 import streamlit as st
 
-from modules.espacios import obtener_aulas_para_qr
+from modules.espacios import (
+    obtener_aulas_para_qr,
+    obtener_espacios_llar_debug,
+)
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
@@ -15,6 +18,8 @@ def pantalla_qr_aulas():
     )
 
     aulas = obtener_aulas_para_qr()
+    st.write("DEBUG LLAR:")
+    st.write(obtener_espacios_llar_debug())
 
     if not aulas:
         st.warning("No hay aulas registradas.")
