@@ -340,6 +340,16 @@ def pantalla_placas_qr():
                     use_container_width=True,
                     key="descargar_qr_general",
                 )
+                pdf_general = generar_pdf_placa_general()
+
+                st.download_button(
+                    "📄 Descargar placa general en PDF",
+                    data=pdf_general,
+                    file_name="PLACA_GENERAL_LORETO_MANTENIMIENTO.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="descargar_pdf_placa_general",
+                )
 
         st.caption(
             "Pensada para recepción, secretaría, sala de profesores "
