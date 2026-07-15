@@ -31,6 +31,7 @@ from ui.ui_recordatorios import pantalla_recordatorios
 from ui.ui_gestion_aulas import pantalla_gestion_aulas
 from ui.ui_colegio import pantalla_colegio
 from ui.ui_admin_espacios import pantalla_admin_espacios
+from ui.ui_placas_qr import pantalla_placas_qr
 from ui.ui_recordatorios import (
     pantalla_recordatorios,
     obtener_resumen_recordatorios
