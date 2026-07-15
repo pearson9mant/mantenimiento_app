@@ -4,9 +4,17 @@ import qrcode
 import streamlit as st
 
 from ui.ui_qr_aulas import pantalla_qr_aulas
+from reportlab.lib.colors import HexColor, white
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
+AZUL_OSCURO = HexColor("#0f2a5f")
+AZUL = HexColor("#1d4ed8")
+GRIS = HexColor("#475569")
 
 
 def generar_qr_general():
@@ -32,6 +40,200 @@ def generar_qr_general():
     buffer.seek(0)
 
     return enlace, buffer.getvalue()
+
+def generar_pdf_placa_general():
+    enlace_general, qr_general = generar_qr_general()
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+
+    ancho_pagina, alto_pagina = A4
+
+    ancho_placa = 90 * mm
+    alto_placa = 120 * mm
+
+    x = (ancho_pagina - ancho_placa) / 2
+    y = (alto_pagina - alto_placa) / 2
+
+    radio = 5 * mm
+    x_centro = x + ancho_placa / 2
+
+    # Fondo y borde
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1.2)
+
+    pdf.roundRect(
+        x,
+        y,
+        ancho_placa,
+        alto_placa,
+        radio,
+        stroke=1,
+        fill=1,
+    )
+
+    # Cabecera
+    alto_cabecera = 22 * mm
+
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.roundRect(
+        x,
+        y + alto_placa - alto_cabecera,
+        ancho_placa,
+        alto_cabecera,
+        radio,
+        stroke=0,
+        fill=1,
+    )
+
+    pdf.rect(
+        x,
+        y + alto_placa - alto_cabecera,
+        ancho_placa,
+        alto_cabecera - radio,
+        stroke=0,
+        fill=1,
+    )
+
+    pdf.setFillColor(white)
+    pdf.setFont("Helvetica-Bold", 15)
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 9 * mm,
+        "LORETO",
+    )
+
+    pdf.setFont("Helvetica-Bold", 13)
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 15 * mm,
+        "MANTENIMIENTO",
+    )
+
+    pdf.setFont("Helvetica", 7)
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 19 * mm,
+        "Sistema Integral de Mantenimiento",
+    )
+
+    # Título central
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setFont("Helvetica-Bold", 15)
+
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 34 * mm,
+        "¿HAS DETECTADO",
+    )
+
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 41 * mm,
+        "UNA INCIDENCIA?",
+    )
+
+    # QR
+    qr_reader = ImageReader(
+        io.BytesIO(qr_general)
+    )
+
+    tamano_qr = 48 * mm
+    x_qr = x + (ancho_placa - tamano_qr) / 2
+    y_qr = y + 37 * mm
+
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1)
+
+    pdf.roundRect(
+        x_qr - 2 * mm,
+        y_qr - 2 * mm,
+        tamano_qr + 4 * mm,
+        tamano_qr + 4 * mm,
+        3 * mm,
+        stroke=1,
+        fill=1,
+    )
+
+    pdf.drawImage(
+        qr_reader,
+        x_qr,
+        y_qr,
+        width=tamano_qr,
+        height=tamano_qr,
+        preserveAspectRatio=True,
+        mask="auto",
+    )
+
+    pdf.setFont("Helvetica-Bold", 7)
+    pdf.setFillColor(HexColor("#64748b"))
+
+    pdf.drawCentredString(
+        x_centro,
+        y_qr + tamano_qr + 5 * mm,
+        "ESCANEA AQUÍ",
+    )
+
+    # Botón azul
+    y_accion = y + 24 * mm
+    alto_accion = 10 * mm
+
+    pdf.setFillColor(AZUL_OSCURO)
+
+    pdf.roundRect(
+        x + 9 * mm,
+        y_accion,
+        ancho_placa - 18 * mm,
+        alto_accion,
+        3 * mm,
+        stroke=0,
+        fill=1,
+    )
+
+    pdf.setFillColor(white)
+    pdf.setFont("Helvetica-Bold", 10)
+
+    pdf.drawCentredString(
+        x_centro,
+        y_accion + 3.4 * mm,
+        "Comunicar una incidencia",
+    )
+
+    # Instrucciones
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setFont("Helvetica-Bold", 7)
+
+    pdf.drawCentredString(
+        x_centro,
+        y + 17 * mm,
+        "Escanea con la cámara del móvil",
+    )
+
+    pdf.setFillColor(AZUL)
+    pdf.setFont("Helvetica", 6.5)
+
+    pdf.drawCentredString(
+        x_centro,
+        y + 13 * mm,
+        "No necesitas ninguna aplicación",
+    )
+
+    # Pie
+    pdf.setFillColor(GRIS)
+    pdf.setFont("Helvetica-Oblique", 6.2)
+
+    pdf.drawCentredString(
+        x_centro,
+        y + 7 * mm,
+        "Gracias por ayudarnos a cuidar nuestro colegio",
+    )
+
+    pdf.save()
+    buffer.seek(0)
+
+    return buffer.getvalue()
 
 
 def pantalla_placas_qr():
