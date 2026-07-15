@@ -466,7 +466,6 @@ def pantalla_placas_qr():
                 unsafe_allow_html=True,
             )
         
-            st.divider()
         
             # Aula
             st.markdown(
