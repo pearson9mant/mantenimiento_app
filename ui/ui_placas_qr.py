@@ -507,13 +507,25 @@ def pantalla_placas_qr():
                 )
         
             # Acción
-            st.markdown(
-                f"<div style='text-align:center; background:#0f2a5f; "
-                f"color:white; border-radius:12px; padding:12px; "
-                f"font-size:18px; font-weight:900;'>"
-                f"{texto_accion}</div>",
-                unsafe_allow_html=True,
-            )
+            col1, col2, col3 = st.columns([1,2,1])
+
+            with col2:
+                st.markdown(
+                    f"""
+                    <div style="
+                        text-align:center;
+                        background:#0f2a5f;
+                        color:white;
+                        border-radius:12px;
+                        padding:12px;
+                        font-size:17px;
+                        font-weight:900;
+                    ">
+                        {texto_accion}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
         
             if mostrar_ayuda:
                 st.markdown(
