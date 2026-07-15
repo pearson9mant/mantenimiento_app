@@ -81,14 +81,14 @@ def obtener_configuracion_placas():
                 True,
             )
         ),
-    }
+    
 
-    "marcas_corte": bool(
-        st.session_state.get(
-            "placas_marcas_corte",
-            True,
-        )
-    ),
+        "marcas_corte": bool(
+            st.session_state.get(
+                "placas_marcas_corte",
+                True,
+            )
+        ),
 
 
 def limpiar_nombre_archivo(texto):
