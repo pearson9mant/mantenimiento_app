@@ -68,7 +68,11 @@ def dibujar_texto_centrado(
 ):
     pdf.setFont(fuente, tamano)
     pdf.setFillColor(color)
-    pdf.drawCentredString(x_centro, y, str(texto or ""))
+    pdf.drawCentredString(
+        x_centro,
+        y,
+        str(texto or "")
+    )
 
 
 def dibujar_pegatina(
@@ -84,17 +88,35 @@ def dibujar_pegatina(
     espacio,
 ):
     radio = 5 * mm
+    x_centro = x + ancho / 2
 
-    # Fondo y borde.
+    # =====================================================
+    # FONDO Y BORDE
+    # =====================================================
+
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
     pdf.setLineWidth(1.2)
-    pdf.roundRect(x, y, ancho, alto, radio, stroke=1, fill=1)
 
-    # Cabecera.
+    pdf.roundRect(
+        x,
+        y,
+        ancho,
+        alto,
+        radio,
+        stroke=1,
+        fill=1,
+    )
+
+    # =====================================================
+    # CABECERA
+    # =====================================================
+
     alto_cabecera = 18 * mm
+
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
+
     pdf.roundRect(
         x,
         y + alto - alto_cabecera,
@@ -104,7 +126,8 @@ def dibujar_pegatina(
         stroke=0,
         fill=1,
     )
-    # Rectángulo para que la parte inferior de la cabecera quede recta.
+
+    # Deja recta la parte inferior de la cabecera.
     pdf.rect(
         x,
         y + alto - alto_cabecera,
@@ -113,8 +136,6 @@ def dibujar_pegatina(
         stroke=0,
         fill=1,
     )
-
-    x_centro = x + ancho / 2
 
     dibujar_texto_centrado(
         pdf,
@@ -125,6 +146,7 @@ def dibujar_pegatina(
         tamano=13,
         color=white,
     )
+
     dibujar_texto_centrado(
         pdf,
         "MANTENIMIENTO",
@@ -132,8 +154,9 @@ def dibujar_pegatina(
         y + alto - 12.5 * mm,
         fuente="Helvetica-Bold",
         tamano=11,
-        color=AMARILLO,
+        color=white,
     )
+
     dibujar_texto_centrado(
         pdf,
         "Sistema Integral de Mantenimiento",
@@ -144,47 +167,101 @@ def dibujar_pegatina(
         color=white,
     )
 
-    # Aula.
+    # =====================================================
+    # IDENTIFICACIÓN DEL AULA
+    # =====================================================
+
     dibujar_texto_centrado(
         pdf,
         "AULA",
         x_centro,
-        y + alto - 25 * mm,
+        y + alto - 23.5 * mm,
         fuente="Helvetica-Bold",
-        tamano=8,
+        tamano=8.5,
         color=AZUL_OSCURO,
     )
 
-    nombre_espacio = str(espacio or "").upper()
-    tamano_aula = 21 if len(nombre_espacio) <= 5 else 16
+    nombre_espacio = str(
+        espacio or ""
+    ).strip().upper()
+
+    if len(nombre_espacio) <= 4:
+        tamano_aula = 24
+    elif len(nombre_espacio) <= 7:
+        tamano_aula = 20
+    else:
+        tamano_aula = 15
+
     dibujar_texto_centrado(
         pdf,
         nombre_espacio,
         x_centro,
-        y + alto - 33.5 * mm,
+        y + alto - 31 * mm,
         fuente="Helvetica-Bold",
         tamano=tamano_aula,
         color=AZUL_OSCURO,
     )
 
-    # QR.
-    enlace = construir_enlace_qr(codigo)
-    qr_bytes = generar_qr_png(enlace, box_size=11, border=2)
-    qr_reader = ImageReader(io.BytesIO(qr_bytes))
+    # Ubicación en dos líneas para evitar que el texto se corte.
+    ubicacion_principal = (
+        f"{centro or '-'} · {edificio or '-'}"
+    )
 
-    tamano_qr = min(41 * mm, ancho - 24 * mm)
+    dibujar_texto_centrado(
+        pdf,
+        ubicacion_principal,
+        x_centro,
+        y + alto - 35.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=5.8,
+        color=GRIS,
+    )
+
+    dibujar_texto_centrado(
+        pdf,
+        planta or "-",
+        x_centro,
+        y + alto - 38.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=5.8,
+        color=GRIS,
+    )
+
+    # =====================================================
+    # QR
+    # =====================================================
+
+    enlace = construir_enlace_qr(codigo)
+
+    qr_bytes = generar_qr_png(
+        enlace,
+        box_size=11,
+        border=2,
+    )
+
+    qr_reader = ImageReader(
+        io.BytesIO(qr_bytes)
+    )
+
+    # Tamaño adaptado para que quepan aula, ubicación y textos.
+    tamano_qr = min(
+        30 * mm,
+        ancho - 28 * mm,
+    )
+
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 30 * mm
+    y_qr = y + 20 * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
     pdf.setLineWidth(1)
+
     pdf.roundRect(
-        x_qr - 2 * mm,
-        y_qr - 2 * mm,
-        tamano_qr + 4 * mm,
-        tamano_qr + 4 * mm,
-        3 * mm,
+        x_qr - 1.5 * mm,
+        y_qr - 1.5 * mm,
+        tamano_qr + 3 * mm,
+        tamano_qr + 3 * mm,
+        2.5 * mm,
         stroke=1,
         fill=1,
     )
@@ -199,18 +276,22 @@ def dibujar_pegatina(
         mask="auto",
     )
 
-    # Acción principal.
-    alto_accion = 10 * mm
-    y_accion = y + 16.5 * mm
+    # =====================================================
+    # ACCIÓN PRINCIPAL
+    # =====================================================
+
+    alto_accion = 7.5 * mm
+    y_accion = y + 10.5 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
+
     pdf.roundRect(
         x + 7 * mm,
         y_accion,
         ancho - 14 * mm,
         alto_accion,
-        3 * mm,
+        2.5 * mm,
         stroke=0,
         fill=1,
     )
@@ -219,49 +300,63 @@ def dibujar_pegatina(
         pdf,
         "Comunicar una incidencia",
         x_centro,
-        y_accion + 3.4 * mm,
+        y_accion + 2.5 * mm,
         fuente="Helvetica-Bold",
-        tamano=9.2,
+        tamano=8.2,
         color=white,
     )
 
-    # Instrucción.
+    # =====================================================
+    # INSTRUCCIONES
+    # =====================================================
+
     dibujar_texto_centrado(
         pdf,
         "Escanea con la cámara del móvil",
         x_centro,
-        y + 11.5 * mm,
+        y + 7.2 * mm,
         fuente="Helvetica-Bold",
-        tamano=6.8,
+        tamano=6.2,
         color=AZUL_OSCURO,
     )
+
     dibujar_texto_centrado(
         pdf,
         "No necesitas ninguna aplicación",
         x_centro,
-        y + 8.2 * mm,
+        y + 4.8 * mm,
         fuente="Helvetica",
-        tamano=6.4,
+        tamano=5.8,
         color=AZUL,
     )
 
-    # Pie.
+    # =====================================================
+    # PIE
+    # =====================================================
+
     dibujar_texto_centrado(
         pdf,
         "Gracias por ayudarnos a cuidar nuestro colegio",
         x_centro,
-        y + 3.9 * mm,
+        y + 2.2 * mm,
         fuente="Helvetica-Oblique",
-        tamano=5.9,
+        tamano=5.2,
         color=GRIS,
     )
 
-    # Código técnico, muy discreto.
-    pdf.setFont("Helvetica", 4.8)
-    pdf.setFillColor(HexColor("#94a3b8"))
+    # Código técnico discreto.
+    pdf.setFont(
+        "Helvetica",
+        4.2,
+    )
+
+    pdf.setFillColor(
+        HexColor("#94a3b8")
+    )
+
     pdf.drawRightString(
-        x + ancho - 3 * mm,
-        y + 2.1 * mm,
+        x + ancho - 2.5 * mm,
+        y + 1.2 * mm,
         str(codigo or ""),
     )
 
