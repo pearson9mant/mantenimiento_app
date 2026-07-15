@@ -147,7 +147,191 @@ def pantalla_placas_qr():
     with tab3:
         st.markdown("### ⚙️ Configuración")
 
-        st.caption(
-            "Aquí configuraremos el tamaño, formato y acabado "
-            "de las placas sin modificar código."
+        st.info(
+            "Ajustes visuales y de impresión para las placas QR. "
+            "Estos cambios no modifican los enlaces ni los códigos QR."
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            titulo_placa = st.text_input(
+                "Título principal",
+                value="LORETO MANTENIMIENTO",
+                key="placas_titulo_principal",
+            )
+
+            subtitulo_placa = st.text_input(
+                "Subtítulo",
+                value="Sistema Integral de Mantenimiento",
+                key="placas_subtitulo",
+            )
+
+            texto_accion = st.text_input(
+                "Texto de acción",
+                value="Comunicar una incidencia",
+                key="placas_texto_accion",
+            )
+
+        with col2:
+            tamano_placa = st.selectbox(
+                "Tamaño recomendado",
+                [
+                    "90 × 120 mm",
+                    "80 × 110 mm",
+                    "70 × 100 mm",
+                ],
+                index=0,
+                key="placas_tamano",
+            )
+
+            placas_por_pagina = st.selectbox(
+                "Placas por página A4",
+                [6, 4, 2],
+                index=0,
+                key="placas_por_pagina",
+            )
+
+            acabado = st.selectbox(
+                "Acabado recomendado",
+                [
+                    "Vinilo adhesivo mate + laminado transparente",
+                    "Vinilo adhesivo brillo + laminado transparente",
+                    "Papel adhesivo plastificado",
+                ],
+                index=0,
+                key="placas_acabado",
+            )
+
+        st.markdown("#### Contenido visible")
+
+        mostrar_codigo = st.checkbox(
+            "Mostrar código técnico del espacio",
+            value=True,
+            key="placas_mostrar_codigo",
+        )
+
+        mostrar_ubicacion = st.checkbox(
+            "Mostrar centro, edificio y planta",
+            value=True,
+            key="placas_mostrar_ubicacion",
+        )
+
+        mostrar_ayuda = st.checkbox(
+            "Mostrar instrucciones para escanear",
+            value=True,
+            key="placas_mostrar_ayuda",
+        )
+
+        mostrar_mensaje_final = st.checkbox(
+            "Mostrar mensaje de colaboración",
+            value=True,
+            key="placas_mostrar_mensaje_final",
+        )
+
+        st.markdown("#### Vista previa")
+
+        with st.container(border=True):
+            st.markdown(
+                f"""
+                <div style="
+                    text-align:center;
+                    background:linear-gradient(135deg,#0f172a,#1d4ed8);
+                    color:white;
+                    border-radius:18px;
+                    padding:20px;
+                    font-size:26px;
+                    font-weight:900;
+                ">
+                    {titulo_placa}
+                    <br>
+                    <span style="
+                        font-size:14px;
+                        font-weight:700;
+                    ">
+                        {subtitulo_placa}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                """
+                <div style="
+                    text-align:center;
+                    margin-top:18px;
+                    font-size:13px;
+                    font-weight:900;
+                    color:#1d4ed8;
+                    letter-spacing:1px;
+                ">
+                    AULA
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                """
+                <div style="
+                    text-align:center;
+                    font-size:34px;
+                    font-weight:900;
+                    color:#0f172a;
+                    margin-top:4px;
+                ">
+                    I4A
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if mostrar_ubicacion:
+                st.caption(
+                    "Pearson 22 · Infantil / Primaria · Planta 1"
+                )
+
+            st.markdown(
+                f"""
+                <div style="
+                    text-align:center;
+                    background:#0f2a5f;
+                    color:white;
+                    border-radius:14px;
+                    padding:12px;
+                    margin-top:16px;
+                    font-size:18px;
+                    font-weight:900;
+                ">
+                    {texto_accion}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if mostrar_ayuda:
+                st.caption(
+                    "Escanea con la cámara del móvil. "
+                    "No necesitas ninguna aplicación."
+                )
+
+            if mostrar_mensaje_final:
+                st.caption(
+                    "Gracias por ayudarnos a cuidar nuestro colegio."
+                )
+
+            if mostrar_codigo:
+                st.caption("ESP-000023")
+
+        st.markdown("#### Resumen de impresión")
+
+        st.write(f"**Tamaño:** {tamano_placa}")
+        st.write(f"**Placas por página:** {placas_por_pagina}")
+        st.write(f"**Acabado:** {acabado}")
+
+        st.success(
+            "Configuración preparada. En el siguiente paso conectaremos "
+            "estos ajustes con el PDF para que puedas generar las placas "
+            "sin volver a tocar código."
         )
