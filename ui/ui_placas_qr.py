@@ -58,46 +58,47 @@ def pantalla_placas_qr():
         enlace_general, qr_general = generar_qr_general()
 
         with st.container(border=True):
+
             st.markdown(
                 """
-                <div style="
-                    text-align:center;
-                    background:linear-gradient(135deg,#0f172a,#1d4ed8);
-                    color:white;
-                    border-radius:20px;
-                    padding:22px;
-                    margin-bottom:16px;
-                ">
-                    <div style="
-                        font-size:27px;
-                        font-weight:900;
-                    ">
-                        LORETO MANTENIMIENTO
-                    </div>
+<div style="
+    text-align:center;
+    background:linear-gradient(135deg,#0f172a,#1d4ed8);
+    color:white;
+    border-radius:20px;
+    padding:22px;
+    margin-bottom:16px;
+">
+    <div style="
+        font-size:27px;
+        font-weight:900;
+    ">
+        LORETO MANTENIMIENTO
+    </div>
 
-                    <div style="
-                        font-size:14px;
-                        font-weight:700;
-                        margin-top:5px;
-                    ">
-                        Sistema Integral de Mantenimiento
-                    </div>
-                </div>
+    <div style="
+        font-size:14px;
+        font-weight:700;
+        margin-top:5px;
+    ">
+        Sistema Integral de Mantenimiento
+    </div>
+</div>
                 """,
                 unsafe_allow_html=True,
             )
 
             st.markdown(
                 """
-                <div style="
-                    text-align:center;
-                    font-size:24px;
-                    font-weight:900;
-                    color:#0f172a;
-                    margin-bottom:12px;
-                ">
-                    ¿Has detectado una incidencia?
-                </div>
+<div style="
+    text-align:center;
+    font-size:24px;
+    font-weight:900;
+    color:#0f172a;
+    margin-bottom:12px;
+">
+    ¿Has detectado una incidencia?
+</div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -112,13 +113,15 @@ def pantalla_placas_qr():
 
             with col2:
                 st.markdown(
-                    """
-                    **Comunica cualquier incidencia del colegio**
+                    "**Comunica cualquier incidencia del colegio**"
+                )
 
-                    Escanea el código con la cámara del móvil.
+                st.write(
+                    "Escanea el código con la cámara del móvil."
+                )
 
-                    No necesitas instalar ninguna aplicación.
-                    """
+                st.write(
+                    "No necesitas instalar ninguna aplicación."
                 )
 
                 st.link_button(
@@ -140,7 +143,6 @@ def pantalla_placas_qr():
             "Pensada para recepción, secretaría, sala de profesores "
             "y otras zonas comunes."
         )
-
     with tab3:
         st.markdown("### ⚙️ Configuración")
         st.caption(
