@@ -361,7 +361,7 @@ def dibujar_pegatina(
 
     # Acción principal
     alto_accion = 7.5 * mm
-    y_accion = y + 8.5 * mm
+    y_accion = y + 21 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
