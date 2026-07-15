@@ -449,77 +449,118 @@ def pantalla_placas_qr():
 
         st.markdown("#### Vista previa")
 
+        enlace_previa, qr_previa = generar_qr_general()
+        
         with st.container(border=True):
             st.markdown(
                 f"""
                 <div style="
-                    text-align:center;
-                    background:linear-gradient(135deg,#0f172a,#1d4ed8);
-                    color:white;
-                    border-radius:18px;
-                    padding:20px;
-                    font-size:26px;
-                    font-weight:900;
+                    max-width:520px;
+                    margin:0 auto;
+                    border:2px solid #0f2a5f;
+                    border-radius:24px;
+                    background:white;
+                    overflow:hidden;
+                    box-shadow:0 10px 28px rgba(15,42,95,0.10);
                 ">
-                    {titulo_placa}
-                    <br>
-                    <span style="
-                        font-size:14px;
-                        font-weight:700;
+                    <div style="
+                        text-align:center;
+                        background:linear-gradient(135deg,#0f172a,#1d4ed8);
+                        color:white;
+                        padding:20px 16px 16px 16px;
                     ">
-                        {subtitulo_placa}
-                    </span>
-                </div>
+                        <div style="
+                            font-size:25px;
+                            font-weight:900;
+                            line-height:1.15;
+                        ">
+                            {titulo_placa}
+                        </div>
+        
+                        <div style="
+                            font-size:13px;
+                            font-weight:700;
+                            margin-top:7px;
+                        ">
+                            {subtitulo_placa}
+                        </div>
+                    </div>
+        
+                    <div style="
+                        padding:18px 22px 22px 22px;
+                        text-align:center;
+                    ">
+                        <div style="
+                            color:#1d4ed8;
+                            font-size:12px;
+                            font-weight:900;
+                            letter-spacing:1px;
+                        ">
+                            AULA
+                        </div>
+        
+                        <div style="
+                            font-size:38px;
+                            font-weight:900;
+                            color:#0f172a;
+                            margin-top:2px;
+                        ">
+                            I4A
+                        </div>
                 """,
                 unsafe_allow_html=True,
             )
-
+        
+            if mostrar_ubicacion:
+                st.markdown(
+                    """
+                    <div style="
+                        text-align:center;
+                        color:#475569;
+                        font-size:13px;
+                        font-weight:700;
+                        line-height:1.5;
+                        margin-top:4px;
+                    ">
+                        Pearson 22 · Infantil / Primaria<br>
+                        Planta 1
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        
             st.markdown(
                 """
                 <div style="
                     text-align:center;
-                    margin-top:18px;
-                    font-size:13px;
+                    margin-top:14px;
+                    color:#64748b;
+                    font-size:11px;
                     font-weight:900;
-                    color:#1d4ed8;
                     letter-spacing:1px;
                 ">
-                    AULA
+                    ESCANEA AQUÍ
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-
-            st.markdown(
-                """
-                <div style="
-                    text-align:center;
-                    font-size:34px;
-                    font-weight:900;
-                    color:#0f172a;
-                    margin-top:4px;
-                ">
-                    I4A
-                </div>
-                """,
-                unsafe_allow_html=True,
+        
+            st.image(
+                qr_previa,
+                width=220,
             )
-
-            if mostrar_ubicacion:
-                st.caption(
-                    "Pearson 22 · Infantil / Primaria · Planta 1"
-                )
-
+        
             st.markdown(
                 f"""
                 <div style="
+                    max-width:390px;
+                    margin:10px auto 0 auto;
                     text-align:center;
                     background:#0f2a5f;
                     color:white;
-                    border-radius:14px;
-                    padding:12px;
-                    margin-top:16px;
-                    font-size:18px;
+                    border-radius:13px;
+                    padding:11px 14px;
+                    font-size:17px;
                     font-weight:900;
                 ">
                     {texto_accion}
@@ -527,20 +568,70 @@ def pantalla_placas_qr():
                 """,
                 unsafe_allow_html=True,
             )
-
+        
             if mostrar_ayuda:
-                st.caption(
-                    "Escanea con la cámara del móvil. "
-                    "No necesitas ninguna aplicación."
+                st.markdown(
+                    """
+                    <div style="
+                        text-align:center;
+                        margin-top:11px;
+                        color:#0f2a5f;
+                        font-size:12px;
+                        font-weight:800;
+                    ">
+                        Escanea con la cámara del móvil
+                    </div>
+        
+                    <div style="
+                        text-align:center;
+                        color:#1d4ed8;
+                        font-size:11px;
+                        margin-top:2px;
+                    ">
+                        No necesitas ninguna aplicación
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
+        
             if mostrar_mensaje_final:
-                st.caption(
-                    "Gracias por ayudarnos a cuidar nuestro colegio."
+                st.markdown(
+                    """
+                    <div style="
+                        text-align:center;
+                        color:#475569;
+                        font-size:11px;
+                        font-style:italic;
+                        margin-top:10px;
+                    ">
+                        Gracias por ayudarnos a cuidar nuestro colegio.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
+        
             if mostrar_codigo:
-                st.caption("ESP-000023")
+                st.markdown(
+                    """
+                    <div style="
+                        text-align:right;
+                        color:#94a3b8;
+                        font-size:9px;
+                        margin-top:8px;
+                    ">
+                        ESP-000023
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        
+            st.markdown(
+                """
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         st.markdown("#### Resumen de impresión")
 
