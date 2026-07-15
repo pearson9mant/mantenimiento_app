@@ -937,6 +937,9 @@ if perfil == "admin":
     elif seccion == "QR aulas":
         pantalla_qr_aulas()
 
+    elif seccion == "Placas QR":
+        pantalla_placas_qr()
+
     elif seccion == "Corazón sistema":
         mostrar_corazon_sistema()
 
