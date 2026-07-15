@@ -623,6 +623,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "QR aulas"
             st.rerun()
 
+        if st.button(
+            "📄\nPlacas QR",
+            key="btn_placas_qr",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Placas QR"
+            st.rerun()
+
 
 
 def mostrar_menu_operario():
