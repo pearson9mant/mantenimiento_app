@@ -471,65 +471,70 @@ def pantalla_qr_aulas():
     )
 
     st.markdown("---")
-    st.markdown("### 🔎 Comprobar aulas individualmente")
 
-    # =====================================================
-    # LISTADO INDIVIDUAL
-    # =====================================================
-
-    for fila in resultados:
-        (
-            codigo,
-            centro,
-            edificio,
-            planta,
-            espacio,
-        ) = fila
-
-        codigo = str(codigo or "").strip()
-
-        if not codigo:
-            continue
-
-        enlace = construir_enlace_qr(codigo)
-        qr_bytes = generar_qr_png(
-            enlace,
-            box_size=8,
-            border=2,
+    with st.expander(
+        "🔎 Ver y comprobar placas individuales",
+        expanded=False,
+    ):
+        st.caption(
+            "Desde aquí puedes probar el formulario de cada aula "
+            "o descargar un QR individual."
         )
-
-        with st.container(border=True):
-            st.markdown(f"### 🏫 {espacio}")
-
-            st.caption(
-                f"📍 {centro} · {edificio} · {planta}"
+    
+        for fila in resultados:
+            (
+                codigo,
+                centro,
+                edificio,
+                planta,
+                espacio,
+            ) = fila
+    
+            codigo = str(codigo or "").strip()
+    
+            if not codigo:
+                continue
+    
+            enlace = construir_enlace_qr(codigo)
+    
+            qr_bytes = generar_qr_png(
+                enlace,
+                box_size=8,
+                border=2,
             )
-
-            col1, col2 = st.columns([1, 2])
-
-            with col1:
-                st.image(
-                    qr_bytes,
-                    width=150,
+    
+            with st.container(border=True):
+                st.markdown(f"### 🏫 {espacio}")
+    
+                st.caption(
+                    f"📍 {centro} · {edificio} · {planta}"
                 )
-
-            with col2:
-                st.code(codigo)
-
-                st.link_button(
-                    "🔎 Probar formulario",
-                    enlace,
-                    use_container_width=True,
-                )
-
-                st.download_button(
-                    "⬇️ Descargar QR",
-                    data=qr_bytes,
-                    file_name=f"{codigo}.png",
-                    mime="image/png",
-                    use_container_width=True,
-                    key=f"descargar_qr_{codigo}",
-                )
+    
+                col1, col2 = st.columns([1, 2])
+    
+                with col1:
+                    st.image(
+                        qr_bytes,
+                        width=150,
+                    )
+    
+                with col2:
+                    st.code(codigo)
+    
+                    st.link_button(
+                        "🔎 Probar formulario",
+                        enlace,
+                        use_container_width=True,
+                    )
+    
+                    st.download_button(
+                        "⬇️ Descargar QR",
+                        data=qr_bytes,
+                        file_name=f"{codigo}.png",
+                        mime="image/png",
+                        use_container_width=True,
+                        key=f"descargar_qr_{codigo}",
+                    )
 
             
 
