@@ -323,7 +323,17 @@ def dibujar_pegatina(
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 18 * mm
+    y_qr = y + 31 * mm
+    
+    dibujar_texto_centrado(
+        pdf,
+        "ESCANEA AQUÍ",
+        x_centro,
+        y_qr + tamano_qr + 4 * mm,
+        fuente="Helvetica-Bold",
+        tamano=6.5,
+        color=HexColor("#64748b"),
+    )
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
