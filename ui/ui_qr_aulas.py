@@ -17,10 +17,71 @@ URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
 
 AZUL_OSCURO = HexColor("#0f2a5f")
 AZUL = HexColor("#1d4ed8")
-AZUL_CLARO = HexColor("#eaf2ff")
-AMARILLO = HexColor("#f4b41a")
 GRIS = HexColor("#475569")
-GRIS_CLARO = HexColor("#e2e8f0")
+
+
+def obtener_configuracion_placas():
+    return {
+        "titulo": str(
+            st.session_state.get(
+                "placas_titulo_principal",
+                "LORETO MANTENIMIENTO",
+            )
+            or "LORETO MANTENIMIENTO"
+        ).strip(),
+        "subtitulo": str(
+            st.session_state.get(
+                "placas_subtitulo",
+                "Sistema Integral de Mantenimiento",
+            )
+            or "Sistema Integral de Mantenimiento"
+        ).strip(),
+        "texto_accion": str(
+            st.session_state.get(
+                "placas_texto_accion",
+                "Comunicar una incidencia",
+            )
+            or "Comunicar una incidencia"
+        ).strip(),
+        "tamano": str(
+            st.session_state.get(
+                "placas_tamano",
+                "90 × 120 mm",
+            )
+            or "90 × 120 mm"
+        ).strip(),
+        "por_pagina": int(
+            st.session_state.get(
+                "placas_por_pagina",
+                6,
+            )
+            or 6
+        ),
+        "mostrar_codigo": bool(
+            st.session_state.get(
+                "placas_mostrar_codigo",
+                True,
+            )
+        ),
+        "mostrar_ubicacion": bool(
+            st.session_state.get(
+                "placas_mostrar_ubicacion",
+                True,
+            )
+        ),
+        "mostrar_ayuda": bool(
+            st.session_state.get(
+                "placas_mostrar_ayuda",
+                True,
+            )
+        ),
+        "mostrar_mensaje_final": bool(
+            st.session_state.get(
+                "placas_mostrar_mensaje_final",
+                True,
+            )
+        ),
+    }
 
 
 def limpiar_nombre_archivo(texto):
@@ -71,8 +132,21 @@ def dibujar_texto_centrado(
     pdf.drawCentredString(
         x_centro,
         y,
-        str(texto or "")
+        str(texto or ""),
     )
+
+
+def dividir_titulo(titulo):
+    palabras = str(titulo or "").strip().split()
+
+    if len(palabras) <= 1:
+        return titulo, ""
+
+    if len(palabras) == 2:
+        return palabras[0], palabras[1]
+
+    mitad = max(1, len(palabras) // 2)
+    return " ".join(palabras[:mitad]), " ".join(palabras[mitad:])
 
 
 def dibujar_pegatina(
@@ -86,18 +160,24 @@ def dibujar_pegatina(
     edificio,
     planta,
     espacio,
+    configuracion,
 ):
     radio = 5 * mm
     x_centro = x + ancho / 2
 
-    # =====================================================
-    # FONDO Y BORDE
-    # =====================================================
+    titulo_placa = configuracion["titulo"]
+    subtitulo_placa = configuracion["subtitulo"]
+    texto_accion = configuracion["texto_accion"]
 
+    mostrar_codigo = configuracion["mostrar_codigo"]
+    mostrar_ubicacion = configuracion["mostrar_ubicacion"]
+    mostrar_ayuda = configuracion["mostrar_ayuda"]
+    mostrar_mensaje_final = configuracion["mostrar_mensaje_final"]
+
+    # Fondo y borde
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
     pdf.setLineWidth(1.2)
-
     pdf.roundRect(
         x,
         y,
@@ -108,10 +188,7 @@ def dibujar_pegatina(
         fill=1,
     )
 
-    # =====================================================
-    # CABECERA
-    # =====================================================
-
+    # Cabecera
     alto_cabecera = 18 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
@@ -127,7 +204,6 @@ def dibujar_pegatina(
         fill=1,
     )
 
-    # Deja recta la parte inferior de la cabecera.
     pdf.rect(
         x,
         y + alto - alto_cabecera,
@@ -137,40 +213,40 @@ def dibujar_pegatina(
         fill=1,
     )
 
+    titulo_1, titulo_2 = dividir_titulo(titulo_placa)
+
     dibujar_texto_centrado(
         pdf,
-        "LORETO",
+        titulo_1,
         x_centro,
-        y + alto - 7.2 * mm,
+        y + alto - 7.0 * mm,
         fuente="Helvetica-Bold",
         tamano=13,
         color=white,
     )
 
-    dibujar_texto_centrado(
-        pdf,
-        "MANTENIMIENTO",
-        x_centro,
-        y + alto - 12.5 * mm,
-        fuente="Helvetica-Bold",
-        tamano=11,
-        color=white,
-    )
+    if titulo_2:
+        dibujar_texto_centrado(
+            pdf,
+            titulo_2,
+            x_centro,
+            y + alto - 12.3 * mm,
+            fuente="Helvetica-Bold",
+            tamano=11,
+            color=white,
+        )
 
     dibujar_texto_centrado(
         pdf,
-        "Sistema Integral de Mantenimiento",
+        subtitulo_placa,
         x_centro,
-        y + alto - 16.1 * mm,
+        y + alto - 16.0 * mm,
         fuente="Helvetica",
-        tamano=6.7,
+        tamano=6.5,
         color=white,
     )
 
-    # =====================================================
-    # IDENTIFICACIÓN DEL AULA
-    # =====================================================
-
+    # Identificación del aula
     dibujar_texto_centrado(
         pdf,
         "AULA",
@@ -181,9 +257,7 @@ def dibujar_pegatina(
         color=AZUL_OSCURO,
     )
 
-    nombre_espacio = str(
-        espacio or ""
-    ).strip().upper()
+    nombre_espacio = str(espacio or "").strip().upper()
 
     if len(nombre_espacio) <= 4:
         tamano_aula = 24
@@ -202,48 +276,40 @@ def dibujar_pegatina(
         color=AZUL_OSCURO,
     )
 
-    # Ubicación en dos líneas para evitar que el texto se corte.
-    ubicacion_principal = (
-        f"{centro or '-'} · {edificio or '-'}"
-    )
+    if mostrar_ubicacion:
+        ubicacion_principal = (
+            f"{centro or '-'} · {edificio or '-'}"
+        )
 
-    dibujar_texto_centrado(
-        pdf,
-        ubicacion_principal,
-        x_centro,
-        y + alto - 35.5 * mm,
-        fuente="Helvetica-Bold",
-        tamano=5.8,
-        color=GRIS,
-    )
+        dibujar_texto_centrado(
+            pdf,
+            ubicacion_principal,
+            x_centro,
+            y + alto - 35.5 * mm,
+            fuente="Helvetica-Bold",
+            tamano=5.8,
+            color=GRIS,
+        )
 
-    dibujar_texto_centrado(
-        pdf,
-        planta or "-",
-        x_centro,
-        y + alto - 38.5 * mm,
-        fuente="Helvetica-Bold",
-        tamano=5.8,
-        color=GRIS,
-    )
+        dibujar_texto_centrado(
+            pdf,
+            planta or "-",
+            x_centro,
+            y + alto - 38.5 * mm,
+            fuente="Helvetica-Bold",
+            tamano=5.8,
+            color=GRIS,
+        )
 
-    # =====================================================
     # QR
-    # =====================================================
-
     enlace = construir_enlace_qr(codigo)
-
     qr_bytes = generar_qr_png(
         enlace,
         box_size=11,
         border=2,
     )
+    qr_reader = ImageReader(io.BytesIO(qr_bytes))
 
-    qr_reader = ImageReader(
-        io.BytesIO(qr_bytes)
-    )
-
-    # Tamaño adaptado para que quepan aula, ubicación y textos.
     tamano_qr = min(
         34 * mm,
         ancho - 24 * mm,
@@ -276,10 +342,7 @@ def dibujar_pegatina(
         mask="auto",
     )
 
-    # =====================================================
-    # ACCIÓN PRINCIPAL
-    # =====================================================
-
+    # Acción principal
     alto_accion = 7.5 * mm
     y_accion = y + 8.5 * mm
 
@@ -298,7 +361,7 @@ def dibujar_pegatina(
 
     dibujar_texto_centrado(
         pdf,
-        "Comunicar una incidencia",
+        texto_accion,
         x_centro,
         y_accion + 2.5 * mm,
         fuente="Helvetica-Bold",
@@ -306,62 +369,59 @@ def dibujar_pegatina(
         color=white,
     )
 
-    # =====================================================
-    # INSTRUCCIONES
-    # =====================================================
+    if mostrar_ayuda:
+        dibujar_texto_centrado(
+            pdf,
+            "Escanea con la cámara del móvil",
+            x_centro,
+            y + 7.2 * mm,
+            fuente="Helvetica-Bold",
+            tamano=6.2,
+            color=AZUL_OSCURO,
+        )
 
-    dibujar_texto_centrado(
-        pdf,
-        "Escanea con la cámara del móvil",
-        x_centro,
-        y + 7.2 * mm,
-        fuente="Helvetica-Bold",
-        tamano=6.2,
-        color=AZUL_OSCURO,
-    )
+        dibujar_texto_centrado(
+            pdf,
+            "No necesitas ninguna aplicación",
+            x_centro,
+            y + 4.8 * mm,
+            fuente="Helvetica",
+            tamano=5.8,
+            color=AZUL,
+        )
 
-    dibujar_texto_centrado(
-        pdf,
-        "No necesitas ninguna aplicación",
-        x_centro,
-        y + 4.8 * mm,
-        fuente="Helvetica",
-        tamano=5.8,
-        color=AZUL,
-    )
+    if mostrar_mensaje_final:
+        dibujar_texto_centrado(
+            pdf,
+            "Gracias por ayudarnos a cuidar nuestro colegio",
+            x_centro,
+            y + 2.2 * mm,
+            fuente="Helvetica-Oblique",
+            tamano=5.2,
+            color=HexColor("#334155"),
+        )
 
-    # =====================================================
-    # PIE
-    # =====================================================
-
-    dibujar_texto_centrado(
-        pdf,
-        "Gracias por ayudarnos a cuidar nuestro colegio",
-        x_centro,
-        y + 2.2 * mm,
-        fuente="Helvetica-Oblique",
-        tamano=5.2,
-        color=HexColor("#334155"),
-    )
-
-    # Código técnico discreto.
-    pdf.setFont(
-        "Helvetica",
-        4.2,
-    )
-
-    pdf.setFillColor(
-        HexColor("#94a3b8")
-    )
-
-    pdf.drawRightString(
-        x + ancho - 2.5 * mm,
-        y + 1.2 * mm,
-        str(codigo or ""),
-    )
+    if mostrar_codigo:
+        pdf.setFont("Helvetica", 4.2)
+        pdf.setFillColor(HexColor("#94a3b8"))
+        pdf.drawRightString(
+            x + ancho - 2.5 * mm,
+            y + 1.2 * mm,
+            str(codigo or ""),
+        )
 
 
-def generar_pdf_pegatinas(aulas):
+def obtener_distribucion_pagina(por_pagina):
+    if por_pagina == 2:
+        return 1, 2
+
+    if por_pagina == 4:
+        return 2, 2
+
+    return 2, 3
+
+
+def generar_pdf_pegatinas(aulas, configuracion):
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
 
@@ -372,8 +432,10 @@ def generar_pdf_pegatinas(aulas):
     separacion_x = 5 * mm
     separacion_y = 5 * mm
 
-    columnas = 2
-    filas = 3
+    por_pagina = configuracion["por_pagina"]
+    columnas, filas = obtener_distribucion_pagina(
+        por_pagina
+    )
 
     ancho_pegatina = (
         ancho_pagina
@@ -387,8 +449,6 @@ def generar_pdf_pegatinas(aulas):
         - ((filas - 1) * separacion_y)
     ) / filas
 
-    por_pagina = columnas * filas
-
     for indice, fila in enumerate(aulas):
         if indice > 0 and indice % por_pagina == 0:
             pdf.showPage()
@@ -397,12 +457,17 @@ def generar_pdf_pegatinas(aulas):
         columna = posicion % columnas
         fila_pagina = posicion // columnas
 
-        x = margen_x + columna * (ancho_pegatina + separacion_x)
+        x = margen_x + columna * (
+            ancho_pegatina + separacion_x
+        )
+
         y = (
             alto_pagina
             - margen_y
             - alto_pegatina
-            - fila_pagina * (alto_pegatina + separacion_y)
+            - fila_pagina * (
+                alto_pegatina + separacion_y
+            )
         )
 
         (
@@ -424,10 +489,12 @@ def generar_pdf_pegatinas(aulas):
             edificio,
             planta,
             espacio,
+            configuracion,
         )
 
     pdf.save()
     buffer.seek(0)
+
     return buffer.getvalue()
 
 
@@ -445,9 +512,6 @@ def pantalla_qr_aulas():
     if not aulas:
         st.warning("No hay aulas registradas.")
         return
-
-    # La función devuelve:
-    # codigo, centro, edificio, planta, espacio
 
     centros = sorted({
         str(fila[1])
@@ -530,15 +594,14 @@ def pantalla_qr_aulas():
         st.info("No hay aulas que coincidan con los filtros.")
         return
 
-    # =====================================================
-    # PDF CON LAS AULAS FILTRADAS
-    # =====================================================
+    configuracion = obtener_configuracion_placas()
 
     st.markdown("### 📄 Pegatinas para imprimir")
 
     st.caption(
-        "El PDF incluye 6 pegatinas por página A4, listas para "
-        "imprimir, recortar y plastificar."
+        f"El PDF incluye {configuracion['por_pagina']} placas "
+        "por página A4, listas para imprimir, recortar "
+        "y plastificar."
     )
 
     nombre_partes = ["QR_Aulas"]
@@ -554,7 +617,10 @@ def pantalla_qr_aulas():
         + ".pdf"
     )
 
-    pdf_bytes = generar_pdf_pegatinas(resultados)
+    pdf_bytes = generar_pdf_pegatinas(
+        resultados,
+        configuracion,
+    )
 
     st.download_button(
         "📄 Descargar PDF de pegatinas",
@@ -575,7 +641,7 @@ def pantalla_qr_aulas():
             "Desde aquí puedes probar el formulario de cada aula "
             "o descargar un QR individual."
         )
-    
+
         for fila in resultados:
             (
                 codigo,
@@ -584,44 +650,44 @@ def pantalla_qr_aulas():
                 planta,
                 espacio,
             ) = fila
-    
+
             codigo = str(codigo or "").strip()
-    
+
             if not codigo:
                 continue
-    
+
             enlace = construir_enlace_qr(codigo)
-    
+
             qr_bytes = generar_qr_png(
                 enlace,
                 box_size=8,
                 border=2,
             )
-    
+
             with st.container(border=True):
                 st.markdown(f"### 🏫 {espacio}")
-    
+
                 st.caption(
                     f"📍 {centro} · {edificio} · {planta}"
                 )
-    
+
                 col1, col2 = st.columns([1, 2])
-    
+
                 with col1:
                     st.image(
                         qr_bytes,
                         width=150,
                     )
-    
+
                 with col2:
                     st.code(codigo)
-    
+
                     st.link_button(
                         "🔎 Probar formulario",
                         enlace,
                         use_container_width=True,
                     )
-    
+
                     st.download_button(
                         "⬇️ Descargar QR",
                         data=qr_bytes,
