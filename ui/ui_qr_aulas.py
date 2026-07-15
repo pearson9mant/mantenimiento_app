@@ -245,12 +245,12 @@ def dibujar_pegatina(
 
     # Tamaño adaptado para que quepan aula, ubicación y textos.
     tamano_qr = min(
-        30 * mm,
-        ancho - 28 * mm,
+        34 * mm,
+        ancho - 24 * mm,
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 20 * mm
+    y_qr = y + 18 * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
@@ -341,7 +341,7 @@ def dibujar_pegatina(
         y + 2.2 * mm,
         fuente="Helvetica-Oblique",
         tamano=5.2,
-        color=GRIS,
+        color=HexColor("#475569"),
     )
 
     # Código técnico discreto.
