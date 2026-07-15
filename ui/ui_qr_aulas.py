@@ -83,6 +83,13 @@ def obtener_configuracion_placas():
         ),
     }
 
+    "marcas_corte": bool(
+        st.session_state.get(
+            "placas_marcas_corte",
+            True,
+        )
+    ),
+
 
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "").strip()
@@ -420,6 +427,75 @@ def obtener_distribucion_pagina(por_pagina):
 
     return 2, 3
 
+def dibujar_marcas_corte(
+    pdf,
+    x,
+    y,
+    ancho,
+    alto,
+):
+    largo = 4 * mm
+    separacion = 1.5 * mm
+
+    pdf.setStrokeColor(HexColor("#94a3b8"))
+    pdf.setLineWidth(0.4)
+
+    # Esquina inferior izquierda
+    pdf.line(
+        x - separacion - largo,
+        y,
+        x - separacion,
+        y,
+    )
+    pdf.line(
+        x,
+        y - separacion - largo,
+        x,
+        y - separacion,
+    )
+
+    # Esquina inferior derecha
+    pdf.line(
+        x + ancho + separacion,
+        y,
+        x + ancho + separacion + largo,
+        y,
+    )
+    pdf.line(
+        x + ancho,
+        y - separacion - largo,
+        x + ancho,
+        y - separacion,
+    )
+
+    # Esquina superior izquierda
+    pdf.line(
+        x - separacion - largo,
+        y + alto,
+        x - separacion,
+        y + alto,
+    )
+    pdf.line(
+        x,
+        y + alto + separacion,
+        x,
+        y + alto + separacion + largo,
+    )
+
+    # Esquina superior derecha
+    pdf.line(
+        x + ancho + separacion,
+        y + alto,
+        x + ancho + separacion + largo,
+        y + alto,
+    )
+    pdf.line(
+        x + ancho,
+        y + alto + separacion,
+        x + ancho,
+        y + alto + separacion + largo,
+    )
+
 
 def generar_pdf_pegatinas(aulas, configuracion):
     buffer = io.BytesIO()
@@ -491,7 +567,14 @@ def generar_pdf_pegatinas(aulas, configuracion):
             espacio,
             configuracion,
         )
-
+        if configuracion.get("marcas_corte", True):
+            dibujar_marcas_corte(
+                pdf,
+                x,
+                y,
+                ancho_pegatina,
+                alto_pegatina,
+            ) 
     pdf.save()
     buffer.seek(0)
 
