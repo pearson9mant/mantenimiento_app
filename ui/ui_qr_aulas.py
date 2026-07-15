@@ -341,7 +341,7 @@ def dibujar_pegatina(
         y + 2.2 * mm,
         fuente="Helvetica-Oblique",
         tamano=5.2,
-        color=HexColor("##334155"),
+        color=HexColor("#334155"),
     )
 
     # Código técnico discreto.
