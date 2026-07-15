@@ -1,8 +1,11 @@
-import streamlit as st
 import io
+
 import qrcode
+import streamlit as st
 
 from ui.ui_qr_aulas import pantalla_qr_aulas
+
+
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
 
 
@@ -29,6 +32,7 @@ def generar_qr_general():
     buffer.seek(0)
 
     return enlace, buffer.getvalue()
+
 
 def pantalla_placas_qr():
     st.markdown("## 📄 Placas QR")
@@ -58,47 +62,43 @@ def pantalla_placas_qr():
         enlace_general, qr_general = generar_qr_general()
 
         with st.container(border=True):
-
             st.markdown(
                 """
-<div style="
-    text-align:center;
-    background:linear-gradient(135deg,#0f172a,#1d4ed8);
-    color:white;
-    border-radius:20px;
-    padding:22px;
-    margin-bottom:16px;
-">
-    <div style="
-        font-size:27px;
-        font-weight:900;
-    ">
-        LORETO MANTENIMIENTO
-    </div>
-
-    <div style="
-        font-size:14px;
-        font-weight:700;
-        margin-top:5px;
-    ">
-        Sistema Integral de Mantenimiento
-    </div>
-</div>
+                <div style="
+                    text-align:center;
+                    background:linear-gradient(135deg,#0f172a,#1d4ed8);
+                    color:white;
+                    border-radius:20px;
+                    padding:22px;
+                    margin-bottom:16px;
+                    font-size:27px;
+                    font-weight:900;
+                    line-height:1.35;
+                ">
+                    LORETO MANTENIMIENTO
+                    <br>
+                    <span style="
+                        font-size:14px;
+                        font-weight:700;
+                    ">
+                        Sistema Integral de Mantenimiento
+                    </span>
+                </div>
                 """,
                 unsafe_allow_html=True,
             )
 
             st.markdown(
                 """
-<div style="
-    text-align:center;
-    font-size:24px;
-    font-weight:900;
-    color:#0f172a;
-    margin-bottom:12px;
-">
-    ¿Has detectado una incidencia?
-</div>
+                <div style="
+                    text-align:center;
+                    font-size:24px;
+                    font-weight:900;
+                    color:#0f172a;
+                    margin-bottom:12px;
+                ">
+                    ¿Has detectado una incidencia?
+                </div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -143,8 +143,10 @@ def pantalla_placas_qr():
             "Pensada para recepción, secretaría, sala de profesores "
             "y otras zonas comunes."
         )
+
     with tab3:
         st.markdown("### ⚙️ Configuración")
+
         st.caption(
             "Aquí configuraremos el tamaño, formato y acabado "
             "de las placas sin modificar código."
