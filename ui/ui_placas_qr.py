@@ -229,6 +229,12 @@ def pantalla_placas_qr():
             key="placas_mostrar_mensaje_final",
         )
 
+        marcas_corte = st.checkbox(
+            "Mostrar marcas de corte en el PDF",
+            value=True,
+            key="placas_marcas_corte",
+        )
+
         st.markdown("#### Vista previa")
 
         with st.container(border=True):
