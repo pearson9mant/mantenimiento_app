@@ -447,7 +447,7 @@ def pantalla_placas_qr():
             key="placas_marcas_corte",
         )
 
-       st.markdown("#### Vista previa")
+        st.markdown("#### Vista previa")
 
         enlace_previa, qr_previa = generar_qr_general()
         
