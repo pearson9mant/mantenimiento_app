@@ -503,7 +503,7 @@ def pantalla_placas_qr():
             with col_qr:
                 st.image(
                     qr_previa,
-                    use_container_width=True,
+                    width=180,
                 )
         
             # Acción
