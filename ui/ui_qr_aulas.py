@@ -29,6 +29,7 @@ def obtener_configuracion_placas():
             )
             or "LORETO MANTENIMIENTO"
         ).strip(),
+
         "subtitulo": str(
             st.session_state.get(
                 "placas_subtitulo",
@@ -36,6 +37,7 @@ def obtener_configuracion_placas():
             )
             or "Sistema Integral de Mantenimiento"
         ).strip(),
+
         "texto_accion": str(
             st.session_state.get(
                 "placas_texto_accion",
@@ -43,6 +45,7 @@ def obtener_configuracion_placas():
             )
             or "Comunicar una incidencia"
         ).strip(),
+
         "tamano": str(
             st.session_state.get(
                 "placas_tamano",
@@ -50,6 +53,7 @@ def obtener_configuracion_placas():
             )
             or "90 × 120 mm"
         ).strip(),
+
         "por_pagina": int(
             st.session_state.get(
                 "placas_por_pagina",
@@ -57,31 +61,34 @@ def obtener_configuracion_placas():
             )
             or 6
         ),
+
         "mostrar_codigo": bool(
             st.session_state.get(
                 "placas_mostrar_codigo",
                 True,
             )
         ),
+
         "mostrar_ubicacion": bool(
             st.session_state.get(
                 "placas_mostrar_ubicacion",
                 True,
             )
         ),
+
         "mostrar_ayuda": bool(
             st.session_state.get(
                 "placas_mostrar_ayuda",
                 True,
             )
         ),
+
         "mostrar_mensaje_final": bool(
             st.session_state.get(
                 "placas_mostrar_mensaje_final",
                 True,
             )
         ),
-    
 
         "marcas_corte": bool(
             st.session_state.get(
@@ -89,6 +96,7 @@ def obtener_configuracion_placas():
                 True,
             )
         ),
+    }
 
 
 def limpiar_nombre_archivo(texto):
