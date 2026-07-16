@@ -576,7 +576,7 @@ def generar_pdf_pegatinas(aulas, configuracion):
             espacio,
         ) = fila
 
-        dibujar_pegatina(
+        dibujar_pegatina_espacio(
             pdf,
             x,
             y,
@@ -614,7 +614,7 @@ def generar_pdf_vista_previa(configuracion):
     x = (ancho_pagina - ancho_placa) / 2
     y = (alto_pagina - alto_placa) / 2
 
-    dibujar_pegatina(
+    dibujar_pegatina_espacio(
         pdf=pdf,
         x=x,
         y=y,
