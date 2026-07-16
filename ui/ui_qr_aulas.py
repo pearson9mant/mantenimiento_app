@@ -587,13 +587,42 @@ def generar_pdf_pegatinas(aulas, configuracion):
 
 def generar_pdf_vista_previa(configuracion):
     buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
+    pdf = canvas.Canvas(
+        buffer,
+        pagesize=A4,
+    )
 
     ancho_pagina, alto_pagina = A4
 
-    ancho_placa = 90 * mm
-    alto_placa = 120 * mm
+    margen_x = 8 * mm
+    margen_y = 8 * mm
+    separacion_x = 5 * mm
+    separacion_y = 5 * mm
 
+    por_pagina = configuracion.get(
+        "por_pagina",
+        6,
+    )
+
+    columnas, filas = obtener_distribucion_pagina(
+        por_pagina
+    )
+
+    # Exactamente las mismas medidas que usa
+    # el PDF de pegatinas.
+    ancho_placa = (
+        ancho_pagina
+        - (2 * margen_x)
+        - ((columnas - 1) * separacion_x)
+    ) / columnas
+
+    alto_placa = (
+        alto_pagina
+        - (2 * margen_y)
+        - ((filas - 1) * separacion_y)
+    ) / filas
+
+    # Centrada en la hoja para verla cómodamente.
     x = (ancho_pagina - ancho_placa) / 2
     y = (alto_pagina - alto_placa) / 2
 
@@ -603,15 +632,18 @@ def generar_pdf_vista_previa(configuracion):
         y=y,
         ancho=ancho_placa,
         alto=alto_placa,
-        codigo="ESP-000023",
+        codigo="ESP-000104",
         centro="Pearson 22",
         edificio="Infantil / Primaria",
         planta="Planta 1",
-        espacio="I4A",
+        espacio="4A",
         configuracion=configuracion,
     )
 
-    if configuracion.get("marcas_corte", True):
+    if configuracion.get(
+        "marcas_corte",
+        True,
+    ):
         dibujar_marcas_corte(
             pdf,
             x,
