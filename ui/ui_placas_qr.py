@@ -2,8 +2,16 @@ import io
 
 import qrcode
 import streamlit as st
+import base64
+import streamlit.components.v1 as components
 
-from ui.ui_qr_aulas import pantalla_qr_aulas
+from ui.ui_qr_aulas import (
+    pantalla_qr_aulas,
+    generar_pdf_vista_previa,
+    obtener_configuracion_placas,
+)
+
+
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
