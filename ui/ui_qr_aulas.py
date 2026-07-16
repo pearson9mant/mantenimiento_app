@@ -597,7 +597,46 @@ def generar_pdf_pegatinas(aulas, configuracion):
     buffer.seek(0)
 
     return buffer.getvalue()
+    
+def generar_pdf_vista_previa(configuracion):
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
 
+    ancho_pagina, alto_pagina = A4
+
+    ancho_placa = 90 * mm
+    alto_placa = 120 * mm
+
+    x = (ancho_pagina - ancho_placa) / 2
+    y = (alto_pagina - alto_placa) / 2
+
+    dibujar_pegatina(
+        pdf=pdf,
+        x=x,
+        y=y,
+        ancho=ancho_placa,
+        alto=alto_placa,
+        codigo="ESP-000023",
+        centro="Pearson 22",
+        edificio="Infantil / Primaria",
+        planta="Planta 1",
+        espacio="I4A",
+        configuracion=configuracion,
+    )
+
+    if configuracion.get("marcas_corte", True):
+        dibujar_marcas_corte(
+            pdf,
+            x,
+            y,
+            ancho_placa,
+            alto_placa,
+        )
+
+    pdf.save()
+    buffer.seek(0)
+
+    return buffer.getvalue()
 
 def pantalla_qr_aulas():
     st.markdown("## 📱 QR de aulas")
