@@ -351,7 +351,7 @@ def dibujar_pegatina_espacio(
 
     # Acción
     alto_accion = 7.5 * mm
-    y_accion = y + 10.5 * mm
+    y_accion = y + 12.5 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
