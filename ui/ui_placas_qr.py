@@ -169,11 +169,6 @@ def generar_pdf_placa_general():
         HexColor("#64748b")
     )
 
-    pdf.drawCentredString(
-        x_centro,
-        y + alto_placa - 47 * mm,
-        "ESCANEA AQUÍ",
-    )
 
     # QR
     qr_reader = ImageReader(
