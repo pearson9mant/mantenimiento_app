@@ -180,9 +180,9 @@ def generar_pdf_placa_general():
         io.BytesIO(qr_general)
     )
 
-    tamano_qr = 43 * mm
+    tamano_qr = 38 * mm
     x_qr = x + (ancho_placa - tamano_qr) / 2
-    y_qr = y + 36 * mm
+    y_qr = y + 32 * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
@@ -209,7 +209,7 @@ def generar_pdf_placa_general():
     )
 
     # Acción
-    y_accion = y + 23 * mm
+    y_accion = y + 19 * mm
     alto_accion = 9 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
