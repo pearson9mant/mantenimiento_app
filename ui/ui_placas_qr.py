@@ -421,7 +421,7 @@ def pantalla_placas_qr():
 
             texto_accion = st.text_input(
                 "Texto de acción",
-                value="Comunicar una incidencia",
+                value="Comunicar incidencia",
                 key="placas_texto_accion",
             )
 
