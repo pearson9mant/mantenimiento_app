@@ -287,7 +287,7 @@ def dibujar_pegatina_espacio(
             pdf,
             f"{centro or '-'} · {edificio or '-'}",
             x_centro,
-            y + alto - 35.5 * mm,
+            y + alto - 30.5 * mm,
             fuente="Helvetica-Bold",
             tamano=5.8,
             color=GRIS,
@@ -297,7 +297,7 @@ def dibujar_pegatina_espacio(
             pdf,
             planta or "-",
             x_centro,
-            y + alto - 38.5 * mm,
+            y + alto - 33.5 * mm,
             fuente="Helvetica-Bold",
             tamano=5.8,
             color=GRIS,
@@ -322,7 +322,7 @@ def dibujar_pegatina_espacio(
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 18 * mm
+    y_qr = y + 22 * mm
 
 
     pdf.setFillColor(white)
