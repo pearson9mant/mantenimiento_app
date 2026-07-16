@@ -332,7 +332,7 @@ def dibujar_pegatina_espacio(
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 31 * mm
+    y_qr = y + 18 * mm
 
     dibujar_texto_centrado(
         pdf,
@@ -370,7 +370,7 @@ def dibujar_pegatina_espacio(
 
     # Acción
     alto_accion = 7.5 * mm
-    y_accion = y + 21 * mm
+    y_accion = y + 8.5 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
