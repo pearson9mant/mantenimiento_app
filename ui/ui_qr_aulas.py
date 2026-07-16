@@ -262,16 +262,6 @@ def dibujar_pegatina_espacio(
         color=white,
     )
 
-    # Identificación
-    dibujar_texto_centrado(
-        pdf,
-        "AULA",
-        x_centro,
-        y + alto - 23.5 * mm,
-        fuente="Helvetica-Bold",
-        tamano=8.5,
-        color=AZUL_OSCURO,
-    )
 
     nombre_espacio = str(espacio or "").strip().upper()
 
