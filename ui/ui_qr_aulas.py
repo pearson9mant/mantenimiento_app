@@ -164,7 +164,7 @@ def dividir_titulo(titulo):
     return " ".join(palabras[:mitad]), " ".join(palabras[mitad:])
 
 
-def dibujar_pegatina(
+def dibujar_pegatina_espacio(
     pdf,
     x,
     y,
@@ -193,6 +193,7 @@ def dibujar_pegatina(
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
     pdf.setLineWidth(1.2)
+
     pdf.roundRect(
         x,
         y,
@@ -261,7 +262,7 @@ def dibujar_pegatina(
         color=white,
     )
 
-    # Identificación del aula
+    # Identificación
     dibujar_texto_centrado(
         pdf,
         "AULA",
@@ -292,13 +293,9 @@ def dibujar_pegatina(
     )
 
     if mostrar_ubicacion:
-        ubicacion_principal = (
-            f"{centro or '-'} · {edificio or '-'}"
-        )
-
         dibujar_texto_centrado(
             pdf,
-            ubicacion_principal,
+            f"{centro or '-'} · {edificio or '-'}",
             x_centro,
             y + alto - 35.5 * mm,
             fuente="Helvetica-Bold",
@@ -318,12 +315,16 @@ def dibujar_pegatina(
 
     # QR
     enlace = construir_enlace_qr(codigo)
+
     qr_bytes = generar_qr_png(
         enlace,
         box_size=11,
         border=2,
     )
-    qr_reader = ImageReader(io.BytesIO(qr_bytes))
+
+    qr_reader = ImageReader(
+        io.BytesIO(qr_bytes)
+    )
 
     tamano_qr = min(
         34 * mm,
@@ -332,7 +333,7 @@ def dibujar_pegatina(
 
     x_qr = x + (ancho - tamano_qr) / 2
     y_qr = y + 31 * mm
-    
+
     dibujar_texto_centrado(
         pdf,
         "ESCANEA AQUÍ",
@@ -367,7 +368,7 @@ def dibujar_pegatina(
         mask="auto",
     )
 
-    # Acción principal
+    # Acción
     alto_accion = 7.5 * mm
     y_accion = y + 21 * mm
 
@@ -394,12 +395,13 @@ def dibujar_pegatina(
         color=white,
     )
 
+    # Instrucciones
     if mostrar_ayuda:
         dibujar_texto_centrado(
             pdf,
             "Escanea con la cámara del móvil",
             x_centro,
-            y + 7.2 * mm,
+            y + 15.2 * mm,
             fuente="Helvetica-Bold",
             tamano=6.2,
             color=AZUL_OSCURO,
@@ -409,18 +411,19 @@ def dibujar_pegatina(
             pdf,
             "No necesitas ninguna aplicación",
             x_centro,
-            y + 4.8 * mm,
+            y + 11.8 * mm,
             fuente="Helvetica",
             tamano=5.8,
             color=AZUL,
         )
 
+    # Pie
     if mostrar_mensaje_final:
         dibujar_texto_centrado(
             pdf,
             "Gracias por ayudarnos a cuidar nuestro colegio",
             x_centro,
-            y + 2.2 * mm,
+            y + 6.5 * mm,
             fuente="Helvetica-Oblique",
             tamano=5.2,
             color=HexColor("#334155"),
@@ -429,9 +432,10 @@ def dibujar_pegatina(
     if mostrar_codigo:
         pdf.setFont("Helvetica", 4.2)
         pdf.setFillColor(HexColor("#94a3b8"))
+
         pdf.drawRightString(
             x + ancho - 2.5 * mm,
-            y + 1.2 * mm,
+            y + 2.2 * mm,
             str(codigo or ""),
         )
 
