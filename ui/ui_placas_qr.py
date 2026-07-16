@@ -2,8 +2,6 @@ import io
 
 import qrcode
 import streamlit as st
-import base64
-import streamlit.components.v1 as components
 
 from ui.ui_qr_aulas import (
     pantalla_qr_aulas,
@@ -48,6 +46,7 @@ def generar_qr_general():
     buffer.seek(0)
 
     return enlace, buffer.getvalue()
+
 
 def generar_pdf_placa_general():
     enlace_general, qr_general = generar_qr_general()
@@ -141,35 +140,6 @@ def generar_pdf_placa_general():
         "Sistema Integral de Mantenimiento",
     )
 
-    # Mensaje principal
-    pdf.setFillColor(AZUL_OSCURO)
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        14,
-    )
-    pdf.drawCentredString(
-        x_centro,
-        y + alto_placa - 32 * mm,
-        "¿HAS DETECTADO",
-    )
-
-    pdf.drawCentredString(
-        x_centro,
-        y + alto_placa - 39 * mm,
-        "UNA INCIDENCIA?",
-    )
-
-    # Indicación
-    pdf.setFont(
-        "Helvetica-Bold",
-        7,
-    )
-    pdf.setFillColor(
-        HexColor("#64748b")
-    )
-
-
     # QR
     qr_reader = ImageReader(
         io.BytesIO(qr_general)
@@ -229,7 +199,7 @@ def generar_pdf_placa_general():
     pdf.drawCentredString(
         x_centro,
         y_accion + 3.1 * mm,
-        "Comunicar una incidencia",
+        "Comunicar incidencia",
     )
 
     # Instrucciones
@@ -325,21 +295,6 @@ def pantalla_placas_qr():
                     ">
                         Sistema Integral de Mantenimiento
                     </span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            st.markdown(
-                """
-                <div style="
-                    text-align:center;
-                    font-size:24px;
-                    font-weight:900;
-                    color:#0f172a;
-                    margin-bottom:12px;
-                ">
-                    ¿Has detectado una incidencia?
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -495,24 +450,18 @@ def pantalla_placas_qr():
             configuracion_previa
         )
 
-        pdf_base64 = base64.b64encode(
-            pdf_previa
-        ).decode("utf-8")
+        st.download_button(
+            "📄 Descargar vista previa real",
+            data=pdf_previa,
+            file_name="VISTA_PREVIA_PLACA_QR.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="descargar_vista_previa_placa",
+        )
 
-        components.html(
-            f"""
-            <iframe
-                src="data:application/pdf;base64,{pdf_base64}"
-                width="100%"
-                height="760"
-                style="
-                    border:1px solid #d1d5db;
-                    border-radius:14px;
-                    background:white;
-                "
-            ></iframe>
-            """,
-            height=780,
+        st.caption(
+            "La vista previa utiliza el mismo diseño que el PDF "
+            "destinado a impresión."
         )
 
         st.markdown("#### Resumen de impresión")
