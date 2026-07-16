@@ -711,7 +711,14 @@ def pantalla_qr_aulas():
             f"{planta} {espacio}"
         ).lower()
 
-        if buscar and buscar not in texto_busqueda:
+        if buscar:
+            espacio_normalizado = str(espacio or "").strip().lower()
+            codigo_normalizado = str(codigo or "").strip().lower()
+        
+            if (
+                buscar != espacio_normalizado
+                and buscar != codigo_normalizado
+            ):
             continue
 
         resultados.append(fila)
