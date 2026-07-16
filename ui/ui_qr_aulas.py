@@ -276,7 +276,7 @@ def dibujar_pegatina_espacio(
         pdf,
         nombre_espacio,
         x_centro,
-        y + alto - 31 * mm,
+        y + alto - 25 * mm,
         fuente="Helvetica-Bold",
         tamano=tamano_aula,
         color=AZUL_OSCURO,
