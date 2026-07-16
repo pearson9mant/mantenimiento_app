@@ -53,7 +53,10 @@ def generar_pdf_placa_general():
     enlace_general, qr_general = generar_qr_general()
 
     buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
+    pdf = canvas.Canvas(
+        buffer,
+        pagesize=A4,
+    )
 
     ancho_pagina, alto_pagina = A4
 
@@ -85,6 +88,8 @@ def generar_pdf_placa_general():
     alto_cabecera = 22 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
+
     pdf.roundRect(
         x,
         y + alto_placa - alto_cabecera,
@@ -105,41 +110,69 @@ def generar_pdf_placa_general():
     )
 
     pdf.setFillColor(white)
-    pdf.setFont("Helvetica-Bold", 15)
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        15,
+    )
     pdf.drawCentredString(
         x_centro,
         y + alto_placa - 9 * mm,
         "LORETO",
     )
 
-    pdf.setFont("Helvetica-Bold", 13)
+    pdf.setFont(
+        "Helvetica-Bold",
+        13,
+    )
     pdf.drawCentredString(
         x_centro,
         y + alto_placa - 15 * mm,
         "MANTENIMIENTO",
     )
 
-    pdf.setFont("Helvetica", 7)
+    pdf.setFont(
+        "Helvetica",
+        7,
+    )
     pdf.drawCentredString(
         x_centro,
         y + alto_placa - 19 * mm,
         "Sistema Integral de Mantenimiento",
     )
 
-    # Título central
+    # Mensaje principal
     pdf.setFillColor(AZUL_OSCURO)
-    pdf.setFont("Helvetica-Bold", 15)
 
+    pdf.setFont(
+        "Helvetica-Bold",
+        14,
+    )
     pdf.drawCentredString(
         x_centro,
-        y + alto_placa - 34 * mm,
+        y + alto_placa - 32 * mm,
         "¿HAS DETECTADO",
     )
 
     pdf.drawCentredString(
         x_centro,
-        y + alto_placa - 41 * mm,
+        y + alto_placa - 39 * mm,
         "UNA INCIDENCIA?",
+    )
+
+    # Indicación
+    pdf.setFont(
+        "Helvetica-Bold",
+        7,
+    )
+    pdf.setFillColor(
+        HexColor("#64748b")
+    )
+
+    pdf.drawCentredString(
+        x_centro,
+        y + alto_placa - 47 * mm,
+        "ESCANEA AQUÍ",
     )
 
     # QR
@@ -147,9 +180,9 @@ def generar_pdf_placa_general():
         io.BytesIO(qr_general)
     )
 
-    tamano_qr = 48 * mm
+    tamano_qr = 43 * mm
     x_qr = x + (ancho_placa - tamano_qr) / 2
-    y_qr = y + 37 * mm
+    y_qr = y + 36 * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
@@ -175,20 +208,12 @@ def generar_pdf_placa_general():
         mask="auto",
     )
 
-    pdf.setFont("Helvetica-Bold", 7)
-    pdf.setFillColor(HexColor("#64748b"))
-
-    pdf.drawCentredString(
-        x_centro,
-        y_qr + tamano_qr + 5 * mm,
-        "ESCANEA AQUÍ",
-    )
-
-    # Botón azul
-    y_accion = y + 24 * mm
-    alto_accion = 10 * mm
+    # Acción
+    y_accion = y + 23 * mm
+    alto_accion = 9 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
 
     pdf.roundRect(
         x + 9 * mm,
@@ -201,40 +226,52 @@ def generar_pdf_placa_general():
     )
 
     pdf.setFillColor(white)
-    pdf.setFont("Helvetica-Bold", 10)
+    pdf.setFont(
+        "Helvetica-Bold",
+        10,
+    )
 
     pdf.drawCentredString(
         x_centro,
-        y_accion + 3.4 * mm,
+        y_accion + 3.1 * mm,
         "Comunicar una incidencia",
     )
 
     # Instrucciones
     pdf.setFillColor(AZUL_OSCURO)
-    pdf.setFont("Helvetica-Bold", 7)
+    pdf.setFont(
+        "Helvetica-Bold",
+        7,
+    )
 
     pdf.drawCentredString(
         x_centro,
-        y + 17 * mm,
+        y + 16 * mm,
         "Escanea con la cámara del móvil",
     )
 
     pdf.setFillColor(AZUL)
-    pdf.setFont("Helvetica", 6.5)
+    pdf.setFont(
+        "Helvetica",
+        6.5,
+    )
 
     pdf.drawCentredString(
         x_centro,
-        y + 13 * mm,
+        y + 12 * mm,
         "No necesitas ninguna aplicación",
     )
 
     # Pie
     pdf.setFillColor(GRIS)
-    pdf.setFont("Helvetica-Oblique", 6.2)
+    pdf.setFont(
+        "Helvetica-Oblique",
+        6.2,
+    )
 
     pdf.drawCentredString(
         x_centro,
-        y + 7 * mm,
+        y + 6 * mm,
         "Gracias por ayudarnos a cuidar nuestro colegio",
     )
 
