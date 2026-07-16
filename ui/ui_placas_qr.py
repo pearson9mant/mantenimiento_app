@@ -455,135 +455,33 @@ def pantalla_placas_qr():
             key="placas_marcas_corte",
         )
 
-        st.markdown("#### Vista previa")
+        st.markdown("#### Vista previa real de impresión")
 
-        enlace_previa, qr_previa = generar_qr_general()
-        
-        with st.container(border=True):
-        
-            # Cabecera
-            st.markdown(
-                f"<h2 style='text-align:center; color:#0f2a5f;'>"
-                f"{titulo_placa}</h2>",
-                unsafe_allow_html=True,
-            )
-        
-            st.markdown(
-                f"<p style='text-align:center; font-weight:700;'>"
-                f"{subtitulo_placa}</p>",
-                unsafe_allow_html=True,
-            )
-        
-        
-            # Aula
-            st.markdown(
-                "<p style='text-align:center; color:#1d4ed8; "
-                "font-weight:900; letter-spacing:1px;'>AULA</p>",
-                unsafe_allow_html=True,
-            )
-        
-            st.markdown(
-                "<h1 style='text-align:center;'>I4A</h1>",
-                unsafe_allow_html=True,
-            )
-        
-            if mostrar_ubicacion:
-                st.markdown(
-                    "<p style='text-align:center; color:#475569; "
-                    "font-weight:700;'>"
-                    "Pearson 22 · Infantil / Primaria<br>Planta 1"
-                    "</p>",
-                    unsafe_allow_html=True,
-                )
-        
-            # QR centrado
-            st.markdown(
-                "<p style='text-align:center; color:#64748b; "
-                "font-size:12px; font-weight:900;'>"
-                "ESCANEA AQUÍ"
-                "</p>",
-                unsafe_allow_html=True,
-            )
-        
-            col_izq, col_qr, col_der = st.columns([1, 1, 1])
-        
-            with col_qr:
-                st.image(
-                    qr_previa,
-                    width=180,
-                )
-        
-            # Acción
-            col1, col2, col3 = st.columns([1,2,1])
+        configuracion_previa = obtener_configuracion_placas()
 
-            with col2:
-                st.markdown(
-                    f"""
-                    <div style="
-                        text-align:center;
-                        background:#0f2a5f;
-                        color:white;
-                        border-radius:12px;
-                        padding:12px;
-                        font-size:17px;
-                        font-weight:900;
-                    ">
-                        {texto_accion}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        
-            if mostrar_ayuda:
-                st.markdown(
-                    "<p style='text-align:center; color:#0f2a5f; "
-                    "font-weight:700; margin-top:14px;'>"
-                    "Escanea con la cámara del móvil"
-                    "</p>",
-                    unsafe_allow_html=True,
-                )
-        
-                st.markdown(
-                    "<p style='text-align:center; color:#1d4ed8;'>"
-                    "No necesitas ninguna aplicación"
-                    "</p>",
-                    unsafe_allow_html=True,
-                )
-        
-            if mostrar_mensaje_final:
-                st.markdown(
-                    "<p style='text-align:center; color:#475569; "
-                    "font-style:italic;'>"
-                    "Gracias por ayudarnos a cuidar nuestro colegio."
-                    "</p>",
-                    unsafe_allow_html=True,
-                )
-        
-            if mostrar_codigo:
-                st.caption("ESP-000023")
-        
-            if mostrar_codigo:
-                st.markdown(
-                    """
-                    <div style="
-                        text-align:right;
-                        color:#94a3b8;
-                        font-size:9px;
-                        margin-top:8px;
-                    ">
-                        ESP-000023
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        
-            st.markdown(
-                """
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        pdf_previa = generar_pdf_vista_previa(
+            configuracion_previa
+        )
+
+        pdf_base64 = base64.b64encode(
+            pdf_previa
+        ).decode("utf-8")
+
+        components.html(
+            f"""
+            <iframe
+                src="data:application/pdf;base64,{pdf_base64}"
+                width="100%"
+                height="760"
+                style="
+                    border:1px solid #d1d5db;
+                    border-radius:14px;
+                    background:white;
+                "
+            ></iframe>
+            """,
+            height=780,
+        )
 
         st.markdown("#### Resumen de impresión")
 
