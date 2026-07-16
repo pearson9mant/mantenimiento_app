@@ -322,7 +322,7 @@ def dibujar_pegatina_espacio(
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 22 * mm
+    y_qr = y + 27 * mm
 
 
     pdf.setFillColor(white)
