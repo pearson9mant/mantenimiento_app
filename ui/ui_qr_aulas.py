@@ -41,9 +41,9 @@ def obtener_configuracion_placas():
         "texto_accion": str(
             st.session_state.get(
                 "placas_texto_accion",
-                "Comunicar una incidencia",
+                "Comunicar incidencia",
             )
-            or "Comunicar una incidencia"
+            or "Comunicar incidencia"
         ).strip(),
 
         "tamano": str(
@@ -351,7 +351,7 @@ def dibujar_pegatina_espacio(
 
     # Acción
     alto_accion = 7.5 * mm
-    y_accion = y + 8.5 * mm
+    y_accion = y + 10.5 * mm
 
     pdf.setFillColor(AZUL_OSCURO)
     pdf.setStrokeColor(AZUL_OSCURO)
@@ -382,7 +382,7 @@ def dibujar_pegatina_espacio(
             pdf,
             "Escanea con la cámara del móvil",
             x_centro,
-            y + 15.2 * mm,
+            y + 7.2 * mm,
             fuente="Helvetica-Bold",
             tamano=6.2,
             color=AZUL_OSCURO,
@@ -392,7 +392,7 @@ def dibujar_pegatina_espacio(
             pdf,
             "No necesitas ninguna aplicación",
             x_centro,
-            y + 11.8 * mm,
+            y + 4.8 * mm,
             fuente="Helvetica",
             tamano=5.8,
             color=AZUL,
@@ -404,7 +404,7 @@ def dibujar_pegatina_espacio(
             pdf,
             "Gracias por ayudarnos a cuidar nuestro colegio",
             x_centro,
-            y + 6.5 * mm,
+            y + 2.2 * mm,
             fuente="Helvetica-Oblique",
             tamano=5.2,
             color=HexColor("#334155"),
@@ -416,7 +416,7 @@ def dibujar_pegatina_espacio(
 
         pdf.drawRightString(
             x + ancho - 2.5 * mm,
-            y + 2.2 * mm,
+            y + 1.2 * mm,
             str(codigo or ""),
         )
 
@@ -429,6 +429,7 @@ def obtener_distribucion_pagina(por_pagina):
         return 2, 2
 
     return 2, 3
+
 
 def dibujar_marcas_corte(
     pdf,
@@ -582,7 +583,8 @@ def generar_pdf_pegatinas(aulas, configuracion):
     buffer.seek(0)
 
     return buffer.getvalue()
-    
+
+
 def generar_pdf_vista_previa(configuracion):
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
@@ -622,6 +624,7 @@ def generar_pdf_vista_previa(configuracion):
     buffer.seek(0)
 
     return buffer.getvalue()
+
 
 def pantalla_qr_aulas():
     st.markdown("## 📱 QR de aulas")
