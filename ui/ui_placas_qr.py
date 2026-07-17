@@ -540,58 +540,97 @@ def pantalla_placas_qr():
                 key="placa_preview_planta",
             )
         
-        with col4:
-            espacios = obtener_espacios_por_planta(
-                centro_preview,
-                edificio_preview,
-                planta_preview,
-            )
-        
-            espacio_preview = st.selectbox(
-                "Espacio",
-                espacios,
-                key="placa_preview_espacio",
-            )
-        
-        # --------------------------------------------------------
-        # Vista previa
-        # --------------------------------------------------------
-        
-        st.markdown("#### Vista previa real de impresión")
-        
-        configuracion_previa = obtener_configuracion_placas()
-        
-        configuracion_previa["centro"] = centro_preview
-        configuracion_previa["edificio"] = edificio_preview
-        configuracion_previa["planta"] = planta_preview
-        configuracion_previa["espacio"] = espacio_preview
-        configuracion_previa["codigo"] = espacio_preview
-        
-        pdf_previa = generar_pdf_vista_previa(
-            configuracion_previa
-        )
-        
-        st.download_button(
-            "📄 Descargar vista previa real",
-            data=pdf_previa,
-            file_name="VISTA_PREVIA_PLACA_QR.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="descargar_vista_previa_placa",
-        )
-        
-        st.caption(
-            "La vista previa utiliza un espacio real del colegio y el mismo diseño que el PDF definitivo."
+  with col4:
+    espacios = []
+
+    if (
+        centro_preview
+        and edificio_preview
+        and planta_preview
+    ):
+        espacios = obtener_espacios_por_planta(
+            centro_preview,
+            edificio_preview,
+            planta_preview,
         )
 
-        st.markdown("#### Resumen de impresión")
+    espacio_seleccionado = st.selectbox(
+        "Espacio",
+        espacios,
+        format_func=lambda item: (
+            f"{item[0]} · {item[1]}"
+            if item and len(item) > 1 and item[1]
+            else item[0]
+        ),
+        key="placa_preview_espacio",
+    )
 
-        st.write(f"**Tamaño:** {tamano_placa}")
-        st.write(f"**Placas por página:** {placas_por_pagina}")
-        st.write(f"**Acabado:** {acabado}")
 
-        st.success(
-            "Configuración preparada. En el siguiente paso conectaremos "
-            "estos ajustes con el PDF para que puedas generar las placas "
-            "sin volver a tocar código."
-        )
+# --------------------------------------------------------
+# Preparar datos del espacio seleccionado
+# --------------------------------------------------------
+
+nombre_espacio_preview = ""
+tipo_espacio_preview = ""
+codigo_espacio_preview = ""
+
+if espacio_seleccionado:
+    nombre_espacio_preview = str(
+        espacio_seleccionado[0] or ""
+    ).strip()
+
+    tipo_espacio_preview = str(
+        espacio_seleccionado[1] or ""
+    ).strip()
+
+    codigo_espacio_preview = obtener_codigo_espacio(
+        centro_preview,
+        edificio_preview,
+        planta_preview,
+        nombre_espacio_preview,
+    )
+
+
+# --------------------------------------------------------
+# Vista previa
+# --------------------------------------------------------
+
+st.markdown("#### Vista previa real de impresión")
+
+configuracion_previa = obtener_configuracion_placas()
+
+configuracion_previa["centro"] = centro_preview
+configuracion_previa["edificio"] = edificio_preview
+configuracion_previa["planta"] = planta_preview
+configuracion_previa["espacio"] = nombre_espacio_preview
+configuracion_previa["tipo_espacio"] = tipo_espacio_preview
+configuracion_previa["codigo"] = codigo_espacio_preview
+
+pdf_previa = generar_pdf_vista_previa(
+    configuracion_previa
+)
+
+st.download_button(
+    "📄 Descargar vista previa real",
+    data=pdf_previa,
+    file_name="VISTA_PREVIA_PLACA_QR.pdf",
+    mime="application/pdf",
+    use_container_width=True,
+    key="descargar_vista_previa_placa",
+)
+
+st.caption(
+    "La vista previa utiliza un espacio real del colegio y el mismo diseño que el PDF definitivo."
+)
+
+st.markdown("#### Resumen de impresión")
+
+st.write(f"**Tamaño:** {tamano_placa}")
+st.write(f"**Placas por página:** {placas_por_pagina}")
+st.write(f"**Acabado:** {acabado}")
+
+st.success(
+    "Configuración preparada. En el siguiente paso conectaremos "
+    "estos ajustes con el PDF para que puedas generar las placas "
+    "sin volver a tocar código."
+)
