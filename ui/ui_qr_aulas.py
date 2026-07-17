@@ -330,8 +330,8 @@ def dibujar_pegatina_espacio(
     )
 
     tamano_qr = min(
-        32 * mm,
-        ancho - 20 * mm,
+        30 * mm,
+        ancho - 21 * mm,
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
