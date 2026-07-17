@@ -475,3 +475,54 @@ def pantalla_placas_qr():
             "estos ajustes con el PDF para que puedas generar las placas "
             "sin volver a tocar código."
         )
+
+        st.markdown("#### Diseño")
+
+        mostrar_aula = st.checkbox(
+            'Mostrar texto "AULA"',
+            value=True,
+            key="placas_mostrar_aula",
+        )
+        
+        tamano_texto_aula = st.slider(
+            "Tamaño texto AULA",
+            6,
+            16,
+            9,
+            key="placas_tamano_aula",
+        )
+        
+        tamano_nombre_espacio = st.slider(
+            "Tamaño nombre del espacio",
+            14,
+            28,
+            20,
+            key="placas_tamano_nombre",
+        )
+        
+        tamano_qr = st.slider(
+            "Tamaño del QR (mm)",
+            25,
+            40,
+            32,
+            key="placas_tamano_qr",
+        )
+        st.markdown("#### Posiciones")
+
+        separacion_superior = st.slider(
+            "Separación cabecera",
+            18.0,
+            26.0,
+            22.0,
+            0.5,
+            key="placas_posicion_aula",
+        )
+        
+        separacion_nombre = st.slider(
+            "Separación nombre",
+            22.0,
+            32.0,
+            27.5,
+            0.5,
+            key="placas_posicion_nombre",
+        )
