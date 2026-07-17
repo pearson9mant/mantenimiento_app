@@ -493,14 +493,84 @@ def pantalla_placas_qr():
             key="placas_posicion_nombre",
         )
 
+        # --------------------------------------------------------
+        # Espacio para la vista previa
+        # --------------------------------------------------------
+        
+        st.markdown("#### Espacio para la vista previa")
+        
+        from modules.espacios import (
+            obtener_centros_espacios,
+            obtener_edificios_espacios,
+            obtener_plantas_espacios,
+            obtener_espacios_por_planta,
+        )
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            centros = obtener_centros_espacios()
+        
+            centro_preview = st.selectbox(
+                "Centro",
+                centros,
+                key="placa_preview_centro",
+            )
+        
+        with col2:
+            edificios = obtener_edificios_espacios(
+                centro_preview
+            )
+        
+            edificio_preview = st.selectbox(
+                "Edificio",
+                edificios,
+                key="placa_preview_edificio",
+            )
+        
+        with col3:
+            plantas = obtener_plantas_espacios(
+                centro_preview,
+                edificio_preview,
+            )
+        
+            planta_preview = st.selectbox(
+                "Planta",
+                plantas,
+                key="placa_preview_planta",
+            )
+        
+        with col4:
+            espacios = obtener_espacios_por_planta(
+                centro_preview,
+                edificio_preview,
+                planta_preview,
+            )
+        
+            espacio_preview = st.selectbox(
+                "Espacio",
+                espacios,
+                key="placa_preview_espacio",
+            )
+        
+        # --------------------------------------------------------
+        # Vista previa
+        # --------------------------------------------------------
+        
         st.markdown("#### Vista previa real de impresión")
-
+        
         configuracion_previa = obtener_configuracion_placas()
-
+        
+        configuracion_previa["centro"] = centro_preview
+        configuracion_previa["edificio"] = edificio_preview
+        configuracion_previa["planta"] = planta_preview
+        configuracion_previa["espacio"] = espacio_preview
+        configuracion_previa["codigo"] = espacio_preview
+        
         pdf_previa = generar_pdf_vista_previa(
             configuracion_previa
         )
-
+        
         st.download_button(
             "📄 Descargar vista previa real",
             data=pdf_previa,
@@ -509,10 +579,9 @@ def pantalla_placas_qr():
             use_container_width=True,
             key="descargar_vista_previa_placa",
         )
-
+        
         st.caption(
-            "La vista previa utiliza el mismo diseño que el PDF "
-            "destinado a impresión."
+            "La vista previa utiliza un espacio real del colegio y el mismo diseño que el PDF definitivo."
         )
 
         st.markdown("#### Resumen de impresión")
