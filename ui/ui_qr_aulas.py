@@ -265,30 +265,31 @@ def dibujar_pegatina_espacio(
 
     nombre_espacio = str(espacio or "").strip().upper()
 
-    # Texto "AULA"
+    # Texto AULA
     dibujar_texto_centrado(
         pdf,
         "AULA",
         x_centro,
-        y + alto - 21.5 * mm,
+        y + alto - 22 * mm,
         fuente="Helvetica-Bold",
-        tamano=11,
+        tamano=9,
         color=AZUL_OSCURO,
     )
     
+    # Tamaño del nombre del aula
     if len(nombre_espacio) <= 4:
-        tamano_aula = 24
-    elif len(nombre_espacio) <= 7:
         tamano_aula = 20
+    elif len(nombre_espacio) <= 7:
+        tamano_aula = 17
     else:
-        tamano_aula = 15
+        tamano_aula = 14
     
     # Nombre del aula
     dibujar_texto_centrado(
         pdf,
         nombre_espacio,
         x_centro,
-        y + alto - 27 * mm,
+        y + alto - 27.5 * mm,
         fuente="Helvetica-Bold",
         tamano=tamano_aula,
         color=AZUL_OSCURO,
