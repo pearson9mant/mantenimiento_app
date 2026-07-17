@@ -442,40 +442,6 @@ def pantalla_placas_qr():
             key="placas_marcas_corte",
         )
 
-        st.markdown("#### Vista previa real de impresión")
-
-        configuracion_previa = obtener_configuracion_placas()
-
-        pdf_previa = generar_pdf_vista_previa(
-            configuracion_previa
-        )
-
-        st.download_button(
-            "📄 Descargar vista previa real",
-            data=pdf_previa,
-            file_name="VISTA_PREVIA_PLACA_QR.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="descargar_vista_previa_placa",
-        )
-
-        st.caption(
-            "La vista previa utiliza el mismo diseño que el PDF "
-            "destinado a impresión."
-        )
-
-        st.markdown("#### Resumen de impresión")
-
-        st.write(f"**Tamaño:** {tamano_placa}")
-        st.write(f"**Placas por página:** {placas_por_pagina}")
-        st.write(f"**Acabado:** {acabado}")
-
-        st.success(
-            "Configuración preparada. En el siguiente paso conectaremos "
-            "estos ajustes con el PDF para que puedas generar las placas "
-            "sin volver a tocar código."
-        )
-
         st.markdown("#### Diseño")
 
         mostrar_aula = st.checkbox(
@@ -525,4 +491,38 @@ def pantalla_placas_qr():
             27.5,
             0.5,
             key="placas_posicion_nombre",
+        )
+
+        st.markdown("#### Vista previa real de impresión")
+
+        configuracion_previa = obtener_configuracion_placas()
+
+        pdf_previa = generar_pdf_vista_previa(
+            configuracion_previa
+        )
+
+        st.download_button(
+            "📄 Descargar vista previa real",
+            data=pdf_previa,
+            file_name="VISTA_PREVIA_PLACA_QR.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="descargar_vista_previa_placa",
+        )
+
+        st.caption(
+            "La vista previa utiliza el mismo diseño que el PDF "
+            "destinado a impresión."
+        )
+
+        st.markdown("#### Resumen de impresión")
+
+        st.write(f"**Tamaño:** {tamano_placa}")
+        st.write(f"**Placas por página:** {placas_por_pagina}")
+        st.write(f"**Acabado:** {acabado}")
+
+        st.success(
+            "Configuración preparada. En el siguiente paso conectaremos "
+            "estos ajustes con el PDF para que puedas generar las placas "
+            "sin volver a tocar código."
         )
