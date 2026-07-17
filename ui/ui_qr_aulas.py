@@ -11,6 +11,13 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from modules.espacios import obtener_aulas_para_qr
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+    obtener_codigo_espacio,
+)
 
 
 URL_BASE_APP = "https://mantenimiento-app-1.onrender.com"
