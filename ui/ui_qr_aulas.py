@@ -751,7 +751,7 @@ def pantalla_qr_aulas():
                 buscar != espacio_normalizado
                 and buscar != codigo_normalizado
             ):
-            continue
+                continue
 
         resultados.append(fila)
 
