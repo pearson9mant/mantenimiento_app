@@ -640,16 +640,16 @@ def generar_pdf_vista_previa(configuracion):
     y = (alto_pagina - alto_placa) / 2
 
     dibujar_pegatina_espacio(
-        pdf=pdf,
-        x=x,
-        y=y,
-        ancho=ancho_placa,
-        alto=alto_placa,
-        codigo="ESP-000104",
-        centro="Pearson 22",
-        edificio="Infantil / Primaria",
-        planta="Planta 1",
-        espacio="4A",
+        pdf,
+        x,
+        y,
+        ancho_placa,
+        alto_placa,
+        codigo=configuracion.get("codigo", "ESP-000023"),
+        espacio=configuracion.get("espacio", "4A"),
+        centro=configuracion.get("centro", ""),
+        edificio=configuracion.get("edificio", ""),
+        planta=configuracion.get("planta", ""),
         configuracion=configuracion,
     )
 
