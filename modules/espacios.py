@@ -1,6 +1,7 @@
 from database.db import conectar, _sql
 
 
+
 PLANTAS_BASE = {
     "Pearson 22": {
         "Infantil / Primaria": [
