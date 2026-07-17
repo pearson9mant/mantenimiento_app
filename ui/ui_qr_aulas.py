@@ -600,6 +600,7 @@ def generar_pdf_pegatinas(aulas, configuracion):
 
 def generar_pdf_vista_previa(configuracion):
     buffer = io.BytesIO()
+
     pdf = canvas.Canvas(
         buffer,
         pagesize=A4,
@@ -621,8 +622,7 @@ def generar_pdf_vista_previa(configuracion):
         por_pagina
     )
 
-    # Exactamente las mismas medidas que usa
-    # el PDF de pegatinas.
+    # Mismas medidas que el PDF definitivo.
     ancho_placa = (
         ancho_pagina
         - (2 * margen_x)
@@ -635,21 +635,36 @@ def generar_pdf_vista_previa(configuracion):
         - ((filas - 1) * separacion_y)
     ) / filas
 
-    # Centrada en la hoja para verla cómodamente.
+    # Pegatina centrada en la hoja.
     x = (ancho_pagina - ancho_placa) / 2
     y = (alto_pagina - alto_placa) / 2
 
     dibujar_pegatina_espacio(
-        pdf,
-        x,
-        y,
-        ancho_placa,
-        alto_placa,
-        codigo=configuracion.get("codigo", "ESP-000023"),
-        espacio=configuracion.get("espacio", "4A"),
-        centro=configuracion.get("centro", ""),
-        edificio=configuracion.get("edificio", ""),
-        planta=configuracion.get("planta", ""),
+        pdf=pdf,
+        x=x,
+        y=y,
+        ancho=ancho_placa,
+        alto=alto_placa,
+        codigo=configuracion.get(
+            "codigo",
+            "ESP-000023",
+        ),
+        centro=configuracion.get(
+            "centro",
+            "",
+        ),
+        edificio=configuracion.get(
+            "edificio",
+            "",
+        ),
+        planta=configuracion.get(
+            "planta",
+            "",
+        ),
+        espacio=configuracion.get(
+            "espacio",
+            "4A",
+        ),
         configuracion=configuracion,
     )
 
@@ -669,6 +684,365 @@ def generar_pdf_vista_previa(configuracion):
     buffer.seek(0)
 
     return buffer.getvalue()
+
+
+def dibujar_pegatina_espacio(
+    pdf,
+    x,
+    y,
+    ancho,
+    alto,
+    codigo,
+    centro,
+    edificio,
+    planta,
+    espacio,
+    configuracion,
+):
+    radio = 5 * mm
+    x_centro = x + ancho / 2
+
+    titulo_placa = configuracion.get(
+        "titulo",
+        "LORETO MANTENIMIENTO",
+    )
+
+    subtitulo_placa = configuracion.get(
+        "subtitulo",
+        "Sistema Integral de Mantenimiento",
+    )
+
+    texto_accion = configuracion.get(
+        "texto_accion",
+        "Comunicar incidencia",
+    )
+
+    mostrar_codigo = configuracion.get(
+        "mostrar_codigo",
+        True,
+    )
+
+    mostrar_ubicacion = configuracion.get(
+        "mostrar_ubicacion",
+        True,
+    )
+
+    mostrar_ayuda = configuracion.get(
+        "mostrar_ayuda",
+        True,
+    )
+
+    mostrar_mensaje_final = configuracion.get(
+        "mostrar_mensaje_final",
+        True,
+    )
+
+    mostrar_aula = configuracion.get(
+        "mostrar_aula",
+        True,
+    )
+
+    tamano_texto_aula = configuracion.get(
+        "tamano_texto_aula",
+        9,
+    )
+
+    tamano_nombre_config = configuracion.get(
+        "tamano_nombre_espacio",
+        20,
+    )
+
+    tamano_qr_config = configuracion.get(
+        "tamano_qr",
+        30,
+    )
+
+    separacion_superior = configuracion.get(
+        "separacion_superior",
+        22.0,
+    )
+
+    separacion_nombre = configuracion.get(
+        "separacion_nombre",
+        27.5,
+    )
+
+    tipo_espacio = str(
+        configuracion.get(
+            "tipo_espacio",
+            "",
+        )
+        or ""
+    ).strip()
+
+    # Fondo y borde
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1.2)
+
+    pdf.roundRect(
+        x,
+        y,
+        ancho,
+        alto,
+        radio,
+        stroke=1,
+        fill=1,
+    )
+
+    # Cabecera
+    alto_cabecera = 18 * mm
+
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
+
+    pdf.roundRect(
+        x,
+        y + alto - alto_cabecera,
+        ancho,
+        alto_cabecera,
+        radio,
+        stroke=0,
+        fill=1,
+    )
+
+    pdf.rect(
+        x,
+        y + alto - alto_cabecera,
+        ancho,
+        alto_cabecera - radio,
+        stroke=0,
+        fill=1,
+    )
+
+    titulo_1, titulo_2 = dividir_titulo(
+        titulo_placa
+    )
+
+    dibujar_texto_centrado(
+        pdf,
+        titulo_1,
+        x_centro,
+        y + alto - 7.0 * mm,
+        fuente="Helvetica-Bold",
+        tamano=13,
+        color=white,
+    )
+
+    if titulo_2:
+        dibujar_texto_centrado(
+            pdf,
+            titulo_2,
+            x_centro,
+            y + alto - 12.3 * mm,
+            fuente="Helvetica-Bold",
+            tamano=11,
+            color=white,
+        )
+
+    dibujar_texto_centrado(
+        pdf,
+        subtitulo_placa,
+        x_centro,
+        y + alto - 16.0 * mm,
+        fuente="Helvetica",
+        tamano=6.5,
+        color=white,
+    )
+
+    nombre_espacio = str(
+        espacio or ""
+    ).strip().upper()
+
+    # Etiqueta superior: AULA para aulas,
+    # ESPACIO para el resto.
+    etiqueta_espacio = "AULA"
+
+    if tipo_espacio and "aula" not in tipo_espacio.lower():
+        etiqueta_espacio = "ESPACIO"
+
+    if mostrar_aula:
+        dibujar_texto_centrado(
+            pdf,
+            etiqueta_espacio,
+            x_centro,
+            y + alto - separacion_superior * mm,
+            fuente="Helvetica-Bold",
+            tamano=tamano_texto_aula,
+            color=AZUL_OSCURO,
+        )
+
+    # Conserva el ajuste automático para nombres largos.
+    if len(nombre_espacio) <= 4:
+        tamano_nombre = tamano_nombre_config
+
+    elif len(nombre_espacio) <= 7:
+        tamano_nombre = min(
+            tamano_nombre_config,
+            17,
+        )
+
+    else:
+        tamano_nombre = min(
+            tamano_nombre_config,
+            14,
+        )
+
+    dibujar_texto_centrado(
+        pdf,
+        nombre_espacio,
+        x_centro,
+        y + alto - separacion_nombre * mm,
+        fuente="Helvetica-Bold",
+        tamano=tamano_nombre,
+        color=AZUL_OSCURO,
+    )
+
+    if mostrar_ubicacion:
+        dibujar_texto_centrado(
+            pdf,
+            f"{centro or '-'} · {edificio or '-'}",
+            x_centro,
+            y + alto - 30.5 * mm,
+            fuente="Helvetica-Bold",
+            tamano=5.8,
+            color=GRIS,
+        )
+
+        dibujar_texto_centrado(
+            pdf,
+            planta or "-",
+            x_centro,
+            y + alto - 33.5 * mm,
+            fuente="Helvetica-Bold",
+            tamano=5.8,
+            color=GRIS,
+        )
+
+    # QR real del espacio seleccionado
+    enlace = construir_enlace_qr(
+        codigo
+    )
+
+    qr_bytes = generar_qr_png(
+        enlace,
+        box_size=11,
+        border=2,
+    )
+
+    qr_reader = ImageReader(
+        io.BytesIO(qr_bytes)
+    )
+
+    tamano_qr = min(
+        float(tamano_qr_config) * mm,
+        ancho - 21 * mm,
+    )
+
+    x_qr = x + (ancho - tamano_qr) / 2
+    y_qr = y + 24 * mm
+
+    pdf.setFillColor(white)
+    pdf.setStrokeColor(AZUL_OSCURO)
+    pdf.setLineWidth(1)
+
+    pdf.roundRect(
+        x_qr - 1.5 * mm,
+        y_qr - 1.5 * mm,
+        tamano_qr + 3 * mm,
+        tamano_qr + 3 * mm,
+        2.5 * mm,
+        stroke=1,
+        fill=1,
+    )
+
+    pdf.drawImage(
+        qr_reader,
+        x_qr,
+        y_qr,
+        width=tamano_qr,
+        height=tamano_qr,
+        preserveAspectRatio=True,
+        mask="auto",
+    )
+
+    # Acción
+    alto_accion = 7.5 * mm
+    y_accion = y + 12.5 * mm
+
+    pdf.setFillColor(AZUL_OSCURO)
+    pdf.setStrokeColor(AZUL_OSCURO)
+
+    pdf.roundRect(
+        x + 7 * mm,
+        y_accion,
+        ancho - 14 * mm,
+        alto_accion,
+        2.5 * mm,
+        stroke=0,
+        fill=1,
+    )
+
+    dibujar_texto_centrado(
+        pdf,
+        texto_accion,
+        x_centro,
+        y_accion + 2.5 * mm,
+        fuente="Helvetica-Bold",
+        tamano=8.2,
+        color=white,
+    )
+
+    # Instrucciones
+    if mostrar_ayuda:
+        dibujar_texto_centrado(
+            pdf,
+            "Escanea con la cámara del móvil",
+            x_centro,
+            y + 9.2 * mm,
+            fuente="Helvetica-Bold",
+            tamano=6.2,
+            color=AZUL_OSCURO,
+        )
+
+        dibujar_texto_centrado(
+            pdf,
+            "No necesitas ninguna aplicación",
+            x_centro,
+            y + 6.8 * mm,
+            fuente="Helvetica",
+            tamano=5.8,
+            color=AZUL,
+        )
+
+    # Mensaje inferior
+    if mostrar_mensaje_final:
+        dibujar_texto_centrado(
+            pdf,
+            "Gracias por ayudarnos a cuidar nuestro colegio",
+            x_centro,
+            y + 4.2 * mm,
+            fuente="Helvetica-Oblique",
+            tamano=5.2,
+            color=HexColor("#334155"),
+        )
+
+    # Código técnico
+    if mostrar_codigo:
+        pdf.setFont(
+            "Helvetica",
+            4.2,
+        )
+
+        pdf.setFillColor(
+            HexColor("#94a3b8")
+        )
+
+        pdf.drawRightString(
+            x + ancho - 2.5 * mm,
+            y + 1.2 * mm,
+            str(codigo or ""),
+        )
 
 
 def pantalla_qr_aulas():
