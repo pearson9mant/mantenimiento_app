@@ -17,6 +17,13 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from database.db import conectar
 
+def leer_df(query, params=()):
+    conn = conectar()
+    try:
+        return pd.read_sql_query(query, conn, params=params)
+    finally:
+        conn.close()
+
 
 def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     st.error("PRUEBA: ESTOY EN EL MÓDULO NUEVO")
