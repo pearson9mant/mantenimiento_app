@@ -239,7 +239,12 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     controles_terminales = contar_tareas("Control punto terminal completo")
     controles_vtm = contar_tareas("Control válvula termostática")
 
-    contenido.append(Paragraph("LIBRO DE INSPECCIÓN Y CONTROL DE LEGIONELLA", styles["Title"]))
+    contenido.append(
+    Paragraph(
+        "LIBRO DE INSPECCIÓN Y CONTROL DE LEGIONELLA - MÓDULO NUEVO",
+        styles["Title"]
+    )
+)
     contenido.append(Spacer(1, 14))
 
     contenido.append(Paragraph(f"<b>Centro:</b> {centro_filtro}", styles["Normal"]))
