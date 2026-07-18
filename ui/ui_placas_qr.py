@@ -8,6 +8,13 @@ from ui.ui_qr_aulas import (
     generar_pdf_vista_previa,
     obtener_configuracion_placas,
 )
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+    obtener_codigo_espacio,
+)
 
 
 from reportlab.lib.colors import HexColor, white
