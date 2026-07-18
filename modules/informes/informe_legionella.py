@@ -464,35 +464,83 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(Spacer(1, 18))
     
     contenido.append(Paragraph("1.1 Estado actual de la instalación", styles["Heading2"]))
-
-    estado_actual = [
-        ["Elemento", "Cantidad / estado"],
-        ["Puntos ACS", str(puntos_acs)],
-        ["Controles sala ACS planificados", str(controles_sala_acs)],
-        ["Puntos AFCH / AFS", str(puntos_afs)],
-        ["Controles AFS planificados", str(controles_afs)],
+    contenido.append(Spacer(1,8))
+    
+    estado_visual = [
+    
+        ["💧 SISTEMA ACS", ""],
+        ["Puntos de control", str(puntos_acs)],
+        ["Controles planificados", str(controles_sala_acs)],
+        ["", ""],
+    
+        ["🚰 AGUA FRÍA (AFCH / AFS)", ""],
+        ["Puntos de control", str(puntos_afs)],
+        ["Controles planificados", str(controles_afs)],
+        ["", ""],
+    
+        ["☀ INSTALACIÓN SOLAR", ""],
         ["Depósitos solares", str(depositos_solares)],
-        ["Puntos ducha", str(puntos_ducha)],
-        ["Terminales de ducha", str(terminales_ducha)],
-        ["Controles terminales ACS+AFS", str(controles_terminales)],
-        ["Válvulas termostáticas", str(puntos_vtm)],
-        ["Controles VTM planificados", str(controles_vtm)],
-        ["Controles realizados en el periodo", str(total)],
+        ["", ""],
+    
+        ["🚿 PUNTOS TERMINALES", ""],
+        ["Duchas", str(puntos_ducha)],
+        ["Terminales", str(terminales_ducha)],
+        ["Controles completos", str(controles_terminales)],
+        ["", ""],
+    
+        ["🌡 VÁLVULAS TERMOSTÁTICAS", ""],
+        ["Instaladas", str(puntos_vtm)],
+        ["Controles", str(controles_vtm)],
+        ["", ""],
+    
+        ["📊 RESULTADO DEL PERIODO", ""],
+        ["Controles realizados", str(total)],
         ["Incidencias abiertas", str(incidencias_abiertas)],
         ["Incidencias cerradas", str(incidencias_cerradas)],
-        ["Cumplimiento general", f"{cumplimiento}%"],
+        ["Cumplimiento", f"{cumplimiento}%"],
     ]
-
-    tabla_estado = Table(estado_actual, colWidths=[250, 180])
+    
+    tabla_estado = Table(
+        estado_visual,
+        colWidths=[300,170]
+    )
     tabla_estado.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
-    contenido.append(tabla_estado)
-    contenido.append(Spacer(1, 16))
+
+    ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+
+    ("BACKGROUND",(0,4),(-1,4),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,4),(-1,4),colors.white),
+
+    ("BACKGROUND",(0,8),(-1,8),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,8),(-1,8),colors.white),
+
+    ("BACKGROUND",(0,11),(-1,11),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,11),(-1,11),colors.white),
+
+    ("BACKGROUND",(0,16),(-1,16),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,16),(-1,16),colors.white),
+
+    ("BACKGROUND",(0,20),(-1,20),colors.HexColor("#17324D")),
+    ("TEXTCOLOR",(0,20),(-1,20),colors.white),
+
+    ("GRID",(0,0),(-1,-1),0.35,colors.HexColor("#D0D0D0")),
+
+    ("FONTNAME",(0,0),(-1,-1),"Helvetica"),
+
+    ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+    ("FONTNAME",(0,4),(-1,4),"Helvetica-Bold"),
+    ("FONTNAME",(0,8),(-1,8),"Helvetica-Bold"),
+    ("FONTNAME",(0,11),(-1,11),"Helvetica-Bold"),
+    ("FONTNAME",(0,16),(-1,16),"Helvetica-Bold"),
+    ("FONTNAME",(0,20),(-1,20),"Helvetica-Bold"),
+
+    ("BOTTOMPADDING",(0,0),(-1,-1),6),
+    ("TOPPADDING",(0,0),(-1,-1),6),
+
+]))
+contenido.append(tabla_estado)
+contenido.append(Spacer(1,18))
 
     if incidencias_abiertas == 0:
         estado_operativo = "FAVORABLE"
