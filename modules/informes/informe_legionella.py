@@ -19,6 +19,7 @@ from database.db import conectar
 from modules.informes.informe_legionella import generar_informe_legionella as generar_informe_legionella_nuevo
 
 def generar_informe_legionella_nuevo(fecha_inicio, fecha_fin, centro_filtro):
+    st.success("✅ Generando informe desde el NUEVO módulo")
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
