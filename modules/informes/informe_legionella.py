@@ -18,7 +18,7 @@ from reportlab.lib.pagesizes import A4
 from database.db import conectar
 from modules.informes.informe_legionella import generar_informe_legionella as generar_informe_legionella_nuevo
 
-def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
+def generar_informe_legionella_nuevo(fecha_inicio, fecha_fin, centro_filtro):
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
