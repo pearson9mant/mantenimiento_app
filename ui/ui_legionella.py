@@ -3744,7 +3744,7 @@ def pantalla_legionella():
 
             with col_p9:
                 if st.button("📘 Generar libro Pearson 9", use_container_width=True):
-                    generar_informe_legionella_nuevo(
+                    generar_informe_legionella(
                         fecha_inicio,
                         fecha_fin,
                         "Pearson 9"
@@ -3752,7 +3752,7 @@ def pantalla_legionella():
 
             with col_p22:
                 if st.button("📘 Generar libro Pearson 22", use_container_width=True):
-                    generar_informe_legionella_nuevo(
+                    generar_informe_legionella(
                         fecha_inicio,
                         fecha_fin,
                         "Pearson 22"
