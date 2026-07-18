@@ -253,7 +253,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     contenido.append(
     Paragraph(
-        "LIBRO DE INSPECCIÓN Y CONTROL DE LEGIONELLA - MÓDULO NUEVO",
+        "LIBRO DE INSPECCIÓN Y CONTROL DE LEGIONELLA",
         styles["Title"]
     )
 )
