@@ -1387,7 +1387,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     return estado, resultado
 
 
-def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
+def generar_informe_legionella_nuevo(fecha_inicio, fecha_fin, centro_filtro):
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
