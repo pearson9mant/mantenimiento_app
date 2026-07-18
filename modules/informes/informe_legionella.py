@@ -31,7 +31,7 @@ def leer_df(query, params=()):
 
 
 def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
-    st.error("PRUEBA: ESTOY EN EL MÓDULO NUEVO")
+    
     fecha_inicio_txt = fecha_inicio.strftime("%Y-%m-%d")
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
