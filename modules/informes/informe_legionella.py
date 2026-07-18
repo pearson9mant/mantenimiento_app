@@ -15,12 +15,17 @@ from reportlab.platypus import (
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
-from database.db import conectar
+from database.db import conectar, _sql
 
 def leer_df(query, params=()):
     conn = conectar()
+
     try:
-        return pd.read_sql_query(query, conn, params=params)
+        return pd.read_sql_query(
+            _sql(query),
+            conn,
+            params=params
+        )
     finally:
         conn.close()
 
