@@ -405,34 +405,64 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     
     contenido.append(Spacer(1, 28))
 
-    contenido.append(Paragraph("1. Datos generales de la instalación", styles["Heading2"]))
-
-    edificios_detectados = (
-        " / ".join(sorted(df_puntos["edificio"].dropna().astype(str).unique().tolist()))
-        if not df_puntos.empty else "No especificado"
-    )
-
-    datos_generales = [
-        ["Centro", centro_filtro],
-        ["Titular", "Loreto Abat Oliba"],
-        ["Edificios / zonas", edificios_detectados],
-        ["Tipo instalación", "ACS / AFCH / Solar / puntos terminales / VTM"],
-        ["Documento", "Libro de inspección y control de Legionella"],
-        ["Periodo revisado", f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"],
-        ["Fecha emisión", fecha_informe],
+    # ---------------------------------------------------------
+    # RESUMEN EJECUTIVO
+    # ---------------------------------------------------------
+    
+    estilo_kpi_titulo = styles["Normal"].clone("KpiTitulo")
+    estilo_kpi_titulo.fontName = "Helvetica-Bold"
+    estilo_kpi_titulo.fontSize = 8
+    estilo_kpi_titulo.leading = 10
+    estilo_kpi_titulo.textColor = colors.HexColor("#4B5563")
+    estilo_kpi_titulo.alignment = 1
+    
+    estilo_kpi_valor = styles["Normal"].clone("KpiValor")
+    estilo_kpi_valor.fontName = "Helvetica-Bold"
+    estilo_kpi_valor.fontSize = 18
+    estilo_kpi_valor.leading = 20
+    estilo_kpi_valor.textColor = colors.HexColor("#16324F")
+    estilo_kpi_valor.alignment = 1
+    
+    contenido.append(Paragraph("1. Resumen ejecutivo", styles["Heading2"]))
+    contenido.append(Spacer(1, 8))
+    
+    kpis = [
+        [
+            Paragraph("CONTROLES", estilo_kpi_titulo),
+            Paragraph("CORRECTOS", estilo_kpi_titulo),
+            Paragraph("INCIDENCIAS", estilo_kpi_titulo),
+            Paragraph("CUMPLIMIENTO", estilo_kpi_titulo),
+        ],
+        [
+            Paragraph(str(total), estilo_kpi_valor),
+            Paragraph(str(ok), estilo_kpi_valor),
+            Paragraph(str(no_ok), estilo_kpi_valor),
+            Paragraph(f"{cumplimiento}%", estilo_kpi_valor),
+        ],
     ]
-
-    tabla_datos = Table(datos_generales, colWidths=[135, 365])
-    tabla_datos.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.black),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    
+    tabla_kpis = Table(
+        kpis,
+        colWidths=[125, 125, 125, 125],
+        rowHeights=[24, 42]
+    )
+    
+    tabla_kpis.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#B8C4CE")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D1D5DB")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
-    contenido.append(tabla_datos)
-    contenido.append(Spacer(1, 16))
-
+    
+    contenido.append(tabla_kpis)
+    contenido.append(Spacer(1, 18))
+    
     contenido.append(Paragraph("1.1 Estado actual de la instalación", styles["Heading2"]))
 
     estado_actual = [
