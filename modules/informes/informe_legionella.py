@@ -251,30 +251,159 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     controles_terminales = contar_tareas("Control punto terminal completo")
     controles_vtm = contar_tareas("Control válvula termostática")
 
+    # ---------------------------------------------------------
+    # PORTADA PROFESIONAL
+    # ---------------------------------------------------------
+    
+    estilo_marca = styles["Normal"].clone("MarcaPortada")
+    estilo_marca.fontName = "Helvetica-Bold"
+    estilo_marca.fontSize = 11
+    estilo_marca.leading = 14
+    estilo_marca.textColor = colors.HexColor("#16324F")
+    estilo_marca.alignment = 1
+    
+    estilo_titulo_portada = styles["Title"].clone("TituloPortada")
+    estilo_titulo_portada.fontName = "Helvetica-Bold"
+    estilo_titulo_portada.fontSize = 23
+    estilo_titulo_portada.leading = 27
+    estilo_titulo_portada.textColor = colors.HexColor("#16324F")
+    estilo_titulo_portada.alignment = 1
+    estilo_titulo_portada.spaceAfter = 8
+    
+    estilo_subtitulo_portada = styles["Normal"].clone("SubtituloPortada")
+    estilo_subtitulo_portada.fontName = "Helvetica"
+    estilo_subtitulo_portada.fontSize = 10
+    estilo_subtitulo_portada.leading = 14
+    estilo_subtitulo_portada.textColor = colors.HexColor("#4B5563")
+    estilo_subtitulo_portada.alignment = 1
+    
+    estilo_texto_portada = styles["Normal"].clone("TextoPortada")
+    estilo_texto_portada.fontName = "Helvetica"
+    estilo_texto_portada.fontSize = 9
+    estilo_texto_portada.leading = 13
+    estilo_texto_portada.textColor = colors.HexColor("#374151")
+    
+    contenido.append(Spacer(1, 18))
+    
     contenido.append(
-    Paragraph(
-        "LIBRO DE INSPECCIÓN Y CONTROL DE LEGIONELLA",
-        styles["Title"]
+        Table(
+            [["LORETO ABAT OLIBA · SERVICIO DE MANTENIMIENTO"]],
+            colWidths=[500],
+            rowHeights=[32],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#16324F")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#16324F")),
+            ])
+        )
     )
-)
-    contenido.append(Spacer(1, 14))
-
-    contenido.append(Paragraph(f"<b>Centro:</b> {centro_filtro}", styles["Normal"]))
-    contenido.append(Paragraph("<b>Titular:</b> Loreto Abat Oliba", styles["Normal"]))
-    contenido.append(Paragraph("<b>Instalaciones:</b> ACS / AFCH / Solar / puntos terminales / acumuladores / VTM", styles["Normal"]))
-    contenido.append(Paragraph(f"<b>Periodo:</b> {fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}", styles["Normal"]))
-    contenido.append(Paragraph(f"<b>Fecha de emisión:</b> {fecha_informe}", styles["Normal"]))
-    contenido.append(Paragraph("<b>Responsable:</b> Servicio de Mantenimiento Loreto Abat Oliba", styles["Normal"]))
-    contenido.append(Spacer(1, 18))
-
-    contenido.append(Paragraph(
-        "Documento generado automáticamente desde el sistema integral de mantenimiento. "
-        "Incluye inventario de puntos físicos, planificación activa, registros operacionales, "
-        "incidencias, acciones correctoras e informes externos asociados al control de Legionella.",
-        styles["Normal"]
-    ))
-
-    contenido.append(Spacer(1, 18))
+    
+    contenido.append(Spacer(1, 38))
+    
+    contenido.append(
+        Paragraph(
+            "LIBRO DE INSPECCIÓN Y<br/>CONTROL DE LEGIONELLA",
+            estilo_titulo_portada
+        )
+    )
+    
+    contenido.append(Spacer(1, 10))
+    
+    contenido.append(
+        Paragraph(
+            "Programa de vigilancia, control y mantenimiento higiénico-sanitario",
+            estilo_subtitulo_portada
+        )
+    )
+    
+    contenido.append(Spacer(1, 30))
+    
+    datos_portada = [
+        [
+            Paragraph("<b>Centro</b>", estilo_texto_portada),
+            Paragraph(limpiar_pdf(centro_filtro), estilo_texto_portada),
+        ],
+        [
+            Paragraph("<b>Titular</b>", estilo_texto_portada),
+            Paragraph("Loreto Abat Oliba", estilo_texto_portada),
+        ],
+        [
+            Paragraph("<b>Instalaciones</b>", estilo_texto_portada),
+            Paragraph(
+                "ACS · AFCH · Solar · puntos terminales · acumuladores · VTM",
+                estilo_texto_portada
+            ),
+        ],
+        [
+            Paragraph("<b>Periodo revisado</b>", estilo_texto_portada),
+            Paragraph(
+                f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}",
+                estilo_texto_portada
+            ),
+        ],
+        [
+            Paragraph("<b>Fecha de emisión</b>", estilo_texto_portada),
+            Paragraph(fecha_informe, estilo_texto_portada),
+        ],
+        [
+            Paragraph("<b>Responsable</b>", estilo_texto_portada),
+            Paragraph(
+                "Servicio de Mantenimiento Loreto Abat Oliba",
+                estilo_texto_portada
+            ),
+        ],
+    ]
+    
+    tabla_portada = Table(
+        datos_portada,
+        colWidths=[145, 355],
+        rowHeights=[30, 30, 42, 30, 30, 38]
+    )
+    
+    tabla_portada.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (1, 0), (1, -1), colors.white),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1F2937")),
+        ("GRID", (0, 0), (-1, -1), 0.45, colors.HexColor("#9CA3AF")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    
+    contenido.append(tabla_portada)
+    
+    contenido.append(Spacer(1, 28))
+    
+    contenido.append(
+        Table(
+            [[
+                Paragraph(
+                    "Documento generado automáticamente desde el Sistema Integral de "
+                    "Mantenimiento. Incluye el inventario de puntos físicos, la planificación "
+                    "preventiva, los controles operacionales, las incidencias, las acciones "
+                    "correctoras y los informes externos asociados al control de Legionella.",
+                    estilo_texto_portada
+                )
+            ]],
+            colWidths=[500],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F3F6F8")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#B8C4CE")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ])
+        )
+    )
+    
+    contenido.append(Spacer(1, 28))
 
     contenido.append(Paragraph("1. Datos generales de la instalación", styles["Heading2"]))
 
