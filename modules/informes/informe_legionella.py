@@ -10,6 +10,7 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
+    KeepTogether,
 )
 
 from reportlab.lib import colors
