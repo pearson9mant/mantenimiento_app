@@ -467,7 +467,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(Paragraph("1.1 Estado actual de la instalación", styles["Heading2"]))
     contenido.append(Spacer(1,8))
     
-       def crear_bloque_estado(titulo, filas):
+    def crear_bloque_estado(titulo, filas):
         datos = [[titulo, ""]] + filas
 
         tabla = Table(
