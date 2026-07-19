@@ -580,10 +580,70 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             "El estado operativo general queda EN SEGUIMIENTO hasta el cierre de las acciones correctoras."
         )
 
-    contenido.append(Paragraph("1.2 Evaluación operativa", styles["Heading2"]))
-    contenido.append(Paragraph(f"<b>Estado general:</b> {estado_operativo}", styles["Normal"]))
-    contenido.append(Paragraph(texto_estado, styles["Normal"]))
-    contenido.append(Spacer(1, 16))
+    contenido.append(
+        Paragraph(
+            "1.2 Evaluación operativa",
+            styles["Heading2"]
+        )
+    )
+    contenido.append(Spacer(1, 6))
+
+    if estado_operativo == "FAVORABLE":
+        color_estado_fondo = colors.HexColor("#E8F5E9")
+        color_estado_borde = colors.HexColor("#2E7D32")
+        color_estado_texto = colors.HexColor("#1B5E20")
+    else:
+        color_estado_fondo = colors.HexColor("#FFF4E5")
+        color_estado_borde = colors.HexColor("#D97706")
+        color_estado_texto = colors.HexColor("#92400E")
+
+    estilo_estado_titulo = styles["Normal"].clone("EstadoTitulo")
+    estilo_estado_titulo.fontName = "Helvetica-Bold"
+    estilo_estado_titulo.fontSize = 11
+    estilo_estado_titulo.leading = 14
+    estilo_estado_titulo.textColor = color_estado_texto
+
+    estilo_estado_texto = styles["Normal"].clone("EstadoTexto")
+    estilo_estado_texto.fontName = "Helvetica"
+    estilo_estado_texto.fontSize = 8.5
+    estilo_estado_texto.leading = 12
+    estilo_estado_texto.textColor = colors.HexColor("#374151")
+
+    tabla_evaluacion = Table(
+        [
+            [
+                Paragraph(
+                    f"ESTADO GENERAL: {estado_operativo}",
+                    estilo_estado_titulo
+                )
+            ],
+            [
+                Paragraph(
+                    texto_estado,
+                    estilo_estado_texto
+                )
+            ],
+        ],
+        colWidths=[470]
+    )
+
+    tabla_evaluacion.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), color_estado_fondo),
+        ("BOX", (0, 0), (-1, -1), 1, color_estado_borde),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, color_estado_borde),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    contenido.append(
+        KeepTogether([
+            tabla_evaluacion,
+            Spacer(1, 16),
+        ])
+    )
 
     contenido.append(Paragraph("2. Programa de mantenimiento y criterios de control", styles["Heading2"]))
 
