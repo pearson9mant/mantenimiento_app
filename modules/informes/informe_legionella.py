@@ -11,6 +11,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     KeepTogether,
+    PageBreak,
 )
 
 from reportlab.lib import colors
@@ -889,92 +890,225 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     contenido.append(Spacer(1, 6))
 
-    contenido.append(Paragraph("4. Resumen del periodo", styles["Heading2"]))
+    # ---------------------------------------------------------
+    # 4. ANÁLISIS TÉCNICO DEL PERIODO
+    # ---------------------------------------------------------
 
-    resumen = [
-        ["Total controles", "Correctos", "Incidencias / Riesgos", "Cumplimiento"],
-        [str(total), str(ok), str(no_ok), f"{cumplimiento}%"]
-    ]
+    contenido.append(Paragraph("4. Análisis técnico del periodo", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
-    tabla_resumen = Table(resumen, colWidths=[125, 125, 140, 110])
-    tabla_resumen.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.black),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    if total == 0:
+        diagnostico_periodo = (
+            "No constan controles registrados durante el periodo seleccionado. "
+            "Por tanto, no es posible emitir una valoración basada en resultados operacionales. "
+            "Se recomienda comprobar la planificación activa y confirmar la ejecución de los controles pendientes."
+        )
+        color_diagnostico_fondo = colors.HexColor("#FFF4E5")
+        color_diagnostico_borde = colors.HexColor("#D97706")
+        titulo_diagnostico = "PERIODO SIN REGISTROS"
+    elif no_ok == 0 and incidencias_abiertas == 0:
+        diagnostico_periodo = (
+            f"Durante el periodo se han registrado {total} controles, todos ellos clasificados como correctos. "
+            "No constan incidencias abiertas asociadas a los controles revisados. "
+            "La evolución operativa del periodo se considera favorable."
+        )
+        color_diagnostico_fondo = colors.HexColor("#E8F5E9")
+        color_diagnostico_borde = colors.HexColor("#2E7D32")
+        titulo_diagnostico = "EVOLUCIÓN FAVORABLE"
+    else:
+        diagnostico_periodo = (
+            f"Durante el periodo se han registrado {total} controles, de los cuales {ok} son correctos "
+            f"y {no_ok} requieren revisión o seguimiento. Permanecen {incidencias_abiertas} incidencia(s) abierta(s). "
+            "Debe mantenerse el seguimiento hasta verificar el cierre efectivo de las acciones correctoras."
+        )
+        color_diagnostico_fondo = colors.HexColor("#FFF4E5")
+        color_diagnostico_borde = colors.HexColor("#D97706")
+        titulo_diagnostico = "PERIODO EN SEGUIMIENTO"
+
+    tabla_diagnostico = Table(
+        [[Paragraph(f"<b>{titulo_diagnostico}</b>", estilo_estado_texto)],
+         [Paragraph(diagnostico_periodo, estilo_estado_texto)]],
+        colWidths=[500]
+    )
+    tabla_diagnostico.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), color_diagnostico_fondo),
+        ("BOX", (0, 0), (-1, -1), 0.8, color_diagnostico_borde),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.4, color_diagnostico_borde),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
-    contenido.append(tabla_resumen)
-    contenido.append(Spacer(1, 16))
+    contenido.append(tabla_diagnostico)
+    contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("5. Planificación activa", styles["Heading2"]))
+    # ---------------------------------------------------------
+    # ESTILOS COMUNES PARA TABLAS OPERATIVAS
+    # ---------------------------------------------------------
+
+    estilo_operativo_cabecera = styles["Normal"].clone("OperativoCabecera")
+    estilo_operativo_cabecera.fontName = "Helvetica-Bold"
+    estilo_operativo_cabecera.fontSize = 6.4
+    estilo_operativo_cabecera.leading = 7.6
+    estilo_operativo_cabecera.textColor = colors.white
+    estilo_operativo_cabecera.alignment = 1
+
+    estilo_operativo_celda = styles["Normal"].clone("OperativoCelda")
+    estilo_operativo_celda.fontName = "Helvetica"
+    estilo_operativo_celda.fontSize = 6.1
+    estilo_operativo_celda.leading = 7.5
+    estilo_operativo_celda.textColor = colors.HexColor("#273444")
+
+    estilo_operativo_celda_centro = estilo_operativo_celda.clone("OperativoCeldaCentro")
+    estilo_operativo_celda_centro.alignment = 1
+
+    def construir_tabla_operativa(cabeceras, filas, anchos, centrar_columnas=None):
+        datos = [[Paragraph(limpiar_pdf(c), estilo_operativo_cabecera) for c in cabeceras]]
+
+        for fila in filas:
+            datos.append([
+                Paragraph(
+                    limpiar_pdf(valor),
+                    estilo_operativo_celda_centro if centrar_columnas and indice in centrar_columnas
+                    else estilo_operativo_celda
+                )
+                for indice, valor in enumerate(fila)
+            ])
+
+        tabla = Table(datos, colWidths=anchos, repeatRows=1)
+
+        comandos = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17324D")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#C7D0D9")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+
+        for indice in range(1, len(datos)):
+            if indice % 2 == 0:
+                comandos.append(
+                    ("BACKGROUND", (0, indice), (-1, indice), colors.HexColor("#F4F7F9"))
+                )
+
+        tabla.setStyle(TableStyle(comandos))
+        return tabla
+
+    def bloque_sin_datos(texto):
+        return Table(
+            [[Paragraph(texto, estilo_operativo_celda)]],
+            colWidths=[500],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F4F7F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#C7D0D9")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ])
+        )
+
+    contenido.append(PageBreak())
+
+    # ---------------------------------------------------------
+    # 5. PLANIFICACIÓN ACTIVA
+    # ---------------------------------------------------------
+
+    contenido.append(Paragraph("5. Planificación preventiva activa", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
     if df_plan.empty:
-        contenido.append(Paragraph("No consta planificación activa registrada.", styles["Normal"]))
+        contenido.append(bloque_sin_datos("No consta planificación activa registrada."))
     else:
-        tabla_plan = [["Edificio", "Punto", "Tarea", "Frecuencia", "Próxima", "Operario", "Consigna"]]
-
+        filas_plan = []
         for _, row in df_plan.head(120).iterrows():
             consigna = ""
             if int(row.get("controla_consigna") or 0) == 1:
                 consigna = f"≥ {row.get('consigna_minima', '')}"
 
-            tabla_plan.append([
-                limpiar_pdf(row.get("edificio", ""), 20),
-                limpiar_pdf(row.get("punto", ""), 28),
-                limpiar_pdf(row.get("tarea", ""), 30),
-                limpiar_pdf(row.get("frecuencia", ""), 14),
-                limpiar_pdf(row.get("proxima_fecha", ""), 12),
-                limpiar_pdf(row.get("operario", ""), 18),
-                limpiar_pdf(consigna, 10),
+            filas_plan.append([
+                limpiar_pdf(row.get("edificio", ""), 28),
+                limpiar_pdf(row.get("punto", ""), 40),
+                limpiar_pdf(row.get("tarea", ""), 42),
+                limpiar_pdf(row.get("frecuencia", ""), 20),
+                limpiar_pdf(row.get("proxima_fecha", ""), 16),
+                limpiar_pdf(row.get("operario", ""), 24),
+                limpiar_pdf(consigna, 12),
             ])
 
-        tabla_pl = Table(tabla_plan, colWidths=[75, 105, 115, 60, 55, 65, 40])
-        tabla_pl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        contenido.append(tabla_pl)
+        contenido.append(construir_tabla_operativa(
+            ["EDIFICIO", "PUNTO", "TAREA", "FRECUENCIA", "PRÓXIMA", "OPERARIO", "CONSIGNA"],
+            filas_plan,
+            [65, 90, 105, 62, 55, 78, 45],
+            centrar_columnas={3, 4, 6}
+        ))
 
-    contenido.append(Spacer(1, 16))
+    contenido.append(Spacer(1, 18))
+
+    # ---------------------------------------------------------
+    # 6. CONTROLES REALIZADOS
+    # ---------------------------------------------------------
 
     contenido.append(Paragraph("6. Registro de controles realizados", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
     if df.empty:
-        contenido.append(Paragraph("No constan controles registrados en el periodo seleccionado.", styles["Normal"]))
+        contenido.append(bloque_sin_datos(
+            "No constan controles registrados en el periodo seleccionado."
+        ))
     else:
-        tabla_data = [["Fecha", "Edificio", "Punto", "Tarea", "Valores registrados", "Estado", "Operario"]]
-
+        filas_controles = []
         for _, row in df.head(150).iterrows():
-            tabla_data.append([
-                limpiar_pdf(str(row["fecha"])[:10]),
-                limpiar_pdf(row["edificio"], 18),
-                limpiar_pdf(row["punto"], 24),
-                limpiar_pdf(row["tarea"], 26),
-                limpiar_pdf(texto_valores(row), 45),
-                limpiar_pdf(row["estado"], 12),
-                limpiar_pdf(row["operario"], 16),
+            filas_controles.append([
+                limpiar_pdf(str(row.get("fecha", ""))[:10]),
+                limpiar_pdf(row.get("edificio", ""), 24),
+                limpiar_pdf(row.get("punto", ""), 36),
+                limpiar_pdf(row.get("tarea", ""), 38),
+                limpiar_pdf(texto_valores(row), 62),
+                limpiar_pdf(row.get("estado", ""), 14),
+                limpiar_pdf(row.get("operario", ""), 22),
             ])
 
-        tabla = Table(tabla_data, colWidths=[50, 70, 95, 100, 140, 50, 65])
-        tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        contenido.append(tabla)
+        tabla_controles = construir_tabla_operativa(
+            ["FECHA", "EDIFICIO", "PUNTO", "TAREA", "VALORES REGISTRADOS", "ESTADO", "OPERARIO"],
+            filas_controles,
+            [48, 64, 85, 92, 125, 42, 44],
+            centrar_columnas={0, 5}
+        )
 
-    contenido.append(Spacer(1, 16))
+        # Colorear visualmente las celdas de estado.
+        estilos_estado_controles = []
+        for indice_fila, (_, row) in enumerate(df.head(150).iterrows(), start=1):
+            estado_txt = str(row.get("estado", "")).strip().lower()
+            if estado_txt == "ok":
+                estilos_estado_controles.extend([
+                    ("BACKGROUND", (5, indice_fila), (5, indice_fila), colors.HexColor("#E8F5E9")),
+                    ("TEXTCOLOR", (5, indice_fila), (5, indice_fila), colors.HexColor("#1B5E20")),
+                ])
+            elif estado_txt:
+                estilos_estado_controles.extend([
+                    ("BACKGROUND", (5, indice_fila), (5, indice_fila), colors.HexColor("#FFF4E5")),
+                    ("TEXTCOLOR", (5, indice_fila), (5, indice_fila), colors.HexColor("#92400E")),
+                ])
 
-    contenido.append(Paragraph("6.1 Últimos controles críticos", styles["Heading2"]))
+        tabla_controles.setStyle(TableStyle(estilos_estado_controles))
+        contenido.append(tabla_controles)
+
+    contenido.append(Spacer(1, 18))
+
+    # ---------------------------------------------------------
+    # 6.1 CONTROLES CRÍTICOS
+    # ---------------------------------------------------------
+
+    contenido.append(Paragraph("6.1 Controles críticos del periodo", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
     if df.empty:
-        contenido.append(Paragraph("No constan controles críticos registrados.", styles["Normal"]))
+        contenido.append(bloque_sin_datos("No constan controles críticos registrados."))
     else:
         df_crit = df[
             df["tarea"].astype(str).isin([
@@ -990,110 +1124,208 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ].copy()
 
         if df_crit.empty:
-            contenido.append(Paragraph("No constan controles críticos registrados.", styles["Normal"]))
+            contenido.append(bloque_sin_datos("No constan controles críticos registrados."))
         else:
-            tabla_crit = [["Fecha", "Punto", "Control", "Valores", "Estado", "Resultado"]]
-
+            filas_criticos = []
             for _, row in df_crit.head(40).iterrows():
-                tabla_crit.append([
-                    limpiar_pdf(str(row["fecha"])[:10]),
-                    limpiar_pdf(row["punto"], 28),
-                    limpiar_pdf(row["tarea"], 28),
-                    limpiar_pdf(texto_valores(row), 45),
-                    limpiar_pdf(row["estado"], 10),
-                    limpiar_pdf(row["resultado"], 45),
+                filas_criticos.append([
+                    limpiar_pdf(str(row.get("fecha", ""))[:10]),
+                    limpiar_pdf(row.get("punto", ""), 38),
+                    limpiar_pdf(row.get("tarea", ""), 38),
+                    limpiar_pdf(texto_valores(row), 60),
+                    limpiar_pdf(row.get("estado", ""), 14),
+                    limpiar_pdf(row.get("resultado", ""), 65),
                 ])
 
-            tabla_c = Table(tabla_crit, colWidths=[50, 95, 100, 135, 45, 145])
-            tabla_c.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 5.8),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]))
-            contenido.append(tabla_c)
+            tabla_criticos = construir_tabla_operativa(
+                ["FECHA", "PUNTO", "CONTROL", "VALORES", "ESTADO", "RESULTADO"],
+                filas_criticos,
+                [50, 90, 100, 125, 45, 90],
+                centrar_columnas={0, 4}
+            )
 
-    contenido.append(Spacer(1, 16))
+            estilos_criticos = []
+            for indice_fila, (_, row) in enumerate(df_crit.head(40).iterrows(), start=1):
+                estado_txt = str(row.get("estado", "")).strip().lower()
+                if estado_txt == "ok":
+                    estilos_criticos.extend([
+                        ("BACKGROUND", (4, indice_fila), (4, indice_fila), colors.HexColor("#E8F5E9")),
+                        ("TEXTCOLOR", (4, indice_fila), (4, indice_fila), colors.HexColor("#1B5E20")),
+                    ])
+                elif estado_txt:
+                    estilos_criticos.extend([
+                        ("BACKGROUND", (4, indice_fila), (4, indice_fila), colors.HexColor("#FDECEC")),
+                        ("TEXTCOLOR", (4, indice_fila), (4, indice_fila), colors.HexColor("#9B1C1C")),
+                    ])
+
+            tabla_criticos.setStyle(TableStyle(estilos_criticos))
+            contenido.append(tabla_criticos)
+
+    contenido.append(Spacer(1, 18))
+
+    # ---------------------------------------------------------
+    # 7. INCIDENCIAS Y ACCIONES CORRECTORAS
+    # ---------------------------------------------------------
 
     contenido.append(Paragraph("7. Incidencias y acciones correctoras", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
     if df_inc.empty:
-        contenido.append(Paragraph("No constan incidencias registradas en el periodo.", styles["Normal"]))
+        contenido.append(bloque_sin_datos(
+            "No constan incidencias registradas en el periodo."
+        ))
     else:
-        tabla_inc = [["Fecha", "Edificio", "Punto", "Tarea", "Estado", "Descripción / cierre"]]
-
+        filas_incidencias = []
         for _, row in df_inc.head(80).iterrows():
-            desc = row.get("descripcion", "")
-            cierre = row.get("observaciones_cierre", "")
+            descripcion = str(row.get("descripcion", "") or "")
+            cierre = str(row.get("observaciones_cierre", "") or "")
             if cierre:
-                desc = f"{desc} | Cierre: {cierre}"
+                descripcion = f"{descripcion} | Cierre: {cierre}"
 
-            tabla_inc.append([
-                limpiar_pdf(str(row["fecha_apertura"])[:10]),
-                limpiar_pdf(row["edificio"], 18),
-                limpiar_pdf(row["punto"], 24),
-                limpiar_pdf(row["tarea"], 24),
-                limpiar_pdf(row["estado"], 14),
-                limpiar_pdf(desc, 65),
+            filas_incidencias.append([
+                limpiar_pdf(str(row.get("fecha_apertura", ""))[:10]),
+                limpiar_pdf(row.get("edificio", ""), 26),
+                limpiar_pdf(row.get("punto", ""), 34),
+                limpiar_pdf(row.get("tarea", ""), 34),
+                limpiar_pdf(row.get("estado", ""), 18),
+                limpiar_pdf(descripcion, 100),
             ])
 
-        tabla_i = Table(tabla_inc, colWidths=[50, 70, 95, 95, 50, 210])
-        tabla_i.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6.2),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        contenido.append(tabla_i)
+        tabla_incidencias = construir_tabla_operativa(
+            ["FECHA", "EDIFICIO", "PUNTO", "TAREA", "ESTADO", "DESCRIPCIÓN / CIERRE"],
+            filas_incidencias,
+            [48, 65, 82, 85, 55, 165],
+            centrar_columnas={0, 4}
+        )
 
-    contenido.append(Spacer(1, 16))
+        estilos_incidencias = []
+        for indice_fila, (_, row) in enumerate(df_inc.head(80).iterrows(), start=1):
+            estado_txt = str(row.get("estado", "")).strip().lower()
+            cerrada = estado_txt in ["cerrada", "cerrado", "finalizada", "finalizado"]
+            if cerrada:
+                estilos_incidencias.extend([
+                    ("BACKGROUND", (4, indice_fila), (4, indice_fila), colors.HexColor("#E8F5E9")),
+                    ("TEXTCOLOR", (4, indice_fila), (4, indice_fila), colors.HexColor("#1B5E20")),
+                ])
+            else:
+                estilos_incidencias.extend([
+                    ("BACKGROUND", (4, indice_fila), (4, indice_fila), colors.HexColor("#FDECEC")),
+                    ("TEXTCOLOR", (4, indice_fila), (4, indice_fila), colors.HexColor("#9B1C1C")),
+                ])
+
+        tabla_incidencias.setStyle(TableStyle(estilos_incidencias))
+        contenido.append(tabla_incidencias)
+
+    contenido.append(Spacer(1, 18))
+
+    # ---------------------------------------------------------
+    # 8. INFORMES EXTERNOS
+    # ---------------------------------------------------------
 
     contenido.append(Paragraph("8. Informes externos, analíticas y certificados", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
 
     if df_inf.empty:
-        contenido.append(Paragraph("No constan informes externos registrados en el periodo.", styles["Normal"]))
+        contenido.append(bloque_sin_datos(
+            "No constan informes externos registrados en el periodo."
+        ))
     else:
-        tabla_inf = [["Fecha", "Tipo", "Empresa", "Inst.", "Punto", "Resultado", "Nº informe"]]
-
+        filas_informes = []
         for _, row in df_inf.head(80).iterrows():
-            tabla_inf.append([
+            filas_informes.append([
                 limpiar_pdf(str(row.get("fecha_informe", ""))[:10]),
-                limpiar_pdf(row.get("tipo_informe", ""), 22),
-                limpiar_pdf(row.get("empresa", ""), 18),
-                limpiar_pdf(row.get("instalacion", ""), 10),
-                limpiar_pdf(row.get("punto", ""), 24),
-                limpiar_pdf(row.get("resultado", ""), 16),
-                limpiar_pdf(row.get("numero_informe", ""), 18),
+                limpiar_pdf(row.get("tipo_informe", ""), 30),
+                limpiar_pdf(row.get("empresa", ""), 26),
+                limpiar_pdf(row.get("instalacion", ""), 16),
+                limpiar_pdf(row.get("punto", ""), 34),
+                limpiar_pdf(row.get("resultado", ""), 24),
+                limpiar_pdf(row.get("numero_informe", ""), 24),
             ])
 
-        tabla_e = Table(tabla_inf, colWidths=[50, 105, 85, 45, 105, 75, 75])
-        tabla_e.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6.2),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        contenido.append(tabla_e)
+        contenido.append(construir_tabla_operativa(
+            ["FECHA", "TIPO", "EMPRESA", "INST.", "PUNTO", "RESULTADO", "N.º INFORME"],
+            filas_informes,
+            [48, 90, 75, 45, 95, 72, 75],
+            centrar_columnas={0, 3, 5}
+        ))
 
     contenido.append(Spacer(1, 20))
 
-    contenido.append(Paragraph("9. Observaciones y trazabilidad", styles["Heading2"]))
+    # ---------------------------------------------------------
+    # 9. CONCLUSIÓN Y TRAZABILIDAD
+    # ---------------------------------------------------------
+
+    contenido.append(Paragraph("9. Conclusión técnica y trazabilidad", styles["Heading2"]))
+    contenido.append(Spacer(1, 6))
+
+    if total == 0:
+        conclusion_tecnica = (
+            "No existen registros suficientes en el periodo para emitir una conclusión operacional completa. "
+            "La planificación preventiva permanece como referencia de trabajo y debe verificarse la ejecución "
+            "de los controles correspondientes."
+        )
+    elif incidencias_abiertas == 0 and no_ok == 0:
+        conclusion_tecnica = (
+            "Los registros disponibles reflejan una situación operativa favorable. Los controles ejecutados "
+            "se encuentran dentro de los criterios establecidos y no constan incidencias abiertas al cierre "
+            "del periodo revisado."
+        )
+    else:
+        conclusion_tecnica = (
+            "Los registros disponibles muestran controles que requieren seguimiento y/o incidencias pendientes. "
+            "La valoración definitiva queda condicionada al cierre documentado de las acciones correctoras y "
+            "a la verificación posterior de los parámetros afectados."
+        )
+
+    tabla_conclusion = Table(
+        [[Paragraph("<b>CONCLUSIÓN DEL PERIODO</b>", estilo_estado_texto)],
+         [Paragraph(conclusion_tecnica, estilo_estado_texto)]],
+        colWidths=[500]
+    )
+    tabla_conclusion.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#EEF3F7")),
+        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#7B91A6")),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.4, colors.HexColor("#7B91A6")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    contenido.append(tabla_conclusion)
+    contenido.append(Spacer(1, 12))
+
     contenido.append(Paragraph(
         "El presente libro se genera con los datos registrados en la aplicación de mantenimiento: "
         "puntos físicos de control, planificación activa, controles de temperatura, cloro residual, "
         "purgas, revisiones visuales, incidencias, acciones correctoras e informes externos. "
         "El retorno ACS se considera integrado dentro del control de sala ACS cuando así esté configurado "
         "en la planificación. La documentación original adjunta permanece archivada en el sistema.",
-        styles["Normal"]
+        estilo_estado_texto
     ))
 
     contenido.append(Spacer(1, 28))
-    contenido.append(Paragraph("<b>Firma / Responsable:</b> ________________________________", styles["Normal"]))
-    contenido.append(Spacer(1, 10))
-    contenido.append(Paragraph("<b>Fecha:</b> ________________________________", styles["Normal"]))
+
+    tabla_firma = Table(
+        [
+            [Paragraph("<b>Firma / Responsable</b>", estilo_estado_texto),
+             Paragraph("<b>Fecha</b>", estilo_estado_texto)],
+            ["", ""],
+        ],
+        colWidths=[330, 170],
+        rowHeights=[24, 58]
+    )
+    tabla_firma.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#9CA3AF")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C7D0D9")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    contenido.append(tabla_firma)
 
     doc.build(contenido)
 
