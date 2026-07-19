@@ -186,6 +186,7 @@ def mostrar_ejecucion_legionella_operario(
         resultado_procedimiento = mostrar_control_depositos_solares(
             id_orden
         )
+        
     elif tarea == "Choque térmico":
         resultado_procedimiento = mostrar_procedimiento_choque_termico(id_orden, terminales)
 
