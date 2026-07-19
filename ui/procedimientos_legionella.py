@@ -169,7 +169,6 @@ def mostrar_control_depositos_solares(id_orden):
         estado_diferencia = "Elevada"
         st.error("🔴 Diferencia térmica elevada")
 
-    st.markdown("#### 🔄 Purga")
 
     st.markdown("#### 💨 Purga")
 
