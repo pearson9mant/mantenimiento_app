@@ -754,6 +754,9 @@ def unidad_por_tarea(tarea):
     if tarea == "Control válvula termostática":
         return "ºC" 
 
+    if tarea == "Control depósitos solares":
+        return "ºC"
+
     if tarea == "Limpieza y desinfección acumulador":
         return "Sí/No"
 
