@@ -10,6 +10,7 @@ from ui.procedimientos_legionella import (
     mostrar_control_afs,
     mostrar_control_acs_terminal,
     mostrar_control_terminal_completo,
+    mostrar_control_depositos_solares,
     mostrar_revision_visual,
     mostrar_purga,
     mostrar_procedimiento_choque_termico,
