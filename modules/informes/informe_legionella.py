@@ -666,16 +666,71 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ["Control válvula termostática", "Según planificación", "Entrada ≥ 60 ºC / salida 38-50 ºC"],
     ]
 
-    tabla_programa = Table(programa, colWidths=[170, 135, 195])
-    tabla_programa.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 6.7),
+    estilo_tabla_cabecera = styles["Normal"].clone("TablaCabecera")
+    estilo_tabla_cabecera.fontName = "Helvetica-Bold"
+    estilo_tabla_cabecera.fontSize = 7.5
+    estilo_tabla_cabecera.leading = 9
+    estilo_tabla_cabecera.textColor = colors.white
+    estilo_tabla_cabecera.alignment = 1
+
+    estilo_tabla_celda = styles["Normal"].clone("TablaCelda")
+    estilo_tabla_celda.fontName = "Helvetica"
+    estilo_tabla_celda.fontSize = 7
+    estilo_tabla_celda.leading = 9
+    estilo_tabla_celda.textColor = colors.HexColor("#273444")
+
+    programa_formateado = []
+
+    programa_formateado.append([
+        Paragraph("CONTROL", estilo_tabla_cabecera),
+        Paragraph("FRECUENCIA", estilo_tabla_cabecera),
+        Paragraph("CRITERIO CORRECTO", estilo_tabla_cabecera),
+    ])
+
+    for fila in programa[1:]:
+        programa_formateado.append([
+            Paragraph(limpiar_pdf(fila[0]), estilo_tabla_celda),
+            Paragraph(limpiar_pdf(fila[1]), estilo_tabla_celda),
+            Paragraph(limpiar_pdf(fila[2]), estilo_tabla_celda),
+        ])
+
+    tabla_programa = Table(
+        programa_formateado,
+        colWidths=[155, 120, 225],
+        repeatRows=1,
+    )
+
+    estilos_programa = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17324D")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#C7D0D9")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]
+
+    for indice in range(1, len(programa_formateado)):
+        if indice % 2 == 0:
+            estilos_programa.append(
+                ("BACKGROUND", (0, indice), (-1, indice), colors.HexColor("#F4F7F9"))
+            )
+
+    tabla_programa.setStyle(TableStyle(estilos_programa))
+
+    contenido.append(
+        KeepTogether([
+            Paragraph(
+                "Criterios aplicados según la planificación activa de mantenimiento y control.",
+                estilo_estado_texto
+            ),
+            Spacer(1, 7),
+        ])
+    )
+
     contenido.append(tabla_programa)
-    contenido.append(Spacer(1, 16))
+    contenido.append(Spacer(1, 18))
 
     contenido.append(Paragraph("3. Inventario de puntos físicos de control", styles["Heading2"]))
 
