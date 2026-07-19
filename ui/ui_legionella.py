@@ -2146,6 +2146,8 @@ def pantalla_legionella():
                 valor_3 = None
                 valor_2 = None
                 purga_realizada = False
+                purga_solar = ""
+                resultado_purga_solar = ""
                 aireador_limpio = False
                 revision_visual_ok = False
                 fuga_ok = False
@@ -2191,6 +2193,68 @@ def pantalla_legionella():
                     cabezal_ok = st.checkbox("Cabezal termostático correcto")
                     regulacion_ok = st.checkbox("Regulación estable")
                     accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")
+
+                elif tarea == "Control depósitos solares":
+                    tipo_control = "Control depósitos solares"
+                    unidad = "ºC"
+                
+                    st.markdown("#### ☀️ Control conjunto de depósitos solares")
+                
+                    valor = st.number_input(
+                        "Temperatura depósito solar 1 ºC",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=45.0,
+                        step=0.1,
+                        key="temperatura_deposito_solar_1"
+                    )
+                
+                    valor_2 = st.number_input(
+                        "Temperatura depósito solar 2 ºC",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=45.0,
+                        step=0.1,
+                        key="temperatura_deposito_solar_2"
+                    )
+                
+                    valor_3 = abs(float(valor) - float(valor_2))
+                
+                    st.metric(
+                        "Diferencia entre depósitos",
+                        f"{valor_3:.1f} ºC"
+                    )
+                
+                    if valor_3 <= 5:
+                        st.success("🟢 Diferencia térmica normal")
+                    elif valor_3 <= 10:
+                        st.warning("🟡 Diferencia térmica a revisar")
+                    else:
+                        st.error("🔴 Diferencia térmica elevada")
+                
+                    purga_solar = st.selectbox(
+                        "Purga",
+                        [
+                            "No necesaria",
+                            "Realizada",
+                            "No realizada"
+                        ],
+                        key="purga_depositos_solares"
+                    )
+                
+                    resultado_purga_solar = ""
+                
+                    if purga_solar == "Realizada":
+                        resultado_purga_solar = st.selectbox(
+                            "Resultado de la purga",
+                            [
+                                "Correcta",
+                                "Salida de aire",
+                                "Agua con partículas",
+                                "Otro"
+                            ],
+                            key="resultado_purga_depositos_solares"
+                        )
 
                 elif tarea == "Control AFS":
                     tipo_control = "Control AFS"
