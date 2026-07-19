@@ -2364,6 +2364,24 @@ def pantalla_legionella():
                                 ruta_foto = ""
 
                         observaciones_finales = observaciones or ""
+                        if tarea == "Control depósitos solares":
+                            datos_solares = [
+                                f"Temperatura depósito solar 1: {valor:.1f} ºC",
+                                f"Temperatura depósito solar 2: {valor_2:.1f} ºC",
+                                f"Diferencia térmica: {valor_3:.1f} ºC",
+                                f"Purga: {purga_solar}",
+                            ]
+                        
+                            if purga_solar == "Realizada" and resultado_purga_solar:
+                                datos_solares.append(
+                                    f"Resultado de la purga: {resultado_purga_solar}"
+                                )
+                        
+                            observaciones_finales = (
+                                observaciones_finales
+                                + "\nControl depósitos solares: "
+                                + " | ".join(datos_solares)
+                            ).strip()
 
                         if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
                             checklist = [
