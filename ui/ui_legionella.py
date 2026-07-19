@@ -701,10 +701,13 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         return ["Temperatura acumulador"]   
 
     else:
-        if tipo_punto in ["acumulador", "acumulador_solar"]:
+        if tipo_punto == "acumulador":
             tareas.insert(0, "Temperatura acumulador")
             tareas.insert(1, "Temperatura impulsión ACS")
-
+    
+        elif tipo_punto == "acumulador_solar":
+            tareas.insert(0, "Control depósitos solares")
+    
         elif tipo_punto == "retorno":
             tareas.insert(0, "Temperatura retorno")
 
