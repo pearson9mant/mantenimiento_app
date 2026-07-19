@@ -468,32 +468,32 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     
     estado_visual = [
     
-        ["💧 SISTEMA ACS", ""],
+        [" SISTEMA ACS", ""],
         ["Puntos de control", str(puntos_acs)],
         ["Controles planificados", str(controles_sala_acs)],
         ["", ""],
     
-        ["🚰 AGUA FRÍA (AFCH / AFS)", ""],
+        [" AGUA FRÍA (AFCH / AFS)", ""],
         ["Puntos de control", str(puntos_afs)],
         ["Controles planificados", str(controles_afs)],
         ["", ""],
     
-        ["☀ INSTALACIÓN SOLAR", ""],
+        [" INSTALACIÓN SOLAR", ""],
         ["Depósitos solares", str(depositos_solares)],
         ["", ""],
     
-        ["🚿 PUNTOS TERMINALES", ""],
+        [" PUNTOS TERMINALES", ""],
         ["Duchas", str(puntos_ducha)],
         ["Terminales", str(terminales_ducha)],
         ["Controles completos", str(controles_terminales)],
         ["", ""],
     
-        ["🌡 VÁLVULAS TERMOSTÁTICAS", ""],
+        [" VÁLVULAS TERMOSTÁTICAS", ""],
         ["Instaladas", str(puntos_vtm)],
         ["Controles", str(controles_vtm)],
         ["", ""],
     
-        ["📊 RESULTADO DEL PERIODO", ""],
+        [" RESULTADO DEL PERIODO", ""],
         ["Controles realizados", str(total)],
         ["Incidencias abiertas", str(incidencias_abiertas)],
         ["Incidencias cerradas", str(incidencias_cerradas)],
@@ -539,8 +539,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     ("TOPPADDING",(0,0),(-1,-1),6),
 
 ]))
-contenido.append(tabla_estado)
-contenido.append(Spacer(1,18))
+    contenido.append(tabla_estado)
+    contenido.append(Spacer(1,18))
 
     if incidencias_abiertas == 0:
         estado_operativo = "FAVORABLE"
