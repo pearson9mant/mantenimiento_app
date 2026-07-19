@@ -467,81 +467,103 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(Paragraph("1.1 Estado actual de la instalación", styles["Heading2"]))
     contenido.append(Spacer(1,8))
     
-    estado_visual = [
-    
-        [" SISTEMA ACS", ""],
-        ["Puntos de control", str(puntos_acs)],
-        ["Controles planificados", str(controles_sala_acs)],
-        ["", ""],
-    
-        [" AGUA FRÍA (AFCH / AFS)", ""],
-        ["Puntos de control", str(puntos_afs)],
-        ["Controles planificados", str(controles_afs)],
-        ["", ""],
-    
-        [" INSTALACIÓN SOLAR", ""],
-        ["Depósitos solares", str(depositos_solares)],
-        ["", ""],
-    
-        [" PUNTOS TERMINALES", ""],
-        ["Duchas", str(puntos_ducha)],
-        ["Terminales", str(terminales_ducha)],
-        ["Controles completos", str(controles_terminales)],
-        ["", ""],
-    
-        [" VÁLVULAS TERMOSTÁTICAS", ""],
-        ["Instaladas", str(puntos_vtm)],
-        ["Controles", str(controles_vtm)],
-        ["", ""],
-    
-        [" RESULTADO DEL PERIODO", ""],
-        ["Controles realizados", str(total)],
-        ["Incidencias abiertas", str(incidencias_abiertas)],
-        ["Incidencias cerradas", str(incidencias_cerradas)],
-        ["Cumplimiento", f"{cumplimiento}%"],
-    ]
-    
-    tabla_estado = Table(
-        estado_visual,
-        colWidths=[300,170]
+       def crear_bloque_estado(titulo, filas):
+        datos = [[titulo, ""]] + filas
+
+        tabla = Table(
+            datos,
+            colWidths=[300, 170],
+        )
+
+        tabla.setStyle(TableStyle([
+            ("SPAN", (0, 0), (1, 0)),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17324D")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 9),
+
+            ("GRID", (0, 1), (-1, -1), 0.35, colors.HexColor("#D0D0D0")),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 1), (-1, -1), 8),
+
+            ("ALIGN", (1, 1), (1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+
+        return KeepTogether([
+            tabla,
+            Spacer(1, 10),
+        ])
+
+
+    contenido.append(
+        crear_bloque_estado(
+            "SISTEMA ACS",
+            [
+                ["Puntos de control", str(puntos_acs)],
+                ["Controles planificados", str(controles_sala_acs)],
+            ]
+        )
     )
-    tabla_estado.setStyle(TableStyle([
 
-    ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+    contenido.append(
+        crear_bloque_estado(
+            "AGUA FRÍA (AFCH / AFS)",
+            [
+                ["Puntos de control", str(puntos_afs)],
+                ["Controles planificados", str(controles_afs)],
+            ]
+        )
+    )
 
-    ("BACKGROUND",(0,4),(-1,4),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,4),(-1,4),colors.white),
+    contenido.append(
+        crear_bloque_estado(
+            "INSTALACIÓN SOLAR",
+            [
+                ["Depósitos solares", str(depositos_solares)],
+            ]
+        )
+    )
 
-    ("BACKGROUND",(0,8),(-1,8),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,8),(-1,8),colors.white),
+    contenido.append(
+        crear_bloque_estado(
+            "PUNTOS TERMINALES",
+            [
+                ["Duchas", str(puntos_ducha)],
+                ["Terminales", str(terminales_ducha)],
+                ["Controles completos", str(controles_terminales)],
+            ]
+        )
+    )
 
-    ("BACKGROUND",(0,11),(-1,11),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,11),(-1,11),colors.white),
+    contenido.append(
+        crear_bloque_estado(
+            "VÁLVULAS TERMOSTÁTICAS",
+            [
+                ["Instaladas", str(puntos_vtm)],
+                ["Controles planificados", str(controles_vtm)],
+            ]
+        )
+    )
 
-    ("BACKGROUND",(0,16),(-1,16),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,16),(-1,16),colors.white),
+    contenido.append(
+        crear_bloque_estado(
+            "RESULTADO DEL PERIODO",
+            [
+                ["Controles realizados", str(total)],
+                ["Incidencias abiertas", str(incidencias_abiertas)],
+                ["Incidencias cerradas", str(incidencias_cerradas)],
+                ["Cumplimiento", f"{cumplimiento}%"],
+            ]
+        )
+    )
 
-    ("BACKGROUND",(0,20),(-1,20),colors.HexColor("#17324D")),
-    ("TEXTCOLOR",(0,20),(-1,20),colors.white),
-
-    ("GRID",(0,0),(-1,-1),0.35,colors.HexColor("#D0D0D0")),
-
-    ("FONTNAME",(0,0),(-1,-1),"Helvetica"),
-
-    ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-    ("FONTNAME",(0,4),(-1,4),"Helvetica-Bold"),
-    ("FONTNAME",(0,8),(-1,8),"Helvetica-Bold"),
-    ("FONTNAME",(0,11),(-1,11),"Helvetica-Bold"),
-    ("FONTNAME",(0,16),(-1,16),"Helvetica-Bold"),
-    ("FONTNAME",(0,20),(-1,20),"Helvetica-Bold"),
-
-    ("BOTTOMPADDING",(0,0),(-1,-1),6),
-    ("TOPPADDING",(0,0),(-1,-1),6),
-
-]))
-    contenido.append(tabla_estado)
-    contenido.append(Spacer(1,18))
+    contenido.append(Spacer(1, 8))
 
     if incidencias_abiertas == 0:
         estado_operativo = "FAVORABLE"
