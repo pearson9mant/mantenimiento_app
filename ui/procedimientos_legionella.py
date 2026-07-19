@@ -127,6 +127,101 @@ def mostrar_control_acs_terminal(id_orden, terminales):
 
     return _base("Control ACS terminal", "ºC", valor, None, None, obs)
 
+def mostrar_control_depositos_solares(id_orden):
+    st.markdown("#### ☀️ Control conjunto de depósitos solares")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        temperatura_1 = st.number_input(
+            "Temperatura depósito solar 1 ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=45.0,
+            step=0.1,
+            key=f"leg_solar_temp_1_{id_orden}"
+        )
+
+    with col2:
+        temperatura_2 = st.number_input(
+            "Temperatura depósito solar 2 ºC",
+            min_value=0.0,
+            max_value=100.0,
+            value=45.0,
+            step=0.1,
+            key=f"leg_solar_temp_2_{id_orden}"
+        )
+
+    diferencia = abs(float(temperatura_1) - float(temperatura_2))
+
+    st.metric(
+        "Diferencia entre depósitos",
+        f"{diferencia:.1f} ºC"
+    )
+
+    if diferencia <= 5:
+        estado_diferencia = "Normal"
+        st.success("🟢 Diferencia térmica normal")
+    elif diferencia <= 10:
+        estado_diferencia = "Revisar"
+        st.warning("🟡 Diferencia térmica a revisar")
+    else:
+        estado_diferencia = "Elevada"
+        st.error("🔴 Diferencia térmica elevada")
+
+    st.markdown("#### 🔄 Purga")
+
+    purga_solar = st.selectbox(
+        "Estado de la purga",
+        [
+            "No necesaria",
+            "Realizada",
+            "No realizada"
+        ],
+        key=f"leg_solar_purga_{id_orden}"
+    )
+
+    resultado_purga = ""
+
+    if purga_solar == "Realizada":
+        resultado_purga = st.selectbox(
+            "Resultado de la purga",
+            [
+                "Correcta",
+                "Salida de aire",
+                "Agua con partículas",
+                "Otro"
+            ],
+            key=f"leg_solar_resultado_purga_{id_orden}"
+        )
+
+    datos_observaciones = [
+        f"Temperatura depósito solar 1: {temperatura_1:.1f} ºC",
+        f"Temperatura depósito solar 2: {temperatura_2:.1f} ºC",
+        f"Diferencia térmica: {diferencia:.1f} ºC",
+        f"Valoración diferencia: {estado_diferencia}",
+        f"Purga: {purga_solar}",
+    ]
+
+    if purga_solar == "Realizada" and resultado_purga:
+        datos_observaciones.append(
+            f"Resultado de la purga: {resultado_purga}"
+        )
+
+    return {
+        "tipo_control": "Control depósitos solares",
+        "unidad": "ºC",
+        "valor": float(temperatura_1),
+        "valor_2": float(temperatura_2),
+        "valor_3": float(diferencia),
+        "valido": True,
+        "errores": [],
+        "observaciones_extra": (
+            "Control depósitos solares: "
+            + " | ".join(datos_observaciones)
+        ),
+    }
+
 
 def mostrar_control_terminal_completo(id_orden, terminales):
     valor = st.number_input("Temperatura AFS ºC", 0.0, 50.0, 18.0, 0.1, key=f"leg_temp_afs_completo_{id_orden}")
