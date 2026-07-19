@@ -732,36 +732,162 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(tabla_programa)
     contenido.append(Spacer(1, 18))
 
-    contenido.append(Paragraph("3. Inventario de puntos físicos de control", styles["Heading2"]))
+    contenido.append(
+        Paragraph(
+            "3. Inventario de puntos físicos de control",
+            styles["Heading2"]
+        )
+    )
+    contenido.append(Spacer(1, 6))
+
+    estilo_inventario_cabecera = styles["Normal"].clone("InventarioCabecera")
+    estilo_inventario_cabecera.fontName = "Helvetica-Bold"
+    estilo_inventario_cabecera.fontSize = 6.5
+    estilo_inventario_cabecera.leading = 8
+    estilo_inventario_cabecera.textColor = colors.white
+    estilo_inventario_cabecera.alignment = 1
+
+    estilo_inventario_celda = styles["Normal"].clone("InventarioCelda")
+    estilo_inventario_celda.fontName = "Helvetica"
+    estilo_inventario_celda.fontSize = 6.2
+    estilo_inventario_celda.leading = 7.8
+    estilo_inventario_celda.textColor = colors.HexColor("#273444")
+
+    estilo_inventario_edificio = styles["Normal"].clone("InventarioEdificio")
+    estilo_inventario_edificio.fontName = "Helvetica-Bold"
+    estilo_inventario_edificio.fontSize = 7.5
+    estilo_inventario_edificio.leading = 9
+    estilo_inventario_edificio.textColor = colors.HexColor("#17324D")
 
     if df_puntos.empty:
-        contenido.append(Paragraph("No constan puntos de control registrados.", styles["Normal"]))
+        contenido.append(
+            Table(
+                [[
+                    Paragraph(
+                        "No constan puntos de control registrados.",
+                        estilo_inventario_celda
+                    )
+                ]],
+                colWidths=[500],
+                style=TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F4F7F9")),
+                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#C7D0D9")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ])
+            )
+        )
+
     else:
-        tabla_puntos = [["Edificio", "Inst.", "Punto", "Tipo punto", "Tipo control", "Terminales", "Ubicación"]]
+        df_puntos_informe = df_puntos.head(140).copy()
 
-        for _, row in df_puntos.head(140).iterrows():
-            ubicacion = row.get("ubicacion_exacta") or row.get("ubicacion") or ""
-            tabla_puntos.append([
-                limpiar_pdf(row.get("edificio", ""), 19),
-                limpiar_pdf(row.get("instalacion", ""), 8),
-                limpiar_pdf(row.get("nombre_punto", ""), 26),
-                limpiar_pdf(row.get("tipo_punto", ""), 16),
-                limpiar_pdf(row.get("tipo_control_punto", ""), 18),
-                limpiar_pdf(row.get("numero_terminales", ""), 5),
-                limpiar_pdf(ubicacion, 26),
-            ])
+        edificios_inventario = (
+            df_puntos_informe["edificio"]
+            .fillna("Sin edificio")
+            .astype(str)
+            .unique()
+            .tolist()
+        )
 
-        tabla_p = Table(tabla_puntos, colWidths=[72, 35, 105, 68, 78, 42, 100])
-        tabla_p.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 5.8),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        contenido.append(tabla_p)
+        for edificio_actual in edificios_inventario:
 
-    contenido.append(Spacer(1, 16))
+            df_edificio = df_puntos_informe[
+                df_puntos_informe["edificio"]
+                .fillna("Sin edificio")
+                .astype(str)
+                == edificio_actual
+            ]
+
+            contenido.append(
+                KeepTogether([
+                    Paragraph(
+                        limpiar_pdf(edificio_actual),
+                        estilo_inventario_edificio
+                    ),
+                    Spacer(1, 5),
+                ])
+            )
+
+            tabla_puntos = [[
+                Paragraph("INST.", estilo_inventario_cabecera),
+                Paragraph("PUNTO", estilo_inventario_cabecera),
+                Paragraph("TIPO", estilo_inventario_cabecera),
+                Paragraph("CONTROL", estilo_inventario_cabecera),
+                Paragraph("TERM.", estilo_inventario_cabecera),
+                Paragraph("UBICACIÓN", estilo_inventario_cabecera),
+            ]]
+
+            for _, row in df_edificio.iterrows():
+                ubicacion = (
+                    row.get("ubicacion_exacta")
+                    or row.get("ubicacion")
+                    or ""
+                )
+
+                tabla_puntos.append([
+                    Paragraph(
+                        limpiar_pdf(row.get("instalacion", ""), 12),
+                        estilo_inventario_celda
+                    ),
+                    Paragraph(
+                        limpiar_pdf(row.get("nombre_punto", ""), 45),
+                        estilo_inventario_celda
+                    ),
+                    Paragraph(
+                        limpiar_pdf(row.get("tipo_punto", ""), 24),
+                        estilo_inventario_celda
+                    ),
+                    Paragraph(
+                        limpiar_pdf(row.get("tipo_control_punto", ""), 30),
+                        estilo_inventario_celda
+                    ),
+                    Paragraph(
+                        limpiar_pdf(row.get("numero_terminales", ""), 6),
+                        estilo_inventario_celda
+                    ),
+                    Paragraph(
+                        limpiar_pdf(ubicacion, 45),
+                        estilo_inventario_celda
+                    ),
+                ])
+
+            tabla_p = Table(
+                tabla_puntos,
+                colWidths=[45, 120, 75, 95, 35, 130],
+                repeatRows=1,
+            )
+
+            estilos_inventario = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17324D")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#C7D0D9")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (4, 1), (4, -1), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+
+            for indice in range(1, len(tabla_puntos)):
+                if indice % 2 == 0:
+                    estilos_inventario.append(
+                        (
+                            "BACKGROUND",
+                            (0, indice),
+                            (-1, indice),
+                            colors.HexColor("#F4F7F9")
+                        )
+                    )
+
+            tabla_p.setStyle(TableStyle(estilos_inventario))
+
+            contenido.append(tabla_p)
+            contenido.append(Spacer(1, 12))
+
+    contenido.append(Spacer(1, 6))
 
     contenido.append(Paragraph("4. Resumen del periodo", styles["Heading2"]))
 
