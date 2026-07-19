@@ -171,12 +171,14 @@ def mostrar_control_depositos_solares(id_orden):
 
     st.markdown("#### 🔄 Purga")
 
+    st.markdown("#### 💨 Purga")
+
     purga_solar = st.selectbox(
-        "Estado de la purga",
+        "¿Ha sido necesaria la purga?",
         [
-            "No necesaria",
-            "Realizada",
-            "No realizada"
+            "No",
+            "Sí",
+            "No ha sido posible"
         ],
         key=f"leg_solar_purga_{id_orden}"
     )
