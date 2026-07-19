@@ -678,6 +678,7 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
     
     if tipo_control_punto == "Choque térmico":
         return ["Choque térmico"]
+
     
     tareas = []
 
@@ -698,7 +699,12 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         tareas = ["Control punto terminal completo"]
         
     elif tipo_control_punto == "Solo temperatura":
-        return ["Temperatura acumulador"]   
+        return ["Temperatura acumulador"]  
+
+    elif tipo_control_punto == "Depósitos solares":
+        return [
+            "Control depósitos solares"
+        ]
 
     else:
         if tipo_punto == "acumulador":
