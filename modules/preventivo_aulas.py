@@ -24,6 +24,7 @@ ELEMENTOS_REVISION_AULA = [
 
 ESTADOS_REVISION_AULA = [
     "Correcto",
+    "Ajustado",
     "Revisar",
     "Avería",
 ]
