@@ -152,15 +152,16 @@ def obtener_items_checklist_por_tarea(tarea):
     tarea_txt = normalizar_tarea(tarea)
 
     if "cuadro" in tarea_txt and "electric" in tarea_txt:
-        return [
-            "Revisión visual del cuadro eléctrico",
-            "Comprobación de magnetotérmicos",
-            "Comprobación de diferenciales con botón TEST",
-            "Revisión de calentamientos, olores o ruidos",
-            "Apriete visual de bornes si procede",
-            "Limpieza interior de polvo si procede",
-            "Comprobación de tapas y señalización",
-        ]
+    return [
+        "Estado general del cuadro",
+        "Comprobación de magnetotérmicos",
+        "Prueba de diferenciales (botón TEST)",
+        "Inspección visual de bornes y conexiones",
+        "Comprobación de calentamientos, olores o ruidos anómalos",
+        "Limpieza interior del cuadro (si procede)",
+        "Estado de tapas, protecciones y señalización",
+        "Accesibilidad y espacio libre del cuadro",
+    ]
 
     if "split" in tarea_txt or "aire acondicionado" in tarea_txt or "climatizacion" in tarea_txt:
         return [
