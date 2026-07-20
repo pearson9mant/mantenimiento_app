@@ -313,6 +313,7 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
     opciones_estado = [
         "",
         "Correcto",
+        "Ajustado",
         "Revisar",
         "Avería",
     ]
@@ -358,6 +359,7 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
                 format_func=lambda valor: {
                     "": "⚪ Pendiente",
                     "Correcto": "✅ Correcto",
+                    "Ajustado": "🛠 Ajustado",
                     "Revisar": "🟡 Revisar",
                     "Avería": "🔴 Avería",
                 }.get(valor, valor),
