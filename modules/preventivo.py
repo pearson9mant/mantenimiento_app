@@ -194,13 +194,23 @@ def obtener_items_checklist_por_tarea(tarea):
             "Comprobar luces de emergencia si aplica",
         ]
 
-    if "bano" in tarea_txt or "grifo" in tarea_txt or "cisterna" in tarea_txt or "fontaner" in tarea_txt:
+    if (
+        "bano" in tarea_txt
+        or "grifo" in tarea_txt
+        or "cisterna" in tarea_txt
+        or "fontaner" in tarea_txt
+    ):
         return [
-            "Comprobar fugas visibles",
-            "Revisar grifos y pulsadores",
-            "Revisar cisternas o fluxores",
-            "Comprobar desagües",
-            "Comprobar malos olores",
+            "Estado general del baño",
+            "Comprobación de inodoros (descarga y fijación)",
+            "Comprobación de lavabos",
+            "Comprobación de grifos o sistemas Presto",
+            "Comprobación de cisternas o fluxores",
+            "Comprobación de fugas visibles",
+            "Comprobación de desagües y sifones",
+            "Estado de puertas y herrajes",
+            "Comprobación de iluminación",
+            "Comprobación de ventilación (si dispone)",
         ]
 
     if "limpieza" in tarea_txt:
