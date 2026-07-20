@@ -434,6 +434,7 @@ def guardar_checklist_preventivo_completo(items, operario=""):
     estados_validos = [
         "",
         "Correcto",
+        "Ajustado",
         "Revisar",
         "Avería",
     ]
