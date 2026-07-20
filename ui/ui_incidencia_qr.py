@@ -306,7 +306,24 @@ def pantalla_incidencia_qr():
                         caption=f"Foto {indice + 1}",
                         use_container_width=True,
                     )
-
+        st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background: #0B3EA9 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 12px !important;
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            height: 55px !important;
+        }
+        
+        div.stButton > button[kind="primary"]:hover {
+            background: #08327F !important;
+            color: white !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
     if st.button(
         "Enviar aviso",
         key=f"qr_enviar_{codigo_espacio}",
