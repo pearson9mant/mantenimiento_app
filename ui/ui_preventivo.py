@@ -601,6 +601,7 @@ def mostrar_historico_preventivo():
             return
 
         correctos = 0
+        ajustados = 0
         revisar = 0
         averias = 0
 
@@ -623,6 +624,11 @@ def mostrar_historico_preventivo():
             if estado == "Correcto":
                 icono = "✅"
                 correctos += 1
+
+            elif estado == "Ajustado":
+                icono = "🛠"
+                ajustados += 1
+                
             elif estado == "Revisar":
                 icono = "🟡"
                 revisar += 1
@@ -649,11 +655,13 @@ def mostrar_historico_preventivo():
                         f"{numero_ot_correctiva}"
                     )
 
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
+
         c1.metric("Puntos", len(checks))
         c2.metric("✅ Correctos", correctos)
-        c3.metric("🟡 Revisar", revisar)
-        c4.metric("🔴 Averías", averias)
+        c3.metric("🛠 Ajustados", ajustados)
+        c4.metric("🟡 Revisar", revisar)
+        c5.metric("🔴 Averías", averias)
 
         return
 
