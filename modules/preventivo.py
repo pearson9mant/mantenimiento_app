@@ -374,6 +374,7 @@ def actualizar_item_checklist_preventivo(
     estados_validos = [
         "",
         "Correcto",
+        "Ajustado",
         "Revisar",
         "Avería",
     ]
