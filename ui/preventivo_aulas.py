@@ -333,12 +333,14 @@ def pantalla_preventivo_aulas():
 
                     resumen = resumen_revision_aula(revision_id)
 
-                    c1, c2, c3, c4, c5 = st.columns(5)
-                    c1.metric("Correctos", resumen.get("correctos", 0))
-                    c2.metric("Revisar", resumen.get("revisar", 0))
-                    c3.metric("Detectadas", resumen.get("averias_detectadas", resumen.get("averias", 0)))
-                    c4.metric("Pendientes", resumen.get("averias_pendientes", resumen.get("averias", 0)))
-                    c5.metric("Resueltas", resumen.get("averias_resueltas", 0))
+                    c1, c2, c3, c4, c5, c6 = st.columns(6)
+                    
+                    c1.metric("✅ Correctos", resumen.get("correctos", 0))
+                    c2.metric("🛠 Ajustados", resumen.get("ajustados", 0))
+                    c3.metric("🟡 Revisar", resumen.get("revisar", 0))
+                    c4.metric("🔴 Detectadas", resumen.get("averias_detectadas", resumen.get("averias", 0)))
+                    c5.metric("⏳ Pendientes", resumen.get("averias_pendientes", resumen.get("averias", 0)))
+                    c6.metric("✅ Resueltas", resumen.get("averias_resueltas", 0))
 
                     observaciones_cierre = st.text_area(
                         "Observaciones de cierre",
