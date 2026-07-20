@@ -551,6 +551,7 @@ def resumen_revision_aula(revision_id):
 
     total = len(items)
     correctos = len([i for i in items if str(i[3]) == "Correcto"])
+    ajustados = len([i for i in items if str(i[3]) == "Ajustado"])
     revisar = len([i for i in items if str(i[3]) == "Revisar"])
 
     averias_detectadas = 0
@@ -572,6 +573,7 @@ def resumen_revision_aula(revision_id):
     return {
         "total": total,
         "correctos": correctos,
+        "ajustados": ajustados,
         "revisar": revisar,
         "averias": averias_detectadas,
         "averias_detectadas": averias_detectadas,
