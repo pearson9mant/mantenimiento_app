@@ -669,6 +669,17 @@ def mostrar_menu_operario():
 
         return
 
+    # ==========================================
+    # Primera entrada del operario -> Prioridades
+    # ==========================================
+    if (
+        st.session_state.get("rol") == "operario"
+        and not st.session_state.get("inicio_operario_mostrado", False)
+    ):
+        st.session_state["inicio_operario_mostrado"] = True
+        st.session_state["seccion_actual"] = "Prioridades"
+        st.rerun()
+
     # ===========================
     # OPERARIOS
     # ===========================
