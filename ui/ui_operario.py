@@ -212,6 +212,72 @@ def calcular_kpis_operario(ordenes, historico=None, operario_sel=""):
     }
 
 
+def mostrar_cabecera_resumen_operario(operario_sel, ordenes_activas):
+    """
+    Cabecera ligera del operario.
+
+    Solo utiliza las órdenes activas que ya se han cargado para el listado.
+    No consulta el histórico, fotos, materiales ni checklists, evitando
+    añadir carga innecesaria a la pantalla principal.
+    """
+    ordenes_activas = ordenes_activas or []
+
+    total_activas = len(ordenes_activas)
+
+    en_curso = len([
+        o for o in ordenes_activas
+        if len(o) > 3
+        and str(o[3] or "").strip() == "En curso"
+    ])
+
+    pendientes = len([
+        o for o in ordenes_activas
+        if len(o) > 3
+        and str(o[3] or "").strip()
+        in ["Abierta", "Pendiente material"]
+    ])
+
+    urgentes = len([
+        o for o in ordenes_activas
+        if len(o) > 9
+        and str(o[9] or "").strip() == "Urgente"
+    ])
+
+    nombre = str(operario_sel or "").strip()
+
+    st.markdown(
+        f"### 👷 Buenos días, {nombre}"
+    )
+
+    st.caption(
+        "Resumen de tu jornada de trabajo."
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "📋 Activas",
+        total_activas
+    )
+
+    col2.metric(
+        "🟠 En curso",
+        en_curso
+    )
+
+    col3.metric(
+        "⏳ Pendientes",
+        pendientes
+    )
+
+    col4.metric(
+        "🚨 Urgentes",
+        urgentes
+    )
+
+    st.markdown("---")
+
+
 def descomponer_orden_operario(fila):
     observaciones_estado = ""
 
@@ -771,6 +837,29 @@ def pantalla_operario(modo="ordenes"):
     st.info(f"Operario: {operario_sel}")
 
     # =====================================================
+    # CARGA ÚNICA DE ÓRDENES ACTIVAS
+    # Se reutiliza para la cabecera, el listado y trabajar una OT.
+    # =====================================================
+    ordenes_activas = []
+
+    if not solo_historico:
+        try:
+            ordenes_activas = cargar_ordenes_activas_operario(
+                operario_sel
+            )
+        except Exception as e:
+            st.error(
+                "No se han podido cargar las órdenes del operario."
+            )
+            st.caption(str(e))
+            return
+
+        mostrar_cabecera_resumen_operario(
+            operario_sel,
+            ordenes_activas
+        )
+
+    # =====================================================
     # MODO ÓRDENES
     # Listado ligero o una única OT abierta
     # =====================================================
@@ -807,17 +896,6 @@ def pantalla_operario(modo="ordenes"):
                     st.exception(e)
 
                 return
-
-        try:
-            ordenes_activas = cargar_ordenes_activas_operario(
-                operario_sel
-            )
-        except Exception as e:
-            st.error(
-                "No se han podido cargar las órdenes del operario."
-            )
-            st.caption(str(e))
-            return
 
         if id_ot_abierta is not None:
             pantalla_trabajar_ot_operario(
