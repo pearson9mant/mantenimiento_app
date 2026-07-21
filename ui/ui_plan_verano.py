@@ -495,47 +495,127 @@ def pintar_leyenda():
                 unsafe_allow_html=True
             )
 
-
 # =====================================================
 # PANTALLA PRINCIPAL
 # =====================================================
 
-def pantalla_plan_verano():
-    asegurar_tabla_plan_verano()
-    pintar_estilos_plan_verano()
+# =====================================================
+# FORMULARIOS
+# =====================================================
 
-    st.markdown("## ☀️ Planificación trabajos de verano")
-    st.caption("Calendario mensual visual compartido para Administración y Gerencia.")
+def formulario_nuevo_trabajo(prefijo_clave="plan", finalizado=False):
+    """
+    Formulario común para:
+    - crear trabajos planificados;
+    - registrar directamente trabajos ya realizados.
+    """
 
-    with st.expander("➕ Crear nuevo trabajo", expanded=False):
+    titulo_expander = (
+        "➕ Registrar trabajo realizado"
+        if finalizado
+        else "➕ Crear nuevo trabajo"
+    )
+
+    with st.expander(titulo_expander, expanded=False):
         col1, col2 = st.columns(2)
 
         with col1:
-            titulo = st.text_input("Título del trabajo")
-            descripcion = st.text_area("Descripción")
-            centro = st.selectbox("Centro", lista_centros())
-            edificio = st.text_input("Edificio")
-            zona = st.text_input("Zona / aula / sala")
+            titulo = st.text_input(
+                "Título del trabajo",
+                key=f"{prefijo_clave}_titulo"
+            )
+            descripcion = st.text_area(
+                "Descripción",
+                key=f"{prefijo_clave}_descripcion"
+            )
+            centro = st.selectbox(
+                "Centro",
+                lista_centros(),
+                key=f"{prefijo_clave}_centro"
+            )
+            edificio = st.text_input(
+                "Edificio",
+                key=f"{prefijo_clave}_edificio"
+            )
+            zona = st.text_input(
+                "Zona / aula / sala",
+                key=f"{prefijo_clave}_zona"
+            )
 
         with col2:
             operarios_seleccionados = st.multiselect(
                 "Operarios asignados",
                 lista_operarios_plan(),
                 max_selections=4,
-                help="Puedes seleccionar hasta 4 operarios o responsables para la misma faena."
+                help="Puedes seleccionar hasta 4 operarios o responsables para la misma faena.",
+                key=f"{prefijo_clave}_operarios"
             )
 
             responsable = ", ".join(operarios_seleccionados)
 
-            empresa_externa = st.text_input("Empresa externa")
-            fecha_inicio = st.date_input("Fecha inicio", value=date.today())
-            fecha_fin = st.date_input("Fecha fin", value=date.today())
-            prioridad = st.selectbox("Prioridad", PRIORIDADES_VERANO, index=1)
-            estado = st.selectbox("Estado", ESTADOS_VERANO)
+            empresa_externa = st.text_input(
+                "Empresa externa",
+                key=f"{prefijo_clave}_empresa"
+            )
 
-        observaciones = st.text_area("Observaciones")
+            if finalizado:
+                fecha_inicio = st.date_input(
+                    "Fecha de inicio",
+                    value=date.today(),
+                    key=f"{prefijo_clave}_fecha_inicio"
+                )
+                fecha_fin = st.date_input(
+                    "Fecha de finalización",
+                    value=date.today(),
+                    key=f"{prefijo_clave}_fecha_fin"
+                )
+                prioridad = st.selectbox(
+                    "Prioridad",
+                    PRIORIDADES_VERANO,
+                    index=1,
+                    key=f"{prefijo_clave}_prioridad"
+                )
+                estado = "Finalizado"
+                st.success("Estado: Finalizado")
+            else:
+                fecha_inicio = st.date_input(
+                    "Fecha inicio",
+                    value=date.today(),
+                    key=f"{prefijo_clave}_fecha_inicio"
+                )
+                fecha_fin = st.date_input(
+                    "Fecha fin",
+                    value=date.today(),
+                    key=f"{prefijo_clave}_fecha_fin"
+                )
+                prioridad = st.selectbox(
+                    "Prioridad",
+                    PRIORIDADES_VERANO,
+                    index=1,
+                    key=f"{prefijo_clave}_prioridad"
+                )
+                estado = st.selectbox(
+                    "Estado",
+                    ESTADOS_VERANO,
+                    key=f"{prefijo_clave}_estado"
+                )
 
-        if st.button("💾 Guardar trabajo", use_container_width=True):
+        observaciones = st.text_area(
+            "Observaciones",
+            key=f"{prefijo_clave}_observaciones"
+        )
+
+        texto_boton = (
+            "✅ Guardar trabajo realizado"
+            if finalizado
+            else "💾 Guardar trabajo"
+        )
+
+        if st.button(
+            texto_boton,
+            use_container_width=True,
+            key=f"{prefijo_clave}_guardar"
+        ):
             if not titulo.strip():
                 st.warning("Falta el título.")
             elif not operarios_seleccionados:
@@ -558,21 +638,50 @@ def pantalla_plan_verano():
                     "observaciones": observaciones,
                     "creado_por": st.session_state.get("usuario", "")
                 })
-                st.success("Trabajo creado correctamente.")
+
+                if finalizado:
+                    st.success("Trabajo realizado guardado correctamente.")
+                else:
+                    st.success("Trabajo creado correctamente.")
+
                 st.rerun()
 
-    df = obtener_plan_verano()
+
+# =====================================================
+# PREPARACIÓN DE DATOS
+# =====================================================
+
+def preparar_dataframe_plan(df):
+    if df.empty:
+        return df
+
+    df = df.copy()
+    df["fecha_inicio_dt"] = pd.to_datetime(
+        df["fecha_inicio"],
+        errors="coerce"
+    )
+    df["fecha_fin_dt"] = pd.to_datetime(
+        df["fecha_fin"],
+        errors="coerce"
+    )
+
+    return df.dropna(
+        subset=["fecha_inicio_dt", "fecha_fin_dt"]
+    )
+
+
+# =====================================================
+# PESTAÑA PLANIFICACIÓN
+# =====================================================
+
+def mostrar_planificacion_verano(df):
+    formulario_nuevo_trabajo(
+        prefijo_clave="plan_nuevo",
+        finalizado=False
+    )
 
     if df.empty:
         st.info("Todavía no hay trabajos de verano planificados.")
-        return
-
-    df["fecha_inicio_dt"] = pd.to_datetime(df["fecha_inicio"], errors="coerce")
-    df["fecha_fin_dt"] = pd.to_datetime(df["fecha_fin"], errors="coerce")
-    df = df.dropna(subset=["fecha_inicio_dt", "fecha_fin_dt"])
-
-    if df.empty:
-        st.info("No hay trabajos con fechas válidas.")
         return
 
     st.markdown("### 🔎 Filtros")
@@ -585,26 +694,32 @@ def pantalla_plan_verano():
             min_value=2025,
             max_value=2035,
             value=date.today().year,
-            step=1
+            step=1,
+            key="plan_filtro_ano"
         )
 
     with colf2:
         mes_nombre = st.selectbox(
             "Mes",
             list(MESES_VERANO.keys()),
-            index=5
+            index=max(0, min(11, date.today().month - 1)),
+            key="plan_filtro_mes"
         )
 
     with colf3:
         filtro_centro = st.selectbox(
             "Centro",
-            ["Todos"] + sorted(df["centro"].dropna().unique().tolist())
+            ["Todos"] + sorted(
+                df["centro"].dropna().astype(str).unique().tolist()
+            ),
+            key="plan_filtro_centro"
         )
 
     with colf4:
         filtro_operario = st.selectbox(
             "Operario",
-            ["Todos"] + lista_operarios_plan()
+            ["Todos"] + lista_operarios_plan(),
+            key="plan_filtro_operario"
         )
 
     colf5, colf6, colf7 = st.columns(3)
@@ -612,42 +727,56 @@ def pantalla_plan_verano():
     with colf5:
         filtro_estado = st.selectbox(
             "Estado",
-            ["Todos"] + ESTADOS_VERANO
+            ["Todos"] + ESTADOS_VERANO,
+            key="plan_filtro_estado"
         )
 
     with colf6:
         filtro_prioridad = st.selectbox(
             "Prioridad",
-            ["Todas"] + PRIORIDADES_VERANO
+            ["Todas"] + PRIORIDADES_VERANO,
+            key="plan_filtro_prioridad"
         )
 
     with colf7:
-        ver_finalizados = st.checkbox("Mostrar finalizados", value=True)
+        ver_finalizados = st.checkbox(
+            "Mostrar finalizados",
+            value=True,
+            key="plan_ver_finalizados"
+        )
 
     mes_numero = MESES_VERANO[mes_nombre]
-
     df_filtrado = df.copy()
 
     if filtro_centro != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["centro"] == filtro_centro]
+        df_filtrado = df_filtrado[
+            df_filtrado["centro"] == filtro_centro
+        ]
 
     if filtro_operario != "Todos":
         df_filtrado = df_filtrado[
             df_filtrado["responsable"].fillna("").str.contains(
                 filtro_operario,
                 case=False,
-                na=False
+                na=False,
+                regex=False
             )
         ]
 
     if filtro_estado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["estado"] == filtro_estado]
+        df_filtrado = df_filtrado[
+            df_filtrado["estado"] == filtro_estado
+        ]
 
     if filtro_prioridad != "Todas":
-        df_filtrado = df_filtrado[df_filtrado["prioridad"] == filtro_prioridad]
+        df_filtrado = df_filtrado[
+            df_filtrado["prioridad"] == filtro_prioridad
+        ]
 
     if not ver_finalizados:
-        df_filtrado = df_filtrado[df_filtrado["estado"] != "Finalizado"]
+        df_filtrado = df_filtrado[
+            df_filtrado["estado"] != "Finalizado"
+        ]
 
     inicio_mes = date(int(año), mes_numero, 1)
 
@@ -666,9 +795,15 @@ def pantalla_plan_verano():
         return
 
     total = len(df_filtrado)
-    en_ejecucion = len(df_filtrado[df_filtrado["estado"] == "En ejecución"])
-    retrasados = len(df_filtrado[df_filtrado["estado"] == "Retrasado"])
-    finalizados = len(df_filtrado[df_filtrado["estado"] == "Finalizado"])
+    en_ejecucion = len(
+        df_filtrado[df_filtrado["estado"] == "En ejecución"]
+    )
+    retrasados = len(
+        df_filtrado[df_filtrado["estado"] == "Retrasado"]
+    )
+    finalizados = len(
+        df_filtrado[df_filtrado["estado"] == "Finalizado"]
+    )
 
     m1, m2, m3, m4 = st.columns(4)
 
@@ -680,13 +815,24 @@ def pantalla_plan_verano():
     pintar_leyenda()
 
     st.markdown(
-        f"<div class='pv-mes-titulo'>📅 Calendario completo · {mes_nombre} {año}</div>",
+        f"<div class='pv-mes-titulo'>"
+        f"📅 Calendario completo · {mes_nombre} {año}"
+        f"</div>",
         unsafe_allow_html=True
     )
 
-    dias_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    dias_nombre = [
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes",
+        "Sábado",
+        "Domingo"
+    ]
 
     cabeceras = st.columns(7)
+
     for i, nombre in enumerate(dias_nombre):
         with cabeceras[i]:
             st.markdown(
@@ -701,10 +847,17 @@ def pantalla_plan_verano():
 
         for i, dia in enumerate(semana):
             trabajos_dia = df_filtrado[
-                df_filtrado.apply(lambda fila: trabajo_activo_en_dia(fila, dia), axis=1)
+                df_filtrado.apply(
+                    lambda fila: trabajo_activo_en_dia(fila, dia),
+                    axis=1
+                )
             ].copy()
 
-            clase_fuera = "pv-card-dia-fuera" if dia.month != mes_numero else ""
+            clase_fuera = (
+                "pv-card-dia-fuera"
+                if dia.month != mes_numero
+                else ""
+            )
 
             with columnas[i]:
                 html_dia = f"""
@@ -716,21 +869,27 @@ def pantalla_plan_verano():
                 """
 
                 if trabajos_dia.empty:
-                    html_dia += "<div class='pv-sin-trabajos'>Sin trabajos</div>"
+                    html_dia += (
+                        "<div class='pv-sin-trabajos'>"
+                        "Sin trabajos"
+                        "</div>"
+                    )
                 else:
                     for _, fila in trabajos_dia.iterrows():
                         html_dia += tarjeta_trabajo_html(fila)
 
                 html_dia += "</div>"
 
-                st.markdown(html_dia, unsafe_allow_html=True)
+                st.markdown(
+                    html_dia,
+                    unsafe_allow_html=True
+                )
 
     st.markdown("---")
     st.markdown("### ✏️ Modificar trabajos")
 
     for _, fila in df_filtrado.iterrows():
         id_trabajo = int(fila["id"])
-
         titulo = texto_seguro(fila.get("titulo", ""))
         centro = texto_seguro(fila.get("centro", ""))
 
@@ -752,20 +911,33 @@ def pantalla_plan_verano():
                 )
 
             with col3:
-                estado_actual = texto_seguro(fila.get("estado", ""))
+                estado_actual = texto_seguro(
+                    fila.get("estado", "")
+                )
+
                 nuevo_estado = st.selectbox(
                     "Estado",
                     ESTADOS_VERANO,
-                    index=ESTADOS_VERANO.index(estado_actual) if estado_actual in ESTADOS_VERANO else 0,
+                    index=(
+                        ESTADOS_VERANO.index(estado_actual)
+                        if estado_actual in ESTADOS_VERANO
+                        else 0
+                    ),
                     key=f"edit_estado_{id_trabajo}"
                 )
 
             with col4:
                 st.write("")
                 st.write("")
-                if st.button("💾 Actualizar", key=f"guardar_edit_{id_trabajo}"):
+
+                if st.button(
+                    "💾 Actualizar",
+                    key=f"guardar_edit_{id_trabajo}"
+                ):
                     if nueva_fecha_fin < nueva_fecha_inicio:
-                        st.warning("La fecha fin no puede ser anterior.")
+                        st.warning(
+                            "La fecha fin no puede ser anterior."
+                        )
                     else:
                         actualizar_trabajo_verano(
                             id_trabajo,
@@ -776,10 +948,22 @@ def pantalla_plan_verano():
                         st.success("Trabajo actualizado.")
                         st.rerun()
 
-            st.write(f"**Descripción:** {texto_seguro(fila.get('descripcion', ''))}")
-            st.write(f"**Operarios:** {texto_seguro(fila.get('responsable', ''))}")
-            st.write(f"**Empresa:** {texto_seguro(fila.get('empresa_externa', ''))}")
-            st.write(f"**Observaciones:** {texto_seguro(fila.get('observaciones', ''))}")
+            st.write(
+                f"**Descripción:** "
+                f"{texto_seguro(fila.get('descripcion', ''))}"
+            )
+            st.write(
+                f"**Operarios:** "
+                f"{texto_seguro(fila.get('responsable', ''))}"
+            )
+            st.write(
+                f"**Empresa:** "
+                f"{texto_seguro(fila.get('empresa_externa', ''))}"
+            )
+            st.write(
+                f"**Observaciones:** "
+                f"{texto_seguro(fila.get('observaciones', ''))}"
+            )
 
             confirmar = st.checkbox(
                 "Confirmar eliminación",
@@ -787,7 +971,316 @@ def pantalla_plan_verano():
             )
 
             if confirmar:
-                if st.button("🗑️ Eliminar trabajo", key=f"borrar_{id_trabajo}"):
+                if st.button(
+                    "🗑️ Eliminar trabajo",
+                    key=f"borrar_{id_trabajo}"
+                ):
                     borrar_trabajo_verano(id_trabajo)
                     st.warning("Trabajo eliminado.")
                     st.rerun()
+
+
+# =====================================================
+# PESTAÑA TRABAJOS TERMINADOS
+# =====================================================
+
+def mostrar_trabajos_terminados(df):
+    st.caption(
+        "Aquí puedes registrar trabajos ya realizados y consultar "
+        "todos los que tienen estado Finalizado."
+    )
+
+    formulario_nuevo_trabajo(
+        prefijo_clave="terminado_nuevo",
+        finalizado=True
+    )
+
+    if df.empty:
+        st.info("Todavía no hay trabajos terminados.")
+        return
+
+    terminados = df[
+        df["estado"].fillna("").astype(str).str.strip() == "Finalizado"
+    ].copy()
+
+    if terminados.empty:
+        st.info("Todavía no hay trabajos con estado Finalizado.")
+        return
+
+    st.markdown("### 🔎 Buscar trabajos realizados")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        años_disponibles = sorted(
+            terminados["fecha_fin_dt"]
+            .dt.year
+            .dropna()
+            .astype(int)
+            .unique()
+            .tolist(),
+            reverse=True
+        )
+
+        filtro_ano = st.selectbox(
+            "Año",
+            ["Todos"] + años_disponibles,
+            key="terminados_filtro_ano"
+        )
+
+    with col2:
+        filtro_centro = st.selectbox(
+            "Centro",
+            ["Todos"] + sorted(
+                terminados["centro"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            ),
+            key="terminados_filtro_centro"
+        )
+
+    with col3:
+        filtro_operario = st.selectbox(
+            "Operario",
+            ["Todos"] + lista_operarios_plan(),
+            key="terminados_filtro_operario"
+        )
+
+    with col4:
+        buscar = st.text_input(
+            "Buscar",
+            placeholder="Título, zona, edificio...",
+            key="terminados_buscar"
+        )
+
+    filtrados = terminados.copy()
+
+    if filtro_ano != "Todos":
+        filtrados = filtrados[
+            filtrados["fecha_fin_dt"].dt.year == int(filtro_ano)
+        ]
+
+    if filtro_centro != "Todos":
+        filtrados = filtrados[
+            filtrados["centro"] == filtro_centro
+        ]
+
+    if filtro_operario != "Todos":
+        filtrados = filtrados[
+            filtrados["responsable"].fillna("").str.contains(
+                filtro_operario,
+                case=False,
+                na=False,
+                regex=False
+            )
+        ]
+
+    texto_busqueda = str(buscar or "").strip()
+
+    if texto_busqueda:
+        mascara = (
+            filtrados["titulo"].fillna("").str.contains(
+                texto_busqueda,
+                case=False,
+                na=False,
+                regex=False
+            )
+            |
+            filtrados["descripcion"].fillna("").str.contains(
+                texto_busqueda,
+                case=False,
+                na=False,
+                regex=False
+            )
+            |
+            filtrados["edificio"].fillna("").str.contains(
+                texto_busqueda,
+                case=False,
+                na=False,
+                regex=False
+            )
+            |
+            filtrados["zona"].fillna("").str.contains(
+                texto_busqueda,
+                case=False,
+                na=False,
+                regex=False
+            )
+        )
+
+        filtrados = filtrados[mascara]
+
+    filtrados = filtrados.sort_values(
+        by=["fecha_fin_dt", "id"],
+        ascending=[False, False]
+    )
+
+    total_terminados = len(filtrados)
+    centros = filtrados["centro"].nunique()
+    operarios = (
+        filtrados["responsable"]
+        .fillna("")
+        .replace("", pd.NA)
+        .dropna()
+        .nunique()
+    )
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Trabajos realizados", total_terminados)
+    m2.metric("Centros", centros)
+    m3.metric("Asignaciones", operarios)
+
+    if filtrados.empty:
+        st.warning("No hay trabajos terminados para esos filtros.")
+        return
+
+    st.markdown("### ✅ Histórico de trabajos realizados")
+
+    for _, fila in filtrados.iterrows():
+        id_trabajo = int(fila["id"])
+        titulo = texto_seguro(fila.get("titulo", ""))
+        centro = texto_seguro(fila.get("centro", ""))
+        edificio = texto_seguro(fila.get("edificio", ""))
+        zona = texto_seguro(fila.get("zona", ""))
+        responsable = texto_seguro(fila.get("responsable", ""))
+        prioridad = texto_seguro(fila.get("prioridad", ""))
+        fecha_fin = fila["fecha_fin_dt"].strftime("%d/%m/%Y")
+
+        encabezado = (
+            f"✅ {fecha_fin} · {titulo} · {centro}"
+        )
+
+        with st.expander(encabezado):
+            col_info1, col_info2, col_info3 = st.columns(3)
+
+            with col_info1:
+                st.write(f"**Centro:** {centro}")
+                st.write(f"**Edificio:** {edificio}")
+                st.write(f"**Zona:** {zona}")
+
+            with col_info2:
+                st.write(f"**Operarios:** {responsable}")
+                st.write(f"**Prioridad:** {prioridad}")
+                st.write(
+                    f"**Empresa:** "
+                    f"{texto_seguro(fila.get('empresa_externa', ''))}"
+                )
+
+            with col_info3:
+                st.write(
+                    f"**Inicio:** "
+                    f"{fila['fecha_inicio_dt'].strftime('%d/%m/%Y')}"
+                )
+                st.write(f"**Finalización:** {fecha_fin}")
+                st.write("**Estado:** Finalizado")
+
+            descripcion = texto_seguro(
+                fila.get("descripcion", "")
+            )
+            observaciones = texto_seguro(
+                fila.get("observaciones", "")
+            )
+
+            if descripcion:
+                st.write(f"**Descripción:** {descripcion}")
+
+            if observaciones:
+                st.write(f"**Observaciones:** {observaciones}")
+
+            st.markdown("---")
+            st.markdown("#### ✏️ Corregir o reabrir")
+
+            col_edit1, col_edit2, col_edit3, col_edit4 = st.columns(4)
+
+            with col_edit1:
+                nueva_fecha_inicio = st.date_input(
+                    "Inicio",
+                    value=fila["fecha_inicio_dt"].date(),
+                    key=f"terminado_inicio_{id_trabajo}"
+                )
+
+            with col_edit2:
+                nueva_fecha_fin = st.date_input(
+                    "Finalización",
+                    value=fila["fecha_fin_dt"].date(),
+                    key=f"terminado_fin_{id_trabajo}"
+                )
+
+            with col_edit3:
+                nuevo_estado = st.selectbox(
+                    "Estado",
+                    ESTADOS_VERANO,
+                    index=ESTADOS_VERANO.index("Finalizado"),
+                    key=f"terminado_estado_{id_trabajo}",
+                    help=(
+                        "Puedes cambiarlo a otro estado para devolverlo "
+                        "a la planificación."
+                    )
+                )
+
+            with col_edit4:
+                st.write("")
+                st.write("")
+
+                if st.button(
+                    "💾 Guardar cambios",
+                    key=f"terminado_guardar_{id_trabajo}"
+                ):
+                    if nueva_fecha_fin < nueva_fecha_inicio:
+                        st.warning(
+                            "La fecha final no puede ser anterior."
+                        )
+                    else:
+                        actualizar_trabajo_verano(
+                            id_trabajo,
+                            nueva_fecha_inicio,
+                            nueva_fecha_fin,
+                            nuevo_estado
+                        )
+                        st.success("Trabajo actualizado.")
+                        st.rerun()
+
+            confirmar = st.checkbox(
+                "Confirmar eliminación del histórico",
+                key=f"terminado_confirmar_borrar_{id_trabajo}"
+            )
+
+            if confirmar:
+                if st.button(
+                    "🗑️ Eliminar trabajo",
+                    key=f"terminado_borrar_{id_trabajo}"
+                ):
+                    borrar_trabajo_verano(id_trabajo)
+                    st.warning("Trabajo eliminado.")
+                    st.rerun()
+
+
+# =====================================================
+# PANTALLA PRINCIPAL
+# =====================================================
+
+def pantalla_plan_verano():
+    asegurar_tabla_plan_verano()
+    pintar_estilos_plan_verano()
+
+    st.markdown("## ☀️ Planificación trabajos de verano")
+    st.caption(
+        "Calendario mensual visual compartido para Administración y Gerencia."
+    )
+
+    df = preparar_dataframe_plan(
+        obtener_plan_verano()
+    )
+
+    tab_planificacion, tab_terminados = st.tabs([
+        "📅 Planificación",
+        "✅ Trabajos terminados"
+    ])
+
+    with tab_planificacion:
+        mostrar_planificacion_verano(df)
+
+    with tab_terminados:
+        mostrar_trabajos_terminados(df)
