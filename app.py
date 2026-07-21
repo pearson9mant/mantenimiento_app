@@ -425,6 +425,7 @@ def login_portada():
             st.session_state["entrada_app"] = True
             st.session_state["seccion_actual"] = None
             st.session_state["vista_operario"] = False
+            st.session_state["inicio_operario_mostrado"] = False
 
             st.rerun()
         else:
