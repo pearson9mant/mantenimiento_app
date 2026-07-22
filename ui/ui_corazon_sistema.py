@@ -306,11 +306,10 @@ def mostrar_corazon_sistema():
                     )
 
             boton_abrir_ot(
-                prioridad.get(
-                    "numero_ot",
-                    ""
-                ),
-                key_extra="prioridad_hoy"
+                prioridad.get("numero_ot", ""),
+                key_extra="prioridad_hoy",
+                texto="▶ Empezar esta actuación",
+                tipo="primary"
             )
 
         else:
