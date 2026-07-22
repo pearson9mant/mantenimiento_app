@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 from database.db import conectar, _sql, _es_postgres
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
@@ -31,6 +32,7 @@ from modules.ordenes import (
     obtener_propuestas_reclasificacion_areas,
     aplicar_reclasificacion_areas,
 )
+from modules.areas import AREAS_OT
 
 
 TIPOS_PUNTO_LEGIONELLA = [
