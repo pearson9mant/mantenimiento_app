@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from database.db import conectar, _sql, _add_column
+from modules.areas import sugerir_area_ot
 
 try:
     from modules.telegram_alertas import enviar_telegram
