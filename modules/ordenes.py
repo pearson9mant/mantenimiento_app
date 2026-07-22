@@ -525,6 +525,16 @@ def crear_orden(datos):
         if not origen or origen == "APP":
             origen = "EXTERNA"
 
+    # -------------------------------------------------
+    # CLASIFICACIÓN AUTOMÁTICA DEL ÁREA
+    # -------------------------------------------------
+    area = sugerir_area_ot(
+        descripcion=descripcion,
+        area_actual=area,
+        origen=origen,
+        tipo_orden=tipo_orden
+    )
+
     if not numero_ot:
         tipo_para_numero = detectar_tipo_ot_para_numero(origen, tipo_orden)
         numero_ot = obtener_siguiente_numero_ot(centro, tipo_para_numero)
