@@ -215,6 +215,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
             "prioridad": row.get("prioridad", ""),
             "operario": row.get("operario", ""),
             "estado": row.get("estado", ""),
+            "dias_abierta": dias_abierta,
             "accion": "Atender esta actuación antes que el resto.",
             "motivo": "El sistema la considera prioritaria por origen, área, prioridad y riesgo operativo.",
             "motivos": motivos,
