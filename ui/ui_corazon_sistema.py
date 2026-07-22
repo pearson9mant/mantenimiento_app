@@ -609,11 +609,9 @@ def mostrar_corazon_sistema():
                             )
 
                     boton_abrir_ot(
-                        prioridad_ranking.get(
-                            "numero_ot",
-                            ""
-                        ),
-                        key_extra=f"ranking_{i}"
+                        prioridad_ranking.get("numero_ot", ""),
+                        key_extra=f"ranking_{i}",
+                        texto="🔎 Abrir OT"
                     )
 
     with tab4:
