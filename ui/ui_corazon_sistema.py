@@ -116,6 +116,29 @@ def mostrar_antiguedad_ot(datos):
     st.caption(f"⏳ {texto}")
 
 
+def mostrar_prioridad_visual(prioridad):
+    prioridad_normalizada = str(
+        prioridad or ""
+    ).strip().lower()
+
+    if "urgente" in prioridad_normalizada:
+        return "🔴 Urgente"
+
+    if "alta" in prioridad_normalizada:
+        return "🟠 Alta"
+
+    if "media" in prioridad_normalizada:
+        return "🟡 Media"
+
+    if "baja" in prioridad_normalizada:
+        return "🟢 Baja"
+
+    if "normal" in prioridad_normalizada:
+        return "🟢 Normal"
+
+    return str(prioridad or "-").strip() or "-"
+
+
 def mostrar_corazon_sistema():
     perfil = str(
         st.session_state.get("perfil", "") or ""
@@ -286,14 +309,18 @@ def mostrar_corazon_sistema():
 
     with st.container(border=True):
         if prioridad:
-            st.markdown(
-                f"#### ⭐ "
-                f"{prioridad.get('numero_ot', '')}"
+            st.caption(
+                f"⭐ OT {prioridad.get('numero_ot', '')}"
             )
 
             st.markdown(
-                f"### "
+                f"## "
                 f"{prioridad.get('titulo', 'Sin prioridad')}"
+            )
+
+            st.caption(
+                "🎯 Recomendación generada automáticamente según "
+                "riesgo, prioridad, antigüedad y agrupación de trabajos."
             )
 
             mostrar_ubicacion_ot(prioridad)
@@ -319,23 +346,22 @@ def mostrar_corazon_sistema():
             )
 
             c3.metric(
-                "Puntuación",
-                f"{prioridad.get('score', 0)}/100"
+                "Confianza del sistema",
+                f"{prioridad.get('score', 0)}%"
             )
 
             c4.metric(
                 "Prioridad",
-                prioridad.get(
-                    "prioridad",
-                    "-"
+                mostrar_prioridad_visual(
+                    prioridad.get(
+                        "prioridad",
+                        "-"
+                    )
                 )
             )
 
             st.info(
-                prioridad.get(
-                    "accion",
-                    "Realizar actuación."
-                )
+                "🎯 Actuación recomendada por el Corazón del Sistema."
             )
 
             with st.expander(
