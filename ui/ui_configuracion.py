@@ -448,13 +448,13 @@ def mostrar_reclasificacion_areas_ot():
     st.markdown("### 🧠 Reclasificar áreas de OT antiguas")
 
     st.info(
-        "Esta herramienta revisa las órdenes que tienen el área vacía, "
-        "'Otro' u 'Otros'. Primero muestra una vista previa y no modifica "
-        "ningún dato hasta que confirmes la operación."
+        "El sistema propone un área para cada orden. "
+        "Puedes revisarla, cambiarla o desmarcarla antes de modificar "
+        "la base de datos."
     )
 
     # -------------------------------------------------
-    # ANALIZAR LAS ÓRDENES
+    # ANALIZAR
     # -------------------------------------------------
 
     if st.button(
@@ -466,11 +466,11 @@ def mostrar_reclasificacion_areas_ot():
             propuestas = obtener_propuestas_reclasificacion_areas()
 
             st.session_state["cfg_propuestas_areas_ot"] = propuestas
-            st.session_state["cfg_confirmar_reclasificacion"] = False
             st.session_state.pop(
-                "cfg_texto_confirmar_reclasificacion",
+                "cfg_propuestas_finales_areas_ot",
                 None
             )
+            st.session_state["cfg_confirmar_reclasificacion"] = False
 
             if propuestas:
                 st.success(
@@ -500,7 +500,7 @@ def mostrar_reclasificacion_areas_ot():
         return
 
     # -------------------------------------------------
-    # CONTADORES GENERALES
+    # MÉTRICAS GENERALES
     # -------------------------------------------------
 
     ordenes_activas = sum(
@@ -538,84 +538,221 @@ def mostrar_reclasificacion_areas_ot():
     st.markdown("---")
 
     # -------------------------------------------------
-    # RESUMEN POR ÁREA
+    # FILTROS
     # -------------------------------------------------
 
-    resumen_areas = {}
+    st.markdown("#### 🔍 Filtrar propuestas")
+
+    areas_encontradas = sorted({
+        str(propuesta.get("area_propuesta") or "Otros")
+        for propuesta in propuestas
+    })
+
+    col_filtro1, col_filtro2 = st.columns(2)
+
+    with col_filtro1:
+        filtro_area = st.selectbox(
+            "Área propuesta",
+            ["Todas"] + areas_encontradas,
+            key="cfg_filtro_area_reclasificacion"
+        )
+
+    with col_filtro2:
+        filtro_tipo = st.selectbox(
+            "Tipo de orden",
+            [
+                "Todas",
+                "OT activas",
+                "Histórico",
+            ],
+            key="cfg_filtro_tipo_reclasificacion"
+        )
+
+    texto_busqueda = st.text_input(
+        "Buscar por número o descripción",
+        placeholder="Ejemplo: lavabo, puerta, enchufe, OT-0025...",
+        key="cfg_buscar_reclasificacion"
+    )
+
+    texto_busqueda_normalizado = texto_busqueda.strip().lower()
+
+    propuestas_filtradas = []
 
     for propuesta in propuestas:
         area_propuesta = str(
             propuesta.get("area_propuesta") or "Otros"
-        ).strip()
-
-        resumen_areas[area_propuesta] = (
-            resumen_areas.get(area_propuesta, 0) + 1
         )
 
-    st.markdown("#### 📊 Resumen por área")
+        tabla = propuesta.get("tabla", "")
 
-    resumen_ordenado = sorted(
-        resumen_areas.items(),
-        key=lambda elemento: elemento[1],
-        reverse=True
+        numero_ot = str(
+            propuesta.get("numero_ot") or ""
+        )
+
+        descripcion = str(
+            propuesta.get("descripcion") or ""
+        )
+
+        if (
+            filtro_area != "Todas"
+            and area_propuesta != filtro_area
+        ):
+            continue
+
+        if (
+            filtro_tipo == "OT activas"
+            and tabla != "ordenes_trabajo"
+        ):
+            continue
+
+        if (
+            filtro_tipo == "Histórico"
+            and tabla != "historico_ordenes"
+        ):
+            continue
+
+        if texto_busqueda_normalizado:
+            texto_completo = (
+                f"{numero_ot} {descripcion}"
+            ).lower()
+
+            if texto_busqueda_normalizado not in texto_completo:
+                continue
+
+        propuestas_filtradas.append(propuesta)
+
+    st.caption(
+        f"Mostrando {len(propuestas_filtradas)} de "
+        f"{len(propuestas)} propuestas."
     )
 
-    if resumen_ordenado:
-        columnas = st.columns(3)
+    # -------------------------------------------------
+    # CREAR TABLA EDITABLE
+    # -------------------------------------------------
 
-        for indice, (area, cantidad) in enumerate(resumen_ordenado):
-            with columnas[indice % 3]:
-                st.metric(
-                    area,
-                    cantidad
-                )
+    filas_editor = []
+
+    for propuesta in propuestas_filtradas:
+        filas_editor.append({
+            "Aplicar": True,
+            "ID interno": propuesta.get("id"),
+            "Tabla": propuesta.get("tabla"),
+            "Nº OT": propuesta.get("numero_ot") or "",
+            "Descripción": propuesta.get("descripcion") or "",
+            "Origen": propuesta.get("origen") or "",
+            "Área actual": propuesta.get("area_actual") or "Otros",
+            "Área final": propuesta.get("area_propuesta") or "Otros",
+        })
+
+    dataframe_editor = pd.DataFrame(filas_editor)
+
+    if dataframe_editor.empty:
+        st.warning(
+            "No hay propuestas que coincidan con los filtros."
+        )
+        return
+
+    st.markdown("#### ✏️ Revisar y corregir")
+
+    st.caption(
+        "Desmarca «Aplicar» para excluir una orden. "
+        "Puedes cambiar «Área final» mediante el desplegable."
+    )
+
+    dataframe_editado = st.data_editor(
+        dataframe_editor,
+        key="cfg_editor_reclasificacion_areas",
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed",
+        disabled=[
+            "ID interno",
+            "Tabla",
+            "Nº OT",
+            "Descripción",
+            "Origen",
+            "Área actual",
+        ],
+        column_config={
+            "Aplicar": st.column_config.CheckboxColumn(
+                "Aplicar",
+                help="Desmarca esta casilla para no actualizar la orden.",
+                default=True,
+                width="small",
+            ),
+            "ID interno": st.column_config.NumberColumn(
+                "ID interno",
+                width="small",
+            ),
+            "Tabla": st.column_config.TextColumn(
+                "Registro",
+                width="small",
+            ),
+            "Nº OT": st.column_config.TextColumn(
+                "Nº OT",
+                width="medium",
+            ),
+            "Descripción": st.column_config.TextColumn(
+                "Descripción",
+                width="large",
+            ),
+            "Origen": st.column_config.TextColumn(
+                "Origen",
+                width="small",
+            ),
+            "Área actual": st.column_config.TextColumn(
+                "Área actual",
+                width="medium",
+            ),
+            "Área final": st.column_config.SelectboxColumn(
+                "Área final",
+                options=AREAS_OT,
+                required=True,
+                width="medium",
+            ),
+        }
+    )
+
+    # -------------------------------------------------
+    # RESUMEN DEL CONTENIDO EDITADO
+    # -------------------------------------------------
+
+    seleccionadas = dataframe_editado[
+        dataframe_editado["Aplicar"] == True
+    ].copy()
 
     st.markdown("---")
+    st.markdown("#### 📊 Resumen definitivo")
+
+    if seleccionadas.empty:
+        st.warning(
+            "No hay ninguna orden marcada para aplicar."
+        )
+    else:
+        resumen_final = (
+            seleccionadas["Área final"]
+            .value_counts()
+            .to_dict()
+        )
+
+        columnas = st.columns(3)
+
+        for indice, (area, cantidad) in enumerate(
+            resumen_final.items()
+        ):
+            with columnas[indice % 3]:
+                st.metric(
+                    str(area),
+                    int(cantidad)
+                )
+
+        st.metric(
+            "Total seleccionado",
+            len(seleccionadas)
+        )
 
     # -------------------------------------------------
-    # VISTA PREVIA
-    # -------------------------------------------------
-
-    with st.expander(
-        "👁️ Ver propuestas de reclasificación",
-        expanded=False
-    ):
-        for indice, propuesta in enumerate(propuestas):
-            tabla = propuesta.get("tabla", "")
-            numero_ot = propuesta.get("numero_ot") or "Sin número"
-            descripcion = propuesta.get("descripcion") or "Sin descripción"
-            area_actual = propuesta.get("area_actual") or "Otros"
-            area_propuesta = propuesta.get("area_propuesta") or "Otros"
-            origen = propuesta.get("origen") or "-"
-
-            tipo_registro = (
-                "OT activa"
-                if tabla == "ordenes_trabajo"
-                else "Histórico"
-            )
-
-            st.markdown(
-                f"**{numero_ot}** · {tipo_registro}"
-            )
-
-            st.caption(
-                f"Origen: {origen}"
-            )
-
-            st.write(
-                str(descripcion)[:500]
-            )
-
-            st.markdown(
-                f"Área actual: `{area_actual}`  \n"
-                f"Área propuesta: **{area_propuesta}**"
-            )
-
-            if indice < len(propuestas) - 1:
-                st.markdown("---")
-
-    # -------------------------------------------------
-    # PREPARAR CONFIRMACIÓN
+    # PREPARAR CAMBIOS
     # -------------------------------------------------
 
     if not st.session_state.get(
@@ -625,8 +762,26 @@ def mostrar_reclasificacion_areas_ot():
         if st.button(
             "✅ Preparar aplicación de cambios",
             key="cfg_preparar_reclasificacion",
-            use_container_width=True
+            use_container_width=True,
+            disabled=seleccionadas.empty
         ):
+            propuestas_finales = []
+
+            for _, fila in seleccionadas.iterrows():
+                propuestas_finales.append({
+                    "tabla": fila["Tabla"],
+                    "id": int(fila["ID interno"]),
+                    "numero_ot": fila["Nº OT"],
+                    "descripcion": fila["Descripción"],
+                    "origen": fila["Origen"],
+                    "area_actual": fila["Área actual"],
+                    "area_propuesta": fila["Área final"],
+                })
+
+            st.session_state[
+                "cfg_propuestas_finales_areas_ot"
+            ] = propuestas_finales
+
             st.session_state[
                 "cfg_confirmar_reclasificacion"
             ] = True
@@ -639,14 +794,24 @@ def mostrar_reclasificacion_areas_ot():
     # CONFIRMACIÓN FINAL
     # -------------------------------------------------
 
+    propuestas_finales = st.session_state.get(
+        "cfg_propuestas_finales_areas_ot",
+        []
+    )
+
+    if not propuestas_finales:
+        st.warning(
+            "No hay propuestas preparadas para aplicar."
+        )
+        return
+
     st.warning(
-        f"Se van a revisar {len(propuestas)} órdenes. "
-        "Solo se actualizarán aquellas que todavía tengan el área "
-        "vacía, 'Otro' u 'Otros'."
+        f"Se van a actualizar hasta "
+        f"{len(propuestas_finales)} órdenes."
     )
 
     confirmar_checkbox = st.checkbox(
-        "Confirmo que quiero aplicar la reclasificación",
+        "Confirmo que he revisado las áreas y quiero aplicar los cambios",
         key="cfg_checkbox_confirmar_reclasificacion"
     )
 
@@ -656,14 +821,15 @@ def mostrar_reclasificacion_areas_ot():
     )
 
     texto_valido = (
-        texto_confirmacion.strip().upper() == "RECLASIFICAR"
+        texto_confirmacion.strip().upper()
+        == "RECLASIFICAR"
     )
 
     col_aplicar, col_cancelar = st.columns(2)
 
     with col_aplicar:
         if st.button(
-            "🧠 Aplicar reclasificación",
+            "🧠 Aplicar cambios definitivos",
             key="cfg_aplicar_reclasificacion",
             use_container_width=True
         ):
@@ -680,7 +846,7 @@ def mostrar_reclasificacion_areas_ot():
             else:
                 try:
                     resultado = aplicar_reclasificacion_areas(
-                        propuestas
+                        propuestas_finales
                     )
 
                     errores = resultado.get("errores", [])
@@ -706,20 +872,21 @@ def mostrar_reclasificacion_areas_ot():
                         )
 
                         st.success(
-                            f"Reclasificación finalizada. "
-                            f"Se han actualizado {actualizadas} órdenes."
+                            f"Reclasificación terminada. "
+                            f"Se han actualizado "
+                            f"{actualizadas} órdenes."
                         )
 
                         if omitidas:
                             st.info(
-                                f"Se han omitido {omitidas} registros "
-                                "porque ya habían sido corregidos, "
-                                "habían cambiado o no eran válidos."
+                                f"Se han omitido {omitidas} órdenes "
+                                "porque ya habían cambiado o no "
+                                "cumplían las condiciones."
                             )
 
                         if por_area:
                             st.markdown(
-                                "#### Resultado por área"
+                                "#### Resultado aplicado"
                             )
 
                             for area, cantidad in sorted(
@@ -733,6 +900,11 @@ def mostrar_reclasificacion_areas_ot():
 
                         st.session_state.pop(
                             "cfg_propuestas_areas_ot",
+                            None
+                        )
+
+                        st.session_state.pop(
+                            "cfg_propuestas_finales_areas_ot",
                             None
                         )
 
@@ -751,6 +923,11 @@ def mostrar_reclasificacion_areas_ot():
                             None
                         )
 
+                        st.session_state.pop(
+                            "cfg_editor_reclasificacion_areas",
+                            None
+                        )
+
                 except Exception as e:
                     st.error(
                         f"No se pudieron aplicar los cambios: {e}"
@@ -758,13 +935,18 @@ def mostrar_reclasificacion_areas_ot():
 
     with col_cancelar:
         if st.button(
-            "❌ Cancelar",
+            "❌ Volver a la revisión",
             key="cfg_cancelar_reclasificacion",
             use_container_width=True
         ):
             st.session_state[
                 "cfg_confirmar_reclasificacion"
             ] = False
+
+            st.session_state.pop(
+                "cfg_propuestas_finales_areas_ot",
+                None
+            )
 
             st.session_state.pop(
                 "cfg_checkbox_confirmar_reclasificacion",
@@ -777,6 +959,8 @@ def mostrar_reclasificacion_areas_ot():
             )
 
             st.rerun()
+
+
 # =====================================================
 # BORRADOS CONTROLADOS
 # =====================================================
