@@ -36,6 +36,21 @@ def boton_abrir_ot(numero_ot, key_extra=""):
     ):
         st.session_state["corazon_ot_abierta"] = numero_ot
         st.rerun()
+        
+def mostrar_ubicacion_ot(datos):
+    ubicacion = " · ".join([
+        str(valor).strip()
+        for valor in [
+            datos.get("centro", ""),
+            datos.get("edificio", ""),
+            datos.get("planta", ""),
+            datos.get("espacio", ""),
+        ]
+        if str(valor or "").strip()
+    ])
+
+    if ubicacion:
+        st.caption(f"📍 {ubicacion}")
 
 
 def mostrar_corazon_sistema():
