@@ -186,7 +186,7 @@ def puntuar_orden(row):
 
     score = min(score, 100)
 
-    return score, motivos
+    return score, motivos, dias if 'dias' in locals() else None
 
 
 def construir_prioridades_globales(centro=None, operario=None, limite=100):
@@ -198,7 +198,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
     prioridades = []
 
     for _, row in df.iterrows():
-        score, motivos = puntuar_orden(row)
+        score, motivos, dias_abierta = puntuar_orden(row)
         edificio_normalizado = normalizar_edificio(row.get("edificio", ""))
 
         prioridades.append({
