@@ -1228,7 +1228,7 @@ def pantalla_configuracion_espacios():
 def pantalla_configuracion():
     st.subheader("⚙️ Configuración")
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🏫 Espacios",
         "💧 Legionella",
         "✅ Checklist preventivo",
