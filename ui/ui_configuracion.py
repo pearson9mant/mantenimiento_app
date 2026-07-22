@@ -438,7 +438,343 @@ def pantalla_checklist_preventivo_config():
                         else:
                             st.error("Marca la confirmación antes de borrar.")
 
+# =====================================================
+# RECLASIFICACIÓN DE ÁREAS DE OT ANTIGUAS
+# =====================================================
 
+def mostrar_reclasificacion_areas_ot():
+    st.markdown("### 🧠 Reclasificar áreas de OT antiguas")
+
+    st.info(
+        "Esta herramienta revisa las órdenes que tienen el área vacía, "
+        "'Otro' u 'Otros'. Primero muestra una vista previa y no modifica "
+        "ningún dato hasta que confirmes la operación."
+    )
+
+    # -------------------------------------------------
+    # ANALIZAR LAS ÓRDENES
+    # -------------------------------------------------
+
+    if st.button(
+        "🔎 Analizar OT antiguas",
+        key="cfg_analizar_areas_ot",
+        use_container_width=True
+    ):
+        try:
+            propuestas = obtener_propuestas_reclasificacion_areas()
+
+            st.session_state["cfg_propuestas_areas_ot"] = propuestas
+            st.session_state["cfg_confirmar_reclasificacion"] = False
+            st.session_state.pop(
+                "cfg_texto_confirmar_reclasificacion",
+                None
+            )
+
+            if propuestas:
+                st.success(
+                    f"Se han encontrado {len(propuestas)} órdenes "
+                    "que pueden reclasificarse."
+                )
+            else:
+                st.success(
+                    "No se han encontrado órdenes pendientes "
+                    "de reclasificar."
+                )
+
+        except Exception as e:
+            st.error(
+                f"No se pudo realizar el análisis: {e}"
+            )
+
+    propuestas = st.session_state.get(
+        "cfg_propuestas_areas_ot",
+        []
+    )
+
+    if not propuestas:
+        st.caption(
+            "Pulsa el botón de análisis para revisar las órdenes antiguas."
+        )
+        return
+
+    # -------------------------------------------------
+    # CONTADORES GENERALES
+    # -------------------------------------------------
+
+    ordenes_activas = sum(
+        1
+        for propuesta in propuestas
+        if propuesta.get("tabla") == "ordenes_trabajo"
+    )
+
+    ordenes_historicas = sum(
+        1
+        for propuesta in propuestas
+        if propuesta.get("tabla") == "historico_ordenes"
+    )
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric(
+            "Cambios propuestos",
+            len(propuestas)
+        )
+
+    with c2:
+        st.metric(
+            "OT activas",
+            ordenes_activas
+        )
+
+    with c3:
+        st.metric(
+            "Histórico",
+            ordenes_historicas
+        )
+
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # RESUMEN POR ÁREA
+    # -------------------------------------------------
+
+    resumen_areas = {}
+
+    for propuesta in propuestas:
+        area_propuesta = str(
+            propuesta.get("area_propuesta") or "Otros"
+        ).strip()
+
+        resumen_areas[area_propuesta] = (
+            resumen_areas.get(area_propuesta, 0) + 1
+        )
+
+    st.markdown("#### 📊 Resumen por área")
+
+    resumen_ordenado = sorted(
+        resumen_areas.items(),
+        key=lambda elemento: elemento[1],
+        reverse=True
+    )
+
+    if resumen_ordenado:
+        columnas = st.columns(3)
+
+        for indice, (area, cantidad) in enumerate(resumen_ordenado):
+            with columnas[indice % 3]:
+                st.metric(
+                    area,
+                    cantidad
+                )
+
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # VISTA PREVIA
+    # -------------------------------------------------
+
+    with st.expander(
+        "👁️ Ver propuestas de reclasificación",
+        expanded=False
+    ):
+        for indice, propuesta in enumerate(propuestas):
+            tabla = propuesta.get("tabla", "")
+            numero_ot = propuesta.get("numero_ot") or "Sin número"
+            descripcion = propuesta.get("descripcion") or "Sin descripción"
+            area_actual = propuesta.get("area_actual") or "Otros"
+            area_propuesta = propuesta.get("area_propuesta") or "Otros"
+            origen = propuesta.get("origen") or "-"
+
+            tipo_registro = (
+                "OT activa"
+                if tabla == "ordenes_trabajo"
+                else "Histórico"
+            )
+
+            st.markdown(
+                f"**{numero_ot}** · {tipo_registro}"
+            )
+
+            st.caption(
+                f"Origen: {origen}"
+            )
+
+            st.write(
+                str(descripcion)[:500]
+            )
+
+            st.markdown(
+                f"Área actual: `{area_actual}`  \n"
+                f"Área propuesta: **{area_propuesta}**"
+            )
+
+            if indice < len(propuestas) - 1:
+                st.markdown("---")
+
+    # -------------------------------------------------
+    # PREPARAR CONFIRMACIÓN
+    # -------------------------------------------------
+
+    if not st.session_state.get(
+        "cfg_confirmar_reclasificacion",
+        False
+    ):
+        if st.button(
+            "✅ Preparar aplicación de cambios",
+            key="cfg_preparar_reclasificacion",
+            use_container_width=True
+        ):
+            st.session_state[
+                "cfg_confirmar_reclasificacion"
+            ] = True
+
+            st.rerun()
+
+        return
+
+    # -------------------------------------------------
+    # CONFIRMACIÓN FINAL
+    # -------------------------------------------------
+
+    st.warning(
+        f"Se van a revisar {len(propuestas)} órdenes. "
+        "Solo se actualizarán aquellas que todavía tengan el área "
+        "vacía, 'Otro' u 'Otros'."
+    )
+
+    confirmar_checkbox = st.checkbox(
+        "Confirmo que quiero aplicar la reclasificación",
+        key="cfg_checkbox_confirmar_reclasificacion"
+    )
+
+    texto_confirmacion = st.text_input(
+        "Para confirmar escribe: RECLASIFICAR",
+        key="cfg_texto_confirmar_reclasificacion"
+    )
+
+    texto_valido = (
+        texto_confirmacion.strip().upper() == "RECLASIFICAR"
+    )
+
+    col_aplicar, col_cancelar = st.columns(2)
+
+    with col_aplicar:
+        if st.button(
+            "🧠 Aplicar reclasificación",
+            key="cfg_aplicar_reclasificacion",
+            use_container_width=True
+        ):
+            if not confirmar_checkbox:
+                st.error(
+                    "Marca primero la casilla de confirmación."
+                )
+
+            elif not texto_valido:
+                st.error(
+                    "Debes escribir RECLASIFICAR para continuar."
+                )
+
+            else:
+                try:
+                    resultado = aplicar_reclasificacion_areas(
+                        propuestas
+                    )
+
+                    errores = resultado.get("errores", [])
+
+                    if errores:
+                        for error in errores:
+                            st.error(error)
+
+                    else:
+                        actualizadas = resultado.get(
+                            "actualizadas",
+                            0
+                        )
+
+                        omitidas = resultado.get(
+                            "omitidas",
+                            0
+                        )
+
+                        por_area = resultado.get(
+                            "por_area",
+                            {}
+                        )
+
+                        st.success(
+                            f"Reclasificación finalizada. "
+                            f"Se han actualizado {actualizadas} órdenes."
+                        )
+
+                        if omitidas:
+                            st.info(
+                                f"Se han omitido {omitidas} registros "
+                                "porque ya habían sido corregidos, "
+                                "habían cambiado o no eran válidos."
+                            )
+
+                        if por_area:
+                            st.markdown(
+                                "#### Resultado por área"
+                            )
+
+                            for area, cantidad in sorted(
+                                por_area.items(),
+                                key=lambda elemento: elemento[1],
+                                reverse=True
+                            ):
+                                st.write(
+                                    f"✅ **{area}:** {cantidad}"
+                                )
+
+                        st.session_state.pop(
+                            "cfg_propuestas_areas_ot",
+                            None
+                        )
+
+                        st.session_state.pop(
+                            "cfg_confirmar_reclasificacion",
+                            None
+                        )
+
+                        st.session_state.pop(
+                            "cfg_checkbox_confirmar_reclasificacion",
+                            None
+                        )
+
+                        st.session_state.pop(
+                            "cfg_texto_confirmar_reclasificacion",
+                            None
+                        )
+
+                except Exception as e:
+                    st.error(
+                        f"No se pudieron aplicar los cambios: {e}"
+                    )
+
+    with col_cancelar:
+        if st.button(
+            "❌ Cancelar",
+            key="cfg_cancelar_reclasificacion",
+            use_container_width=True
+        ):
+            st.session_state[
+                "cfg_confirmar_reclasificacion"
+            ] = False
+
+            st.session_state.pop(
+                "cfg_checkbox_confirmar_reclasificacion",
+                None
+            )
+
+            st.session_state.pop(
+                "cfg_texto_confirmar_reclasificacion",
+                None
+            )
+
+            st.rerun()
 # =====================================================
 # BORRADOS CONTROLADOS
 # =====================================================
