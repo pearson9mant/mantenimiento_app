@@ -409,13 +409,10 @@ def mostrar_corazon_sistema():
                             )
 
                             boton_abrir_ot(
-                                trabajo.get(
-                                    "numero_ot",
-                                    ""
-                                ),
-                                key_extra=(
-                                    f"ruta_{i}_{j}"
-                                )
+                                trabajo.get("numero_ot", ""),
+                                key_extra=f"ruta_{i}_{j}",
+                                texto="🔎 Abrir OT"
+                            )
                             )
 
     with tab2:
