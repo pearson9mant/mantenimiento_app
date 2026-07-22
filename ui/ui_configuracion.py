@@ -896,6 +896,7 @@ def pantalla_configuracion():
         "🏫 Espacios",
         "💧 Legionella",
         "✅ Checklist preventivo",
+        "🧠 Inteligencia",
         "🧹 Borrados"
     ])
 
@@ -1019,4 +1020,9 @@ def pantalla_configuracion():
         pantalla_checklist_preventivo_config()
 
     with tab4:
+        mostrar_reclasificacion_areas_ot()
+    
+    with tab5:
         pantalla_borrados_inicio()
+
+        
