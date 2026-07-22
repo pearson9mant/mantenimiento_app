@@ -27,6 +27,11 @@ from modules.espacios import (
     PLANTAS_BASE,
 )
 
+from modules.ordenes import (
+    obtener_propuestas_reclasificacion_areas,
+    aplicar_reclasificacion_areas,
+)
+
 
 TIPOS_PUNTO_LEGIONELLA = [
     "acumulador",
