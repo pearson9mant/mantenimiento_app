@@ -413,7 +413,6 @@ def mostrar_corazon_sistema():
                                 key_extra=f"ruta_{i}_{j}",
                                 texto="🔎 Abrir OT"
                             )
-                            )
 
     with tab2:
         st.subheader(
