@@ -31,14 +31,20 @@ def obtener_fila_ot_por_numero(numero_ot):
     return fila
 
 
-def boton_abrir_ot(numero_ot, key_extra=""):
+def boton_abrir_ot(
+    numero_ot,
+    key_extra="",
+    texto="🔎 Abrir OT",
+    tipo="secondary"
+):
     if not numero_ot:
         return
 
     if st.button(
-        "🔎 Abrir y trabajar esta OT",
+        texto,
         key=f"abrir_corazon_{numero_ot}_{key_extra}",
-        use_container_width=True
+        use_container_width=True,
+        type=tipo
     ):
         st.session_state["corazon_ot_abierta"] = numero_ot
         st.rerun()
