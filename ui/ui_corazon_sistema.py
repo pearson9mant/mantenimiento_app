@@ -201,6 +201,19 @@ def mostrar_corazon_sistema():
                                 f"{t.get('tipo_prioridad', '')} · "
                                 f"{t.get('titulo', '')}"
                             )
+                        
+                            ubicacion = " · ".join([
+                                x for x in [
+                                    t.get("centro", ""),
+                                    t.get("edificio", ""),
+                                    t.get("planta", ""),
+                                    t.get("espacio", ""),
+                                ] if x
+                            ])
+                        
+                            if ubicacion:
+                                st.caption(f"📍 {ubicacion}")
+                        
                             boton_abrir_ot(
                                 t.get("numero_ot", ""),
                                 key_extra=f"ruta_{i}_{j}"
