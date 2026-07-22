@@ -87,8 +87,7 @@ def mostrar_corazon_sistema():
 
         if not fila_ot:
             st.session_state.pop("corazon_ot_abierta", None)
-            st.error("No se ha encontrado la OT seleccionada.")
-            st.stop()
+            st.rerun()
 
         pantalla_trabajar_ot(
             fila=fila_ot,
