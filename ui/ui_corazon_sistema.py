@@ -10,15 +10,21 @@ def obtener_fila_ot_por_numero(numero_ot):
     cur = conn.cursor()
 
     try:
-        cur.execute(_sql("""
-            SELECT *
-            FROM ordenes_trabajo
-            WHERE numero_ot = ?
-            LIMIT 1
-        """), (numero_ot,))
+        cur.execute(
+            _sql("""
+                SELECT *
+                FROM ordenes_trabajo
+                WHERE numero_ot = ?
+                LIMIT 1
+            """),
+            (numero_ot,)
+        )
+
         fila = cur.fetchone()
+
     except Exception:
         fila = None
+
     finally:
         conn.close()
 
@@ -36,33 +42,42 @@ def boton_abrir_ot(numero_ot, key_extra=""):
     ):
         st.session_state["corazon_ot_abierta"] = numero_ot
         st.rerun()
-        
+
+
 def mostrar_ubicacion_ot(datos):
-    ubicacion = " · ".join([
-        str(valor).strip()
-        for valor in [
-            datos.get("centro", ""),
-            datos.get("edificio", ""),
-            datos.get("planta", ""),
-            datos.get("espacio", ""),
+    if not datos:
+        return
+
+    ubicacion = " · ".join(
+        [
+            str(valor).strip()
+            for valor in [
+                datos.get("centro", ""),
+                datos.get("edificio", ""),
+                datos.get("planta", ""),
+                datos.get("espacio", ""),
+            ]
+            if str(valor or "").strip()
         ]
-        if str(valor or "").strip()
-    ])
+    )
 
     if ubicacion:
-        st.caption(f"📍 {ubicacion}")
+        st.caption(f"📍 Ubicación: {ubicacion}")
 
 
 def mostrar_corazon_sistema():
-    perfil = str(st.session_state.get("perfil", "") or "").strip().lower()
+    perfil = str(
+        st.session_state.get("perfil", "") or ""
+    ).strip().lower()
+
     operario = str(
         st.session_state.get("operario_activo")
         or st.session_state.get("usuario")
         or ""
     ).strip()
-    
+
     st.title("🎯 Prioridades")
-    
+
     if perfil == "operario":
         operario_normalizado = (
             operario.lower()
@@ -71,37 +86,59 @@ def mostrar_corazon_sistema():
             .replace("-", "")
             .replace("_", "")
         )
-    
-        if "luis" in operario_normalizado or "lozano" in operario_normalizado:
+
+        if (
+            "luis" in operario_normalizado
+            or "lozano" in operario_normalizado
+        ):
             centro_motor = "Pearson 9"
             st.caption("📍 Centro asignado: Pearson 9")
-    
-        elif "almeda" in operario_normalizado or "juanantonio" in operario_normalizado:
+
+        elif (
+            "almeda" in operario_normalizado
+            or "juanantonio" in operario_normalizado
+        ):
             centro_motor = "Pearson 22"
             st.caption("📍 Centro asignado: Pearson 22")
-    
+
         else:
-            st.error("No se ha podido determinar el centro asignado a este operario.")
+            st.error(
+                "No se ha podido determinar el centro asignado "
+                "a este operario."
+            )
             return
-    
+
     else:
         centro_sel = st.selectbox(
             "Centro",
             ["Todos", "Pearson 22", "Pearson 9"],
             key="corazon_centro"
         )
-    
-        centro_motor = None if centro_sel == "Todos" else centro_sel
-    
-    panel = diagnosticar_corazon_sistema(centro=centro_motor)
 
-    ot_abierta = st.session_state.get("corazon_ot_abierta")
+        centro_motor = (
+            None
+            if centro_sel == "Todos"
+            else centro_sel
+        )
+
+    panel = diagnosticar_corazon_sistema(
+        centro=centro_motor
+    )
+
+    ot_abierta = st.session_state.get(
+        "corazon_ot_abierta"
+    )
 
     if ot_abierta:
-        fila_ot = obtener_fila_ot_por_numero(ot_abierta)
+        fila_ot = obtener_fila_ot_por_numero(
+            ot_abierta
+        )
 
         if not fila_ot:
-            st.session_state.pop("corazon_ot_abierta", None)
+            st.session_state.pop(
+                "corazon_ot_abierta",
+                None
+            )
             st.rerun()
 
         pantalla_trabajar_ot(
@@ -120,214 +157,506 @@ def mostrar_corazon_sistema():
     score = panel.get("score_global", 0)
 
     if color == "rojo":
-        st.error(f"🔴 Estado global · {score}% · {panel.get('estado', '')}")
-    elif color == "amarillo":
-        st.warning(f"🟠 Estado global · {score}% · {panel.get('estado', '')}")
-    else:
-        st.success(f"🟢 Estado global · {score}% · {panel.get('estado', '')}")
+        st.error(
+            f"🔴 Estado global · "
+            f"{score}% · "
+            f"{panel.get('estado', '')}"
+        )
 
-    st.caption(panel.get("mensaje", ""))
+    elif color == "amarillo":
+        st.warning(
+            f"🟠 Estado global · "
+            f"{score}% · "
+            f"{panel.get('estado', '')}"
+        )
+
+    else:
+        st.success(
+            f"🟢 Estado global · "
+            f"{score}% · "
+            f"{panel.get('estado', '')}"
+        )
+
+    st.caption(
+        panel.get("mensaje", "")
+    )
 
     kpis = panel.get("kpis", {})
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("OT", kpis.get("abiertas", 0))
-    c2.metric("Incidencias", kpis.get("incidencias", 0))
-    c3.metric("Preventivos", kpis.get("preventivos", 0))
-    c4.metric("Legionella", kpis.get("legionella", 0))
-    c5.metric("Alta/Urgente", kpis.get("urgentes", 0))
+
+    c1.metric(
+        "OT",
+        kpis.get("abiertas", 0)
+    )
+
+    c2.metric(
+        "Incidencias",
+        kpis.get("incidencias", 0)
+    )
+
+    c3.metric(
+        "Preventivos",
+        kpis.get("preventivos", 0)
+    )
+
+    c4.metric(
+        "Legionella",
+        kpis.get("legionella", 0)
+    )
+
+    c5.metric(
+        "Alta/Urgente",
+        kpis.get("urgentes", 0)
+    )
 
     i1, i2, i3 = st.columns(3)
-    i1.metric("Operativo", f"{panel.get('score_operativo', 0)}%")
-    i2.metric("Preventivo", f"{panel.get('score_preventivo', 0)}%")
-    i3.metric("Sanitario", f"{panel.get('score_legionella', 0)}%")
 
-    st.markdown("### 🎯 Si hoy solo hicieras una cosa...")
+    i1.metric(
+        "Operativo",
+        f"{panel.get('score_operativo', 0)}%"
+    )
+
+    i2.metric(
+        "Preventivo",
+        f"{panel.get('score_preventivo', 0)}%"
+    )
+
+    i3.metric(
+        "Sanitario",
+        f"{panel.get('score_legionella', 0)}%"
+    )
+
+    st.markdown(
+        "### 🎯 Si hoy solo hicieras una cosa..."
+    )
 
     prioridad = panel.get("prioridad_hoy")
 
     with st.container(border=True):
         if prioridad:
-            st.markdown(f"#### ⭐ {prioridad.get('numero_ot', '')}")
-            st.markdown(f"### {prioridad.get('titulo', 'Sin prioridad')}")
-
-            st.caption(
-                f"{prioridad.get('centro', '')} · "
-                f"{prioridad.get('edificio', '')} · "
-                f"{prioridad.get('espacio', '')}"
+            st.markdown(
+                f"#### ⭐ "
+                f"{prioridad.get('numero_ot', '')}"
             )
+
+            st.markdown(
+                f"### "
+                f"{prioridad.get('titulo', 'Sin prioridad')}"
+            )
+
+            mostrar_ubicacion_ot(prioridad)
 
             c1, c2, c3 = st.columns(3)
-            c1.metric("Tipo", prioridad.get("tipo_prioridad", "-"))
-            c2.metric("Puntuación", f"{prioridad.get('score', 0)}/100")
-            c3.metric("Prioridad", prioridad.get("prioridad", "-"))
 
-            st.info(prioridad.get("accion", "Realizar actuación."))
+            c1.metric(
+                "Tipo",
+                prioridad.get(
+                    "tipo_prioridad",
+                    "-"
+                )
+            )
 
-            with st.expander("🧠 Ver motivos"):
-                motivos = prioridad.get("motivos", [])
+            c2.metric(
+                "Puntuación",
+                f"{prioridad.get('score', 0)}/100"
+            )
+
+            c3.metric(
+                "Prioridad",
+                prioridad.get(
+                    "prioridad",
+                    "-"
+                )
+            )
+
+            st.info(
+                prioridad.get(
+                    "accion",
+                    "Realizar actuación."
+                )
+            )
+
+            with st.expander(
+                "🧠 Ver motivos"
+            ):
+                motivos = prioridad.get(
+                    "motivos",
+                    []
+                )
+
                 if motivos:
-                    for m in motivos:
-                        st.markdown(f"• {m}")
+                    for motivo in motivos:
+                        st.markdown(
+                            f"• {motivo}"
+                        )
+
                 else:
-                    st.caption(prioridad.get("motivo", ""))
+                    st.caption(
+                        prioridad.get(
+                            "motivo",
+                            ""
+                        )
+                    )
 
             boton_abrir_ot(
-                prioridad.get("numero_ot", ""),
+                prioridad.get(
+                    "numero_ot",
+                    ""
+                ),
                 key_extra="prioridad_hoy"
             )
-        else:
-            st.success("No existen actuaciones prioritarias.")
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📍 Ruta",
-        "🏫 Edificios",
-        "🚦 Ranking",
-        "⚠️ Datos"
-    ])
+        else:
+            st.success(
+                "No existen actuaciones prioritarias."
+            )
+
+    tab1, tab2, tab3, tab4 = st.tabs(
+        [
+            "📍 Ruta",
+            "🏫 Edificios",
+            "🚦 Ranking",
+            "⚠️ Datos"
+        ]
+    )
 
     with tab1:
-        st.subheader("📍 Ruta inteligente de trabajo")
+        st.subheader(
+            "📍 Ruta inteligente de trabajo"
+        )
 
         ruta = panel.get("ruta", [])
 
         if not ruta:
-            st.info("Todavía no hay suficientes datos para proponer una ruta inteligente.")
+            st.info(
+                "Todavía no hay suficientes datos "
+                "para proponer una ruta inteligente."
+            )
+
         else:
-            for i, tramo in enumerate(ruta, start=1):
+            for i, tramo in enumerate(
+                ruta,
+                start=1
+            ):
+                titulo_tramo = (
+                    f"{i}. "
+                    f"{tramo.get('centro', '')} · "
+                    f"{tramo.get('edificio', '')} · "
+                    f"{tramo.get('cantidad', 0)} actuaciones"
+                )
+
                 with st.expander(
-                    f"{i}. {tramo.get('centro', '')} · {tramo.get('edificio', '')} · "
-                    f"{tramo.get('cantidad', 0)} actuaciones",
+                    titulo_tramo,
                     expanded=i == 1
                 ):
-                    st.metric("Prioridad máxima", f"{tramo.get('score', 0)}/100")
-                    st.info(tramo.get("mensaje", ""))
+                    st.metric(
+                        "Prioridad máxima",
+                        f"{tramo.get('score', 0)}/100"
+                    )
 
-                    tipos = tramo.get("tipos", {})
+                    st.info(
+                        tramo.get(
+                            "mensaje",
+                            ""
+                        )
+                    )
+
+                    tipos = tramo.get(
+                        "tipos",
+                        {}
+                    )
+
                     if tipos:
-                        st.markdown("**Tipos de trabajo**")
-                        for tipo, cantidad in tipos.items():
-                            st.markdown(f"• **{tipo}:** {cantidad}")
+                        st.markdown(
+                            "**Tipos de trabajo**"
+                        )
 
-                    with st.expander("Ver trabajos incluidos"):
-                        for j, t in enumerate(tramo.get("trabajos", []), start=1):
+                        for tipo, cantidad in tipos.items():
                             st.markdown(
-                                f"• **{t.get('numero_ot', '')}** · "
-                                f"{t.get('tipo_prioridad', '')} · "
-                                f"{t.get('titulo', '')}"
+                                f"• **{tipo}:** "
+                                f"{cantidad}"
                             )
-                        
-                            ubicacion = " · ".join([
-                                x for x in [
-                                    t.get("centro", ""),
-                                    t.get("edificio", ""),
-                                    t.get("planta", ""),
-                                    t.get("espacio", ""),
-                                ] if x
-                            ])
-                        
-                            if ubicacion:
-                                st.caption(f"📍 {ubicacion}")
-                        
+
+                    with st.expander(
+                        "Ver trabajos incluidos"
+                    ):
+                        trabajos = tramo.get(
+                            "trabajos",
+                            []
+                        )
+
+                        for j, trabajo in enumerate(
+                            trabajos,
+                            start=1
+                        ):
+                            st.markdown(
+                                f"• **"
+                                f"{trabajo.get('numero_ot', '')}"
+                                f"** · "
+                                f"{trabajo.get('tipo_prioridad', '')}"
+                                f" · "
+                                f"{trabajo.get('titulo', '')}"
+                            )
+
+                            mostrar_ubicacion_ot(
+                                trabajo
+                            )
+
                             boton_abrir_ot(
-                                t.get("numero_ot", ""),
-                                key_extra=f"ruta_{i}_{j}"
+                                trabajo.get(
+                                    "numero_ot",
+                                    ""
+                                ),
+                                key_extra=(
+                                    f"ruta_{i}_{j}"
+                                )
                             )
 
     with tab2:
-        st.subheader("🏫 Carga por edificio")
+        st.subheader(
+            "🏫 Carga por edificio"
+        )
 
-        carga_edificios = panel.get("carga_edificios", [])
+        carga_edificios = panel.get(
+            "carga_edificios",
+            []
+        )
 
         if not carga_edificios:
-            st.info("No hay carga por edificio disponible.")
+            st.info(
+                "No hay carga por edificio disponible."
+            )
+
         else:
-            for e in carga_edificios:
+            for edificio in carga_edificios:
                 icono = {
                     "rojo": "🔴",
                     "amarillo": "🟠",
                     "verde": "🟢"
-                }.get(e.get("color", "verde"), "🟢")
+                }.get(
+                    edificio.get(
+                        "color",
+                        "verde"
+                    ),
+                    "🟢"
+                )
+
+                titulo_edificio = (
+                    f"{icono} "
+                    f"{edificio.get('centro', '')} · "
+                    f"{edificio.get('edificio', '')} · "
+                    f"{edificio.get('total', 0)} actuaciones"
+                )
 
                 with st.expander(
-                    f"{icono} {e.get('centro', '')} · {e.get('edificio', '')} · "
-                    f"{e.get('total', 0)} actuaciones",
+                    titulo_edificio,
                     expanded=False
                 ):
                     c1, c2, c3 = st.columns(3)
-                    c1.metric("Salud", f"{e.get('salud', 0)}%")
-                    c2.metric("Actuaciones", e.get("total", 0))
-                    c3.metric("Estado", e.get("estado", "-"))
 
-                    st.progress(e.get("salud", 0) / 100)
-
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("🦠 Sanitarias", e.get("sanitarias", 0))
-                    c2.metric("🛠 Preventivas", e.get("preventivas", 0))
-                    c3.metric("🚨 Urgentes", e.get("urgentes", 0))
-                    c4.metric("📋 Otras", e.get("incidencias", 0))
-
-    with tab3:
-        st.subheader("🚦 Ranking general")
-
-        prioridades = panel.get("prioridades", [])
-
-        if not prioridades:
-            st.success("No existen prioridades.")
-        else:
-            for i, p in enumerate(prioridades, start=1):
-                with st.expander(
-                    f"{p.get('score', 0)}/100 · "
-                    f"{p.get('tipo_prioridad', '-')} · "
-                    f"{p.get('numero_ot', '')} · "
-                    f"{p.get('titulo', '')}",
-                    expanded=False
-                ):
-                    st.caption(
-                        f"{p.get('centro', '')} · "
-                        f"{p.get('edificio', '')} · "
-                        f"{p.get('espacio', '')}"
+                    c1.metric(
+                        "Salud",
+                        f"{edificio.get('salud', 0)}%"
                     )
 
-                    st.markdown(f"**Origen:** {p.get('origen', '-')}")
-                    st.markdown(f"**Área:** {p.get('area', '-')}")
-                    st.markdown(f"**Estado:** {p.get('estado', '-')}")
-                    st.markdown(f"**Prioridad:** {p.get('prioridad', '-')}")
-                    st.markdown(f"**Operario:** {p.get('operario', '-')}")
-                    st.info(p.get("accion", ""))
+                    c2.metric(
+                        "Actuaciones",
+                        edificio.get(
+                            "total",
+                            0
+                        )
+                    )
 
-                    motivos = p.get("motivos", [])
+                    c3.metric(
+                        "Estado",
+                        edificio.get(
+                            "estado",
+                            "-"
+                        )
+                    )
+
+                    salud = edificio.get(
+                        "salud",
+                        0
+                    )
+
+                    salud = max(
+                        0,
+                        min(100, salud)
+                    )
+
+                    st.progress(
+                        salud / 100
+                    )
+
+                    c1, c2, c3, c4 = st.columns(4)
+
+                    c1.metric(
+                        "🦠 Sanitarias",
+                        edificio.get(
+                            "sanitarias",
+                            0
+                        )
+                    )
+
+                    c2.metric(
+                        "🛠 Preventivas",
+                        edificio.get(
+                            "preventivas",
+                            0
+                        )
+                    )
+
+                    c3.metric(
+                        "🚨 Urgentes",
+                        edificio.get(
+                            "urgentes",
+                            0
+                        )
+                    )
+
+                    c4.metric(
+                        "📋 Otras",
+                        edificio.get(
+                            "incidencias",
+                            0
+                        )
+                    )
+
+    with tab3:
+        st.subheader(
+            "🚦 Ranking general"
+        )
+
+        prioridades = panel.get(
+            "prioridades",
+            []
+        )
+
+        if not prioridades:
+            st.success(
+                "No existen prioridades."
+            )
+
+        else:
+            for i, prioridad_ranking in enumerate(
+                prioridades,
+                start=1
+            ):
+                titulo_ranking = (
+                    f"{prioridad_ranking.get('score', 0)}/100 · "
+                    f"{prioridad_ranking.get('tipo_prioridad', '-')} · "
+                    f"{prioridad_ranking.get('numero_ot', '')} · "
+                    f"{prioridad_ranking.get('titulo', '')}"
+                )
+
+                with st.expander(
+                    titulo_ranking,
+                    expanded=False
+                ):
+                    mostrar_ubicacion_ot(
+                        prioridad_ranking
+                    )
+
+                    st.markdown(
+                        f"**Origen:** "
+                        f"{prioridad_ranking.get('origen', '-')}"
+                    )
+
+                    st.markdown(
+                        f"**Área:** "
+                        f"{prioridad_ranking.get('area', '-')}"
+                    )
+
+                    st.markdown(
+                        f"**Estado:** "
+                        f"{prioridad_ranking.get('estado', '-')}"
+                    )
+
+                    st.markdown(
+                        f"**Prioridad:** "
+                        f"{prioridad_ranking.get('prioridad', '-')}"
+                    )
+
+                    st.markdown(
+                        f"**Operario:** "
+                        f"{prioridad_ranking.get('operario', '-')}"
+                    )
+
+                    st.info(
+                        prioridad_ranking.get(
+                            "accion",
+                            ""
+                        )
+                    )
+
+                    motivos = prioridad_ranking.get(
+                        "motivos",
+                        []
+                    )
 
                     if motivos:
-                        st.markdown("#### 🧠 Motivos")
-                        for m in motivos:
-                            st.markdown(f"• {m}")
+                        st.markdown(
+                            "#### 🧠 Motivos"
+                        )
+
+                        for motivo in motivos:
+                            st.markdown(
+                                f"• {motivo}"
+                            )
 
                     boton_abrir_ot(
-                        p.get("numero_ot", ""),
+                        prioridad_ranking.get(
+                            "numero_ot",
+                            ""
+                        ),
                         key_extra=f"ranking_{i}"
                     )
 
     with tab4:
-        st.subheader("⚠️ Datos incompletos")
+        st.subheader(
+            "⚠️ Datos incompletos"
+        )
 
-        datos_incompletos = panel.get("datos_incompletos", [])
+        datos_incompletos = panel.get(
+            "datos_incompletos",
+            []
+        )
 
         if not datos_incompletos:
-            st.success("No se han detectado datos incompletos relevantes.")
+            st.success(
+                "No se han detectado datos "
+                "incompletos relevantes."
+            )
+
         else:
             st.warning(
-                "Hay OT con edificio o espacio incompleto. Conviene corregirlas para que el Corazón agrupe mejor."
+                "Hay OT con edificio o espacio incompleto. "
+                "Conviene corregirlas para que el Corazón "
+                "agrupe mejor."
             )
 
             for aviso in datos_incompletos[:50]:
+                titulo_aviso = (
+                    f"{aviso.get('numero_ot', '')} · "
+                    f"{aviso.get('campo', '')}"
+                )
+
                 with st.expander(
-                    f"{aviso.get('numero_ot', '')} · {aviso.get('campo', '')}",
+                    titulo_aviso,
                     expanded=False
                 ):
-                    st.markdown(aviso.get("mensaje", ""))
+                    st.markdown(
+                        aviso.get(
+                            "mensaje",
+                            ""
+                        )
+                    )
+
                     st.caption(
-                        f"{aviso.get('centro', '')} · {aviso.get('titulo', '')}"
+                        f"{aviso.get('centro', '')} · "
+                        f"{aviso.get('titulo', '')}"
                     )
 
     st.markdown("---")
