@@ -1011,7 +1011,225 @@ def finalizar_orden(id_orden, observaciones=""):
 
     conn.commit()
     conn.close()
+# =====================================================
+# RECLASIFICAR ÁREAS DE OT ANTIGUAS
+# =====================================================
 
+def _area_pendiente_clasificacion(area):
+    """
+    Indica si un área puede ser reclasificada automáticamente.
+    Solo considera áreas vacías, Otro u Otros.
+    """
+
+    area_txt = str(area or "").strip().lower()
+
+    return area_txt in [
+        "",
+        "otro",
+        "otros",
+        "-",
+        "sin área",
+        "sin area",
+        "no definida",
+        "no definido",
+    ]
+
+
+def obtener_propuestas_reclasificacion_areas():
+    """
+    Analiza OT abiertas e históricas sin modificar la base de datos.
+
+    Devuelve una lista de propuestas con:
+    - tabla
+    - id
+    - numero_ot
+    - descripcion
+    - area_actual
+    - area_propuesta
+    - origen
+    """
+
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    propuestas = []
+
+    tablas = [
+        "ordenes_trabajo",
+        "historico_ordenes",
+    ]
+
+    try:
+        for tabla in tablas:
+            cursor.execute(f"""
+                SELECT id,
+                       numero_ot,
+                       descripcion,
+                       area,
+                       origen,
+                       tipo_orden
+                FROM {tabla}
+                ORDER BY id DESC
+            """)
+
+            filas = cursor.fetchall()
+
+            for fila in filas:
+                (
+                    id_orden,
+                    numero_ot,
+                    descripcion,
+                    area_actual,
+                    origen,
+                    tipo_orden,
+                ) = fila
+
+                if not _area_pendiente_clasificacion(area_actual):
+                    continue
+
+                area_propuesta = sugerir_area_ot(
+                    descripcion=descripcion,
+                    area_actual=area_actual,
+                    origen=origen,
+                    tipo_orden=tipo_orden,
+                )
+
+                if not area_propuesta:
+                    continue
+
+                if str(area_propuesta).strip().lower() == "otros":
+                    continue
+
+                propuestas.append({
+                    "tabla": tabla,
+                    "id": id_orden,
+                    "numero_ot": numero_ot or "",
+                    "descripcion": descripcion or "",
+                    "area_actual": area_actual or "Otros",
+                    "area_propuesta": area_propuesta,
+                    "origen": origen or "",
+                })
+
+    except Exception as e:
+        propuestas = []
+        raise RuntimeError(
+            f"No se pudieron obtener las propuestas de reclasificación: {e}"
+        )
+
+    finally:
+        conn.close()
+
+    return propuestas
+
+
+def aplicar_reclasificacion_areas(propuestas):
+    """
+    Aplica las propuestas previamente revisadas.
+
+    Solo actualiza registros cuyo área todavía continúa vacía,
+    como Otro u Otros. Esto evita sobrescribir cambios manuales
+    realizados después de generar la vista previa.
+    """
+
+    if not propuestas:
+        return {
+            "actualizadas": 0,
+            "omitidas": 0,
+            "errores": [],
+            "por_area": {},
+        }
+
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    actualizadas = 0
+    omitidas = 0
+    errores = []
+    por_area = {}
+
+    tablas_permitidas = {
+        "ordenes_trabajo",
+        "historico_ordenes",
+    }
+
+    try:
+        for propuesta in propuestas:
+            tabla = str(propuesta.get("tabla") or "").strip()
+            id_orden = propuesta.get("id")
+            area_propuesta = str(
+                propuesta.get("area_propuesta") or ""
+            ).strip()
+
+            if tabla not in tablas_permitidas:
+                omitidas += 1
+                continue
+
+            if not id_orden or not area_propuesta:
+                omitidas += 1
+                continue
+
+            if area_propuesta == "Otros":
+                omitidas += 1
+                continue
+
+            cursor.execute(
+                _sql(f"""
+                    SELECT area
+                    FROM {tabla}
+                    WHERE id = ?
+                """),
+                (id_orden,)
+            )
+
+            fila_actual = cursor.fetchone()
+
+            if not fila_actual:
+                omitidas += 1
+                continue
+
+            area_actual = fila_actual[0]
+
+            if not _area_pendiente_clasificacion(area_actual):
+                omitidas += 1
+                continue
+
+            cursor.execute(
+                _sql(f"""
+                    UPDATE {tabla}
+                    SET area = ?
+                    WHERE id = ?
+                """),
+                (
+                    area_propuesta,
+                    id_orden,
+                )
+            )
+
+            actualizadas += 1
+
+            por_area[area_propuesta] = (
+                por_area.get(area_propuesta, 0) + 1
+            )
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        errores.append(str(e))
+
+    finally:
+        conn.close()
+
+    return {
+        "actualizadas": actualizadas,
+        "omitidas": omitidas,
+        "errores": errores,
+        "por_area": por_area,
+    }
 
 # =====================================================
 # BORRADOS
