@@ -314,20 +314,43 @@ def mostrar_impacto_esperado(datos):
 
 
 def mostrar_oportunidad_misma_zona(prioridad, prioridades):
+    """
+    Muestra únicamente otras OT de la misma planta.
+
+    Mantiene el resto del flujo sin cambios y evita agrupar trabajos
+    que estén en plantas diferentes aunque pertenezcan al mismo edificio.
+    """
     if not prioridad or not prioridades:
         return
 
     numero_actual = str(
         prioridad.get("numero_ot", "") or ""
     ).strip()
+
     centro_actual = str(
         prioridad.get("centro", "") or ""
     ).strip()
+
     edificio_actual = str(
         prioridad.get("edificio", "") or ""
     ).strip()
 
-    trabajos_zona = []
+    planta_actual = str(
+        prioridad.get("planta", "") or ""
+    ).strip()
+
+    # Sin planta informada no se puede garantizar que las OT
+    # pertenezcan realmente a la misma zona de trabajo.
+    if not planta_actual or planta_actual.lower() in [
+        "nan",
+        "none",
+        "null",
+        "-",
+        "sin planta",
+    ]:
+        return
+
+    trabajos_planta = []
 
     for trabajo in prioridades:
         numero = str(
@@ -343,23 +366,30 @@ def mostrar_oportunidad_misma_zona(prioridad, prioridades):
         if str(trabajo.get("edificio", "") or "").strip() != edificio_actual:
             continue
 
-        trabajos_zona.append(trabajo)
+        planta_trabajo = str(
+            trabajo.get("planta", "") or ""
+        ).strip()
 
-    if not trabajos_zona:
+        if planta_trabajo != planta_actual:
+            continue
+
+        trabajos_planta.append(trabajo)
+
+    if not trabajos_planta:
         return
 
     st.markdown("#### 🧭 Aprovechar el desplazamiento")
 
     st.info(
-        f"En este mismo edificio hay "
-        f"{len(trabajos_zona)} actuaciones adicionales. "
-        "Conviene revisarlas durante el mismo desplazamiento."
+        f"En esta misma planta ({planta_actual}) hay "
+        f"{len(trabajos_planta)} actuaciones adicionales. "
+        "Conviene revisarlas antes de cambiar de planta."
     )
 
     with st.expander(
-        f"Ver actuaciones del mismo edificio ({len(trabajos_zona)})"
+        f"Ver actuaciones de la misma planta ({len(trabajos_planta)})"
     ):
-        for i, trabajo in enumerate(trabajos_zona[:6], start=1):
+        for i, trabajo in enumerate(trabajos_planta[:6], start=1):
             st.markdown(
                 f"**{trabajo.get('numero_ot', '')}** · "
                 f"{trabajo.get('titulo', '')}"
@@ -381,9 +411,10 @@ def mostrar_oportunidad_misma_zona(prioridad, prioridades):
 
             boton_abrir_ot(
                 trabajo.get("numero_ot", ""),
-                key_extra=f"misma_zona_{i}",
+                key_extra=f"misma_planta_{i}",
                 texto="🔎 Abrir esta OT"
             )
+
 
 
 def etiqueta_motivo_principal(datos):
