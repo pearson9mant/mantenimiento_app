@@ -600,6 +600,19 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
             "accion": "Atender esta actuación antes que el resto.",
             "motivo": "El sistema la considera prioritaria por origen, área, prioridad y riesgo operativo.",
             "motivos": motivos,
+            "historial_espacio": historial_espacio,
+            "recurrencia": historial_espacio.get(
+                "nivel_recurrencia",
+                "Sin datos"
+            ),
+            "actuaciones_espacio": historial_espacio.get(
+                "total",
+                0
+            ),
+            "actuaciones_misma_area": historial_espacio.get(
+                "misma_area",
+                0
+            ),
         })
 
     prioridades.sort(key=lambda x: x["score"], reverse=True)
