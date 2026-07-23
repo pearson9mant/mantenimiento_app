@@ -162,7 +162,216 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
         return st.session_state.get(f"legionella_guardada_{id_orden}", False)
 
     return True
+def puede_corregir_ubicacion():
+    return rol_actual() in [
+        "admin",
+        "administrador",
+        "administracion",
+        "administración",
+    ]
 
+
+def obtener_ubicacion_ot(id_orden):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT centro, edificio, planta, espacio
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
+
+        fila = cur.fetchone()
+
+        if not fila:
+            return "", "", "", ""
+
+        return (
+            str(fila[0] or "").strip(),
+            str(fila[1] or "").strip(),
+            str(fila[2] or "").strip(),
+            str(fila[3] or "").strip(),
+        )
+
+    except Exception:
+        return "", "", "", ""
+
+    finally:
+        conn.close()
+
+
+def guardar_ubicacion_ot(
+    id_orden,
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET centro = ?,
+                edificio = ?,
+                planta = ?,
+                espacio = ?
+            WHERE id = ?
+        """), (
+            centro,
+            edificio,
+            planta,
+            espacio,
+            id_orden,
+        ))
+
+        conn.commit()
+        return True, "Ubicación corregida correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo corregir la ubicación: {e}"
+
+    finally:
+        conn.close()
+
+
+def indice_opcion(opciones, valor):
+    valor = str(valor or "").strip()
+
+    if valor in opciones:
+        return opciones.index(valor)
+
+    return 0
+
+
+def mostrar_correccion_ubicacion_ot(id_orden, modo):
+    if not puede_corregir_ubicacion():
+        return
+
+    centro_actual, edificio_actual, planta_actual, espacio_actual = (
+        obtener_ubicacion_ot(id_orden)
+    )
+
+    with st.expander("✏️ Corregir ubicación", expanded=False):
+        st.caption(
+            "Solo cambia la ubicación de esta OT. "
+            "No modifica el estado, fotos, observaciones ni materiales."
+        )
+
+        centros = obtener_centros_espacios()
+
+        if not centros:
+            st.warning("No hay centros en el catálogo de espacios.")
+            return
+
+        centro_sel = st.selectbox(
+            "Centro",
+            centros,
+            index=indice_opcion(centros, centro_actual),
+            key=f"{modo}_corregir_centro_{id_orden}",
+        )
+
+        edificios = obtener_edificios_espacios(centro_sel)
+
+        if not edificios:
+            st.warning("No hay edificios para este centro.")
+            return
+
+        edificio_sel = st.selectbox(
+            "Edificio",
+            edificios,
+            index=indice_opcion(edificios, edificio_actual),
+            key=f"{modo}_corregir_edificio_{id_orden}",
+        )
+
+        plantas = obtener_plantas_espacios(
+            centro_sel,
+            edificio_sel,
+        )
+
+        if not plantas:
+            st.warning("No hay plantas para este edificio.")
+            return
+
+        planta_sel = st.selectbox(
+            "Planta",
+            plantas,
+            index=indice_opcion(plantas, planta_actual),
+            key=f"{modo}_corregir_planta_{id_orden}",
+        )
+
+        espacios_filas = obtener_espacios_por_planta(
+            centro_sel,
+            edificio_sel,
+            planta_sel,
+        )
+
+        espacios = []
+
+        for fila_espacio in espacios_filas:
+            if isinstance(fila_espacio, dict):
+                nombre = str(
+                    fila_espacio.get("espacio")
+                    or fila_espacio.get("nombre")
+                    or ""
+                ).strip()
+            elif isinstance(fila_espacio, (list, tuple)):
+                nombre = str(
+                    fila_espacio[0] if fila_espacio else ""
+                ).strip()
+            else:
+                nombre = str(fila_espacio or "").strip()
+
+            if nombre and nombre not in espacios:
+                espacios.append(nombre)
+
+        if not espacios:
+            st.warning("No hay espacios para esta planta.")
+            return
+
+        espacio_sel = st.selectbox(
+            "Espacio",
+            espacios,
+            index=indice_opcion(espacios, espacio_actual),
+            key=f"{modo}_corregir_espacio_{id_orden}",
+        )
+
+        st.info(
+            f"📍 {centro_sel} · {edificio_sel} · "
+            f"{planta_sel} · {espacio_sel}"
+        )
+
+        confirmar = st.checkbox(
+            "Confirmo que quiero modificar la ubicación",
+            key=f"{modo}_confirmirma_ubicacion_{id_orden}",
+        )
+
+        if st.button(
+            "💾 Guardar ubicación",
+            key=f"{modo}_guardar_ubicacion_{id_orden}",
+            use_container_width=True,
+            type="primary",
+        ):
+            if not confirmar:
+                st.warning("Marca primero la confirmación.")
+                return
+
+            ok, mensaje = guardar_ubicacion_ot(
+                id_orden=id_orden,
+                centro=centro_sel,
+                edificio=edificio_sel,
+                planta=planta_sel,
+                espacio=espacio_sel,
+            )
+
+            if ok:
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.error(mensaje)
 
 def mostrar_tarjeta_ot(
     fila,
