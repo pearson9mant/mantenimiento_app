@@ -1,6 +1,13 @@
 import streamlit as st
+from database.db import conectar, _sql
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from modules.ubicaciones import obtener_espacios
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
 from config_gerencia import TIPOS_SOLICITANTE
 from ui.ui_legionella import obtener_checklist_correctivo_legionella
 
