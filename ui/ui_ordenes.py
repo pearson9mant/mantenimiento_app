@@ -1284,7 +1284,10 @@ def pantalla_ordenes():
 
                     if fecha_origen:
                         st.caption(f"Fecha origen: {fecha_origen}")
-
+                    mostrar_editor_ubicacion_ot_admin(
+                        id_orden=id_orden,
+                        numero_ot=numero_ot,
+                    )
                     if foto:
                         try:
                             with st.expander("📷 Ver foto"):
