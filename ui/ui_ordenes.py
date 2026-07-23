@@ -373,10 +373,12 @@ def actualizar_ubicacion_ot(
     id_orden,
     centro,
     edificio,
+    planta,
     espacio,
 ):
     centro = str(centro or "").strip()
     edificio = str(edificio or "").strip()
+    planta = str(planta or "").strip()
     espacio = str(espacio or "").strip()
 
     if not centro:
@@ -384,6 +386,9 @@ def actualizar_ubicacion_ot(
 
     if not edificio:
         return False, "Selecciona el edificio."
+
+    if not planta:
+        return False, "Selecciona la planta."
 
     if not espacio:
         return False, "Selecciona el espacio."
@@ -396,25 +401,23 @@ def actualizar_ubicacion_ot(
             UPDATE ordenes_trabajo
             SET centro = ?,
                 edificio = ?,
+                planta = ?,
                 espacio = ?
             WHERE id = ?
         """), (
             centro,
             edificio,
+            planta,
             espacio,
             id_orden,
         ))
 
         conn.commit()
-
         return True, "Ubicación actualizada correctamente."
 
     except Exception as e:
         conn.rollback()
-
-        return False, (
-            f"No se pudo actualizar la ubicación: {e}"
-        )
+        return False, f"No se pudo actualizar la ubicación: {e}"
 
     finally:
         conn.close()
