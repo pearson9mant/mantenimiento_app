@@ -1201,9 +1201,58 @@ def mostrar_corazon_sistema():
                         )
                     )
 
-                    st.caption(
-                        f"{aviso.get('centro', '')} · "
-                        f"{aviso.get('titulo', '')}"
+                    ubicacion_aviso = " · ".join(
+                        [
+                            str(valor).strip()
+                            for valor in [
+                                aviso.get("centro", ""),
+                                aviso.get("edificio", ""),
+                                aviso.get("espacio", ""),
+                            ]
+                            if str(valor or "").strip()
+                        ]
                     )
+
+                    if ubicacion_aviso:
+                        st.caption(
+                            f"📍 {ubicacion_aviso}"
+                        )
+
+                    if aviso.get("titulo"):
+                        st.caption(
+                            aviso.get("titulo", "")
+                        )
+
+                    sugerencias = aviso.get(
+                        "sugerencias",
+                        []
+                    ) or []
+
+                    if sugerencias:
+                        st.markdown(
+                            "#### Posibles coincidencias del catálogo"
+                        )
+
+                        for sugerencia in sugerencias:
+                            if isinstance(sugerencia, dict):
+                                st.markdown(
+                                    f"• **{sugerencia.get('espacio', '')}** · "
+                                    f"{sugerencia.get('edificio', '')} · "
+                                    f"{sugerencia.get('planta', '')}"
+                                )
+                            else:
+                                st.markdown(
+                                    f"• {sugerencia}"
+                                )
+
+                    if aviso.get("campo") == "planta":
+                        boton_abrir_ot(
+                            aviso.get("numero_ot", ""),
+                            key_extra=(
+                                f"datos_planta_"
+                                f"{aviso.get('numero_ot', '')}"
+                            ),
+                            texto="🔎 Abrir OT para corregir ubicación"
+                        )
 
     st.markdown("---")
