@@ -301,7 +301,278 @@ def mostrar_checklist_preventivo(numero_ot, operario):
 
     st.warning("Faltan puntos del checklist por marcar.")
     return False
+# =====================================================
+# CORRECCIÓN DE UBICACIÓN DE OT
+# =====================================================
 
+def obtener_ubicacion_completa_ot(id_orden):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT centro, edificio, planta, espacio
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
+
+        fila = cur.fetchone()
+
+        if not fila:
+            return "", "", "", ""
+
+        return (
+            str(fila[0] or "").strip(),
+            str(fila[1] or "").strip(),
+            str(fila[2] or "").strip(),
+            str(fila[3] or "").strip(),
+        )
+
+    except Exception:
+        return "", "", "", ""
+
+    finally:
+        conn.close()
+
+
+def actualizar_ubicacion_completa_ot(
+    id_orden,
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
+    planta = str(planta or "").strip()
+    espacio = str(espacio or "").strip()
+
+    if not centro:
+        return False, "Selecciona el centro."
+
+    if not edificio:
+        return False, "Selecciona el edificio."
+
+    if not planta:
+        return False, "Selecciona la planta."
+
+    if not espacio:
+        return False, "Selecciona el espacio."
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET centro = ?,
+                edificio = ?,
+                planta = ?,
+                espacio = ?
+            WHERE id = ?
+        """), (
+            centro,
+            edificio,
+            planta,
+            espacio,
+            id_orden,
+        ))
+
+        conn.commit()
+
+        return True, "Ubicación actualizada correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo actualizar la ubicación: {e}"
+
+    finally:
+        conn.close()
+
+
+def indice_seguro(opciones, valor_actual):
+    if not opciones:
+        return 0
+
+    valor_actual = str(valor_actual or "").strip()
+
+    if valor_actual in opciones:
+        return opciones.index(valor_actual)
+
+    return 0
+
+
+def extraer_nombre_espacio(fila):
+    if isinstance(fila, dict):
+        return str(
+            fila.get("espacio")
+            or fila.get("nombre")
+            or ""
+        ).strip()
+
+    if isinstance(fila, (list, tuple)):
+        if not fila:
+            return ""
+
+        return str(fila[0] or "").strip()
+
+    return str(fila or "").strip()
+
+
+def mostrar_editor_ubicacion_ot_admin(
+    id_orden,
+    numero_ot,
+):
+    if not (es_admin() or es_gerencia()):
+        return
+
+    (
+        centro_actual,
+        edificio_actual,
+        planta_actual,
+        espacio_actual,
+    ) = obtener_ubicacion_completa_ot(id_orden)
+
+    with st.expander(
+        f"✏️ Corregir ubicación {numero_ot}",
+        expanded=False,
+    ):
+        st.caption(
+            "Este cambio solo modifica el centro, edificio, planta "
+            "y espacio de la OT."
+        )
+
+        centros = obtener_centros_espacios()
+
+        if not centros:
+            st.warning(
+                "No hay centros registrados en el catálogo de espacios."
+            )
+            return
+
+        centro_sel = st.selectbox(
+            "Centro",
+            centros,
+            index=indice_seguro(
+                centros,
+                centro_actual,
+            ),
+            key=f"corregir_centro_ot_{id_orden}",
+        )
+
+        edificios = obtener_edificios_espacios(
+            centro_sel
+        )
+
+        if not edificios:
+            st.warning(
+                "No hay edificios registrados para este centro."
+            )
+            return
+
+        edificio_sel = st.selectbox(
+            "Edificio",
+            edificios,
+            index=indice_seguro(
+                edificios,
+                edificio_actual,
+            ),
+            key=f"corregir_edificio_ot_{id_orden}",
+        )
+
+        plantas = obtener_plantas_espacios(
+            centro_sel,
+            edificio_sel,
+        )
+
+        if not plantas:
+            st.warning(
+                "No hay plantas registradas para este edificio."
+            )
+            return
+
+        planta_sel = st.selectbox(
+            "Planta",
+            plantas,
+            index=indice_seguro(
+                plantas,
+                planta_actual,
+            ),
+            key=f"corregir_planta_ot_{id_orden}",
+        )
+
+        filas_espacios = obtener_espacios_por_planta(
+            centro_sel,
+            edificio_sel,
+            planta_sel,
+        )
+
+        espacios = []
+
+        for fila_espacio in filas_espacios:
+            nombre_espacio = extraer_nombre_espacio(
+                fila_espacio
+            )
+
+            if (
+                nombre_espacio
+                and nombre_espacio not in espacios
+            ):
+                espacios.append(nombre_espacio)
+
+        if not espacios:
+            st.warning(
+                "No hay espacios registrados para esta planta."
+            )
+            return
+
+        espacio_sel = st.selectbox(
+            "Espacio",
+            espacios,
+            index=indice_seguro(
+                espacios,
+                espacio_actual,
+            ),
+            key=f"corregir_espacio_ot_{id_orden}",
+        )
+
+        st.info(
+            f"📍 Nueva ubicación: "
+            f"{centro_sel} · {edificio_sel} · "
+            f"{planta_sel} · {espacio_sel}"
+        )
+
+        confirmar_ubicacion = st.checkbox(
+            "Confirmo el cambio de ubicación",
+            key=f"confirmar_cambio_ubicacion_{id_orden}",
+        )
+
+        if st.button(
+            f"💾 Guardar ubicación {numero_ot}",
+            key=f"guardar_ubicacion_ot_{id_orden}",
+            use_container_width=True,
+            type="primary",
+        ):
+            if not confirmar_ubicacion:
+                st.error(
+                    "Marca primero la confirmación."
+                )
+                return
+
+            ok, mensaje = actualizar_ubicacion_completa_ot(
+                id_orden=id_orden,
+                centro=centro_sel,
+                edificio=edificio_sel,
+                planta=planta_sel,
+                espacio=espacio_sel,
+            )
+
+            if ok:
+                limpiar_cache_streamlit()
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.error(mensaje)
 
 # =====================================================
 # PANTALLA
