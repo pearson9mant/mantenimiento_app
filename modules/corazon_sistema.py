@@ -4,7 +4,172 @@ import pandas as pd
 from database.db import conectar, _sql
 from modules.inteligencia_preventivos import construir_panel_preventivo
 from modules.inteligencia_legionella import construir_panel_sanitario_legionella
-from modules.colegio import resolver_planta_desde_espacio
+
+
+def _normalizar_ubicacion_corazon(valor):
+    return (
+        str(valor or "")
+        .strip()
+        .lower()
+        .replace("edif.", "")
+        .replace("edificio", "")
+        .replace("infantil / primaria", "infantilprimaria")
+        .replace("infantil/primaria", "infantilprimaria")
+        .replace("·", "")
+        .replace("/", "")
+        .replace("\\", "")
+        .replace("-", "")
+        .replace("_", "")
+        .replace(" ", "")
+    )
+
+
+def _normalizar_espacio_corazon(valor):
+    texto = _normalizar_ubicacion_corazon(valor)
+
+    texto = (
+        texto
+        .replace("niñas", "chicas")
+        .replace("ninas", "chicas")
+        .replace("niños", "chicos")
+        .replace("ninos", "chicos")
+        .replace("profesores", "profes")
+    )
+
+    return texto
+
+
+def cargar_indice_plantas_espacios(centro=None):
+    """
+    Lee una sola vez la tabla real `espacios` y construye un índice:
+
+        (centro, edificio, espacio) -> planta
+
+    Solo usa espacios activos y no modifica la base de datos.
+    """
+    params = []
+    filtro = " WHERE activo = 1"
+
+    if centro:
+        filtro += " AND centro = ?"
+        params.append(centro)
+
+    df = leer_df_corazon(
+        f"""
+        SELECT centro, edificio, planta, espacio
+        FROM espacios
+        {filtro}
+        """,
+        tuple(params),
+    )
+
+    indice_exacto = {}
+    indice_por_centro_espacio = {}
+
+    if df.empty:
+        return {
+            "exacto": indice_exacto,
+            "centro_espacio": indice_por_centro_espacio,
+        }
+
+    for _, fila in df.iterrows():
+        centro_txt = str(fila.get("centro") or "").strip()
+        edificio_txt = str(fila.get("edificio") or "").strip()
+        planta_txt = str(fila.get("planta") or "").strip()
+        espacio_txt = str(fila.get("espacio") or "").strip()
+
+        if not centro_txt or not planta_txt or not espacio_txt:
+            continue
+
+        if planta_txt.lower() in [
+            "nan",
+            "none",
+            "null",
+            "-",
+            "sin planta",
+        ]:
+            continue
+
+        clave_exacta = (
+            _normalizar_ubicacion_corazon(centro_txt),
+            _normalizar_ubicacion_corazon(edificio_txt),
+            _normalizar_espacio_corazon(espacio_txt),
+        )
+
+        indice_exacto[clave_exacta] = planta_txt
+
+        clave_reducida = (
+            _normalizar_ubicacion_corazon(centro_txt),
+            _normalizar_espacio_corazon(espacio_txt),
+        )
+
+        indice_por_centro_espacio.setdefault(
+            clave_reducida,
+            set(),
+        ).add(planta_txt)
+
+    return {
+        "exacto": indice_exacto,
+        "centro_espacio": indice_por_centro_espacio,
+    }
+
+
+def resolver_planta_corazon(
+    centro,
+    edificio,
+    espacio,
+    planta_actual,
+    indice_plantas,
+):
+    """
+    Respeta la planta existente. Si falta, busca en la tabla `espacios`.
+    """
+    planta_txt = str(planta_actual or "").strip()
+
+    if planta_txt and planta_txt.lower() not in [
+        "nan",
+        "none",
+        "null",
+        "-",
+        "sin planta",
+    ]:
+        return planta_txt
+
+    centro_norm = _normalizar_ubicacion_corazon(centro)
+    edificio_norm = _normalizar_ubicacion_corazon(edificio)
+    espacio_norm = _normalizar_espacio_corazon(espacio)
+
+    if not centro_norm or not espacio_norm:
+        return "Sin planta"
+
+    clave_exacta = (
+        centro_norm,
+        edificio_norm,
+        espacio_norm,
+    )
+
+    planta = indice_plantas.get(
+        "exacto",
+        {},
+    ).get(clave_exacta)
+
+    if planta:
+        return planta
+
+    clave_reducida = (
+        centro_norm,
+        espacio_norm,
+    )
+
+    candidatas = indice_plantas.get(
+        "centro_espacio",
+        {},
+    ).get(clave_reducida, set())
+
+    if len(candidatas) == 1:
+        return next(iter(candidatas))
+
+    return "Sin planta"
 
 
 ESTADOS_CIERRE = [
@@ -526,6 +691,7 @@ def construir_prioridades_globales(
         return []
 
     indice_historial = cargar_indice_historial_corazon(centro)
+    indice_plantas = cargar_indice_plantas_espacios(centro)
     cache_plantas = {}
     prioridades = []
 
@@ -552,11 +718,12 @@ def construir_prioridades_globales(
             planta_resuelta = cache_plantas[clave_planta]
         else:
             try:
-                planta_resuelta = resolver_planta_desde_espacio(
+                planta_resuelta = resolver_planta_corazon(
                     centro=centro_ot,
                     edificio=edificio_original,
                     espacio=espacio_ot,
                     planta_actual=planta_original,
+                    indice_plantas=indice_plantas,
                 )
             except Exception:
                 planta_resuelta = (
