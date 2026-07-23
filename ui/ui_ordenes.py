@@ -1292,10 +1292,44 @@ def pantalla_ordenes():
 
                     if fecha_origen:
                         st.caption(f"Fecha origen: {fecha_origen}")
-                    mostrar_editor_ubicacion_ot_admin(
-                        id_orden=id_orden,
-                        numero_ot=numero_ot,
+                    clave_editor_ubicacion = (
+                        "ot_editor_ubicacion_activa"
                     )
+
+                    if (
+                        st.session_state.get(
+                            clave_editor_ubicacion
+                        )
+                        == id_orden
+                    ):
+                        if st.button(
+                            "❌ Cerrar corrección",
+                            key=f"cerrar_editor_ubicacion_{id_orden}",
+                        ):
+                            st.session_state.pop(
+                                clave_editor_ubicacion,
+                                None,
+                            )
+                            st.rerun()
+
+                        mostrar_editor_ubicacion_ot_admin(
+                            id_orden=id_orden,
+                            numero_ot=numero_ot,
+                            centro_actual=centro,
+                            edificio_actual=edificio,
+                            espacio_actual=espacio,
+                        )
+
+                    else:
+                        if st.button(
+                            "✏️ Corregir ubicación",
+                            key=f"abrir_editor_ubicacion_{id_orden}",
+                        ):
+                            st.session_state[
+                                clave_editor_ubicacion
+                            ] = id_orden
+
+                            st.rerun()
                     if foto:
                         try:
                             with st.expander("📷 Ver foto"):
