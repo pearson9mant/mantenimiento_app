@@ -537,9 +537,50 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
 
     prioridades = []
 
-    for _, row in df.iterrows():
+        for _, row in df.iterrows():
         score, motivos, dias_abierta = puntuar_orden(row)
-        edificio_normalizado = normalizar_edificio(row.get("edificio", ""))
+
+        edificio_normalizado = normalizar_edificio(
+            row.get("edificio", "")
+        )
+
+        historial_espacio = obtener_historial_espacio_corazon(
+            centro=row.get("centro", ""),
+            edificio=row.get("edificio", ""),
+            espacio=row.get("espacio", ""),
+            area=row.get("area", ""),
+            numero_ot_actual=row.get("numero_ot", ""),
+        )
+
+
+        total_historial = historial_espacio.get("total", 0)
+        misma_area = historial_espacio.get("misma_area", 0)
+
+        if historial_espacio.get("es_recurrente"):
+            incremento_recurrencia = min(
+                15,
+                5 + misma_area
+            )
+
+            score = min(
+                100,
+                score + incremento_recurrencia
+            )
+
+            motivos.append(
+                historial_espacio.get(
+                    "mensaje_recurrencia",
+                    "El espacio presenta averías recurrentes."
+                )
+            )
+
+        elif total_historial >= 3:
+            score = min(100, score + 3)
+
+            motivos.append(
+                f"El espacio acumula "
+                f"{total_historial} actuaciones anteriores."
+            )   
 
         prioridades.append({
             "score": score,
