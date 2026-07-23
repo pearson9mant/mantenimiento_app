@@ -24,6 +24,15 @@ from ui.ui_ot_controles import (
     mostrar_checklist_correctivo_legionella_operario,
 )
 
+from database.db import conectar, _sql
+
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
+
 
 def normalizar_txt(valor):
     return str(valor or "").strip().lower()
