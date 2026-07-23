@@ -757,7 +757,7 @@ def mostrar_corazon_sistema():
 
     with tab1:
         st.subheader(
-            "📍 Ruta inteligente de trabajo"
+            "📍 Ruta inteligente por plantas"
         )
 
         ruta = panel.get("ruta", [])
@@ -773,10 +773,15 @@ def mostrar_corazon_sistema():
                 ruta,
                 start=1
             ):
+                planta = str(
+                    tramo.get("planta", "") or "Sin planta"
+                ).strip()
+
                 titulo_tramo = (
                     f"{i}. "
                     f"{tramo.get('centro', '')} · "
                     f"{tramo.get('edificio', '')} · "
+                    f"{planta} · "
                     f"{tramo.get('cantidad', 0)} actuaciones"
                 )
 
@@ -784,17 +789,42 @@ def mostrar_corazon_sistema():
                     titulo_tramo,
                     expanded=i == 1
                 ):
-                    st.metric(
+                    c1, c2, c3 = st.columns(3)
+
+                    c1.metric(
                         "Prioridad máxima",
                         f"{tramo.get('score', 0)}/100"
                     )
 
-                    st.info(
+                    c2.metric(
+                        "Actuaciones",
                         tramo.get(
-                            "mensaje",
-                            ""
+                            "cantidad",
+                            0
                         )
                     )
+
+                    c3.metric(
+                        "Planta",
+                        planta
+                    )
+
+                    mensaje_tramo = str(
+                        tramo.get("mensaje", "") or ""
+                    ).strip()
+
+                    if planta == "Sin planta":
+                        st.warning(
+                            mensaje_tramo
+                            or (
+                                "Hay actuaciones sin planta informada. "
+                                "Conviene completar este dato."
+                            )
+                        )
+                    else:
+                        st.info(
+                            mensaje_tramo
+                        )
 
                     tipos = tramo.get(
                         "tipos",
@@ -803,33 +833,104 @@ def mostrar_corazon_sistema():
 
                     if tipos:
                         st.markdown(
-                            "**Tipos de trabajo**"
+                            "#### 🧰 Tipos de trabajo"
                         )
 
-                        for tipo, cantidad in tipos.items():
-                            st.markdown(
-                                f"• **{tipo}:** "
-                                f"{cantidad}"
+                        columnas_tipos = st.columns(
+                            min(4, len(tipos))
+                        )
+
+                        for indice_tipo, (
+                            tipo,
+                            cantidad
+                        ) in enumerate(
+                            tipos.items()
+                        ):
+                            columnas_tipos[
+                                indice_tipo % len(columnas_tipos)
+                            ].metric(
+                                tipo,
+                                cantidad
                             )
 
-                    with st.expander(
-                        "Ver trabajos incluidos"
-                    ):
-                        trabajos = tramo.get(
-                            "trabajos",
-                            []
+                    primera_ot = tramo.get(
+                        "primera_ot"
+                    ) or {}
+
+                    numero_ot_recomendada = str(
+                        tramo.get(
+                            "numero_ot_recomendada",
+                            ""
                         )
+                        or primera_ot.get(
+                            "numero_ot",
+                            ""
+                        )
+                        or ""
+                    ).strip()
+
+                    titulo_ot_recomendada = str(
+                        tramo.get(
+                            "titulo_ot_recomendada",
+                            ""
+                        )
+                        or primera_ot.get(
+                            "titulo",
+                            ""
+                        )
+                        or ""
+                    ).strip()
+
+                    if numero_ot_recomendada:
+                        st.markdown(
+                            "#### 🎯 Primera actuación recomendada"
+                        )
+
+                        with st.container(border=True):
+                            st.markdown(
+                                f"**{numero_ot_recomendada}**"
+                            )
+
+                            if titulo_ot_recomendada:
+                                st.markdown(
+                                    titulo_ot_recomendada
+                                )
+
+                            mostrar_ubicacion_ot(
+                                primera_ot
+                            )
+                            mostrar_antiguedad_ot(
+                                primera_ot
+                            )
+
+                            boton_abrir_ot(
+                                numero_ot_recomendada,
+                                key_extra=f"ruta_principal_{i}",
+                                texto="▶ Empezar esta planta",
+                                tipo="primary"
+                            )
+
+                    trabajos = tramo.get(
+                        "trabajos",
+                        []
+                    )
+
+                    with st.expander(
+                        f"Ver trabajos de esta planta ({len(trabajos)})"
+                    ):
+                        if not trabajos:
+                            st.caption(
+                                "No hay trabajos disponibles "
+                                "en este tramo."
+                            )
 
                         for j, trabajo in enumerate(
                             trabajos,
                             start=1
                         ):
                             st.markdown(
-                                f"• **"
-                                f"{trabajo.get('numero_ot', '')}"
-                                f"** · "
-                                f"{trabajo.get('tipo_prioridad', '')}"
-                                f" · "
+                                f"**{trabajo.get('numero_ot', '')}** · "
+                                f"{trabajo.get('tipo_prioridad', '')} · "
                                 f"{trabajo.get('titulo', '')}"
                             )
 
@@ -845,6 +946,9 @@ def mostrar_corazon_sistema():
                                 key_extra=f"ruta_{i}_{j}",
                                 texto="🔎 Abrir OT"
                             )
+
+                            if j < len(trabajos):
+                                st.markdown("---")
 
     with tab2:
         st.subheader(
