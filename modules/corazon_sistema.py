@@ -4,6 +4,7 @@ import pandas as pd
 from database.db import conectar, _sql
 from modules.inteligencia_preventivos import construir_panel_preventivo
 from modules.inteligencia_legionella import construir_panel_sanitario_legionella
+from modules.colegio import resolver_planta_desde_espacio
 
 
 ESTADOS_CIERRE = [
@@ -525,14 +526,45 @@ def construir_prioridades_globales(
         return []
 
     indice_historial = cargar_indice_historial_corazon(centro)
+    cache_plantas = {}
     prioridades = []
 
     for _, row in df.iterrows():
         score, motivos, dias_abierta = puntuar_orden(row)
 
+        edificio_original = row.get("edificio", "")
         edificio_normalizado = normalizar_edificio(
-            row.get("edificio", "")
+            edificio_original
         )
+
+        centro_ot = row.get("centro", "")
+        espacio_ot = row.get("espacio", "")
+        planta_original = row.get("planta", "")
+
+        clave_planta = (
+            str(centro_ot or "").strip(),
+            str(edificio_original or "").strip(),
+            str(espacio_ot or "").strip(),
+            str(planta_original or "").strip(),
+        )
+
+        if clave_planta in cache_plantas:
+            planta_resuelta = cache_plantas[clave_planta]
+        else:
+            try:
+                planta_resuelta = resolver_planta_desde_espacio(
+                    centro=centro_ot,
+                    edificio=edificio_original,
+                    espacio=espacio_ot,
+                    planta_actual=planta_original,
+                )
+            except Exception:
+                planta_resuelta = (
+                    str(planta_original or "").strip()
+                    or "Sin planta"
+                )
+
+            cache_plantas[clave_planta] = planta_resuelta
 
         historial_espacio = obtener_historial_espacio_corazon(
             centro=row.get("centro", ""),
@@ -579,9 +611,10 @@ def construir_prioridades_globales(
             "titulo": row.get("descripcion", ""),
             "centro": row.get("centro", ""),
             "edificio": edificio_normalizado,
-            "edificio_original": row.get("edificio", ""),
-            "planta": row.get("planta", ""),
-            "espacio": row.get("espacio", ""),
+            "edificio_original": edificio_original,
+            "planta": planta_resuelta,
+            "planta_original": planta_original,
+            "espacio": espacio_ot,
             "area": row.get("area", ""),
             "origen": row.get("origen", ""),
             "prioridad": row.get("prioridad", ""),
