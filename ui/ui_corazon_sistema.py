@@ -172,6 +172,13 @@ def mostrar_historial_espacio(datos, titulo="📚 Historial del espacio"):
 
     st.markdown(f"#### {titulo}")
 
+    if total <= 0:
+        st.info(
+            "📭 No constan actuaciones anteriores en este espacio. "
+            "No se detecta recurrencia."
+        )
+        return
+
     h1, h2, h3 = st.columns(3)
 
     h1.metric(
@@ -297,8 +304,86 @@ def mostrar_impacto_esperado(datos):
 
     st.markdown("#### 🎯 Impacto esperado")
 
-    for impacto in impactos[:4]:
-        st.markdown(f"✓ {impacto}")
+    texto_impacto = "\n".join(
+        f"✓ {impacto}"
+        for impacto in impactos[:4]
+    )
+
+    st.success(texto_impacto)
+
+
+
+def mostrar_oportunidad_misma_zona(prioridad, prioridades):
+    if not prioridad or not prioridades:
+        return
+
+    numero_actual = str(
+        prioridad.get("numero_ot", "") or ""
+    ).strip()
+    centro_actual = str(
+        prioridad.get("centro", "") or ""
+    ).strip()
+    edificio_actual = str(
+        prioridad.get("edificio", "") or ""
+    ).strip()
+
+    trabajos_zona = []
+
+    for trabajo in prioridades:
+        numero = str(
+            trabajo.get("numero_ot", "") or ""
+        ).strip()
+
+        if numero == numero_actual:
+            continue
+
+        if str(trabajo.get("centro", "") or "").strip() != centro_actual:
+            continue
+
+        if str(trabajo.get("edificio", "") or "").strip() != edificio_actual:
+            continue
+
+        trabajos_zona.append(trabajo)
+
+    if not trabajos_zona:
+        return
+
+    st.markdown("#### 🧭 Aprovechar el desplazamiento")
+
+    st.info(
+        f"En este mismo edificio hay "
+        f"{len(trabajos_zona)} actuaciones adicionales. "
+        "Conviene revisarlas durante el mismo desplazamiento."
+    )
+
+    with st.expander(
+        f"Ver actuaciones del mismo edificio ({len(trabajos_zona)})"
+    ):
+        for i, trabajo in enumerate(trabajos_zona[:6], start=1):
+            st.markdown(
+                f"**{trabajo.get('numero_ot', '')}** · "
+                f"{trabajo.get('titulo', '')}"
+            )
+
+            st.caption(
+                " · ".join(
+                    [
+                        valor
+                        for valor in [
+                            str(trabajo.get("espacio", "") or "").strip(),
+                            str(trabajo.get("area", "") or "").strip(),
+                            f"{trabajo.get('score', 0)}/100",
+                        ]
+                        if valor
+                    ]
+                )
+            )
+
+            boton_abrir_ot(
+                trabajo.get("numero_ot", ""),
+                key_extra=f"misma_zona_{i}",
+                texto="🔎 Abrir esta OT"
+            )
 
 
 def etiqueta_motivo_principal(datos):
@@ -518,6 +603,8 @@ def mostrar_corazon_sistema():
 
     with st.container(border=True):
         if prioridad:
+            st.success("🏆 Recomendación nº 1 del Corazón")
+
             st.caption(
                 f"⭐ OT {prioridad.get('numero_ot', '')}"
             )
@@ -533,7 +620,6 @@ def mostrar_corazon_sistema():
             )
 
             mostrar_ubicacion_ot(prioridad)
-            mostrar_motivo_principal(prioridad)
             mostrar_antiguedad_ot(prioridad)
 
             st.markdown("#### 🧠 ¿Por qué la recomienda?")
@@ -570,8 +656,8 @@ def mostrar_corazon_sistema():
             )
 
             c3.metric(
-                "Confianza del sistema",
-                f"{prioridad.get('score', 0)}%"
+                "Confianza",
+                f"{prioridad.get('score', 0)}/100"
             )
 
             c4.metric(
@@ -590,6 +676,10 @@ def mostrar_corazon_sistema():
 
             mostrar_historial_espacio(prioridad)
             mostrar_impacto_esperado(prioridad)
+            mostrar_oportunidad_misma_zona(
+                prioridad,
+                panel.get("prioridades", [])
+            )
 
             with st.expander(
                 "🧠 Ver todos los motivos"
