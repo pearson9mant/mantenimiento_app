@@ -436,7 +436,10 @@ def mostrar_tarjeta_ot(
 
         if fecha_origen:
             st.caption(f"Fecha origen: {fecha_origen}")
-
+        mostrar_correccion_ubicacion_ot(
+            id_orden=id_orden,
+            modo=modo,
+        )
         try:
             fotos_db = obtener_fotos_ot(num_ot)
 
