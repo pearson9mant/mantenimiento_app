@@ -1,4 +1,5 @@
 from datetime import date
+from difflib import SequenceMatcher
 import pandas as pd
 
 from database.db import conectar, _sql
@@ -65,11 +66,13 @@ def cargar_indice_plantas_espacios(centro=None):
 
     indice_exacto = {}
     indice_por_centro_espacio = {}
+    filas_catalogo = []
 
     if df.empty:
         return {
             "exacto": indice_exacto,
             "centro_espacio": indice_por_centro_espacio,
+            "filas": filas_catalogo,
         }
 
     for _, fila in df.iterrows():
@@ -108,9 +111,20 @@ def cargar_indice_plantas_espacios(centro=None):
             set(),
         ).add(planta_txt)
 
+        filas_catalogo.append({
+            "centro": centro_txt,
+            "edificio": edificio_txt,
+            "planta": planta_txt,
+            "espacio": espacio_txt,
+            "centro_norm": _normalizar_ubicacion_corazon(centro_txt),
+            "edificio_norm": _normalizar_ubicacion_corazon(edificio_txt),
+            "espacio_norm": _normalizar_espacio_corazon(espacio_txt),
+        })
+
     return {
         "exacto": indice_exacto,
         "centro_espacio": indice_por_centro_espacio,
+        "filas": filas_catalogo,
     }
 
 
@@ -546,6 +560,124 @@ def obtener_historial_espacio_corazon(
     )
 
 
+def diagnosticar_planta_corazon(
+    centro,
+    edificio,
+    espacio,
+    planta_resuelta,
+    indice_plantas,
+):
+    """
+    Explica por qué no se pudo resolver la planta y propone
+    coincidencias cercanas del catálogo real de espacios.
+    """
+    if normalizar_planta(planta_resuelta) != "Sin planta":
+        return {
+            "estado": "resuelta",
+            "motivo": "",
+            "sugerencias": [],
+        }
+
+    centro_norm = _normalizar_ubicacion_corazon(centro)
+    edificio_norm = _normalizar_ubicacion_corazon(edificio)
+    espacio_norm = _normalizar_espacio_corazon(espacio)
+
+    if not espacio_norm:
+        return {
+            "estado": "sin_espacio",
+            "motivo": "La OT no tiene espacio informado.",
+            "sugerencias": [],
+        }
+
+    clave_reducida = (
+        centro_norm,
+        espacio_norm,
+    )
+
+    candidatas = indice_plantas.get(
+        "centro_espacio",
+        {},
+    ).get(clave_reducida, set())
+
+    if len(candidatas) > 1:
+        return {
+            "estado": "duplicado",
+            "motivo": (
+                "El mismo nombre de espacio aparece en varias plantas "
+                "del centro."
+            ),
+            "sugerencias": sorted(candidatas),
+        }
+
+    sugerencias = []
+
+    for fila in indice_plantas.get("filas", []):
+        if fila.get("centro_norm") != centro_norm:
+            continue
+
+        puntuacion = SequenceMatcher(
+            None,
+            espacio_norm,
+            fila.get("espacio_norm", ""),
+        ).ratio()
+
+        if fila.get("edificio_norm") == edificio_norm:
+            puntuacion += 0.15
+
+        if puntuacion >= 0.55:
+            sugerencias.append({
+                "puntuacion": puntuacion,
+                "espacio": fila.get("espacio", ""),
+                "edificio": fila.get("edificio", ""),
+                "planta": fila.get("planta", ""),
+            })
+
+    sugerencias.sort(
+        key=lambda item: item.get("puntuacion", 0),
+        reverse=True,
+    )
+
+    sugerencias_limpias = []
+    vistos = set()
+
+    for sugerencia in sugerencias:
+        clave = (
+            sugerencia.get("espacio"),
+            sugerencia.get("edificio"),
+            sugerencia.get("planta"),
+        )
+
+        if clave in vistos:
+            continue
+
+        vistos.add(clave)
+        sugerencias_limpias.append({
+            "espacio": sugerencia.get("espacio", ""),
+            "edificio": sugerencia.get("edificio", ""),
+            "planta": sugerencia.get("planta", ""),
+        })
+
+        if len(sugerencias_limpias) >= 3:
+            break
+
+    if sugerencias_limpias:
+        motivo = (
+            "El nombre del espacio de la OT no coincide exactamente "
+            "con el catálogo."
+        )
+    else:
+        motivo = (
+            "El espacio no está registrado en la tabla de espacios "
+            "o no tiene una coincidencia reconocible."
+        )
+
+    return {
+        "estado": "no_encontrada",
+        "motivo": motivo,
+        "sugerencias": sugerencias_limpias,
+    }
+
+
 def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
     params = []
     filtro = ""
@@ -733,6 +865,14 @@ def construir_prioridades_globales(
 
             cache_plantas[clave_planta] = planta_resuelta
 
+        diagnostico_planta = diagnosticar_planta_corazon(
+            centro=centro_ot,
+            edificio=edificio_original,
+            espacio=espacio_ot,
+            planta_resuelta=planta_resuelta,
+            indice_plantas=indice_plantas,
+        )
+
         historial_espacio = obtener_historial_espacio_corazon(
             centro=row.get("centro", ""),
             edificio=row.get("edificio", ""),
@@ -781,6 +921,7 @@ def construir_prioridades_globales(
             "edificio_original": edificio_original,
             "planta": planta_resuelta,
             "planta_original": planta_original,
+            "diagnostico_planta": diagnostico_planta,
             "espacio": espacio_ot,
             "area": row.get("area", ""),
             "origen": row.get("origen", ""),
@@ -1044,14 +1185,18 @@ def detectar_datos_incompletos(prioridades):
     for p in prioridades:
         edificio = normalizar_edificio(p.get("edificio", ""))
         espacio = str(p.get("espacio", "") or "").strip()
+        planta = normalizar_planta(p.get("planta", ""))
 
         if edificio == "Sin edificio":
             avisos.append({
                 "numero_ot": p.get("numero_ot", ""),
                 "titulo": p.get("titulo", ""),
                 "centro": p.get("centro", ""),
+                "edificio": p.get("edificio_original", ""),
+                "espacio": espacio,
                 "campo": "edificio",
                 "mensaje": "Esta OT no tiene edificio informado.",
+                "sugerencias": [],
             })
 
         if not espacio or espacio.lower() in ["nan", "none", "-"]:
@@ -1059,11 +1204,39 @@ def detectar_datos_incompletos(prioridades):
                 "numero_ot": p.get("numero_ot", ""),
                 "titulo": p.get("titulo", ""),
                 "centro": p.get("centro", ""),
+                "edificio": p.get("edificio_original", ""),
+                "espacio": espacio,
                 "campo": "espacio",
                 "mensaje": "Esta OT no tiene espacio informado.",
+                "sugerencias": [],
+            })
+
+        if planta == "Sin planta":
+            diagnostico = p.get("diagnostico_planta", {}) or {}
+
+            avisos.append({
+                "numero_ot": p.get("numero_ot", ""),
+                "titulo": p.get("titulo", ""),
+                "centro": p.get("centro", ""),
+                "edificio": p.get("edificio_original", ""),
+                "espacio": espacio,
+                "campo": "planta",
+                "mensaje": diagnostico.get(
+                    "motivo",
+                    "No se ha podido determinar la planta de esta OT."
+                ),
+                "estado_diagnostico": diagnostico.get(
+                    "estado",
+                    "no_encontrada"
+                ),
+                "sugerencias": diagnostico.get(
+                    "sugerencias",
+                    []
+                ),
             })
 
     return avisos
+
 
 
 def diagnosticar_corazon_sistema(centro=None, operario=None):
