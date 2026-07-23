@@ -54,6 +54,7 @@ def asegurar_columnas_observaciones_estado():
 
     columnas = [
         ("observaciones_estado", "TEXT DEFAULT ''"),
+        ("planta", "TEXT"),
         ("tipo_orden", "TEXT DEFAULT 'Interna'"),
         ("empresa_externa", "TEXT"),
         ("contacto_empresa", "TEXT"),
