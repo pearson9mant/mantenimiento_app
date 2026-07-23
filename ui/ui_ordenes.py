@@ -569,6 +569,7 @@ def mostrar_editor_ubicacion_ot_admin(
             id_orden=id_orden,
             centro=centro_sel,
             edificio=edificio_sel,
+            planta=planta_sel,
             espacio=espacio_sel,
         )
 
