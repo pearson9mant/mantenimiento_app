@@ -68,45 +68,16 @@ def normalizar_edificio(edificio):
 
 def _texto_valido_corazon(valor):
     texto = str(valor or "").strip()
-
     return bool(
         texto
         and texto.lower() not in [
-            "nan",
-            "none",
-            "null",
-            "-",
-            "sin espacio",
-            "sin edificio",
+            "nan", "none", "null", "-", "sin espacio", "sin edificio"
         ]
     )
 
 
-def obtener_historial_espacio_corazon(
-    centro,
-    edificio,
-    espacio,
-    area=None,
-    numero_ot_actual=None,
-):
-    """
-    Obtiene actuaciones activas e históricas del mismo espacio.
-
-    La comparación se realiza por:
-    - centro
-    - edificio normalizado
-    - espacio normalizado
-
-    La OT que se está evaluando se excluye del recuento.
-    """
-
-    centro_txt = str(centro or "").strip()
-    edificio_objetivo = normalizar_edificio(edificio)
-    espacio_objetivo = normalizar(espacio)
-    area_objetivo = normalizar(area)
-    numero_actual = str(numero_ot_actual or "").strip()
-
-    resultado_vacio = {
+def _resultado_historial_vacio():
+    return {
         "total": 0,
         "activas": 0,
         "historicas": 0,
@@ -120,207 +91,195 @@ def obtener_historial_espacio_corazon(
         "es_recurrente": False,
     }
 
+
+def _fecha_registro_corazon(fila):
+    return (
+        fila.get("fecha")
+        or fila.get("fecha_creacion")
+        or fila.get("fecha_alta")
+        or ""
+    )
+
+
+def _clave_espacio_corazon(centro, edificio, espacio):
+    centro_txt = str(centro or "").strip()
+    edificio_txt = normalizar_edificio(edificio)
+    espacio_txt = normalizar(espacio)
+
     if not centro_txt:
-        return resultado_vacio
-
-    if edificio_objetivo == "Sin edificio":
-        return resultado_vacio
-
+        return None
+    if edificio_txt == "Sin edificio":
+        return None
     if not _texto_valido_corazon(espacio):
-        return resultado_vacio
+        return None
 
-    registros = []
+    return centro_txt, edificio_txt, espacio_txt
 
-    # -------------------------------------------------
-    # ÓRDENES ACTIVAS
-    # -------------------------------------------------
+
+def _crear_registro_corazon(fila, tipo):
+    return {
+        "tipo": tipo,
+        "numero_ot": str(fila.get("numero_ot") or "").strip(),
+        "fecha": _fecha_registro_corazon(fila),
+        "area": str(fila.get("area") or "Otros"),
+        "descripcion": str(fila.get("descripcion") or ""),
+        "estado": str(fila.get("estado") or ""),
+        "origen": str(fila.get("origen") or ""),
+    }
+
+
+def construir_indice_historial_corazon(df_activas, df_historico):
+    """
+    Construye una sola vez un índice:
+    (centro, edificio normalizado, espacio normalizado) -> actuaciones.
+    """
+    indice = {}
+
+    if df_activas is not None and not df_activas.empty:
+        for _, fila in df_activas.iterrows():
+            if normalizar(fila.get("estado")) in ESTADOS_CIERRE:
+                continue
+
+            clave = _clave_espacio_corazon(
+                fila.get("centro"),
+                fila.get("edificio"),
+                fila.get("espacio"),
+            )
+            if clave is None:
+                continue
+
+            indice.setdefault(clave, []).append(
+                _crear_registro_corazon(fila, "Activa")
+            )
+
+    if df_historico is not None and not df_historico.empty:
+        for _, fila in df_historico.iterrows():
+            clave = _clave_espacio_corazon(
+                fila.get("centro"),
+                fila.get("edificio"),
+                fila.get("espacio"),
+            )
+            if clave is None:
+                continue
+
+            indice.setdefault(clave, []).append(
+                _crear_registro_corazon(fila, "Histórico")
+            )
+
+    for registros in indice.values():
+        for registro in registros:
+            registro["_fecha_orden"] = pd.to_datetime(
+                registro.get("fecha"),
+                errors="coerce",
+                dayfirst=True,
+            )
+
+        registros.sort(
+            key=lambda item: (
+                pd.notna(item.get("_fecha_orden")),
+                item.get("_fecha_orden")
+                if pd.notna(item.get("_fecha_orden"))
+                else pd.Timestamp.min,
+            ),
+            reverse=True,
+        )
+
+    return indice
+
+
+def cargar_indice_historial_corazon(centro=None):
+    """
+    Lee ordenes_trabajo e historico_ordenes una sola vez.
+    """
+    filtro = ""
+    params = ()
+
+    if centro:
+        filtro = " WHERE centro = ?"
+        params = (centro,)
+
+    columnas = """
+        numero_ot, fecha, fecha_creacion, fecha_alta,
+        centro, edificio, espacio, area, descripcion,
+        estado, origen
+    """
 
     df_activas = leer_df_corazon(
-        """
-        SELECT numero_ot, fecha, fecha_creacion, fecha_alta,
-               centro, edificio, espacio, area, descripcion,
-               estado, origen
+        f"""
+        SELECT {columnas}
         FROM ordenes_trabajo
-        WHERE centro = ?
+        {filtro}
         """,
-        (centro_txt,),
+        params,
     )
-
-    if not df_activas.empty:
-        for _, fila in df_activas.iterrows():
-            numero_ot = str(fila.get("numero_ot") or "").strip()
-
-            if numero_actual and numero_ot == numero_actual:
-                continue
-
-            edificio_fila = normalizar_edificio(
-                fila.get("edificio")
-            )
-
-            espacio_fila = normalizar(
-                fila.get("espacio")
-            )
-
-            if edificio_fila != edificio_objetivo:
-                continue
-
-            if espacio_fila != espacio_objetivo:
-                continue
-
-            estado = normalizar(fila.get("estado"))
-
-            if estado in ESTADOS_CIERRE:
-                continue
-
-            fecha_registro = (
-                fila.get("fecha")
-                or fila.get("fecha_creacion")
-                or fila.get("fecha_alta")
-                or ""
-            )
-
-            registros.append({
-                "tipo": "Activa",
-                "numero_ot": numero_ot,
-                "fecha": fecha_registro,
-                "area": str(fila.get("area") or "Otros"),
-                "descripcion": str(
-                    fila.get("descripcion") or ""
-                ),
-                "estado": str(fila.get("estado") or ""),
-                "origen": str(fila.get("origen") or ""),
-            })
-
-    # -------------------------------------------------
-    # HISTÓRICO
-    # -------------------------------------------------
 
     df_historico = leer_df_corazon(
-        """
-        SELECT numero_ot, fecha, fecha_creacion, fecha_alta,
-               centro, edificio, espacio, area, descripcion,
-               estado, origen
+        f"""
+        SELECT {columnas}
         FROM historico_ordenes
-        WHERE centro = ?
+        {filtro}
         """,
-        (centro_txt,),
+        params,
     )
 
-    if not df_historico.empty:
-        for _, fila in df_historico.iterrows():
-            numero_ot = str(fila.get("numero_ot") or "").strip()
+    return construir_indice_historial_corazon(
+        df_activas,
+        df_historico,
+    )
 
-            if numero_actual and numero_ot == numero_actual:
-                continue
 
-            edificio_fila = normalizar_edificio(
-                fila.get("edificio")
-            )
+def _analizar_registros_espacio(
+    registros,
+    area=None,
+    numero_ot_actual=None,
+):
+    resultado_vacio = _resultado_historial_vacio()
+    area_objetivo = normalizar(area)
+    numero_actual = str(numero_ot_actual or "").strip()
 
-            espacio_fila = normalizar(
-                fila.get("espacio")
-            )
+    registros_filtrados = [
+        registro
+        for registro in registros
+        if not (
+            numero_actual
+            and str(registro.get("numero_ot") or "").strip() == numero_actual
+        )
+    ]
 
-            if edificio_fila != edificio_objetivo:
-                continue
-
-            if espacio_fila != espacio_objetivo:
-                continue
-
-            fecha_registro = (
-                fila.get("fecha")
-                or fila.get("fecha_creacion")
-                or fila.get("fecha_alta")
-                or ""
-            )
-
-            registros.append({
-                "tipo": "Histórico",
-                "numero_ot": numero_ot,
-                "fecha": fecha_registro,
-                "area": str(fila.get("area") or "Otros"),
-                "descripcion": str(
-                    fila.get("descripcion") or ""
-                ),
-                "estado": str(fila.get("estado") or ""),
-                "origen": str(fila.get("origen") or ""),
-            })
-
-    if not registros:
+    if not registros_filtrados:
         resultado_vacio["nivel_recurrencia"] = "Sin recurrencia"
         resultado_vacio["mensaje_recurrencia"] = (
             "No constan actuaciones anteriores en este espacio."
         )
         return resultado_vacio
 
-    # -------------------------------------------------
-    # PREPARAR FECHAS Y ORDENAR
-    # -------------------------------------------------
-
-    for registro in registros:
-        registro["_fecha_orden"] = pd.to_datetime(
-            registro.get("fecha"),
-            errors="coerce",
-            dayfirst=True,
-        )
-
-    registros.sort(
-        key=lambda item: (
-            pd.notna(item.get("_fecha_orden")),
-            item.get("_fecha_orden")
-            if pd.notna(item.get("_fecha_orden"))
-            else pd.Timestamp.min,
-        ),
-        reverse=True,
-    )
-
-    # -------------------------------------------------
-    # RECUENTOS
-    # -------------------------------------------------
-
-    total = len(registros)
-
+    total = len(registros_filtrados)
     activas = sum(
-        1 for registro in registros
-        if registro.get("tipo") == "Activa"
+        1 for r in registros_filtrados if r.get("tipo") == "Activa"
     )
-
     historicas = sum(
-        1 for registro in registros
-        if registro.get("tipo") == "Histórico"
+        1 for r in registros_filtrados if r.get("tipo") == "Histórico"
     )
 
     areas = {}
-
-    for registro in registros:
-        nombre_area = str(
-            registro.get("area") or "Otros"
-        ).strip()
-
+    for registro in registros_filtrados:
+        nombre_area = str(registro.get("area") or "Otros").strip()
         areas[nombre_area] = areas.get(nombre_area, 0) + 1
 
     misma_area = 0
-
     if area_objetivo:
         misma_area = sum(
             1
-            for registro in registros
+            for registro in registros_filtrados
             if normalizar(registro.get("area")) == area_objetivo
         )
-
-    # -------------------------------------------------
-    # NIVEL DE RECURRENCIA
-    # -------------------------------------------------
 
     es_recurrente = False
 
     if total >= 10 or misma_area >= 6:
         nivel = "Muy alta"
         es_recurrente = True
-
-        mensaje = (
-            f"Este espacio acumula {total} actuaciones anteriores"
-        )
+        mensaje = f"Este espacio acumula {total} actuaciones anteriores"
 
         if misma_area:
             mensaje += (
@@ -337,25 +296,19 @@ def obtener_historial_espacio_corazon(
     elif total >= 6 or misma_area >= 4:
         nivel = "Alta"
         es_recurrente = True
-
         mensaje = (
             f"Se observa una recurrencia alta: "
             f"{total} actuaciones anteriores"
         )
 
         if misma_area:
-            mensaje += (
-                f" y {misma_area} del mismo área."
-            )
+            mensaje += f" y {misma_area} del mismo área."
         else:
             mensaje += "."
 
     elif total >= 3 or misma_area >= 2:
         nivel = "Media"
-
-        mensaje = (
-            f"Este espacio tiene {total} actuaciones anteriores"
-        )
+        mensaje = f"Este espacio tiene {total} actuaciones anteriores"
 
         if misma_area:
             mensaje += (
@@ -367,19 +320,14 @@ def obtener_historial_espacio_corazon(
 
     else:
         nivel = "Baja"
-
         mensaje = (
-            f"Solo consta {total} actuación anterior "
-            "en este espacio."
+            f"Solo consta {total} actuación anterior en este espacio."
             if total == 1
-            else f"Constan {total} actuaciones anteriores "
-                 "en este espacio."
+            else f"Constan {total} actuaciones anteriores en este espacio."
         )
 
-    # Quitamos el campo interno usado para ordenar
     ultimas = []
-
-    for registro in registros[:5]:
+    for registro in registros_filtrados[:5]:
         ultimas.append({
             "tipo": registro.get("tipo"),
             "numero_ot": registro.get("numero_ot"),
@@ -401,6 +349,35 @@ def obtener_historial_espacio_corazon(
         "mensaje_recurrencia": mensaje,
         "es_recurrente": es_recurrente,
     }
+
+
+def obtener_historial_espacio_corazon(
+    centro,
+    edificio,
+    espacio,
+    area=None,
+    numero_ot_actual=None,
+    indice_historial=None,
+):
+    """
+    Usa el índice en memoria cuando se proporciona.
+    Mantiene compatibilidad si se llama sin índice.
+    """
+    clave = _clave_espacio_corazon(centro, edificio, espacio)
+
+    if clave is None:
+        return _resultado_historial_vacio()
+
+    if indice_historial is None:
+        indice_historial = cargar_indice_historial_corazon(
+            str(centro or "").strip() or None
+        )
+
+    return _analizar_registros_espacio(
+        registros=indice_historial.get(clave, []),
+        area=area,
+        numero_ot_actual=numero_ot_actual,
+    )
 
 
 def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
@@ -529,15 +506,28 @@ def puntuar_orden(row):
     return score, motivos, dias if 'dias' in locals() else None
 
 
-def construir_prioridades_globales(centro=None, operario=None, limite=100):
-    df = obtener_ordenes_abiertas_corazon(centro, operario)
+def construir_prioridades_globales(
+    centro=None,
+    operario=None,
+    limite=100,
+    df_ordenes_abiertas=None,
+):
+    """
+    Mantiene el mismo comportamiento, pero evita consultar el historial
+    dos veces por cada OT.
+    """
+    if df_ordenes_abiertas is None:
+        df = obtener_ordenes_abiertas_corazon(centro, operario)
+    else:
+        df = df_ordenes_abiertas
 
     if df.empty:
         return []
 
+    indice_historial = cargar_indice_historial_corazon(centro)
     prioridades = []
 
-        for _, row in df.iterrows():
+    for _, row in df.iterrows():
         score, motivos, dias_abierta = puntuar_orden(row)
 
         edificio_normalizado = normalizar_edificio(
@@ -550,8 +540,8 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
             espacio=row.get("espacio", ""),
             area=row.get("area", ""),
             numero_ot_actual=row.get("numero_ot", ""),
+            indice_historial=indice_historial,
         )
-
 
         total_historial = historial_espacio.get("total", 0)
         misma_area = historial_espacio.get("misma_area", 0)
@@ -580,7 +570,7 @@ def construir_prioridades_globales(centro=None, operario=None, limite=100):
             motivos.append(
                 f"El espacio acumula "
                 f"{total_historial} actuaciones anteriores."
-            )   
+            )
 
         prioridades.append({
             "score": score,
@@ -839,7 +829,12 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         estado = "Colegio bajo control"
         mensaje = "La situación general es estable. Mantener ritmo de cierre y seguimiento."
 
-    prioridades = construir_prioridades_globales(centro, operario, limite=100)
+    prioridades = construir_prioridades_globales(
+        centro=centro,
+        operario=operario,
+        limite=100,
+        df_ordenes_abiertas=df,
+    )
     grupos = construir_grupos_inteligentes(prioridades)
     ruta = construir_ruta_inteligente(grupos)
     carga_edificios = construir_carga_por_edificio(prioridades)
