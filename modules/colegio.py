@@ -4,53 +4,29 @@ import unicodedata
 import streamlit as st
 from database.db import conectar, _sql
 
-# =====================================================
-# MAPA BASE DEL COLEGIO
-# =====================================================
-
 COLEGIO_BASE = {
     "Pearson 22": {
         "Infantil / Primaria": {
-            "Terrado": [],
-            "Planta 5": [],
-            "Planta 4": [],
-            "Planta 3": [],
-            "Planta 2": [],
-            "Planta 1": [],
+            "Terrado": [], "Planta 5": [], "Planta 4": [],
+            "Planta 3": [], "Planta 2": [], "Planta 1": [],
         },
         "Llar": {
-            "Terrado": [],
-            "Planta 2": [],
-            "Planta 1": [],
-            "Planta 0": [],
+            "Terrado": [], "Planta 2": [], "Planta 1": [], "Planta 0": [],
         },
     },
     "Pearson 9": {
         "Edificio A": {
-            "Terrado": [],
-            "Planta 0": [],
-            "Planta 1": [],
-            "Planta 2": [],
+            "Terrado": [], "Planta 0": [], "Planta 1": [], "Planta 2": [],
         },
         "Edificio B": {
-            "Terrado": [],
-            "Planta 0": [],
-            "Planta 1": [],
-            "Planta 2": [],
+            "Terrado": [], "Planta 0": [], "Planta 1": [], "Planta 2": [],
         },
         "Edificio C": {
-            "Terrado": [],
-            "Planta 0": [],
-            "Planta 1": [],
-            "Planta 2": [],
+            "Terrado": [], "Planta 0": [], "Planta 1": [], "Planta 2": [],
         },
     },
 }
 
-
-# =====================================================
-# NORMALIZADORES
-# =====================================================
 
 def normalizar_texto(texto):
     return str(texto or "").strip()
@@ -66,7 +42,6 @@ def _sin_acentos(texto):
 
 def _normalizar_comparacion(texto):
     texto = _sin_acentos(texto).lower()
-
     texto = texto.replace("edif.", "")
     texto = texto.replace("edificio", "")
     texto = texto.replace("infantil/primaria", "infantilprimaria")
@@ -85,28 +60,15 @@ def _normalizar_comparacion(texto):
     texto = texto.replace("5a", "5")
     texto = texto.replace("planta", "p")
     texto = texto.replace(" ", "")
-
     return texto.strip()
 
 
 def _normalizar_espacio_alias(texto):
-    """
-    Normalización prudente para espacios.
-    No convierte 'WC' en 'WC chicas' para evitar falsos positivos.
-    Sí corrige equivalencias claras:
-    - P5A / I5A
-    - WC niñas / WC chicas
-    - WC niños / WC chicos
-    """
-
     t = _normalizar_comparacion(texto)
-
     t = t.replace("ninas", "chicas")
     t = t.replace("ninos", "chicos")
     t = t.replace("profesores", "profes")
 
-    # Antiguo formulario: P3A/P4A/P5A
-    # Catálogo nuevo: I3A/I4A/I5A
     m = re.fullmatch(r"p([345])([abc])", t)
     if m:
         return f"i{m.group(1)}{m.group(2)}"
@@ -118,6 +80,27 @@ def _coincide_centro(a, b):
     return _normalizar_comparacion(a) == _normalizar_comparacion(b)
 
 
+def _coincide_edificio(a, b):
+    a_norm = _normalizar_comparacion(a)
+    b_norm = _normalizar_comparacion(b)
+
+    if not a_norm or not b_norm:
+        return False
+
+    aliases = {
+        "infantilprimaria": "infantilprimaria",
+        "infantil": "infantilprimaria",
+        "primaria": "infantilprimaria",
+        "llar": "llar",
+        "llaranexo": "llar",
+        "a": "a",
+        "b": "b",
+        "c": "c",
+    }
+
+    return aliases.get(a_norm, a_norm) == aliases.get(b_norm, b_norm)
+
+
 def _coincide_espacio(a, b):
     a_norm = _normalizar_espacio_alias(a)
     b_norm = _normalizar_espacio_alias(b)
@@ -125,15 +108,18 @@ def _coincide_espacio(a, b):
     if not a_norm or not b_norm:
         return False
 
-    if a_norm == b_norm:
-        return True
-
-    return False
+    return a_norm == b_norm
 
 
-# =====================================================
-# CENTROS / ESPACIOS
-# =====================================================
+def _planta_valida(planta):
+    planta_txt = normalizar_texto(planta)
+    return bool(
+        planta_txt
+        and planta_txt.lower() not in [
+            "nan", "none", "null", "-", "sin planta"
+        ]
+    )
+
 
 def obtener_centros_espacios():
     centros = []
@@ -141,22 +127,18 @@ def obtener_centros_espacios():
     try:
         conn = conectar()
         cur = conn.cursor()
-
         cur.execute(_sql("""
             SELECT DISTINCT centro
             FROM colegio_espacios
             WHERE centro IS NOT NULL AND TRIM(centro) <> ''
             ORDER BY centro
         """))
-
         centros = [
             normalizar_texto(r[0])
             for r in cur.fetchall()
             if normalizar_texto(r[0])
         ]
-
         conn.close()
-
     except Exception:
         centros = []
 
@@ -184,10 +166,6 @@ def obtener_centros_visibles_usuario():
     return todos_centros
 
 
-# =====================================================
-# ÁRBOL BASE ANTIGUO / COMPATIBILIDAD
-# =====================================================
-
 def detectar_planta_desde_espacio(espacio):
     texto = normalizar_texto(espacio).lower()
 
@@ -207,6 +185,106 @@ def detectar_planta_desde_espacio(espacio):
         return "Planta 0"
 
     return "Sin planta"
+
+
+def resolver_planta_desde_espacio(
+    centro,
+    edificio,
+    espacio,
+    planta_actual=None,
+):
+    if _planta_valida(planta_actual):
+        return normalizar_texto(planta_actual)
+
+    centro_txt = normalizar_texto(centro)
+    edificio_txt = normalizar_texto(edificio)
+    espacio_txt = normalizar_texto(espacio)
+
+    if not centro_txt or not espacio_txt:
+        return "Sin planta"
+
+    consultas = [
+        """
+        SELECT centro, edificio, planta, espacio
+        FROM colegio_espacios
+        WHERE espacio IS NOT NULL
+          AND TRIM(espacio) <> ''
+        """,
+        """
+        SELECT centro, edificio, planta, espacio
+        FROM inventario_aulas
+        WHERE espacio IS NOT NULL
+          AND TRIM(espacio) <> ''
+        """,
+        """
+        SELECT centro, edificio, planta, espacio
+        FROM preventivo_aulas
+        WHERE espacio IS NOT NULL
+          AND TRIM(espacio) <> ''
+        """,
+    ]
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        for sql in consultas:
+            try:
+                cur.execute(_sql(sql))
+                filas = cur.fetchall()
+            except Exception:
+                continue
+
+            coincidencias = []
+
+            for centro_bd, edificio_bd, planta_bd, espacio_bd in filas:
+                if not _planta_valida(planta_bd):
+                    continue
+                if not _coincide_centro(centro_bd, centro_txt):
+                    continue
+                if not _coincide_espacio(espacio_bd, espacio_txt):
+                    continue
+
+                if edificio_txt and _coincide_edificio(
+                    edificio_bd,
+                    edificio_txt,
+                ):
+                    return normalizar_texto(planta_bd)
+
+                coincidencias.append(normalizar_texto(planta_bd))
+
+            coincidencias = list(dict.fromkeys(
+                planta for planta in coincidencias if planta
+            ))
+
+            if len(coincidencias) == 1:
+                return coincidencias[0]
+    finally:
+        conn.close()
+
+    planta_detectada = detectar_planta_desde_espacio(espacio_txt)
+
+    if _planta_valida(planta_detectada):
+        return planta_detectada
+
+    return "Sin planta"
+
+
+def completar_planta_ubicacion(datos):
+    if not isinstance(datos, dict):
+        return datos
+
+    resultado = dict(datos)
+    resultado["planta"] = resolver_planta_desde_espacio(
+        centro=resultado.get("centro", ""),
+        edificio=(
+            resultado.get("edificio_original")
+            or resultado.get("edificio", "")
+        ),
+        espacio=resultado.get("espacio", ""),
+        planta_actual=resultado.get("planta", ""),
+    )
+    return resultado
 
 
 def obtener_espacios_desde_bd():
@@ -284,7 +362,11 @@ def obtener_arbol_colegio():
         if edificio not in arbol[centro]:
             arbol[centro][edificio] = {}
 
-        planta = detectar_planta_desde_espacio(espacio)
+        planta = resolver_planta_desde_espacio(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+        )
 
         if planta not in arbol[centro][edificio]:
             arbol[centro][edificio][planta] = []
@@ -302,10 +384,6 @@ def obtener_arbol_colegio():
     return arbol
 
 
-# =====================================================
-# ESTADO DEL ESPACIO
-# =====================================================
-
 def obtener_estado_espacio(centro, edificio, espacio):
     conn = conectar()
     cur = conn.cursor()
@@ -315,10 +393,7 @@ def obtener_estado_espacio(centro, edificio, espacio):
             SELECT centro, edificio, espacio, estado
             FROM ordenes_trabajo
             WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
-                'finalizada',
-                'cerrado',
-                'cerrada',
-                'cancelada'
+                'finalizada', 'cerrado', 'cerrada', 'cancelada'
             )
         """))
 
@@ -329,7 +404,6 @@ def obtener_estado_espacio(centro, edificio, espacio):
             ):
                 conn.close()
                 return "rojo"
-
     except Exception:
         pass
 
@@ -354,24 +428,17 @@ def obtener_ots_abiertas_por_centro():
             SELECT centro, espacio, COUNT(*)
             FROM ordenes_trabajo
             WHERE TRIM(LOWER(COALESCE(estado, ''))) NOT IN (
-                'finalizada',
-                'cerrado',
-                'cerrada',
-                'cancelada'
+                'finalizada', 'cerrado', 'cerrada', 'cancelada'
             )
             GROUP BY centro, espacio
         """))
-
         filas = cur.fetchall()
-
     except Exception:
         filas = []
 
     conn.close()
 
-    datos = {
-        "__filas__": []
-    }
+    datos = {"__filas__": []}
 
     for centro, espacio, total in filas:
         centro_txt = normalizar_texto(centro)
@@ -384,7 +451,6 @@ def obtener_ots_abiertas_por_centro():
         )
 
         datos[clave] = datos.get(clave, 0) + total_int
-
         datos["__filas__"].append({
             "centro": centro_txt,
             "espacio": espacio_txt,
@@ -397,7 +463,6 @@ def obtener_ots_abiertas_por_centro():
 def obtener_estado_espacio_rapido(centro, espacio, ots_abiertas):
     if contar_ots_espacio_rapido(centro, espacio, ots_abiertas) > 0:
         return "rojo"
-
     return "verde"
 
 
