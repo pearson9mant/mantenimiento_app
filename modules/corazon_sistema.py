@@ -62,6 +62,346 @@ def normalizar_edificio(edificio):
 
     return e
 
+# =====================================================
+# HISTORIAL Y RECURRENCIA DEL ESPACIO
+# =====================================================
+
+def _texto_valido_corazon(valor):
+    texto = str(valor or "").strip()
+
+    return bool(
+        texto
+        and texto.lower() not in [
+            "nan",
+            "none",
+            "null",
+            "-",
+            "sin espacio",
+            "sin edificio",
+        ]
+    )
+
+
+def obtener_historial_espacio_corazon(
+    centro,
+    edificio,
+    espacio,
+    area=None,
+    numero_ot_actual=None,
+):
+    """
+    Obtiene actuaciones activas e históricas del mismo espacio.
+
+    La comparación se realiza por:
+    - centro
+    - edificio normalizado
+    - espacio normalizado
+
+    La OT que se está evaluando se excluye del recuento.
+    """
+
+    centro_txt = str(centro or "").strip()
+    edificio_objetivo = normalizar_edificio(edificio)
+    espacio_objetivo = normalizar(espacio)
+    area_objetivo = normalizar(area)
+    numero_actual = str(numero_ot_actual or "").strip()
+
+    resultado_vacio = {
+        "total": 0,
+        "activas": 0,
+        "historicas": 0,
+        "misma_area": 0,
+        "areas": {},
+        "ultimas": [],
+        "nivel_recurrencia": "Sin datos",
+        "mensaje_recurrencia": (
+            "No hay suficiente información para analizar este espacio."
+        ),
+        "es_recurrente": False,
+    }
+
+    if not centro_txt:
+        return resultado_vacio
+
+    if edificio_objetivo == "Sin edificio":
+        return resultado_vacio
+
+    if not _texto_valido_corazon(espacio):
+        return resultado_vacio
+
+    registros = []
+
+    # -------------------------------------------------
+    # ÓRDENES ACTIVAS
+    # -------------------------------------------------
+
+    df_activas = leer_df_corazon(
+        """
+        SELECT numero_ot, fecha, fecha_creacion, fecha_alta,
+               centro, edificio, espacio, area, descripcion,
+               estado, origen
+        FROM ordenes_trabajo
+        WHERE centro = ?
+        """,
+        (centro_txt,),
+    )
+
+    if not df_activas.empty:
+        for _, fila in df_activas.iterrows():
+            numero_ot = str(fila.get("numero_ot") or "").strip()
+
+            if numero_actual and numero_ot == numero_actual:
+                continue
+
+            edificio_fila = normalizar_edificio(
+                fila.get("edificio")
+            )
+
+            espacio_fila = normalizar(
+                fila.get("espacio")
+            )
+
+            if edificio_fila != edificio_objetivo:
+                continue
+
+            if espacio_fila != espacio_objetivo:
+                continue
+
+            estado = normalizar(fila.get("estado"))
+
+            if estado in ESTADOS_CIERRE:
+                continue
+
+            fecha_registro = (
+                fila.get("fecha")
+                or fila.get("fecha_creacion")
+                or fila.get("fecha_alta")
+                or ""
+            )
+
+            registros.append({
+                "tipo": "Activa",
+                "numero_ot": numero_ot,
+                "fecha": fecha_registro,
+                "area": str(fila.get("area") or "Otros"),
+                "descripcion": str(
+                    fila.get("descripcion") or ""
+                ),
+                "estado": str(fila.get("estado") or ""),
+                "origen": str(fila.get("origen") or ""),
+            })
+
+    # -------------------------------------------------
+    # HISTÓRICO
+    # -------------------------------------------------
+
+    df_historico = leer_df_corazon(
+        """
+        SELECT numero_ot, fecha, fecha_creacion, fecha_alta,
+               centro, edificio, espacio, area, descripcion,
+               estado, origen
+        FROM historico_ordenes
+        WHERE centro = ?
+        """,
+        (centro_txt,),
+    )
+
+    if not df_historico.empty:
+        for _, fila in df_historico.iterrows():
+            numero_ot = str(fila.get("numero_ot") or "").strip()
+
+            if numero_actual and numero_ot == numero_actual:
+                continue
+
+            edificio_fila = normalizar_edificio(
+                fila.get("edificio")
+            )
+
+            espacio_fila = normalizar(
+                fila.get("espacio")
+            )
+
+            if edificio_fila != edificio_objetivo:
+                continue
+
+            if espacio_fila != espacio_objetivo:
+                continue
+
+            fecha_registro = (
+                fila.get("fecha")
+                or fila.get("fecha_creacion")
+                or fila.get("fecha_alta")
+                or ""
+            )
+
+            registros.append({
+                "tipo": "Histórico",
+                "numero_ot": numero_ot,
+                "fecha": fecha_registro,
+                "area": str(fila.get("area") or "Otros"),
+                "descripcion": str(
+                    fila.get("descripcion") or ""
+                ),
+                "estado": str(fila.get("estado") or ""),
+                "origen": str(fila.get("origen") or ""),
+            })
+
+    if not registros:
+        resultado_vacio["nivel_recurrencia"] = "Sin recurrencia"
+        resultado_vacio["mensaje_recurrencia"] = (
+            "No constan actuaciones anteriores en este espacio."
+        )
+        return resultado_vacio
+
+    # -------------------------------------------------
+    # PREPARAR FECHAS Y ORDENAR
+    # -------------------------------------------------
+
+    for registro in registros:
+        registro["_fecha_orden"] = pd.to_datetime(
+            registro.get("fecha"),
+            errors="coerce",
+            dayfirst=True,
+        )
+
+    registros.sort(
+        key=lambda item: (
+            pd.notna(item.get("_fecha_orden")),
+            item.get("_fecha_orden")
+            if pd.notna(item.get("_fecha_orden"))
+            else pd.Timestamp.min,
+        ),
+        reverse=True,
+    )
+
+    # -------------------------------------------------
+    # RECUENTOS
+    # -------------------------------------------------
+
+    total = len(registros)
+
+    activas = sum(
+        1 for registro in registros
+        if registro.get("tipo") == "Activa"
+    )
+
+    historicas = sum(
+        1 for registro in registros
+        if registro.get("tipo") == "Histórico"
+    )
+
+    areas = {}
+
+    for registro in registros:
+        nombre_area = str(
+            registro.get("area") or "Otros"
+        ).strip()
+
+        areas[nombre_area] = areas.get(nombre_area, 0) + 1
+
+    misma_area = 0
+
+    if area_objetivo:
+        misma_area = sum(
+            1
+            for registro in registros
+            if normalizar(registro.get("area")) == area_objetivo
+        )
+
+    # -------------------------------------------------
+    # NIVEL DE RECURRENCIA
+    # -------------------------------------------------
+
+    es_recurrente = False
+
+    if total >= 10 or misma_area >= 6:
+        nivel = "Muy alta"
+        es_recurrente = True
+
+        mensaje = (
+            f"Este espacio acumula {total} actuaciones anteriores"
+        )
+
+        if misma_area:
+            mensaje += (
+                f", de las cuales {misma_area} pertenecen "
+                f"al área de {area or 'mantenimiento'}."
+            )
+        else:
+            mensaje += "."
+
+        mensaje += (
+            " Conviene valorar una revisión completa del espacio."
+        )
+
+    elif total >= 6 or misma_area >= 4:
+        nivel = "Alta"
+        es_recurrente = True
+
+        mensaje = (
+            f"Se observa una recurrencia alta: "
+            f"{total} actuaciones anteriores"
+        )
+
+        if misma_area:
+            mensaje += (
+                f" y {misma_area} del mismo área."
+            )
+        else:
+            mensaje += "."
+
+    elif total >= 3 or misma_area >= 2:
+        nivel = "Media"
+
+        mensaje = (
+            f"Este espacio tiene {total} actuaciones anteriores"
+        )
+
+        if misma_area:
+            mensaje += (
+                f", con {misma_area} relacionadas con "
+                f"{area or 'esta área'}."
+            )
+        else:
+            mensaje += "."
+
+    else:
+        nivel = "Baja"
+
+        mensaje = (
+            f"Solo consta {total} actuación anterior "
+            "en este espacio."
+            if total == 1
+            else f"Constan {total} actuaciones anteriores "
+                 "en este espacio."
+        )
+
+    # Quitamos el campo interno usado para ordenar
+    ultimas = []
+
+    for registro in registros[:5]:
+        ultimas.append({
+            "tipo": registro.get("tipo"),
+            "numero_ot": registro.get("numero_ot"),
+            "fecha": registro.get("fecha"),
+            "area": registro.get("area"),
+            "descripcion": registro.get("descripcion"),
+            "estado": registro.get("estado"),
+            "origen": registro.get("origen"),
+        })
+
+    return {
+        "total": total,
+        "activas": activas,
+        "historicas": historicas,
+        "misma_area": misma_area,
+        "areas": areas,
+        "ultimas": ultimas,
+        "nivel_recurrencia": nivel,
+        "mensaje_recurrencia": mensaje,
+        "es_recurrente": es_recurrente,
+    }
+
 
 def obtener_ordenes_abiertas_corazon(centro=None, operario=None):
     params = []
