@@ -139,6 +139,215 @@ def mostrar_prioridad_visual(prioridad):
     return str(prioridad or "-").strip() or "-"
 
 
+
+
+def icono_recurrencia(nivel):
+    nivel_normalizado = str(nivel or "").strip().lower()
+
+    if nivel_normalizado == "muy alta":
+        return "🔴"
+    if nivel_normalizado == "alta":
+        return "🟠"
+    if nivel_normalizado == "media":
+        return "🟡"
+    if nivel_normalizado == "baja":
+        return "🟢"
+
+    return "⚪"
+
+
+def mostrar_historial_espacio(datos, titulo="📚 Historial del espacio"):
+    if not datos:
+        return
+
+    historial = datos.get("historial_espacio", {}) or {}
+    total = int(historial.get("total", 0) or 0)
+    misma_area = int(historial.get("misma_area", 0) or 0)
+    nivel = str(
+        historial.get("nivel_recurrencia", "Sin datos") or "Sin datos"
+    ).strip()
+    mensaje = str(
+        historial.get("mensaje_recurrencia", "") or ""
+    ).strip()
+
+    st.markdown(f"#### {titulo}")
+
+    h1, h2, h3 = st.columns(3)
+
+    h1.metric(
+        "Actuaciones anteriores",
+        total
+    )
+
+    h2.metric(
+        "Misma área",
+        misma_area
+    )
+
+    h3.metric(
+        "Recurrencia",
+        f"{icono_recurrencia(nivel)} {nivel}"
+    )
+
+    if historial.get("es_recurrente"):
+        st.warning(
+            "⚠️ Este espacio presenta averías repetidas. "
+            "Conviene valorar una revisión completa de la instalación "
+            "o del elemento afectado, además de resolver esta OT."
+        )
+    elif mensaje:
+        st.caption(f"🧠 {mensaje}")
+
+    ultimas = historial.get("ultimas", []) or []
+
+    if ultimas:
+        with st.expander("📅 Ver últimas actuaciones del espacio"):
+            for i, actuacion in enumerate(ultimas, start=1):
+                numero_ot = str(
+                    actuacion.get("numero_ot", "") or ""
+                ).strip()
+                fecha = str(
+                    actuacion.get("fecha", "") or ""
+                ).strip()
+                area = str(
+                    actuacion.get("area", "") or ""
+                ).strip()
+                descripcion = str(
+                    actuacion.get("descripcion", "") or ""
+                ).strip()
+                tipo = str(
+                    actuacion.get("tipo", "") or ""
+                ).strip()
+
+                cabecera = " · ".join(
+                    [
+                        valor
+                        for valor in [
+                            fecha,
+                            numero_ot,
+                            area,
+                            tipo,
+                        ]
+                        if valor
+                    ]
+                )
+
+                if cabecera:
+                    st.markdown(f"**{cabecera}**")
+
+                if descripcion:
+                    st.caption(descripcion)
+
+                if i < len(ultimas):
+                    st.markdown("---")
+
+
+def mostrar_impacto_esperado(datos):
+    if not datos:
+        return
+
+    impactos = []
+    historial = datos.get("historial_espacio", {}) or {}
+    motivos = [
+        str(motivo or "").lower()
+        for motivo in datos.get("motivos", []) or []
+    ]
+
+    if any(
+        palabra in " ".join(motivos)
+        for palabra in ["agua", "fuga", "pérdida", "perdida"]
+    ):
+        impactos.append("Reduce el riesgo de daños provocados por agua.")
+
+    if any(
+        palabra in " ".join(motivos)
+        for palabra in ["eléctr", "electric"]
+    ):
+        impactos.append("Reduce un posible riesgo eléctrico.")
+
+    if any(
+        palabra in " ".join(motivos)
+        for palabra in ["legionella", "sanitario"]
+    ):
+        impactos.append("Reduce el principal riesgo sanitario pendiente.")
+
+    if historial.get("es_recurrente"):
+        impactos.append(
+            "Puede evitar nuevas intervenciones repetidas en el mismo espacio."
+        )
+
+    if int(historial.get("misma_area", 0) or 0) >= 2:
+        impactos.append(
+            "Permite atacar un problema repetido de la misma especialidad."
+        )
+
+    if datos.get("dias_abierta") is not None:
+        try:
+            if int(datos.get("dias_abierta")) >= 30:
+                impactos.append(
+                    "Reduce carga antigua acumulada en el sistema."
+                )
+        except (TypeError, ValueError):
+            pass
+
+    if not impactos:
+        impactos.append(
+            "Reduce la carga prioritaria del centro y mejora el estado operativo."
+        )
+
+    st.markdown("#### 🎯 Impacto esperado")
+
+    for impacto in impactos[:4]:
+        st.markdown(f"✓ {impacto}")
+
+
+def etiqueta_motivo_principal(datos):
+    if not datos:
+        return "📋 Prioritaria"
+
+    texto = " ".join(
+        [
+            str(datos.get("area", "") or ""),
+            str(datos.get("origen", "") or ""),
+            str(datos.get("titulo", "") or ""),
+            " ".join(
+                str(motivo or "")
+                for motivo in datos.get("motivos", []) or []
+            ),
+        ]
+    ).lower()
+
+    historial = datos.get("historial_espacio", {}) or {}
+
+    if "legionella" in texto:
+        return "🦠 Sanitaria"
+
+    if any(palabra in texto for palabra in ["fuga", "agua", "perdida", "pérdida"]):
+        return "💧 Agua"
+
+    if any(palabra in texto for palabra in ["eléctr", "electric"]):
+        return "⚡ Electricidad"
+
+    if historial.get("es_recurrente"):
+        return "🔁 Recurrente"
+
+    try:
+        if int(datos.get("dias_abierta")) >= 60:
+            return "📅 Muy antigua"
+    except (TypeError, ValueError):
+        pass
+
+    prioridad = str(datos.get("prioridad", "") or "").lower()
+
+    if "urgente" in prioridad:
+        return "🚨 Urgente"
+
+    if "alta" in prioridad:
+        return "🟠 Alta"
+
+    return "📋 Prioritaria"
+
+
 def mostrar_corazon_sistema():
     perfil = str(
         st.session_state.get("perfil", "") or ""
@@ -327,6 +536,21 @@ def mostrar_corazon_sistema():
             mostrar_motivo_principal(prioridad)
             mostrar_antiguedad_ot(prioridad)
 
+            st.markdown("#### 🧠 ¿Por qué la recomienda?")
+
+            motivos_resumen = prioridad.get("motivos", []) or []
+
+            if motivos_resumen:
+                for motivo in motivos_resumen[:4]:
+                    st.markdown(f"✓ {motivo}")
+            else:
+                st.caption(
+                    prioridad.get(
+                        "motivo",
+                        "Actuación prioritaria según el Corazón del Sistema."
+                    )
+                )
+
             c1, c2, c3, c4 = st.columns(4)
 
             c1.metric(
@@ -363,6 +587,9 @@ def mostrar_corazon_sistema():
             st.info(
                 "🎯 Actuación recomendada por el Corazón del Sistema."
             )
+
+            mostrar_historial_espacio(prioridad)
+            mostrar_impacto_esperado(prioridad)
 
             with st.expander(
                 "🧠 Ver todos los motivos"
@@ -629,9 +856,13 @@ def mostrar_corazon_sistema():
                 prioridades,
                 start=1
             ):
+                etiqueta = etiqueta_motivo_principal(
+                    prioridad_ranking
+                )
+
                 titulo_ranking = (
                     f"{prioridad_ranking.get('score', 0)}/100 · "
-                    f"{prioridad_ranking.get('tipo_prioridad', '-')} · "
+                    f"{etiqueta} · "
                     f"{prioridad_ranking.get('numero_ot', '')} · "
                     f"{prioridad_ranking.get('titulo', '')}"
                 )
@@ -693,6 +924,11 @@ def mostrar_corazon_sistema():
                             st.markdown(
                                 f"• {motivo}"
                             )
+
+                    mostrar_historial_espacio(
+                        prioridad_ranking,
+                        titulo="📚 Historial del espacio"
+                    )
 
                     boton_abrir_ot(
                         prioridad_ranking.get("numero_ot", ""),
