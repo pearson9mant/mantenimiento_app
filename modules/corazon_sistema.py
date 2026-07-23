@@ -580,6 +580,7 @@ def construir_prioridades_globales(
             "centro": row.get("centro", ""),
             "edificio": edificio_normalizado,
             "edificio_original": row.get("edificio", ""),
+            "planta": row.get("planta", ""),
             "espacio": row.get("espacio", ""),
             "area": row.get("area", ""),
             "origen": row.get("origen", ""),
@@ -609,62 +610,167 @@ def construir_prioridades_globales(
     return prioridades[:limite]
 
 
+def normalizar_planta(planta):
+    planta_txt = str(planta or "").strip()
+
+    if not planta_txt or planta_txt.lower() in [
+        "nan",
+        "none",
+        "null",
+        "-",
+        "sin planta",
+    ]:
+        return "Sin planta"
+
+    return planta_txt
+
+
 def construir_grupos_inteligentes(prioridades):
+    """
+    Agrupa las actuaciones por:
+    centro -> edificio -> planta.
+
+    No modifica puntuaciones ni prioridades. Solo organiza la ruta
+    según la forma real de trabajo del operario.
+    """
     grupos = {}
 
     for p in prioridades:
+        centro = p.get("centro", "") or "Sin centro"
+        edificio = normalizar_edificio(
+            p.get("edificio", "")
+        )
+        planta = normalizar_planta(
+            p.get("planta", "")
+        )
+
         clave = (
-            p.get("centro", "") or "Sin centro",
-            normalizar_edificio(p.get("edificio", "")),
+            centro,
+            edificio,
+            planta,
         )
 
         grupos.setdefault(clave, []).append(p)
 
     resultado = []
 
-    for (centro, edificio), lista in grupos.items():
-        score = max(x.get("score", 0) for x in lista)
+    for (centro, edificio, planta), lista in grupos.items():
+        score = max(
+            x.get("score", 0)
+            for x in lista
+        )
+
+        trabajos_ordenados = sorted(
+            lista,
+            key=lambda x: x.get("score", 0),
+            reverse=True,
+        )
 
         resultado.append({
             "centro": centro,
             "edificio": edificio,
-            "cantidad": len(lista),
+            "planta": planta,
+            "cantidad": len(trabajos_ordenados),
             "score": score,
-            "trabajos": lista,
+            "trabajos": trabajos_ordenados,
+            "primera_ot": (
+                trabajos_ordenados[0]
+                if trabajos_ordenados
+                else None
+            ),
         })
 
     resultado.sort(
-        key=lambda x: (x["score"], x["cantidad"]),
-        reverse=True
+        key=lambda x: (
+            x["score"],
+            x["cantidad"],
+        ),
+        reverse=True,
     )
 
     return resultado
 
 
-def construir_ruta_inteligente(grupos, limite=5):
+def construir_ruta_inteligente(grupos, limite=10):
+    """
+    Construye una ruta por planta.
+
+    Cada tramo representa una única planta dentro de un edificio.
+    """
     ruta = []
 
     for g in grupos[:limite]:
         trabajos = g.get("trabajos", [])
 
         tipos = {}
-        for t in trabajos:
-            tipo = t.get("tipo_prioridad", "Otros")
-            tipos[tipo] = tipos.get(tipo, 0) + 1
 
-        edificio = g.get("edificio", "") or "Sin edificio"
+        for t in trabajos:
+            tipo = t.get(
+                "tipo_prioridad",
+                "Otros"
+            )
+
+            tipos[tipo] = (
+                tipos.get(tipo, 0) + 1
+            )
+
+        centro = (
+            g.get("centro", "")
+            or "Sin centro"
+        )
+
+        edificio = (
+            g.get("edificio", "")
+            or "Sin edificio"
+        )
+
+        planta = (
+            g.get("planta", "")
+            or "Sin planta"
+        )
+
+        cantidad = g.get(
+            "cantidad",
+            0
+        )
+
+        primera_ot = g.get(
+            "primera_ot"
+        )
+
+        if planta == "Sin planta":
+            mensaje = (
+                f"Hay {cantidad} actuaciones sin planta informada "
+                f"en {edificio}. Conviene completar este dato para "
+                "optimizar correctamente la ruta."
+            )
+        else:
+            mensaje = (
+                f"Conviene comenzar por {planta} de {edificio}. "
+                f"Esta zona reúne {cantidad} actuaciones y una "
+                f"prioridad máxima de {g.get('score', 0)}/100."
+            )
 
         ruta.append({
-            "centro": g.get("centro", ""),
+            "centro": centro,
             "edificio": edificio,
-            "cantidad": g.get("cantidad", 0),
+            "planta": planta,
+            "cantidad": cantidad,
             "score": g.get("score", 0),
             "tipos": tipos,
             "trabajos": trabajos,
-            "mensaje": (
-                f"Concentrar trabajos en {edificio} permite resolver "
-                f"{g.get('cantidad', 0)} actuaciones en una misma zona."
-            )
+            "primera_ot": primera_ot,
+            "numero_ot_recomendada": (
+                primera_ot.get("numero_ot", "")
+                if primera_ot
+                else ""
+            ),
+            "titulo_ot_recomendada": (
+                primera_ot.get("titulo", "")
+                if primera_ot
+                else ""
+            ),
+            "mensaje": mensaje,
         })
 
     return ruta
