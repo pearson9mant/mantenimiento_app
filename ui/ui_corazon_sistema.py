@@ -580,52 +580,6 @@ def mostrar_corazon_sistema():
         panel.get("mensaje", "")
     )
 
-    kpis = panel.get("kpis", {})
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    c1.metric(
-        "OT",
-        kpis.get("abiertas", 0)
-    )
-
-    c2.metric(
-        "Incidencias",
-        kpis.get("incidencias", 0)
-    )
-
-    c3.metric(
-        "Preventivos",
-        kpis.get("preventivos", 0)
-    )
-
-    c4.metric(
-        "Legionella",
-        kpis.get("legionella", 0)
-    )
-
-    c5.metric(
-        "Alta/Urgente",
-        kpis.get("urgentes", 0)
-    )
-
-    i1, i2, i3 = st.columns(3)
-
-    i1.metric(
-        "Operativo",
-        f"{panel.get('score_operativo', 0)}%"
-    )
-
-    i2.metric(
-        "Preventivo",
-        f"{panel.get('score_preventivo', 0)}%"
-    )
-
-    i3.metric(
-        "Sanitario",
-        f"{panel.get('score_legionella', 0)}%"
-    )
-
     st.markdown(
         "### 🎯 Si hoy solo hicieras una cosa..."
     )
@@ -1256,3 +1210,31 @@ def mostrar_corazon_sistema():
                         )
 
     st.markdown("---")
+    st.markdown("### 📊 Resumen del colegio")
+
+    kpis = panel.get("kpis", {})
+    
+    c1, c2, c3, c4, c5 = st.columns(5)
+    
+    c1.metric("OT", kpis.get("abiertas", 0))
+    c2.metric("Incidencias", kpis.get("incidencias", 0))
+    c3.metric("Preventivos", kpis.get("preventivos", 0))
+    c4.metric("Legionella", kpis.get("legionella", 0))
+    c5.metric("Alta/Urgente", kpis.get("urgentes", 0))
+    
+    i1, i2, i3 = st.columns(3)
+    
+    i1.metric(
+        "Operativo",
+        f"{panel.get('score_operativo', 0)}%"
+    )
+    
+    i2.metric(
+        "Preventivo",
+        f"{panel.get('score_preventivo', 0)}%"
+    )
+    
+    i3.metric(
+        "Sanitario",
+        f"{panel.get('score_legionella', 0)}%"
+    )
