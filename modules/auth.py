@@ -30,6 +30,12 @@ USUARIOS = {
         "password": "gerencia2026",
         "perfil": "gerencia",
         "nombre": "Gerencia"
+    },
+
+    "comunicacion": {
+        "password": "com2026",
+        "perfil": "comunicacion",
+        "nombre": "Comunicación"
     }
 }
 
