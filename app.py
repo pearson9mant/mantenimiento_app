@@ -1003,6 +1003,17 @@ elif perfil == "gerencia":
     elif seccion == "Plan verano":
         pantalla_plan_verano()
 
+elif perfil == "comunicacion":
+
+    if seccion == "Nueva solicitud":
+        pantalla_comunicacion()
+
+    elif seccion == "Mis solicitudes":
+        pantalla_comunicacion(modo="historico")
+
+    else:
+        st.warning("La sección seleccionada no está disponible.")
+
 
 else:
     st.caption(f"👷 {operario_activo}")
