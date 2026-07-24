@@ -877,8 +877,13 @@ if perfil == "gerencia":
 
 
 if st.session_state["seccion_actual"] is None:
+
     if perfil == "admin":
         mostrar_menu_admin()
+
+    elif perfil == "comunicacion":
+        mostrar_menu_comunicacion()
+
     else:
         mostrar_menu_operario()
 
