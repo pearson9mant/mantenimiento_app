@@ -21,11 +21,6 @@ OPERARIO_POR_CENTRO = {
     "Pearson 22": "J.A. Almeda",
     "Pearson 9": "Luis Lozano",
 }
-SOLICITANTE_POR_USUARIO = {
-    "comunicacion": "Comunicación",
-    "direccion_servicios": "Dirección de Servicios",
-    "direccionservicios": "Dirección de Servicios",
-}
 
 def _solicitante_actual():
     return str(
