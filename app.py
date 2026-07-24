@@ -745,6 +745,33 @@ def mostrar_menu_operario():
             st.session_state["seccion_actual"] = "Histórico"
             st.rerun()
 
+def mostrar_menu_comunicacion():
+
+    st.markdown(
+        "<div class='section-title'>Comunicación</div>",
+        unsafe_allow_html=True
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button(
+            "📣\nNueva solicitud",
+            key="btn_comunicacion_nueva",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Nueva solicitud"
+            st.rerun()
+
+    with col2:
+        if st.button(
+            "📋\nMis solicitudes",
+            key="btn_comunicacion_historial",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Mis solicitudes"
+            st.rerun()
+
 
 # =====================================================
 # INICIO APP
