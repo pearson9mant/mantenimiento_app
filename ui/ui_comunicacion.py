@@ -27,48 +27,12 @@ SOLICITANTE_POR_USUARIO = {
     "direccionservicios": "Dirección de Servicios",
 }
 
-
-def _usuario_actual():
-    """
-    Obtiene el usuario que ha iniciado sesión.
-    Revisa varias claves para adaptarse al sistema actual de login.
-    """
-    for clave in [
-        "usuario",
-        "username",
-        "nombre_usuario",
-        "email",
-        "user",
-    ]:
-        valor = st.session_state.get(clave)
-
-        if valor:
-            return str(valor).strip()
-
-    return ""
-
-
 def _solicitante_actual():
-    usuario = _usuario_actual()
-    usuario_normalizado = usuario.lower().strip()
-
-    solicitante = SOLICITANTE_POR_USUARIO.get(usuario_normalizado)
-
-    if solicitante:
-        return solicitante
-
-    # Alternativa por si el nombre del departamento
-    # ya está guardado en la sesión.
-    departamento = str(
-        st.session_state.get("departamento")
-        or st.session_state.get("nombre")
-        or ""
+    return str(
+        st.session_state.get("nombre")
+        or st.session_state.get("operario_activo")
+        or "Comunicación"
     ).strip()
-
-    if departamento:
-        return departamento
-
-    return usuario or "Comunicación"
 
 
 def _es_administracion():
