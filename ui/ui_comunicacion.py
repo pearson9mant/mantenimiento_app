@@ -21,7 +21,70 @@ OPERARIO_POR_CENTRO = {
     "Pearson 22": "J.A. Almeda",
     "Pearson 9": "Luis Lozano",
 }
+SOLICITANTE_POR_USUARIO = {
+    "comunicacion": "Comunicación",
+    "direccion_servicios": "Dirección de Servicios",
+    "direccionservicios": "Dirección de Servicios",
+}
 
+
+def _usuario_actual():
+    """
+    Obtiene el usuario que ha iniciado sesión.
+    Revisa varias claves para adaptarse al sistema actual de login.
+    """
+    for clave in [
+        "usuario",
+        "username",
+        "nombre_usuario",
+        "email",
+        "user",
+    ]:
+        valor = st.session_state.get(clave)
+
+        if valor:
+            return str(valor).strip()
+
+    return ""
+
+
+def _solicitante_actual():
+    usuario = _usuario_actual()
+    usuario_normalizado = usuario.lower().strip()
+
+    solicitante = SOLICITANTE_POR_USUARIO.get(usuario_normalizado)
+
+    if solicitante:
+        return solicitante
+
+    # Alternativa por si el nombre del departamento
+    # ya está guardado en la sesión.
+    departamento = str(
+        st.session_state.get("departamento")
+        or st.session_state.get("nombre")
+        or ""
+    ).strip()
+
+    if departamento:
+        return departamento
+
+    return usuario or "Comunicación"
+
+
+def _es_administracion():
+    rol = str(
+        st.session_state.get("rol")
+        or st.session_state.get("tipo_usuario")
+        or st.session_state.get("perfil")
+        or ""
+    ).strip().lower()
+
+    return rol in [
+        "admin",
+        "administrador",
+        "administracion",
+        "administración",
+    ]
 
 # =====================================================
 # UTILIDADES
@@ -194,6 +257,7 @@ def _crear_ot_comunicacion(
     espacio = espacio_seleccionado["espacio"]
 
     operario = OPERARIO_POR_CENTRO.get(centro, "")
+    solicitante = _solicitante_actual()
 
     descripcion_ot = titulo_limpio
 
@@ -214,7 +278,7 @@ def _crear_ot_comunicacion(
         "Alta",                     # 7 prioridad
         operario,                   # 8 operario
         "COMUNICACION",             # 9 origen
-        "Comunicación",             # 10 solicitante
+        solicitante,                # 10 solicitante real
         fecha_solicitud,            # 11 fecha_origen
         "",                         # 12 foto antigua
         "Comunicación",             # 13 tipo_solicitante
@@ -300,17 +364,38 @@ def _normalizar_ot_historica(fila):
 def _obtener_solicitudes_comunicacion():
     solicitudes = []
 
+    solicitante_actual = _solicitante_actual()
+    es_admin = _es_administracion()
+
     for fila in obtener_ordenes():
         solicitud = _normalizar_ot_activa(fila)
 
-        if solicitud["origen"].upper() == "COMUNICACION":
-            solicitudes.append(solicitud)
+        if solicitud["origen"].upper() != "COMUNICACION":
+            continue
+
+        if (
+            not es_admin
+            and solicitud["solicitante"].strip().lower()
+            != solicitante_actual.strip().lower()
+        ):
+            continue
+
+        solicitudes.append(solicitud)
 
     for fila in obtener_historico():
         solicitud = _normalizar_ot_historica(fila)
 
-        if solicitud["origen"].upper() == "COMUNICACION":
-            solicitudes.append(solicitud)
+        if solicitud["origen"].upper() != "COMUNICACION":
+            continue
+
+        if (
+            not es_admin
+            and solicitud["solicitante"].strip().lower()
+            != solicitante_actual.strip().lower()
+        ):
+            continue
+
+        solicitudes.append(solicitud)
 
     solicitudes.sort(
         key=lambda item: _texto(
@@ -474,6 +559,12 @@ def _mostrar_historico_comunicacion():
 
     st.title("📋 Mis solicitudes")
 
+    if not _es_administracion():
+        st.caption(
+            f"Mostrando únicamente las solicitudes de "
+            f"**{_solicitante_actual()}**"
+        )
+
     if not solicitudes:
         st.info("Todavía no hay solicitudes enviadas.")
         return
@@ -591,6 +682,13 @@ def _mostrar_historico_comunicacion():
 
 def _mostrar_nueva_solicitud():
     st.title("📣 Comunicación")
+
+    solicitante = _solicitante_actual()
+
+    st.caption(
+        f"Solicitudes de: **{solicitante}**"
+    )
+
     st.markdown("### Nueva solicitud")
 
     st.caption(
