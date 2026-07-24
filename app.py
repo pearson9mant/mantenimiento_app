@@ -315,6 +315,9 @@ def etiqueta_perfil(perfil):
     if perfil == "inventario":
         return "Inventario"
 
+    if perfil == "comunicacion":
+        return "Comunicación"
+
     return "Operario"
 
 
