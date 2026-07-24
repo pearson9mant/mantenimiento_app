@@ -488,7 +488,7 @@ def crear_orden(datos):
     telefono_empresa = datos[17] if len(datos) > 17 else ""
     email_empresa = datos[18] if len(datos) > 18 else ""
     # Dato opcional añadido al final para no romper llamadas antiguas
-    planta = datos[29] if len(datos) > 29 else ""
+    
 
     if len(datos) > 27:
         fecha_aviso_empresa = datos[19] if len(datos) > 19 else ""
@@ -550,7 +550,6 @@ def crear_orden(datos):
             estado,
             centro,
             edificio,
-            planta,
             espacio,
             planta,
             area,
@@ -577,7 +576,7 @@ def crear_orden(datos):
             coste_final,
             observaciones_estado
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         numero_ot,
         descripcion,
@@ -585,7 +584,6 @@ def crear_orden(datos):
         centro,
         edificio,
         espacio,
-        planta,
         area,
         prioridad,
         operario,
