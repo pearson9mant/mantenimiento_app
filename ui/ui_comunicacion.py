@@ -123,35 +123,34 @@ def _crear_ot_comunicacion(
     fecha_programada = fecha_necesaria.isoformat()
 
     numero_ot = crear_orden((
-        "",                         # numero_ot
-        descripcion_ot,
-        "Abierta",
-        centro,
-        edificio,
-        espacio,
-        "",                         # area
-        "Alta",
-        operario,
-        "COMUNICACION",
-        "Comunicación",
-        fecha_solicitud,
-        "",
-        "Comunicación",
-        "Interna",
-        "",                         # empresa
-        "",                         # contacto
-        "",                         # telefono
-        "",                         # email
-        fecha_programada,           # fecha_programada
-        "",                         # fecha_aviso_empresa
-        "",                         # fecha_realizacion
-        "",                         # trabajo_a_realizar
-        "",                         # trabajo_realizado
-        "",                         # firma_operario
-        "",                         # fecha_firma_operario
-        0,                          # coste_estimado
-        0,                          # coste_final
-        ""                          # observaciones_estado
+        "",                         # 0  numero_ot: automático
+        descripcion_ot,             # 1  descripción
+        "Abierta",                  # 2  estado
+        centro,                     # 3  centro
+        edificio,                   # 4  edificio
+        espacio,                    # 5  espacio
+        "",                         # 6  área: automática
+        "Alta",                     # 7  prioridad
+        operario,                   # 8  operario
+        "COMUNICACION",             # 9  origen
+        "Comunicación",             # 10 solicitante
+        fecha_solicitud,            # 11 fecha_origen
+        "",                         # 12 foto antigua
+        "Comunicación",             # 13 tipo_solicitante
+        "Interna",                  # 14 tipo_orden
+        "",                         # 15 empresa_externa
+        "",                         # 16 contacto_empresa
+        "",                         # 17 telefono_empresa
+        "",                         # 18 email_empresa
+        fecha_programada,           # 19 fecha_aviso / programada
+        "",                         # 20 fecha_realizacion
+        "",                         # 21 trabajo_a_realizar
+        "",                         # 22 trabajo_realizado
+        "",                         # 23 firma_operario
+        "",                         # 24 fecha_firma_operario
+        0,                          # 25 coste_estimado
+        0,                          # 26 coste_final
+        ""                          # 27 observaciones_estado
     ))
 
     if archivo is not None and numero_ot:
