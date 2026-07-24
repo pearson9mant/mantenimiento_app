@@ -551,7 +551,6 @@ def crear_orden(datos):
             centro,
             edificio,
             espacio,
-            planta,
             area,
             prioridad,
             operario,
