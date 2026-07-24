@@ -1,8 +1,16 @@
+import mimetypes
+from datetime import date, datetime
+
 import streamlit as st
-from datetime import date
 
 from modules.espacios import obtener_espacios
-from modules.ordenes import crear_orden, guardar_foto_ot
+from modules.ordenes import (
+    crear_orden,
+    guardar_foto_ot,
+    obtener_ordenes,
+    obtener_historico,
+    obtener_fotos_ot,
+)
 
 
 # =====================================================
@@ -13,6 +21,79 @@ OPERARIO_POR_CENTRO = {
     "Pearson 22": "J.A. Almeda",
     "Pearson 9": "Luis Lozano",
 }
+
+
+# =====================================================
+# UTILIDADES
+# =====================================================
+
+def _texto(valor):
+    return str(valor or "").strip()
+
+
+def _formatear_fecha(valor):
+    texto = _texto(valor)
+
+    if not texto:
+        return "-"
+
+    formatos = [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+    ]
+
+    for formato in formatos:
+        try:
+            fecha = datetime.strptime(texto[:19], formato)
+            return fecha.strftime("%d/%m/%Y")
+        except Exception:
+            pass
+
+    return texto
+
+
+def _separar_titulo_descripcion(descripcion_ot):
+    texto = _texto(descripcion_ot)
+
+    if not texto:
+        return "Solicitud de mantenimiento", ""
+
+    partes = texto.splitlines()
+
+    titulo = partes[0].strip()
+    detalle = "\n".join(partes[1:]).strip()
+
+    return titulo, detalle
+
+
+def _icono_estado(estado):
+    estado_txt = _texto(estado).lower()
+
+    if estado_txt in ["finalizada", "cerrado"]:
+        return "🟢"
+
+    if estado_txt in [
+        "en curso",
+        "en ejecución",
+        "pendiente material",
+        "pendiente proveedor",
+        "avisado",
+        "pendiente presupuesto",
+    ]:
+        return "🟡"
+
+    return "🔴"
+
+
+def _estado_visible(estado):
+    estado_txt = _texto(estado)
+
+    if estado_txt == "Cerrado":
+        return "Finalizada"
+
+    return estado_txt or "Abierta"
 
 
 # =====================================================
@@ -37,11 +118,11 @@ def _obtener_opciones_espacios():
 
         opciones[id_espacio] = {
             "id": id_espacio,
-            "centro": str(centro or "").strip(),
-            "edificio": str(edificio or "").strip(),
-            "planta": str(planta or "").strip(),
-            "espacio": str(espacio or "").strip(),
-            "tipo": str(tipo or "").strip(),
+            "centro": _texto(centro),
+            "edificio": _texto(edificio),
+            "planta": _texto(planta),
+            "espacio": _texto(espacio),
+            "tipo": _texto(tipo),
         }
 
     return opciones
@@ -85,7 +166,7 @@ def _seleccionar_espacio():
             id_espacio,
             opciones
         ),
-        key="comunicacion_espacio"
+        key="comunicacion_espacio",
     )
 
     if id_seleccionado is None:
@@ -105,8 +186,8 @@ def _crear_ot_comunicacion(
     fecha_necesaria,
     archivo=None,
 ):
-    titulo_limpio = str(titulo or "").strip()
-    descripcion_limpia = str(descripcion or "").strip()
+    titulo_limpio = _texto(titulo)
+    descripcion_limpia = _texto(descripcion)
 
     centro = espacio_seleccionado["centro"]
     edificio = espacio_seleccionado["edificio"]
@@ -123,16 +204,16 @@ def _crear_ot_comunicacion(
     fecha_programada = fecha_necesaria.isoformat()
 
     numero_ot = crear_orden((
-        "",                         # 0  numero_ot: automático
-        descripcion_ot,             # 1  descripción
-        "Abierta",                  # 2  estado
-        centro,                     # 3  centro
-        edificio,                   # 4  edificio
-        espacio,                    # 5  espacio
-        "",                         # 6  área: automática
-        "Alta",                     # 7  prioridad
-        operario,                   # 8  operario
-        "COMUNICACION",             # 9  origen
+        "",                         # 0 numero_ot
+        descripcion_ot,             # 1 descripcion
+        "Abierta",                  # 2 estado
+        centro,                     # 3 centro
+        edificio,                   # 4 edificio
+        espacio,                    # 5 espacio
+        "",                         # 6 area automática
+        "Alta",                     # 7 prioridad
+        operario,                   # 8 operario
+        "COMUNICACION",             # 9 origen
         "Comunicación",             # 10 solicitante
         fecha_solicitud,            # 11 fecha_origen
         "",                         # 12 foto antigua
@@ -142,7 +223,7 @@ def _crear_ot_comunicacion(
         "",                         # 16 contacto_empresa
         "",                         # 17 telefono_empresa
         "",                         # 18 email_empresa
-        fecha_programada,           # 19 fecha_aviso / programada
+        fecha_programada,           # 19 fecha programada
         "",                         # 20 fecha_realizacion
         "",                         # 21 trabajo_a_realizar
         "",                         # 22 trabajo_realizado
@@ -150,7 +231,7 @@ def _crear_ot_comunicacion(
         "",                         # 24 fecha_firma_operario
         0,                          # 25 coste_estimado
         0,                          # 26 coste_final
-        ""                          # 27 observaciones_estado
+        "",                         # 27 observaciones_estado
     ))
 
     if archivo is not None and numero_ot:
@@ -164,28 +245,363 @@ def _crear_ot_comunicacion(
 
 
 # =====================================================
-# PANTALLA
+# SOLICITUDES DE COMUNICACIÓN
 # =====================================================
 
-def pantalla_comunicacion(modo="nuevo"):
+def _normalizar_ot_activa(fila):
+    return {
+        "id": fila[0],
+        "numero_ot": _texto(fila[1]),
+        "descripcion": _texto(fila[2]),
+        "estado": _texto(fila[3]),
+        "fecha_creacion": fila[4],
+        "centro": _texto(fila[5]),
+        "edificio": _texto(fila[6]),
+        "espacio": _texto(fila[7]),
+        "area": _texto(fila[8]),
+        "prioridad": _texto(fila[9]),
+        "operario": _texto(fila[10]),
+        "origen": _texto(fila[11]),
+        "solicitante": _texto(fila[12]),
+        "fecha_origen": fila[13],
+        "fecha_programada": fila[21],
+        "fecha_realizacion": fila[22],
+        "observaciones_estado": _texto(fila[25]),
+        "observaciones_cierre": "",
+        "finalizada": False,
+    }
 
-    if modo == "historico":
-        st.title("📋 Mis solicitudes")
-        st.info("El histórico de solicitudes se conectará en el siguiente paso.")
+
+def _normalizar_ot_historica(fila):
+    return {
+        "id": fila[0],
+        "numero_ot": _texto(fila[1]),
+        "descripcion": _texto(fila[2]),
+        "estado": _texto(fila[3]),
+        "fecha_creacion": fila[4],
+        "centro": _texto(fila[5]),
+        "edificio": _texto(fila[6]),
+        "espacio": _texto(fila[7]),
+        "area": _texto(fila[8]),
+        "prioridad": _texto(fila[9]),
+        "operario": _texto(fila[10]),
+        "origen": _texto(fila[11]),
+        "solicitante": _texto(fila[12]),
+        "fecha_origen": fila[13],
+        "fecha_cierre": fila[14],
+        "observaciones_cierre": _texto(fila[15]),
+        "fecha_programada": fila[23],
+        "fecha_realizacion": fila[24],
+        "observaciones_estado": _texto(fila[27]),
+        "finalizada": True,
+    }
+
+
+def _obtener_solicitudes_comunicacion():
+    solicitudes = []
+
+    for fila in obtener_ordenes():
+        solicitud = _normalizar_ot_activa(fila)
+
+        if solicitud["origen"].upper() == "COMUNICACION":
+            solicitudes.append(solicitud)
+
+    for fila in obtener_historico():
+        solicitud = _normalizar_ot_historica(fila)
+
+        if solicitud["origen"].upper() == "COMUNICACION":
+            solicitudes.append(solicitud)
+
+    solicitudes.sort(
+        key=lambda item: _texto(
+            item.get("fecha_creacion")
+            or item.get("fecha_origen")
+        ),
+        reverse=True,
+    )
+
+    return solicitudes
+
+
+# =====================================================
+# ADJUNTOS
+# =====================================================
+
+def _mostrar_adjuntos(numero_ot):
+    fotos = obtener_fotos_ot(numero_ot)
+
+    if not fotos:
         return
 
+    st.markdown("### 📎 Archivos adjuntos")
+
+    for indice, foto in enumerate(fotos):
+        nombre_foto = _texto(foto[0]) or f"archivo_{indice + 1}"
+        foto_data = foto[1]
+
+        mime, _ = mimetypes.guess_type(nombre_foto)
+        mime = mime or "application/octet-stream"
+
+        if mime.startswith("image/"):
+            st.image(
+                foto_data,
+                caption=nombre_foto,
+                use_container_width=True,
+            )
+
+        st.download_button(
+            label=f"⬇️ Descargar {nombre_foto}",
+            data=foto_data,
+            file_name=nombre_foto,
+            mime=mime,
+            key=f"comunicacion_descargar_{numero_ot}_{indice}",
+        )
+
+
+# =====================================================
+# DETALLE DE SOLICITUD
+# =====================================================
+
+def _mostrar_detalle_solicitud(solicitud):
+    if st.button(
+        "← Volver a mis solicitudes",
+        key="comunicacion_volver_historico",
+    ):
+        st.session_state.pop("comunicacion_ot_abierta", None)
+        st.rerun()
+
+    titulo, descripcion = _separar_titulo_descripcion(
+        solicitud["descripcion"]
+    )
+
+    estado = _estado_visible(solicitud["estado"])
+    icono = _icono_estado(estado)
+
+    st.title("📣 Solicitud")
+    st.markdown(f"## {titulo}")
+
+    if solicitud["finalizada"]:
+        st.success("✅ Trabajo finalizado")
+    else:
+        st.info(f"{icono} Estado actual: **{estado}**")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Estado", estado)
+
+    with col2:
+        st.metric("Prioridad", solicitud["prioridad"] or "Alta")
+
+    with col3:
+        st.metric("Área", solicitud["area"] or "Pendiente de clasificar")
+
+    st.markdown("### 📍 Ubicación")
+
+    st.write(
+        f"**Centro:** {solicitud['centro'] or '-'}  \n"
+        f"**Edificio:** {solicitud['edificio'] or '-'}  \n"
+        f"**Espacio:** {solicitud['espacio'] or '-'}"
+    )
+
+    st.markdown("### 📋 Seguimiento")
+
+    st.write(
+        f"**OT:** {solicitud['numero_ot']}  \n"
+        f"**Operario asignado:** {solicitud['operario'] or 'Pendiente'}  \n"
+        f"**Fecha de solicitud:** "
+        f"{_formatear_fecha(solicitud['fecha_origen'])}  \n"
+        f"**Fecha necesaria:** "
+        f"{_formatear_fecha(solicitud['fecha_programada'])}"
+    )
+
+    if descripcion:
+        st.markdown("### 📝 Descripción")
+        st.write(descripcion)
+
+    if solicitud["observaciones_estado"]:
+        st.markdown("### 🔧 Información de mantenimiento")
+        st.info(solicitud["observaciones_estado"])
+
+    if solicitud["finalizada"]:
+        observaciones_finales = solicitud["observaciones_cierre"]
+
+        st.markdown("### ✅ Trabajo realizado")
+
+        if observaciones_finales:
+            st.success(observaciones_finales)
+        else:
+            st.success("La orden de trabajo ha sido finalizada.")
+
+        fecha_final = (
+            solicitud.get("fecha_realizacion")
+            or solicitud.get("fecha_cierre")
+        )
+
+        st.write(
+            f"**Fecha de finalización:** "
+            f"{_formatear_fecha(fecha_final)}  \n"
+            f"**Operario:** {solicitud['operario'] or '-'}"
+        )
+
+    _mostrar_adjuntos(solicitud["numero_ot"])
+
+
+# =====================================================
+# HISTÓRICO
+# =====================================================
+
+def _mostrar_historico_comunicacion():
+    solicitudes = _obtener_solicitudes_comunicacion()
+
+    numero_abierto = st.session_state.get("comunicacion_ot_abierta")
+
+    if numero_abierto:
+        solicitud = next(
+            (
+                item
+                for item in solicitudes
+                if item["numero_ot"] == numero_abierto
+            ),
+            None,
+        )
+
+        if solicitud:
+            _mostrar_detalle_solicitud(solicitud)
+            return
+
+        st.session_state.pop("comunicacion_ot_abierta", None)
+
+    st.title("📋 Mis solicitudes")
+
+    if not solicitudes:
+        st.info("Todavía no hay solicitudes enviadas.")
+        return
+
+    abiertas = sum(
+        1
+        for solicitud in solicitudes
+        if not solicitud["finalizada"]
+        and solicitud["estado"] == "Abierta"
+    )
+
+    en_seguimiento = sum(
+        1
+        for solicitud in solicitudes
+        if not solicitud["finalizada"]
+        and solicitud["estado"] != "Abierta"
+    )
+
+    finalizadas = sum(
+        1
+        for solicitud in solicitudes
+        if solicitud["finalizada"]
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Abiertas", abiertas)
+
+    with col2:
+        st.metric("En seguimiento", en_seguimiento)
+
+    with col3:
+        st.metric("Finalizadas", finalizadas)
+
+    filtro_estado = st.selectbox(
+        "Mostrar",
+        [
+            "Todas",
+            "Abiertas",
+            "En seguimiento",
+            "Finalizadas",
+        ],
+        key="comunicacion_filtro_estado",
+    )
+
+    solicitudes_filtradas = []
+
+    for solicitud in solicitudes:
+        if filtro_estado == "Abiertas":
+            if solicitud["finalizada"]:
+                continue
+
+            if solicitud["estado"] != "Abierta":
+                continue
+
+        elif filtro_estado == "En seguimiento":
+            if solicitud["finalizada"]:
+                continue
+
+            if solicitud["estado"] == "Abierta":
+                continue
+
+        elif filtro_estado == "Finalizadas":
+            if not solicitud["finalizada"]:
+                continue
+
+        solicitudes_filtradas.append(solicitud)
+
+    if not solicitudes_filtradas:
+        st.info("No hay solicitudes en este estado.")
+        return
+
+    for solicitud in solicitudes_filtradas:
+        titulo, _ = _separar_titulo_descripcion(
+            solicitud["descripcion"]
+        )
+
+        estado = _estado_visible(solicitud["estado"])
+        icono = _icono_estado(estado)
+
+        with st.container(border=True):
+            col_info, col_boton = st.columns([5, 1])
+
+            with col_info:
+                st.markdown(f"### {icono} {titulo}")
+
+                st.caption(
+                    f"{solicitud['numero_ot']} · "
+                    f"{solicitud['centro']} · "
+                    f"{solicitud['espacio']}"
+                )
+
+                st.write(
+                    f"**Estado:** {estado}  \n"
+                    f"**Fecha necesaria:** "
+                    f"{_formatear_fecha(solicitud['fecha_programada'])}"
+                )
+
+            with col_boton:
+                if st.button(
+                    "Ver",
+                    key=f"comunicacion_ver_{solicitud['numero_ot']}",
+                    use_container_width=True,
+                ):
+                    st.session_state["comunicacion_ot_abierta"] = (
+                        solicitud["numero_ot"]
+                    )
+                    st.rerun()
+
+
+# =====================================================
+# NUEVA SOLICITUD
+# =====================================================
+
+def _mostrar_nueva_solicitud():
     st.title("📣 Comunicación")
     st.markdown("### Nueva solicitud")
 
     st.caption(
-        "Indica el trabajo necesario. Mantenimiento recibirá automáticamente "
-        "una orden con prioridad alta."
+        "Indica el trabajo necesario. Mantenimiento recibirá "
+        "automáticamente una orden con prioridad alta."
     )
 
     titulo = st.text_input(
         "Título *",
         placeholder="Ej.: Pérdida de agua",
-        key="comunicacion_titulo"
+        key="comunicacion_titulo",
     )
 
     espacio_seleccionado = _seleccionar_espacio()
@@ -194,14 +610,14 @@ def pantalla_comunicacion(modo="nuevo"):
         "Fecha necesaria",
         value=date.today(),
         min_value=date.today(),
-        key="comunicacion_fecha"
+        key="comunicacion_fecha",
     )
 
     descripcion = st.text_area(
         "Descripción (opcional)",
         placeholder="Añade información solamente si es necesaria.",
         height=130,
-        key="comunicacion_descripcion"
+        key="comunicacion_descripcion",
     )
 
     archivo = st.file_uploader(
@@ -214,7 +630,7 @@ def pantalla_comunicacion(modo="nuevo"):
             "doc",
             "docx",
         ],
-        key="comunicacion_archivo"
+        key="comunicacion_archivo",
     )
 
     if espacio_seleccionado:
@@ -229,9 +645,9 @@ def pantalla_comunicacion(modo="nuevo"):
         "📣 Enviar solicitud",
         key="comunicacion_enviar",
         use_container_width=True,
-        type="primary"
+        type="primary",
     ):
-        titulo_limpio = str(titulo or "").strip()
+        titulo_limpio = _texto(titulo)
 
         if not titulo_limpio:
             st.warning("Escribe el título de la solicitud.")
@@ -270,3 +686,15 @@ def pantalla_comunicacion(modo="nuevo"):
                 "No se pudo crear la solicitud. "
                 f"Detalle técnico: {e}"
             )
+
+
+# =====================================================
+# PANTALLA PRINCIPAL
+# =====================================================
+
+def pantalla_comunicacion(modo="nuevo"):
+    if modo == "historico":
+        _mostrar_historico_comunicacion()
+        return
+
+    _mostrar_nueva_solicitud()
