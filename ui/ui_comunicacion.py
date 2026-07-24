@@ -1,83 +1,91 @@
 import streamlit as st
 from datetime import date
 
-from modules.espacios import buscar_espacios_texto
+from modules.espacios import obtener_espacios
 
 
-def _limpiar_seleccion_espacio():
-    st.session_state.pop("comunicacion_espacio_seleccionado", None)
-    st.session_state.pop("comunicacion_espacio_busqueda", None)
+# =====================================================
+# ESPACIOS
+# =====================================================
+
+def _obtener_opciones_espacios():
+    filas = obtener_espacios(activos=True)
+
+    opciones = {}
+
+    for fila in filas:
+        (
+            id_espacio,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo,
+        ) = fila
+
+        opciones[id_espacio] = {
+            "id": id_espacio,
+            "centro": str(centro or "").strip(),
+            "edificio": str(edificio or "").strip(),
+            "planta": str(planta or "").strip(),
+            "espacio": str(espacio or "").strip(),
+            "tipo": str(tipo or "").strip(),
+        }
+
+    return opciones
 
 
-def _mostrar_buscador_espacio():
-    seleccionado = st.session_state.get(
-        "comunicacion_espacio_seleccionado"
-    )
+def _etiqueta_espacio(id_espacio, opciones):
+    datos = opciones.get(id_espacio)
 
-    if seleccionado:
-        st.success(
-            f"📍 {seleccionado['espacio']} · "
-            f"{seleccionado['centro']} · "
-            f"{seleccionado['edificio']} · "
-            f"{seleccionado['planta']}"
-        )
+    if not datos:
+        return ""
 
-        if st.button(
-            "Cambiar espacio",
-            key="comunicacion_cambiar_espacio"
-        ):
-            _limpiar_seleccion_espacio()
-            st.rerun()
+    partes = [datos["espacio"]]
 
-        return seleccionado
+    if datos["centro"]:
+        partes.append(datos["centro"])
 
-    texto = st.text_input(
+    if datos["edificio"]:
+        partes.append(datos["edificio"])
+
+    if datos["planta"]:
+        partes.append(datos["planta"])
+
+    return " · ".join(partes)
+
+
+def _seleccionar_espacio():
+    opciones = _obtener_opciones_espacios()
+
+    if not opciones:
+        st.warning("No hay espacios disponibles.")
+        return None
+
+    ids_espacios = list(opciones.keys())
+
+    id_seleccionado = st.selectbox(
         "Espacio",
-        placeholder="Escribe 3, I2, Biblioteca, Teatro...",
-        key="comunicacion_espacio_busqueda"
+        options=ids_espacios,
+        index=None,
+        placeholder="Escribe 3, I1, I2, Biblioteca...",
+        format_func=lambda id_espacio: _etiqueta_espacio(
+            id_espacio,
+            opciones
+        ),
+        key="comunicacion_espacio"
     )
 
-    texto = str(texto or "").strip()
-
-    if not texto:
+    if id_seleccionado is None:
         return None
 
-    resultados = buscar_espacios_texto(
-        texto,
-        limite=25
-    )
+    return opciones.get(id_seleccionado)
 
-    if not resultados:
-        st.warning("No se han encontrado espacios.")
-        return None
 
-    st.caption(f"{len(resultados)} espacios encontrados")
-
-    for resultado in resultados:
-        etiqueta = resultado["espacio"]
-
-        if resultado["centro"]:
-            etiqueta += f" · {resultado['centro']}"
-
-        if resultado["edificio"]:
-            etiqueta += f" · {resultado['edificio']}"
-
-        if resultado["planta"]:
-            etiqueta += f" · {resultado['planta']}"
-
-        if st.button(
-            etiqueta,
-            key=f"comunicacion_espacio_{resultado['id']}",
-            use_container_width=True
-        ):
-            st.session_state[
-                "comunicacion_espacio_seleccionado"
-            ] = resultado
-
-            st.rerun()
-
-    return None
-
+# =====================================================
+# PANTALLA
+# =====================================================
 
 def pantalla_comunicacion(modo="nuevo"):
 
@@ -91,11 +99,11 @@ def pantalla_comunicacion(modo="nuevo"):
 
     titulo = st.text_input(
         "Título",
-        placeholder="Ej.: Pérdida de agua en aula",
+        placeholder="Ej.: Pérdida de agua",
         key="comunicacion_titulo"
     )
 
-    espacio_seleccionado = _mostrar_buscador_espacio()
+    espacio_seleccionado = _seleccionar_espacio()
 
     fecha_necesaria = st.date_input(
         "Fecha necesaria",
@@ -104,8 +112,9 @@ def pantalla_comunicacion(modo="nuevo"):
     )
 
     descripcion = st.text_area(
-        "Descripción",
-        height=180,
+        "Descripción (opcional)",
+        placeholder="Añade información solamente si es necesaria.",
+        height=130,
         key="comunicacion_descripcion"
     )
 
@@ -127,19 +136,17 @@ def pantalla_comunicacion(modo="nuevo"):
         key="comunicacion_enviar",
         use_container_width=True
     ):
-        if not titulo.strip():
+        titulo_limpio = str(titulo or "").strip()
+
+        if not titulo_limpio:
             st.warning("Escribe el título de la solicitud.")
             return
 
         if not espacio_seleccionado:
-            st.warning("Selecciona un espacio de la lista.")
-            return
-
-        if not descripcion.strip():
-            st.warning("Escribe la descripción del trabajo.")
+            st.warning("Selecciona un espacio.")
             return
 
         st.success(
-            "Solicitud preparada correctamente. "
-            "El siguiente paso será crear la OT."
+            f"Solicitud preparada: {titulo_limpio} · "
+            f"{espacio_seleccionado['espacio']}"
         )
