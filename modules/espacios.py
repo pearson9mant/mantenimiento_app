@@ -1035,4 +1035,86 @@ def obtener_aulas_para_qr():
     conn.close()
     return datos
 
+def buscar_espacios_texto(texto, limite=30):
+    crear_tabla_espacios()
+    asegurar_codigos_espacios()
+
+    texto = str(texto or "").strip().lower()
+
+    if not texto:
+        return []
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT
+            id,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo
+        FROM espacios
+        WHERE activo = 1
+        ORDER BY espacio, centro, edificio, planta
+    """))
+
+    filas = cur.fetchall()
+    conn.close()
+
+    resultados = []
+
+    for fila in filas:
+        (
+            id_espacio,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+        ) = fila
+
+        codigo_txt = str(codigo or "").strip()
+        centro_txt = str(centro or "").strip()
+        edificio_txt = str(edificio or "").strip()
+        planta_txt = str(planta or "").strip()
+        espacio_txt = str(espacio or "").strip()
+        tipo_txt = str(tipo or "").strip()
+
+        texto_busqueda = " ".join([
+            codigo_txt,
+            centro_txt,
+            edificio_txt,
+            planta_txt,
+            espacio_txt,
+            tipo_txt,
+        ]).lower()
+
+        if texto not in texto_busqueda:
+            continue
+
+        resultados.append({
+            "id": id_espacio,
+            "codigo": codigo_txt,
+            "centro": centro_txt,
+            "edificio": edificio_txt,
+            "planta": planta_txt,
+            "espacio": espacio_txt,
+            "tipo": tipo_txt,
+            "etiqueta": (
+                f"{espacio_txt} · "
+                f"{centro_txt} · "
+                f"{edificio_txt} · "
+                f"{planta_txt}"
+            ),
+        })
+
+        if len(resultados) >= limite:
+            break
+
+    return resultados
+
 
