@@ -123,30 +123,35 @@ def _crear_ot_comunicacion(
     fecha_programada = fecha_necesaria.isoformat()
 
     numero_ot = crear_orden((
-        "",                         # numero_ot: automático
-        descripcion_ot,             # descripción
-        "Abierta",                  # estado
-        centro,                     # centro
-        edificio,                   # edificio
-        espacio,                    # espacio
-        "",                         # área: detección automática
-        "Alta",                     # prioridad
-        operario,                   # operario según centro
-        "COMUNICACION",             # origen
-        "Comunicación",             # solicitante
-        fecha_solicitud,            # fecha_origen
-        "",                         # foto antigua
-        "Comunicación",             # tipo_solicitante
-        "Interna",                  # tipo_orden
-        "",                         # empresa_externa
-        "",                         # contacto_empresa
-        "",                         # telefono_empresa
-        "",                         # email_empresa
+        "",                         # numero_ot
+        descripcion_ot,
+        "Abierta",
+        centro,
+        edificio,
+        espacio,
+        "",                         # area
+        "Alta",
+        operario,
+        "COMUNICACION",
+        "Comunicación",
+        fecha_solicitud,
+        "",
+        "Comunicación",
+        "Interna",
+        "",                         # empresa
+        "",                         # contacto
+        "",                         # telefono
+        "",                         # email
         fecha_programada,           # fecha_programada
+        "",                         # fecha_aviso_empresa
         "",                         # fecha_realizacion
+        "",                         # trabajo_a_realizar
+        "",                         # trabajo_realizado
+        "",                         # firma_operario
+        "",                         # fecha_firma_operario
         0,                          # coste_estimado
         0,                          # coste_final
-        "",                         # observaciones_estado
+        ""                          # observaciones_estado
     ))
 
     if archivo is not None and numero_ot:
