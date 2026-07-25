@@ -373,6 +373,339 @@ def mostrar_correccion_ubicacion_ot(id_orden, modo):
             else:
                 st.error(mensaje)
 
+# =====================================================
+# SELECTOR INTELIGENTE DE MATERIALES
+# =====================================================
+
+CATEGORIAS_MATERIAL_POR_PREFIJO = {
+    "FON": "Fontanería",
+    "ELE": "Electricidad",
+    "FER": "Ferretería",
+    "CLI": "Climatización",
+    "PIN": "Pintura",
+    "LIM": "Limpieza",
+    "SEG": "Seguridad",
+    "JAR": "Jardinería",
+    "INF": "Informática",
+    "ACS": "ACS",
+    "LEG": "Legionella",
+    "EQU": "Equipamiento",
+    "OTR": "Otros",
+}
+
+
+ICONOS_CATEGORIA_MATERIAL = {
+    "Todas": "📦",
+    "Fontanería": "🔧",
+    "Electricidad": "⚡",
+    "Ferretería": "🔩",
+    "Climatización": "❄️",
+    "Pintura": "🎨",
+    "Limpieza": "🧹",
+    "Seguridad": "🦺",
+    "Jardinería": "🌿",
+    "Informática": "💻",
+    "ACS": "🌡️",
+    "Legionella": "💧",
+    "Equipamiento": "🪑",
+    "Otros": "📦",
+}
+
+
+def obtener_categoria_material_desde_codigo(codigo):
+    """
+    Obtiene la categoría usando el prefijo del código.
+
+    Ejemplos:
+        FON-PRPI-001 -> Fontanería
+        ELE-PAEL-001 -> Electricidad
+        FER-JUDE-001 -> Ferretería
+    """
+    codigo_txt = str(codigo or "").strip().upper()
+
+    if not codigo_txt:
+        return "Otros"
+
+    prefijo = codigo_txt.split("-")[0]
+
+    return CATEGORIAS_MATERIAL_POR_PREFIJO.get(
+        prefijo,
+        "Otros"
+    )
+
+
+def preparar_materiales_selector(materiales_select):
+    """
+    Convierte los materiales recibidos en una estructura uniforme.
+    Mantiene compatibilidad con obtener_materiales_para_select().
+    """
+    materiales = []
+
+    for fila in materiales_select or []:
+        try:
+            codigo = str(fila[0] or "").strip()
+            nombre = str(fila[1] or "").strip()
+            stock = float(fila[2] or 0)
+            unidad = str(fila[3] or "").strip()
+        except (IndexError, TypeError, ValueError):
+            continue
+
+        if not codigo:
+            continue
+
+        materiales.append({
+            "codigo": codigo,
+            "nombre": nombre or codigo,
+            "stock": stock,
+            "unidad": unidad,
+            "categoria": obtener_categoria_material_desde_codigo(
+                codigo
+            ),
+        })
+
+    return materiales
+
+
+def mostrar_ficha_material_seleccionado(material):
+    """
+    Muestra la información completa del material elegido.
+    """
+    if not material:
+        return
+
+    codigo = material["codigo"]
+
+    try:
+        datos_mat = obtener_material_por_codigo(codigo)
+    except Exception as e:
+        datos_mat = None
+        st.caption(f"No se pudo cargar la ficha del material: {e}")
+
+    st.markdown(f"#### {material['nombre']}")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.caption("Código")
+        st.markdown(f"**{codigo}**")
+
+    with col2:
+        st.caption("Stock disponible")
+        st.markdown(
+            f"**{material['stock']:g} "
+            f"{material['unidad']}**"
+        )
+
+    icono_categoria = ICONOS_CATEGORIA_MATERIAL.get(
+        material["categoria"],
+        "📦"
+    )
+
+    st.caption(
+        f"{icono_categoria} Categoría: "
+        f"{material['categoria']}"
+    )
+
+    if material["stock"] <= 0:
+        st.warning("Este material no tiene stock disponible.")
+    elif material["stock"] <= 2:
+        st.warning("Queda poco stock de este material.")
+
+    if not datos_mat:
+        return
+
+    foto_data = datos_mat.get("foto_data")
+    foto_ruta = datos_mat.get("foto")
+
+    if foto_data:
+        try:
+            st.image(
+                bytes(foto_data),
+                width=220,
+                caption=material["nombre"]
+            )
+        except Exception:
+            st.caption("Foto del material no disponible.")
+
+    elif foto_ruta:
+        try:
+            st.image(
+                foto_ruta,
+                width=220,
+                caption=material["nombre"]
+            )
+        except Exception:
+            st.caption("Foto del material no disponible.")
+
+    ubicacion = str(
+        datos_mat.get("ubicacion")
+        or datos_mat.get("espacio")
+        or ""
+    ).strip()
+
+    centro_material = str(
+        datos_mat.get("centro")
+        or ""
+    ).strip()
+
+    edificio_material = str(
+        datos_mat.get("edificio")
+        or ""
+    ).strip()
+
+    partes_ubicacion = [
+        parte
+        for parte in [
+            centro_material,
+            edificio_material,
+            ubicacion,
+        ]
+        if parte
+    ]
+
+    if partes_ubicacion:
+        st.info(
+            "📍 " + " · ".join(partes_ubicacion)
+        )
+
+
+def selector_material_inteligente(
+    materiales,
+    id_orden,
+    indice,
+    modo="operario",
+):
+    """
+    Selector reutilizable de un material.
+
+    Flujo:
+        1. Categoría
+        2. Búsqueda por nombre o código
+        3. Selección del material
+        4. Ficha y cantidad
+    """
+    if not materiales:
+        st.info("No hay materiales disponibles.")
+        return None
+
+    categorias_disponibles = sorted({
+        material["categoria"]
+        for material in materiales
+    })
+
+    categorias = ["Todas"] + categorias_disponibles
+
+    categoria_sel = st.selectbox(
+        "Categoría",
+        categorias,
+        format_func=lambda categoria: (
+            f"{ICONOS_CATEGORIA_MATERIAL.get(categoria, '📦')} "
+            f"{categoria}"
+        ),
+        key=(
+            f"{modo}_categoria_material_"
+            f"{id_orden}_{indice}"
+        ),
+    )
+
+    texto_busqueda = st.text_input(
+        "Buscar por nombre o código",
+        placeholder=(
+            "Ejemplo: Presto, pistón, conector, FON..."
+        ),
+        key=(
+            f"{modo}_buscar_material_"
+            f"{id_orden}_{indice}"
+        ),
+    )
+
+    materiales_filtrados = materiales
+
+    if categoria_sel != "Todas":
+        materiales_filtrados = [
+            material
+            for material in materiales_filtrados
+            if material["categoria"] == categoria_sel
+        ]
+
+    buscar_txt = normalizar_txt(texto_busqueda)
+
+    if buscar_txt:
+        materiales_filtrados = [
+            material
+            for material in materiales_filtrados
+            if (
+                buscar_txt
+                in normalizar_txt(material["nombre"])
+                or buscar_txt
+                in normalizar_txt(material["codigo"])
+            )
+        ]
+
+    materiales_filtrados = sorted(
+        materiales_filtrados,
+        key=lambda material: (
+            normalizar_txt(material["nombre"]),
+            normalizar_txt(material["codigo"]),
+        )
+    )
+
+    st.caption(
+        f"{len(materiales_filtrados)} materiales encontrados."
+    )
+
+    if not materiales_filtrados:
+        st.warning(
+            "No se encontraron materiales con estos filtros."
+        )
+        return None
+
+    codigos_filtrados = [
+        material["codigo"]
+        for material in materiales_filtrados
+    ]
+
+    materiales_por_codigo = {
+        material["codigo"]: material
+        for material in materiales_filtrados
+    }
+
+    codigo_sel = st.selectbox(
+        "Material",
+        codigos_filtrados,
+        format_func=lambda codigo: (
+            f"{materiales_por_codigo[codigo]['nombre']} · "
+            f"Stock: "
+            f"{materiales_por_codigo[codigo]['stock']:g} "
+            f"{materiales_por_codigo[codigo]['unidad']}"
+        ),
+        key=(
+            f"{modo}_material_ot_"
+            f"{id_orden}_{indice}"
+        ),
+    )
+
+    material_sel = materiales_por_codigo.get(codigo_sel)
+
+    mostrar_ficha_material_seleccionado(
+        material_sel
+    )
+
+    cantidad_material = st.number_input(
+        "Cantidad usada",
+        min_value=0.0,
+        step=1.0,
+        key=(
+            f"{modo}_cantidad_material_ot_"
+            f"{id_orden}_{indice}"
+        ),
+    )
+
+    return {
+        "codigo": codigo_sel,
+        "cantidad": cantidad_material,
+    }
+
 def mostrar_tarjeta_ot(
     fila,
     materiales_select,
