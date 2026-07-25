@@ -907,64 +907,50 @@ def mostrar_tarjeta_ot(
             materiales_ot = []
 
             if usar_material:
-                if materiales_select:
-                    opciones_material = [
-                        f"{codigo} | {material} | Stock: {stock_actual} {unidad}"
-                        for codigo, material, stock_actual, unidad in materiales_select
-                    ]
+                materiales_preparados = preparar_materiales_selector(
+                    materiales_select
+                )
 
+                if materiales_preparados:
                     num_materiales = st.number_input(
                         "Número de materiales usados",
                         min_value=1,
                         max_value=10,
                         value=1,
                         step=1,
-                        key=f"{modo}_num_materiales_ot_{id_orden}"
+                        key=(
+                            f"{modo}_num_materiales_ot_"
+                            f"{id_orden}"
+                        ),
                     )
 
-                    st.markdown("#### Materiales usados")
+                    st.markdown("### 📦 Materiales usados")
 
                     for i in range(int(num_materiales)):
-                        st.markdown(f"**Material {i + 1}**")
+                        with st.container(border=True):
+                            st.markdown(
+                                f"### Material {i + 1}"
+                            )
 
-                        material_ot = st.selectbox(
-                            "Selecciona material",
-                            opciones_material,
-                            key=f"{modo}_material_ot_{id_orden}_{i}"
-                        )
+                            material_usado = (
+                                selector_material_inteligente(
+                                    materiales=materiales_preparados,
+                                    id_orden=id_orden,
+                                    indice=i,
+                                    modo=modo,
+                                )
+                            )
 
-                        codigo_sel = material_ot.split(" | ")[0]
-                        datos_mat = obtener_material_por_codigo(codigo_sel)
+                            if material_usado:
+                                materiales_ot.append(
+                                    material_usado
+                                )
 
-                        if datos_mat:
-                            foto_data = datos_mat.get("foto_data")
-                            foto_ruta = datos_mat.get("foto")
-
-                            if foto_data:
-                                try:
-                                    st.image(bytes(foto_data), width=180)
-                                except Exception:
-                                    st.caption("Foto del material no disponible.")
-
-                            elif foto_ruta:
-                                try:
-                                    st.image(foto_ruta, width=180)
-                                except Exception:
-                                    st.caption("Foto del material no disponible.")
-
-                        cantidad_material = st.number_input(
-                            "Cantidad usada",
-                            min_value=0.0,
-                            step=1.0,
-                            key=f"{modo}_cantidad_material_ot_{id_orden}_{i}"
-                        )
-
-                        materiales_ot.append({
-                            "codigo": codigo_sel,
-                            "cantidad": cantidad_material
-                        })
                 else:
-                    st.info("No hay materiales dados de alta en Inventario.")
+                    st.info(
+                        "No hay materiales dados de alta "
+                        "en Inventario."
+                    )
 
             st.file_uploader(
                 "📷 Fotos del trabajo realizado",
