@@ -159,45 +159,48 @@ def mostrar_arbol_colegio():
                             f"{texto_contador(total_planta)}",
                             expanded=False
                         ):
-                            for item_espacio in espacios:
+                            for indice, item_espacio in enumerate(espacios):
                                 nombre_espacio = str(
                                     item_espacio.get("espacio", "") or ""
                                 ).strip()
-
+                            
                                 tipo_espacio = str(
                                     item_espacio.get("tipo", "") or ""
                                 ).strip()
-
+                            
                                 if not nombre_espacio:
                                     continue
-
+                            
                                 total_espacio = contar_ots_espacio_rapido(
                                     centro=centro,
                                     espacio=nombre_espacio,
                                     ots_abiertas=ots_abiertas
                                 )
-
+                            
                                 estado_espacio = obtener_estado_espacio_rapido(
                                     centro=centro,
                                     espacio=nombre_espacio,
                                     ots_abiertas=ots_abiertas
                                 )
-
+                            
                                 icono_estado = icono_estado_espacio(
                                     estado_espacio
                                 )
-
+                            
                                 icono_tipo = icono_tipo_espacio(
                                     tipo_espacio
                                 )
-
+                            
+                                # Dibuja visualmente la última rama de forma diferente.
+                                es_ultimo = indice == len(espacios) - 1
+                                rama = "└──" if es_ultimo else "├──"
+                            
                                 etiqueta = (
-                                    f"{icono_estado} "
-                                    f"{icono_tipo} "
-                                    f"{nombre_espacio}"
+                                    f"{rama} {icono_estado} "
+                                    f"{icono_tipo} {nombre_espacio}"
                                     f"{texto_contador(total_espacio)}"
                                 )
-
+                            
                                 clave_espacio = (
                                     f"abrir_ficha_"
                                     f"{centro}_"
@@ -205,23 +208,46 @@ def mostrar_arbol_colegio():
                                     f"{planta}_"
                                     f"{nombre_espacio}"
                                 )
-
-                                if st.button(
-                                    etiqueta,
-                                    key=clave_espacio,
-                                    use_container_width=True
-                                ):
-                                    st.session_state[
-                                        "colegio_ficha_seleccionada"
-                                    ] = {
-                                        "centro": centro,
-                                        "edificio": edificio,
-                                        "planta": planta,
-                                        "espacio": nombre_espacio,
-                                        "tipo": tipo_espacio,
-                                    }
-
-                                    st.rerun()
+                            
+                                # Primera columna: sangría visual.
+                                # Segunda columna: nombre compacto del espacio.
+                                columna_sangria, columna_espacio = st.columns(
+                                    [0.05, 0.95],
+                                    gap="small"
+                                )
+                            
+                                with columna_espacio:
+                                    if st.button(
+                                        etiqueta,
+                                        key=clave_espacio,
+                                        use_container_width=False
+                                    ):
+                                        st.session_state[
+                                            "colegio_ficha_seleccionada"
+                                        ] = {
+                                            "centro": centro,
+                                            "edificio": edificio,
+                                            "planta": planta,
+                                            "espacio": nombre_espacio,
+                                            "tipo": tipo_espacio,
+                                        }
+                            
+                                        # Ocultamos el árbol y mostramos la ficha.
+                                        st.session_state["colegio_ver_arbol"] = False
+                            
+                                        clave_ficha = (
+                                            f"{centro}_{edificio}_{planta}_{nombre_espacio}"
+                                            .replace(" ", "_")
+                                            .replace("/", "_")
+                                            .replace("\\", "_")
+                                            .replace(":", "_")
+                                        )
+                            
+                                        st.session_state[
+                                            f"bloque_ficha_{clave_ficha}"
+                                        ] = "resumen"
+                            
+                                        st.rerun()
 
 
 # =====================================================
