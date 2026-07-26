@@ -118,16 +118,23 @@ def pantalla_colegio(modo="completo"):
 
     else:
         st.markdown("## 🏫 Colegio")
-
+    
         st.caption(
-            "Centro de control por centro, edificio, planta y espacio."
+            "Qué necesita hoy el colegio y dónde se encuentra."
         )
-
-        solo_actividad = st.checkbox(
-            "Mostrar solo espacios con actividad pendiente",
-            value=False,
-            key="colegio_solo_incidencias"
+    
+        vista_colegio = st.radio(
+            "Vista",
+            options=[
+                "📌 Hoy",
+                "🌳 Explorar colegio",
+            ],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="colegio_vista_principal"
         )
+    
+        solo_actividad = vista_colegio == "📌 Hoy"
 
     # =====================================================
     # CENTROS VISIBLES PARA EL USUARIO
