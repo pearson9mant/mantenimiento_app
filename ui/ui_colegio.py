@@ -566,6 +566,9 @@ def ficha_espacio_basica(
         espacio
     )
 
+    # =====================================================
+    # CABECERA LIGERA
+    # =====================================================
     estado = obtener_estado_espacio(
         centro,
         edificio,
@@ -574,185 +577,285 @@ def ficha_espacio_basica(
 
     icono = icono_estado_espacio(estado)
 
-    st.markdown(
-        f"### {icono} {espacio}"
-    )
+    cabecera, cerrar = st.columns([6, 1])
 
-    st.caption(
-        f"{centro} · {edificio} · {planta}"
-    )
-
-    info = diagnosticar_espacio(
-        centro=centro,
-        edificio=edificio,
-        espacio=espacio
-    )
-
-    if info["color"] == "verde":
-        st.success(
-            f"🟢 {info['estado']}"
-        )
-
-    elif info["color"] == "amarillo":
-        st.warning(
-            f"🟠 {info['estado']}"
-        )
-
-    else:
-        st.error(
-            f"🔴 {info['estado']}"
-        )
-
-    st.markdown(
-        "### 🧠 Asistente técnico"
-    )
-
-    st.markdown(
-        "**Situación actual**"
-    )
-
-    for linea in info.get(
-        "diagnostico",
-        []
-    ):
+    with cabecera:
         st.markdown(
-            f"• {linea}"
+            f"## {icono} {espacio}"
         )
 
-    st.markdown(
-        "**Siguiente actuación**"
+        st.caption(
+            f"🏢 {centro} · 🏫 {edificio} · 📍 {planta}"
+        )
+
+    with cerrar:
+        if st.button(
+            "← Volver",
+            key=f"cerrar_ficha_superior_{clave}",
+            use_container_width=True
+        ):
+            st.session_state[
+                "colegio_ficha_seleccionada"
+            ] = None
+
+            st.session_state[
+                f"bloque_ficha_{clave}"
+            ] = "resumen"
+
+            st.rerun()
+
+    # =====================================================
+    # BLOQUE ACTIVO
+    # =====================================================
+    clave_bloque = f"bloque_ficha_{clave}"
+
+    bloque_actual = st.session_state.get(
+        clave_bloque,
+        "resumen"
     )
 
-    st.info(
-        info.get(
+    if not bloque_actual:
+        bloque_actual = "resumen"
+
+    opciones = {
+        "📊 Resumen": "resumen",
+        "🔧 Actuaciones": "actuaciones",
+        "📦 Inventario": "inventario",
+        "📅 Preventivos": "preventivos",
+        "🦠 Legionella": "legionella",
+        "📚 Historial": "historial",
+    }
+
+    etiqueta_actual = next(
+        (
+            etiqueta
+            for etiqueta, valor in opciones.items()
+            if valor == bloque_actual
+        ),
+        "📊 Resumen"
+    )
+
+    # Navegación horizontal con apariencia de pestañas.
+    # Solo se ejecutará el bloque seleccionado.
+    etiqueta_seleccionada = st.radio(
+        "Secciones de la ficha",
+        options=list(opciones.keys()),
+        index=list(opciones.keys()).index(
+            etiqueta_actual
+        ),
+        horizontal=True,
+        label_visibility="collapsed",
+        key=f"navegacion_ficha_{clave}"
+    )
+
+    bloque_seleccionado = opciones[
+        etiqueta_seleccionada
+    ]
+
+    if bloque_seleccionado != bloque_actual:
+        st.session_state[
+            clave_bloque
+        ] = bloque_seleccionado
+
+        st.rerun()
+
+    bloque = bloque_seleccionado
+
+    st.markdown("---")
+
+    # =====================================================
+    # RESUMEN
+    # Es el único bloque que se carga inicialmente.
+    # =====================================================
+    if bloque == "resumen":
+        try:
+            info = diagnosticar_espacio(
+                centro=centro,
+                edificio=edificio,
+                espacio=espacio
+            )
+
+        except Exception as error:
+            st.error(
+                "No se ha podido calcular el estado "
+                "del espacio."
+            )
+
+            st.exception(error)
+            info = {}
+
+        color = str(
+            info.get("color") or estado or "verde"
+        ).strip().lower()
+
+        estado_texto = str(
+            info.get("estado")
+            or "Estado sin determinar"
+        )
+
+        if color == "verde":
+            st.success(
+                f"🟢 {estado_texto}"
+            )
+
+        elif color in ["amarillo", "naranja"]:
+            st.warning(
+                f"🟠 {estado_texto}"
+            )
+
+        else:
+            st.error(
+                f"🔴 {estado_texto}"
+            )
+
+        # ---------------------------------------------
+        # INDICADORES PRINCIPALES
+        # ---------------------------------------------
+        c1, c2, c3, c4 = st.columns(4)
+
+        c1.metric(
+            "Trabajos",
+            info.get("trabajos", 0)
+        )
+
+        c2.metric(
+            "Activos",
+            info.get("activos", 0)
+        )
+
+        c3.metric(
+            "Dañados",
+            info.get("danados", 0)
+        )
+
+        c4.metric(
+            "Correctivos",
+            info.get("correctivos", 0)
+        )
+
+        st.markdown("### 🧠 Situación del espacio")
+
+        diagnostico = info.get(
+            "diagnostico",
+            []
+        ) or []
+
+        if diagnostico:
+            for linea in diagnostico:
+                st.markdown(
+                    f"• {linea}"
+                )
+
+        else:
+            st.info(
+                "Todavía no hay suficiente información "
+                "para elaborar un diagnóstico detallado."
+            )
+
+        st.markdown(
+            "### 🎯 Siguiente actuación recomendada"
+        )
+
+        recomendacion = info.get(
             "recomendacion",
             "No es necesaria ninguna actuación inmediata."
         )
-    )
 
-    c1, c2, c3, c4 = st.columns(4)
+        st.info(recomendacion)
 
-    c1.metric(
-        "Trabajos",
-        info.get("trabajos", 0)
-    )
+        legionella = info.get(
+            "legionella",
+            {}
+        ) or {}
 
-    c2.metric(
-        "Activos",
-        info.get("activos", 0)
-    )
+        if legionella.get("aplica"):
+            st.markdown(
+                "### 🦠 Control sanitario"
+            )
 
-    c3.metric(
-        "Dañados",
-        info.get("danados", 0)
-    )
+            color_leg = str(
+                legionella.get("color") or ""
+            ).lower()
 
-    c4.metric(
-        "Correctivos",
-        info.get("correctivos", 0)
-    )
+            estado_leg = (
+                legionella.get("estado")
+                or "Estado sin determinar"
+            )
 
-    st.markdown("---")
+            if color_leg == "rojo":
+                st.error(
+                    f"🔴 {estado_leg}"
+                )
 
-    c1, c2 = st.columns(2)
+            elif color_leg in ["amarillo", "naranja"]:
+                st.warning(
+                    f"🟠 {estado_leg}"
+                )
 
-    with c1:
-        if st.button(
-            "📋 Trabajos del espacio",
-            key=f"ver_actuaciones_{clave}",
-            use_container_width=True
-        ):
-            st.session_state[
-                f"bloque_ficha_{clave}"
-            ] = "actuaciones"
+            else:
+                st.success(
+                    f"🟢 {estado_leg}"
+                )
 
-            st.rerun()
-
-        if st.button(
-            "📦 Inventario",
-            key=f"ver_inventario_{clave}",
-            use_container_width=True
-        ):
-            st.session_state[
-                f"bloque_ficha_{clave}"
-            ] = "inventario"
-
-            st.rerun()
-
-        if st.button(
-            "🦠 Legionella",
-            key=f"ver_legionella_{clave}",
-            use_container_width=True
-        ):
-            st.session_state[
-                f"bloque_ficha_{clave}"
-            ] = "legionella"
-
-            st.rerun()
-
-    with c2:
-        if st.button(
-            "📅 Preventivos",
-            key=f"ver_preventivos_{clave}",
-            use_container_width=True
-        ):
-            st.session_state[
-                f"bloque_ficha_{clave}"
-            ] = "preventivos"
-
-            st.rerun()
-
-        if st.button(
-            "📋 Historial",
-            key=f"ver_historial_{clave}",
-            use_container_width=True
-        ):
-            st.session_state[
-                f"bloque_ficha_{clave}"
-            ] = "historial"
-
-            st.rerun()
-
-    bloque = st.session_state.get(
-        f"bloque_ficha_{clave}",
-        ""
-    )
-
-    st.markdown("---")
-
-    if bloque == "actuaciones":
+    # =====================================================
+    # ACTUACIONES
+    # Solo carga las OT cuando se abre esta sección.
+    # =====================================================
+    elif bloque == "actuaciones":
         st.markdown(
-            "### 📋 Trabajos del espacio"
+            "### 🔧 Actuaciones abiertas"
         )
 
-        actuaciones = obtener_actuaciones_espacio(
-            centro,
-            edificio,
-            espacio
-        )
+        try:
+            actuaciones = obtener_actuaciones_espacio(
+                centro,
+                edificio,
+                espacio
+            )
+
+        except Exception as error:
+            actuaciones = []
+
+            st.error(
+                "No se han podido cargar las actuaciones."
+            )
+
+            st.exception(error)
 
         if not actuaciones:
-            st.info(
+            st.success(
                 "No hay trabajos abiertos en este espacio."
             )
 
         else:
-            materiales_select = (
-                obtener_materiales_para_select()
+            st.caption(
+                f"{len(actuaciones)} trabajo(s) abierto(s)."
             )
 
+            try:
+                materiales_select = (
+                    obtener_materiales_para_select()
+                )
+
+            except Exception:
+                materiales_select = []
+
             for a in actuaciones:
-                (
-                    id_ot,
-                    numero_ot,
-                    descripcion,
-                    estado_ot,
-                    prioridad,
-                    operario,
-                    origen,
-                    area,
-                    fecha,
-                ) = a
+                try:
+                    (
+                        id_ot,
+                        numero_ot,
+                        descripcion,
+                        estado_ot,
+                        prioridad,
+                        operario,
+                        origen,
+                        area,
+                        fecha,
+                    ) = a
+
+                except Exception:
+                    continue
 
                 fila_ot = (
                     id_ot,
@@ -781,28 +884,54 @@ def ficha_espacio_basica(
                     modo="colegio"
                 )
 
+    # =====================================================
+    # INVENTARIO
+    # Solo carga al entrar en esta sección.
+    # =====================================================
     elif bloque == "inventario":
         st.markdown(
             "### 📦 Inventario del espacio"
         )
 
-        mostrar_inventario_espacio(
-            centro=centro,
-            edificio=edificio,
-            planta=planta,
-            espacio=espacio
-        )
+        try:
+            mostrar_inventario_espacio(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio
+            )
 
+        except Exception as error:
+            st.error(
+                "No se ha podido cargar el inventario "
+                "de este espacio."
+            )
+
+            st.exception(error)
+
+    # =====================================================
+    # PREVENTIVOS
+    # =====================================================
     elif bloque == "preventivos":
         st.markdown(
-            "### 📅 Preventivos"
+            "### 📅 Mantenimiento preventivo"
         )
 
-        preventivos = obtener_preventivos_espacio(
-            centro,
-            edificio,
-            espacio
-        )
+        try:
+            preventivos = obtener_preventivos_espacio(
+                centro,
+                edificio,
+                espacio
+            )
+
+        except Exception as error:
+            preventivos = []
+
+            st.error(
+                "No se han podido cargar los preventivos."
+            )
+
+            st.exception(error)
 
         if not preventivos:
             st.info(
@@ -811,6 +940,10 @@ def ficha_espacio_basica(
             )
 
         else:
+            st.caption(
+                f"{len(preventivos)} preventivo(s) registrado(s)."
+            )
+
             for p in preventivos:
                 try:
                     (
@@ -825,31 +958,73 @@ def ficha_espacio_basica(
                 except Exception:
                     continue
 
-                st.markdown(
-                    f"**{fecha or '-'}** · "
-                    f"{estado_prev or '-'} · "
-                    f"{operario or '-'} · "
-                    f"OT `{numero_ot_preventiva or '-'}`"
-                )
+                estado_normalizado = str(
+                    estado_prev or ""
+                ).strip().lower()
 
-                if observaciones:
-                    st.caption(observaciones)
+                if estado_normalizado in [
+                    "finalizado",
+                    "finalizada",
+                    "cerrado",
+                    "cerrada",
+                    "realizado",
+                    "completado",
+                ]:
+                    icono_prev = "🟢"
 
+                elif estado_normalizado in [
+                    "pendiente",
+                    "vencido",
+                    "atrasado",
+                ]:
+                    icono_prev = "🔴"
+
+                else:
+                    icono_prev = "🟠"
+
+                with st.container(border=True):
+                    st.markdown(
+                        f"{icono_prev} "
+                        f"**{fecha or 'Sin fecha'}**"
+                    )
+
+                    st.caption(
+                        f"Estado: {estado_prev or '-'} · "
+                        f"Operario: {operario or '-'} · "
+                        f"OT: {numero_ot_preventiva or '-'}"
+                    )
+
+                    if observaciones:
+                        st.write(observaciones)
+
+    # =====================================================
+    # LEGIONELLA
+    # =====================================================
     elif bloque == "legionella":
         st.markdown(
             "### 🦠 Legionella"
         )
 
-        info = diagnosticar_espacio(
-            centro=centro,
-            edificio=edificio,
-            espacio=espacio
-        )
+        try:
+            info = diagnosticar_espacio(
+                centro=centro,
+                edificio=edificio,
+                espacio=espacio
+            )
+
+        except Exception as error:
+            st.error(
+                "No se ha podido cargar la información "
+                "de Legionella."
+            )
+
+            st.exception(error)
+            info = {}
 
         legionella = info.get(
             "legionella",
             {}
-        )
+        ) or {}
 
         if not legionella.get("aplica"):
             st.info(
@@ -859,8 +1034,7 @@ def ficha_espacio_basica(
 
         else:
             color = str(
-                legionella.get("color")
-                or ""
+                legionella.get("color") or ""
             ).lower()
 
             estado_leg = (
@@ -873,7 +1047,7 @@ def ficha_espacio_basica(
                     f"🔴 {estado_leg}"
                 )
 
-            elif color == "amarillo":
+            elif color in ["amarillo", "naranja"]:
                 st.warning(
                     f"🟠 {estado_leg}"
                 )
@@ -920,44 +1094,63 @@ def ficha_espacio_basica(
                 f"Próximo control: {proximo}"
             )
 
-            diagnostico = (
+            diagnostico_leg = (
                 legionella.get("diagnostico")
                 or []
             )
 
-            recomendaciones = (
+            recomendaciones_leg = (
                 legionella.get("recomendaciones")
                 or []
             )
 
-            if diagnostico:
+            if diagnostico_leg:
                 st.markdown(
-                    "**Diagnóstico Legionella**"
+                    "#### Diagnóstico"
                 )
 
-                for d in diagnostico:
+                for linea in diagnostico_leg:
                     st.markdown(
-                        f"• {d}"
+                        f"• {linea}"
                     )
 
-            if recomendaciones:
+            if recomendaciones_leg:
                 st.markdown(
-                    "**Recomendaciones**"
+                    "#### Recomendaciones"
                 )
 
-                for r in recomendaciones:
-                    st.info(r)
+                for recomendacion_leg in recomendaciones_leg:
+                    st.info(recomendacion_leg)
 
+    # =====================================================
+    # HISTORIAL
+    # Solo muestra los últimos 10 registros.
+    # =====================================================
     elif bloque == "historial":
         st.markdown(
-            "### 📋 Historial técnico"
+            "### 📚 Historial técnico"
         )
 
-        historial = obtener_historial_tecnico_espacio(
-            centro,
-            edificio,
-            espacio
+        st.caption(
+            "Se muestran los últimos 10 registros "
+            "para mantener la ficha ligera."
         )
+
+        try:
+            historial = obtener_historial_tecnico_espacio(
+                centro,
+                edificio,
+                espacio
+            )
+
+        except Exception as error:
+            historial = []
+
+            st.error(
+                "No se ha podido cargar el historial."
+            )
+
+            st.exception(error)
 
         if not historial:
             st.info(
@@ -967,45 +1160,56 @@ def ficha_espacio_basica(
 
         else:
             for h in historial[:10]:
-                (
-                    id_hist,
-                    fecha,
-                    elemento,
-                    tipo,
-                    numero_ot,
-                    descripcion,
-                    area,
-                    estado_hist,
-                    operario,
-                    observaciones,
-                    origen,
-                    tipo_orden,
-                    coste,
-                    foto,
-                    fecha_reparacion,
-                ) = h
+                try:
+                    (
+                        id_hist,
+                        fecha,
+                        elemento,
+                        tipo,
+                        numero_ot,
+                        descripcion,
+                        area,
+                        estado_hist,
+                        operario,
+                        observaciones,
+                        origen,
+                        tipo_orden,
+                        coste,
+                        foto,
+                        fecha_reparacion,
+                    ) = h
 
-                st.markdown(
-                    f"**{fecha or '-'}** · "
-                    f"{tipo or '-'} · "
-                    f"{area or '-'} · "
-                    f"OT `{numero_ot or '-'}`"
-                )
+                except Exception:
+                    continue
 
-                st.caption(
-                    descripcion or ""
-                )
+                with st.container(border=True):
+                    st.markdown(
+                        f"**{fecha or '-'}** · "
+                        f"{tipo or 'Actuación'}"
+                    )
 
-    else:
-        st.info(
-            "Elige qué quieres abrir de este espacio."
-        )
+                    st.caption(
+                        f"{area or '-'} · "
+                        f"OT {numero_ot or '-'} · "
+                        f"{operario or '-'}"
+                    )
 
+                    if descripcion:
+                        st.write(descripcion)
+
+                    if observaciones:
+                        st.caption(
+                            f"Observaciones: {observaciones}"
+                        )
+
+    # =====================================================
+    # PIE DE FICHA
+    # =====================================================
     st.markdown("---")
 
     if st.button(
-        "❌ Cerrar ficha",
-        key=f"cerrar_ficha_{clave}",
+        "← Volver al colegio",
+        key=f"cerrar_ficha_inferior_{clave}",
         use_container_width=True
     ):
         st.session_state[
@@ -1013,10 +1217,9 @@ def ficha_espacio_basica(
         ] = None
 
         st.session_state[
-            f"bloque_ficha_{clave}"
-        ] = ""
+            clave_bloque
+        ] = "resumen"
 
         st.rerun()
-
 
 
