@@ -6,7 +6,7 @@ from modules.colegio import (
     obtener_centros_visibles_usuario,
 )
 
-from ui.ui_arbol_colegio import mostrar_arbol_colegio
+from ui.ui_arbol_colegio_v2 import mostrar_arbol_colegio
 from ui.ui_ot import mostrar_tarjeta_ot
 from ui.ui_inventario_espacio import mostrar_inventario_espacio
 
