@@ -87,9 +87,13 @@ def estado_y_total_centro(centro, edificios, ots_abiertas):
 
 
 def mostrar_arbol_colegio():
-    st.markdown("#### 🌳 Árbol del colegio")
+    st.markdown("#### 🏫 Estado del colegio")
 
+    # El árbol completo ya se obtiene aquí.
+    # No hacemos consultas nuevas por cada espacio.
     arbol = obtener_arbol_espacios()
+
+    # Respetamos los centros que puede visualizar el usuario actual.
     centros_visibles = obtener_centros_visibles_usuario()
 
     arbol = {
@@ -98,8 +102,18 @@ def mostrar_arbol_colegio():
         if centro in centros_visibles
     }
 
+    # Todas las OT abiertas se cargan una sola vez.
+    # Después se reutilizan para calcular estados y contadores.
     ots_abiertas = obtener_ots_abiertas_por_centro()
-    hay_incidencias = False
+
+    if not arbol:
+        st.warning("No hay centros o espacios disponibles para este usuario.")
+        return
+
+    st.caption(
+        "Selecciona cualquier espacio para consultar su estado, "
+        "sus actuaciones y su historial."
+    )
 
     for centro, edificios in arbol.items():
         estado_centro, total_centro = estado_y_total_centro(
@@ -108,10 +122,6 @@ def mostrar_arbol_colegio():
             ots_abiertas=ots_abiertas
         )
 
-        if total_centro == 0:
-            continue
-
-        hay_incidencias = True
         icono_centro = icono_estado_espacio(estado_centro)
 
         with st.expander(
@@ -125,13 +135,11 @@ def mostrar_arbol_colegio():
                     ots_abiertas=ots_abiertas
                 )
 
-                if total_edificio == 0:
-                    continue
-
                 icono_edificio = icono_estado_espacio(estado_edificio)
 
                 with st.expander(
-                    f"{icono_edificio} 🏫 {edificio}{texto_contador(total_edificio)}",
+                    f"{icono_edificio} 🏫 {edificio}"
+                    f"{texto_contador(total_edificio)}",
                     expanded=False
                 ):
                     for planta, espacios in plantas.items():
@@ -144,18 +152,24 @@ def mostrar_arbol_colegio():
                             ots_abiertas=ots_abiertas
                         )
 
-                        if total_planta == 0:
-                            continue
-
                         icono_planta = icono_estado_espacio(estado_planta)
 
                         with st.expander(
-                            f"{icono_planta} 📍 {planta}{texto_contador(total_planta)}",
+                            f"{icono_planta} 📍 {planta}"
+                            f"{texto_contador(total_planta)}",
                             expanded=False
                         ):
                             for item_espacio in espacios:
-                                nombre_espacio = item_espacio.get("espacio", "")
-                                tipo_espacio = item_espacio.get("tipo", "")
+                                nombre_espacio = str(
+                                    item_espacio.get("espacio", "") or ""
+                                ).strip()
+
+                                tipo_espacio = str(
+                                    item_espacio.get("tipo", "") or ""
+                                ).strip()
+
+                                if not nombre_espacio:
+                                    continue
 
                                 total_espacio = contar_ots_espacio_rapido(
                                     centro=centro,
@@ -163,33 +177,51 @@ def mostrar_arbol_colegio():
                                     ots_abiertas=ots_abiertas
                                 )
 
-                                if total_espacio == 0:
-                                    continue
-
                                 estado_espacio = obtener_estado_espacio_rapido(
                                     centro=centro,
                                     espacio=nombre_espacio,
                                     ots_abiertas=ots_abiertas
                                 )
 
-                                icono_estado = icono_estado_espacio(estado_espacio)
-                                icono_tipo = icono_tipo_espacio(tipo_espacio)
+                                icono_estado = icono_estado_espacio(
+                                    estado_espacio
+                                )
+
+                                icono_tipo = icono_tipo_espacio(
+                                    tipo_espacio
+                                )
+
+                                etiqueta = (
+                                    f"{icono_estado} "
+                                    f"{icono_tipo} "
+                                    f"{nombre_espacio}"
+                                    f"{texto_contador(total_espacio)}"
+                                )
+
+                                clave_espacio = (
+                                    f"abrir_ficha_"
+                                    f"{centro}_"
+                                    f"{edificio}_"
+                                    f"{planta}_"
+                                    f"{nombre_espacio}"
+                                )
 
                                 if st.button(
-                                    f"{icono_estado} {icono_tipo} {nombre_espacio}{texto_contador(total_espacio)}",
-                                    key=f"abrir_ficha_{centro}_{edificio}_{planta}_{nombre_espacio}",
+                                    etiqueta,
+                                    key=clave_espacio,
                                     use_container_width=True
                                 ):
-                                    st.session_state["colegio_ficha_seleccionada"] = {
+                                    st.session_state[
+                                        "colegio_ficha_seleccionada"
+                                    ] = {
                                         "centro": centro,
                                         "edificio": edificio,
                                         "planta": planta,
                                         "espacio": nombre_espacio,
+                                        "tipo": tipo_espacio,
                                     }
-                                    st.rerun()
 
-    if not hay_incidencias:
-        st.success("No hay incidencias abiertas en tus centros.")
+                                    st.rerun()
 
 
 # =====================================================
