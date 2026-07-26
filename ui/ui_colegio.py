@@ -205,9 +205,66 @@ def pantalla_colegio(modo="completo"):
             _mostrar_boton_arbol_y_ficha()
             return
 
-        st.markdown(
-            "### 📋 Actividad pendiente por planta"
+        st.markdown("### 📌 Lo importante hoy")
+
+        st.caption(
+            "Trabajos, preventivos y controles que requieren atención."
         )
+        total_trabajos = 0
+        total_preventivos = 0
+        total_legionella = 0
+        total_espacios = 0
+        
+        for items in mapa_actividad.values():
+            for item in items:
+                tiene_actividad = False
+        
+                actuaciones = item.get("actuaciones", [])
+                preventivos = item.get(
+                    "preventivos_pendientes",
+                    []
+                )
+        
+                tiene_legionella = item.get(
+                    "tiene_legionella",
+                    False
+                )
+        
+                total_trabajos += len(actuaciones)
+                total_preventivos += len(preventivos)
+        
+                if tiene_legionella:
+                    total_legionella += 1
+        
+                if actuaciones or preventivos or tiene_legionella:
+                    tiene_actividad = True
+        
+                if tiene_actividad:
+                    total_espacios += 1
+        
+        c1, c2, c3, c4 = st.columns(4)
+        
+        c1.metric(
+            "Espacios",
+            total_espacios
+        )
+        
+        c2.metric(
+            "Trabajos",
+            total_trabajos
+        )
+        
+        c3.metric(
+            "Preventivos",
+            total_preventivos
+        )
+        
+        c4.metric(
+            "Legionella",
+            total_legionella
+        )
+        
+        st.markdown("---")
 
         for planta, items in mapa_actividad.items():
             st.markdown(f"#### 📍 {planta}")
