@@ -99,11 +99,14 @@ def _mostrar_selector_rapido(
     En la vista Explorar colegio se muestra dentro de un expander,
     por lo que no compite visualmente con el árbol.
     """
-    centro = st.selectbox(
-        "🏢 Centro",
-        centros,
-        key=f"colegio_rapido_centro_{modo}"
-    )
+    col_centro, col_edificio = st.columns(2, gap="small")
+
+    with col_centro:
+        centro = st.selectbox(
+            "🏢 Centro",
+            centros,
+            key=f"colegio_rapido_centro_{modo}"
+        )
 
     try:
         edificios = obtener_edificios_espacios(centro)
@@ -116,11 +119,12 @@ def _mostrar_selector_rapido(
         )
         return None
 
-    edificio = st.selectbox(
-        "🏫 Edificio",
-        edificios,
-        key=f"colegio_rapido_edificio_{modo}_{centro}"
-    )
+    with col_edificio:
+        edificio = st.selectbox(
+            "🏫 Edificio",
+            edificios,
+            key=f"colegio_rapido_edificio_{modo}_{centro}"
+        )
 
     try:
         plantas = obtener_plantas_espacios(
@@ -136,14 +140,17 @@ def _mostrar_selector_rapido(
         )
         return None
 
-    planta = st.selectbox(
-        "📍 Planta",
-        plantas,
-        key=(
-            f"colegio_rapido_planta_"
-            f"{modo}_{centro}_{edificio}"
+    col_planta, col_espacio = st.columns(2, gap="small")
+
+    with col_planta:
+        planta = st.selectbox(
+            "📍 Planta",
+            plantas,
+            key=(
+                f"colegio_rapido_planta_"
+                f"{modo}_{centro}_{edificio}"
+            )
         )
-    )
 
     try:
         espacios_datos = obtener_espacios_por_planta(
@@ -166,14 +173,15 @@ def _mostrar_selector_rapido(
         )
         return None
 
-    espacio = st.selectbox(
-        "🚪 Espacio",
-        espacios,
-        key=(
-            f"colegio_rapido_espacio_"
-            f"{modo}_{centro}_{edificio}_{planta}"
+    with col_espacio:
+        espacio = st.selectbox(
+            "🚪 Espacio",
+            espacios,
+            key=(
+                f"colegio_rapido_espacio_"
+                f"{modo}_{centro}_{edificio}_{planta}"
+            )
         )
-    )
 
     seleccion = {
         "centro": centro,
@@ -233,11 +241,14 @@ def _mostrar_hoy(centros, modo):
     Los selectores de centro y edificio se mantienen visibles porque
     delimitan el panel de actividad que se consulta.
     """
-    centro = st.selectbox(
-        "🏢 Centro",
-        centros,
-        key=f"colegio_hoy_centro_{modo}"
-    )
+    col_centro, col_edificio = st.columns(2, gap="small")
+
+    with col_centro:
+        centro = st.selectbox(
+            "🏢 Centro",
+            centros,
+            key=f"colegio_hoy_centro_{modo}"
+        )
 
     try:
         edificios = obtener_edificios_espacios(centro)
@@ -250,11 +261,12 @@ def _mostrar_hoy(centros, modo):
         )
         return
 
-    edificio = st.selectbox(
-        "🏫 Edificio",
-        edificios,
-        key=f"colegio_hoy_edificio_{modo}_{centro}"
-    )
+    with col_edificio:
+        edificio = st.selectbox(
+            "🏫 Edificio",
+            edificios,
+            key=f"colegio_hoy_edificio_{modo}_{centro}"
+        )
 
     try:
         mapa_actividad = obtener_mapa_actividad(
@@ -305,14 +317,14 @@ def _mostrar_hoy(centros, modo):
             if actuaciones or preventivos or tiene_legionella:
                 total_espacios += 1
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4, gap="small")
 
     c1.metric("Espacios", total_espacios)
     c2.metric("Trabajos", total_trabajos)
     c3.metric("Preventivos", total_preventivos)
     c4.metric("Legionella", total_legionella)
 
-    st.markdown("---")
+    st.divider()
 
     for planta, items in mapa_actividad.items():
         st.markdown(f"#### 📍 {planta}")
@@ -351,7 +363,7 @@ def _mostrar_hoy(centros, modo):
                 except Exception:
                     continue
 
-                c_info, c_btn = st.columns([5, 1])
+                c_info, c_btn = st.columns([12, 1], gap="small")
 
                 with c_info:
                     st.markdown(
@@ -401,7 +413,7 @@ def _mostrar_hoy(centros, modo):
                     obs_prev = ""
                     num_prev = ""
 
-                c_info, c_btn = st.columns([5, 1])
+                c_info, c_btn = st.columns([12, 1], gap="small")
 
                 with c_info:
                     st.markdown(
@@ -457,7 +469,7 @@ def _mostrar_hoy(centros, modo):
                 elif color_leg in ["amarillo", "naranja"]:
                     icono_leg = "🟠🦠"
 
-                c_info, c_btn = st.columns([5, 1])
+                c_info, c_btn = st.columns([12, 1], gap="small")
 
                 with c_info:
                     st.markdown(
@@ -515,7 +527,7 @@ def _mostrar_explorador_colegio(centros, modo):
 
     mostrar_arbol_colegio()
 
-    st.markdown("---")
+    st.divider()
 
     with st.expander(
         "🔎 Ir directamente a un espacio",
@@ -550,7 +562,7 @@ def _mostrar_inventario_espacios(centros, modo):
     planta = seleccion["planta"]
     espacio = seleccion["espacio"]
 
-    st.markdown("---")
+    st.divider()
     st.markdown(f"### 📦 {espacio}")
     st.caption(f"{centro} · {edificio} · {planta}")
 
@@ -674,7 +686,7 @@ def ficha_espacio_basica(
 
     icono = icono_estado_espacio(estado)
 
-    cabecera, cerrar = st.columns([6, 1])
+    cabecera, cerrar = st.columns([10, 2], gap="small")
 
     with cabecera:
         st.markdown(
@@ -758,7 +770,7 @@ def ficha_espacio_basica(
 
     bloque = bloque_seleccionado
 
-    st.markdown("---")
+    st.divider()
 
     # =====================================================
     # RESUMEN
@@ -1302,7 +1314,7 @@ def ficha_espacio_basica(
     # =====================================================
     # PIE DE FICHA
     # =====================================================
-    st.markdown("---")
+    st.divider()
 
     if st.button(
         "← Volver al colegio",
