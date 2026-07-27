@@ -298,8 +298,176 @@ def _urgentes(datos):
     ].copy()
 
 
+
+def _activas_centro_totales(df, centro):
+    """Todas las órdenes activas del centro, sin exigir edificio ni planta."""
+    if df.empty:
+        return df.copy()
+
+    datos = df[
+        df["centro"]
+        .fillna("")
+        .astype(str)
+        .apply(lambda valor: _coincide_centro(valor, centro))
+    ].copy()
+
+    return _activas(datos)
+
+
+def _clave_fila_orden(fila):
+    numero_ot = str(fila.get("numero_ot", "") or "").strip()
+    if numero_ot:
+        return f"ot::{numero_ot}"
+
+    identificador = str(fila.get("id", "") or "").strip()
+    if identificador:
+        return f"id::{identificador}"
+
+    return "fila::" + "||".join(
+        str(fila.get(campo, "") or "").strip()
+        for campo in [
+            "fecha_creacion",
+            "centro",
+            "edificio",
+            "planta",
+            "espacio",
+            "descripcion",
+        ]
+    )
+
+
+def _indices_ubicados_centro(df, centro):
+    """Claves de órdenes que ya han sido colocadas en alguna planta del plano."""
+    claves = set()
+
+    for edificio, plantas in EDIFICIOS[centro].items():
+        for planta in plantas:
+            datos = _activas(_filtrar_ubicacion(df, centro, edificio, planta))
+            for _, fila in datos.iterrows():
+                claves.add(_clave_fila_orden(fila))
+
+    return claves
+
+
+def _incidencias_sin_ubicar(df, centro):
+    """Órdenes activas del centro que no coinciden con ninguna planta del dibujo."""
+    todas = _activas_centro_totales(df, centro)
+
+    if todas.empty:
+        return todas
+
+    ubicadas = _indices_ubicados_centro(df, centro)
+
+    mascara = todas.apply(
+        lambda fila: _clave_fila_orden(fila) not in ubicadas,
+        axis=1,
+    )
+
+    return todas[mascara].copy()
+
+
+def _planta_respaldo(centro, edificio):
+    """
+    Planta donde se muestran temporalmente incidencias antiguas sin planta.
+    Evita que desaparezcan del cuadro, pero se identifican como 'sin ubicar'.
+    """
+    if centro == "Pearson 22":
+        if edificio == "Llar":
+            return "Planta 0"
+        return "Planta 1"
+
+    return "Planta 0"
+
+
+def _sin_ubicar_asignadas_a_edificio(df, centro, edificio, planta):
+    """
+    Reparte únicamente órdenes sin ubicar:
+    - respeta edificio cuando puede inferirse;
+    - las que tampoco tienen edificio van al edificio principal del centro;
+    - solo se añaden en la planta de respaldo.
+    """
+    if planta != _planta_respaldo(centro, edificio):
+        return pd.DataFrame(columns=df.columns)
+
+    sin_ubicar = _incidencias_sin_ubicar(df, centro)
+
+    if sin_ubicar.empty:
+        return sin_ubicar
+
+    def pertenece(fila):
+        texto = _norm(_texto_ubicacion_fila(fila))
+        edificio_guardado = _norm(fila.get("edificio", ""))
+
+        if _coincide_edificio(texto, edificio):
+            return True
+
+        if centro == "Pearson 22":
+            contiene_llar = any(
+                palabra in texto
+                for palabra in ["llar", "guarderia", "anexo"]
+            )
+
+            if edificio == "Llar":
+                return contiene_llar
+
+            if edificio == "Infantil / Primaria":
+                return not contiene_llar
+
+        if centro == "Pearson 9" and not edificio_guardado:
+            # Las antiguas sin bloque se muestran provisionalmente en Edificio A.
+            return edificio == "Edificio A"
+
+        return False
+
+    return sin_ubicar[
+        sin_ubicar.apply(pertenece, axis=1)
+    ].copy()
+
+
+def _datos_planta_completos(df, centro, edificio, planta):
+    """
+    Datos colocados normalmente + incidencias antiguas sin ubicación exacta.
+    Se eliminan duplicados por OT para no inflar los contadores.
+    """
+    normales = _filtrar_ubicacion(df, centro, edificio, planta)
+    respaldo = _sin_ubicar_asignadas_a_edificio(
+        df, centro, edificio, planta
+    )
+
+    if normales.empty and respaldo.empty:
+        return normales.copy()
+
+    datos = pd.concat([normales, respaldo], ignore_index=True)
+
+    datos["_clave_orden"] = datos.apply(_clave_fila_orden, axis=1)
+    datos = datos.drop_duplicates("_clave_orden", keep="first")
+
+    return datos.drop(columns=["_clave_orden"], errors="ignore")
+
+
+def _pendiente_material(datos):
+    if datos.empty:
+        return datos
+
+    estados_material = {
+        "pendiente material",
+        "esperando material",
+        "pendiente proveedor",
+        "pendiente presupuesto",
+    }
+
+    estado_normalizado = (
+        datos["estado"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    return datos[estado_normalizado.isin(estados_material)].copy()
+
 def _estado_planta(df, centro, edificio, planta):
-    activas = _activas(_filtrar_ubicacion(df, centro, edificio, planta))
+    activas = _activas(_datos_planta_completos(df, centro, edificio, planta))
     cantidad = len(activas)
     if len(_urgentes(activas)):
         return "critica", cantidad
@@ -494,6 +662,65 @@ def _mostrar_mapa(df):
     with col_c:
         _render_building_native(df, "Pearson 9", "Edificio C", EDIFICIOS["Pearson 9"]["Edificio C"])
 
+    total_activo = 0
+    total_ubicado = 0
+    total_sin_ubicar = 0
+
+    for centro in EDIFICIOS:
+        activas_centro = _activas_centro_totales(df, centro)
+        sin_ubicar = _incidencias_sin_ubicar(df, centro)
+
+        total_activo += len(activas_centro)
+        total_sin_ubicar += len(sin_ubicar)
+        total_ubicado += max(0, len(activas_centro) - len(sin_ubicar))
+
+    if total_sin_ubicar:
+        st.warning(
+            f"⚠️ Hay {total_sin_ubicar} incidencias activas antiguas sin edificio "
+            f"o planta reconocible. Ya aparecen provisionalmente en el plano para "
+            f"que no desaparezcan de los totales."
+        )
+
+        with st.expander(
+            f"🔎 Revisar {total_sin_ubicar} incidencias sin ubicación exacta",
+            expanded=False,
+        ):
+            for centro in EDIFICIOS:
+                pendientes = _incidencias_sin_ubicar(df, centro)
+
+                if pendientes.empty:
+                    continue
+
+                st.markdown(f"#### {centro}")
+
+                columnas_revision = [
+                    "numero_ot",
+                    "fecha_creacion",
+                    "edificio",
+                    "planta",
+                    "espacio",
+                    "descripcion",
+                    "estado",
+                    "prioridad",
+                ]
+                columnas_revision = [
+                    columna
+                    for columna in columnas_revision
+                    if columna in pendientes.columns
+                ]
+
+                st.dataframe(
+                    pendientes[columnas_revision],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+    st.caption(
+        f"Control de lectura: {total_activo} incidencias activas · "
+        f"{total_ubicado} ubicadas directamente · "
+        f"{total_sin_ubicar} sin ubicación exacta."
+    )
+
     st.markdown(
         '<div class="rv-legend">'
         '<span><i class="rv-dot" style="background:#55c947"></i>Correcto</span>'
@@ -506,10 +733,26 @@ def _mostrar_mapa(df):
 
 
 def _mostrar_detalle(df, centro, edificio, planta):
-    datos = _filtrar_ubicacion(df, centro, edificio, planta)
+    datos = _datos_planta_completos(df, centro, edificio, planta)
     activas = _activas(datos)
     urgentes = _urgentes(activas)
-    en_curso = activas[activas["estado"].isin(["En curso", "En ejecución"])] if not activas.empty else activas
+
+    if not activas.empty:
+        estado_normalizado = (
+            activas["estado"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        en_curso = activas[
+            estado_normalizado.isin(["en curso", "en ejecución", "en ejecucion"])
+        ].copy()
+    else:
+        en_curso = activas
+
+    pendiente_material = _pendiente_material(activas)
     cerradas_mes = _cerradas_mes(datos)
 
     st.button("← Volver al colegio", key="gerencia_v3_volver", on_click=_volver_mapa)
@@ -519,11 +762,23 @@ def _mostrar_detalle(df, centro, edificio, planta):
         unsafe_allow_html=True,
     )
 
-    columnas = st.columns(4)
+    columnas = st.columns(5)
     for columna, etiqueta, valor in zip(
         columnas,
-        ["Pendientes", "Urgentes / altas", "En curso", "Finalizadas mes"],
-        [len(activas), len(urgentes), len(en_curso), len(cerradas_mes)],
+        [
+            "Activas",
+            "En curso",
+            "Pendiente material",
+            "Urgentes / altas",
+            "Finalizadas mes",
+        ],
+        [
+            len(activas),
+            len(en_curso),
+            len(pendiente_material),
+            len(urgentes),
+            len(cerradas_mes),
+        ],
     ):
         with columna:
             st.markdown(
@@ -561,6 +816,25 @@ def _mostrar_detalle(df, centro, edificio, planta):
         else:
             vista = activas.sort_values("fecha_dt", ascending=True, na_position="last").copy()
             vista["descripcion"] = vista["descripcion"].apply(_limpiar_descripcion)
+
+            def _estado_visual(valor):
+                estado = str(valor or "").strip()
+                normalizado = estado.lower()
+
+                if normalizado in ["en curso", "en ejecución", "en ejecucion"]:
+                    return f"🛠️ {estado}"
+
+                if normalizado in [
+                    "pendiente material",
+                    "esperando material",
+                    "pendiente proveedor",
+                    "pendiente presupuesto",
+                ]:
+                    return f"📦 {estado}"
+
+                return f"📋 {estado}" if estado else "📋 Abierta"
+
+            vista["estado"] = vista["estado"].apply(_estado_visual)
             columnas_vista = ["numero_ot", "descripcion", "area", "prioridad", "estado", "operario"]
             columnas_vista = [columna for columna in columnas_vista if columna in vista.columns]
             st.dataframe(vista[columnas_vista], use_container_width=True, hide_index=True)
