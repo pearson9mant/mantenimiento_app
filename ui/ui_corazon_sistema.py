@@ -1239,11 +1239,60 @@ def mostrar_corazon_sistema_clasico():
         f"{panel.get('score_legionella', 0)}%"
     )
 
+# =====================================================
+# CORAZÓN 2.0 · JORNADA INTELIGENTE DEL OPERARIO
+#
+# Administración conserva mostrar_corazon_sistema_clasico().
+# El operario recibe una ruta de trabajo orientada a la acción.
+# =====================================================
 
-# =====================================================
-# NUEVA ENTRADA INTELIGENTE DEL OPERARIO
-# La vista clásica se conserva para administración.
-# =====================================================
+ESTADOS_BLOQUEADOS_CORAZON = {
+    "pendiente material",
+    "esperando material",
+    "pendiente proveedor",
+    "pendiente presupuesto",
+    "avisado",
+}
+
+PALABRAS_RIESGO_CORAZON = {
+    "agua": [
+        "agua", "fuga", "inund", "goteo", "pérdida", "perdida",
+        "tubería", "tuberia", "desagüe", "desague", "atasco",
+        "grifo", "cisterna", "wc", "lavabo", "acs",
+    ],
+    "electricidad": [
+        "eléctr", "electric", "enchufe", "cuadro", "cable",
+        "corriente", "tensión", "tension", "diferencial",
+        "magnetotérmico", "magnetotermico", "cortocircuito",
+        "chisp", "sin luz",
+    ],
+    "seguridad": [
+        "seguridad", "peligro", "riesgo", "cortafuego",
+        "cristal", "barandilla", "caída", "caida", "suelto",
+        "acceso", "cerradura", "puerta de emergencia",
+        "evacuación", "evacuacion",
+    ],
+    "legionella": [
+        "legionella", "sanitario", "cloro", "temperatura acs",
+        "choque térmico", "choque termico",
+    ],
+    "climatizacion": [
+        "climat", "calefacción", "calefaccion", "refrigeración",
+        "refrigeracion", "aire acondicionado", "split",
+        "sin calefacción", "sin calefaccion", "sin frío",
+        "sin frio", "sin calor", "ventilación", "ventilacion",
+    ],
+}
+
+ICONOS_RIESGO_CORAZON = {
+    "agua": "💧",
+    "electricidad": "⚡",
+    "seguridad": "🦺",
+    "legionella": "🦠",
+    "climatizacion": "🌡️",
+    "general": "📋",
+}
+
 
 def _nombre_corto_corazon(operario):
     texto = str(operario or "").strip()
@@ -1264,10 +1313,7 @@ def _nombre_corto_corazon(operario):
     if "abel" in limpio or "vasquez" in limpio:
         return "Abel"
 
-    if not texto:
-        return "Operario"
-
-    return texto.split()[0]
+    return texto.split()[0] if texto else "Operario"
 
 
 def _centro_operario_corazon(operario):
@@ -1292,23 +1338,31 @@ def _centro_operario_corazon(operario):
 def _texto_valido_corazon(valor, defecto):
     texto = str(valor or "").strip()
 
-    if not texto or texto.lower() in [
-        "nan",
-        "none",
-        "null",
-        "-",
-    ]:
+    if not texto or texto.lower() in {
+        "nan", "none", "null", "-"
+    }:
         return defecto
 
     return texto
 
 
-def _es_urgente_corazon(trabajo):
-    prioridad = str(
-        trabajo.get("prioridad", "") or ""
+def _estado_corazon(trabajo):
+    return str(
+        trabajo.get("estado", "") or ""
     ).strip().lower()
 
-    return "urgente" in prioridad
+
+def _trabajo_bloqueado_corazon(trabajo):
+    return _estado_corazon(trabajo) in ESTADOS_BLOQUEADOS_CORAZON
+
+
+def _trabajo_en_curso_corazon(trabajo):
+    return _estado_corazon(trabajo) in {
+        "en curso",
+        "en proceso",
+        "en ejecución",
+        "en ejecucion",
+    }
 
 
 def _dias_abierta_corazon(trabajo):
@@ -1321,167 +1375,250 @@ def _dias_abierta_corazon(trabajo):
         return 0
 
 
-def _orden_trabajo_corazon(trabajo):
-    return (
-        0 if _es_urgente_corazon(trabajo) else 1,
-        -int(trabajo.get("score", 0) or 0),
-        -_dias_abierta_corazon(trabajo),
-        str(trabajo.get("numero_ot", "") or ""),
+def _texto_trabajo_corazon(trabajo):
+    motivos = " ".join(
+        str(motivo or "")
+        for motivo in trabajo.get("motivos", []) or []
     )
 
+    return " ".join(
+        [
+            str(trabajo.get("titulo", "") or ""),
+            str(trabajo.get("area", "") or ""),
+            str(trabajo.get("origen", "") or ""),
+            str(trabajo.get("prioridad", "") or ""),
+            motivos,
+        ]
+    ).lower()
 
-def _agrupar_prioridades_por_edificio(prioridades):
+
+def _tipo_riesgo_corazon(trabajo):
+    texto = _texto_trabajo_corazon(trabajo)
+
+    for tipo, palabras in PALABRAS_RIESGO_CORAZON.items():
+        if any(palabra in texto for palabra in palabras):
+            return tipo
+
+    return "general"
+
+
+def _nivel_riesgo_corazon(trabajo):
+    """
+    Orden lexicográfico de riesgo.
+
+    5 = urgencia marcada o indicios de peligro inmediato
+    4 = agua / electricidad / seguridad / Legionella
+    3 = climatización con afectación del servicio
+    1 = actuación general
+    """
+    texto = _texto_trabajo_corazon(trabajo)
+    prioridad = str(
+        trabajo.get("prioridad", "") or ""
+    ).strip().lower()
+
+    if (
+        "urgente" in prioridad
+        or any(
+            palabra in texto
+            for palabra in [
+                "inund", "cortocircuito", "chisp",
+                "peligro inmediato", "riesgo eléctrico",
+                "riesgo electrico", "sin agua",
+                "sin corriente",
+            ]
+        )
+    ):
+        return 5
+
+    tipo = _tipo_riesgo_corazon(trabajo)
+
+    if tipo in {
+        "agua",
+        "electricidad",
+        "seguridad",
+        "legionella",
+    }:
+        return 4
+
+    if tipo == "climatizacion":
+        return 3
+
+    return 1
+
+
+def _agrupar_prioridades_operativas(prioridades):
+    """
+    Agrupa solo trabajos realizables por edificio y planta.
+
+    Las OT bloqueadas se mantienen aparte para consulta, pero nunca
+    deciden la ruta diaria.
+    """
     edificios = {}
+    bloqueadas = []
 
     for trabajo in prioridades or []:
+        if _trabajo_bloqueado_corazon(trabajo):
+            bloqueadas.append(trabajo)
+            continue
+
         edificio = _texto_valido_corazon(
             trabajo.get("edificio"),
             "Sin edificio"
         )
-
         planta = _texto_valido_corazon(
             trabajo.get("planta"),
             "Sin planta"
         )
 
-        if edificio not in edificios:
-            edificios[edificio] = {
+        datos_edificio = edificios.setdefault(
+            edificio,
+            {
                 "trabajos": [],
                 "plantas": {},
-                "urgentes": 0,
-                "atrasadas": 0,
-                "score_max": 0,
             }
+        )
 
-        datos = edificios[edificio]
-        datos["trabajos"].append(trabajo)
-        datos["plantas"].setdefault(
+        datos_edificio["trabajos"].append(trabajo)
+        datos_edificio["plantas"].setdefault(
             planta,
             []
         ).append(trabajo)
 
-        if _es_urgente_corazon(trabajo):
-            datos["urgentes"] += 1
+    return edificios, bloqueadas
 
-        if _dias_abierta_corazon(trabajo) >= 7:
-            datos["atrasadas"] += 1
 
-        datos["score_max"] = max(
-            datos["score_max"],
-            int(trabajo.get("score", 0) or 0)
+def _estadisticas_ruta(edificios):
+    for datos_edificio in edificios.values():
+        total_edificio = len(datos_edificio["trabajos"])
+
+        for planta, trabajos in datos_edificio["plantas"].items():
+            cantidad_planta = len(trabajos)
+
+            for trabajo in trabajos:
+                trabajo["_corazon_total_edificio"] = total_edificio
+                trabajo["_corazon_total_planta"] = cantidad_planta
+
+
+def _clave_prioridad_corazon(trabajo):
+    """
+    Criterio acordado:
+
+    1. Riesgo inmediato.
+    2. Trabajo ya iniciado y realizable.
+    3. Mayor antigüedad.
+    4. Planta con más incidencias.
+    5. Edificio con más incidencias.
+    6. Score previo del Corazón como desempate.
+    """
+    return (
+        _nivel_riesgo_corazon(trabajo),
+        1 if _trabajo_en_curso_corazon(trabajo) else 0,
+        _dias_abierta_corazon(trabajo),
+        int(trabajo.get("_corazon_total_planta", 0) or 0),
+        int(trabajo.get("_corazon_total_edificio", 0) or 0),
+        int(trabajo.get("score", 0) or 0),
+    )
+
+
+def _elegir_primera_actuacion(edificios):
+    candidatas = []
+
+    for datos_edificio in edificios.values():
+        candidatas.extend(
+            datos_edificio.get("trabajos", [])
         )
 
-    for datos in edificios.values():
-        datos["trabajos"] = sorted(
-            datos["trabajos"],
-            key=_orden_trabajo_corazon
-        )
-
-        for planta in list(datos["plantas"]):
-            datos["plantas"][planta] = sorted(
-                datos["plantas"][planta],
-                key=_orden_trabajo_corazon
-            )
-
-    return edificios
-
-
-def _elegir_edificio_recomendado(
-    edificios,
-    prioridad_hoy=None
-):
-    if not edificios:
+    if not candidatas:
         return None
 
-    edificio_prioridad = _texto_valido_corazon(
-        (prioridad_hoy or {}).get("edificio"),
-        ""
-    )
-
-    if edificio_prioridad in edificios:
-        return edificio_prioridad
-
     return max(
-        edificios,
-        key=lambda edificio: (
-            edificios[edificio]["urgentes"],
-            edificios[edificio]["atrasadas"],
-            edificios[edificio]["score_max"],
-            len(edificios[edificio]["trabajos"]),
-        )
+        candidatas,
+        key=_clave_prioridad_corazon
     )
 
 
-def _mensaje_recomendacion_operario(
-    edificio,
-    datos
-):
-    total = len(
-        datos.get("trabajos", [])
+def _ordenar_trabajos_corazon(trabajos):
+    return sorted(
+        trabajos or [],
+        key=_clave_prioridad_corazon,
+        reverse=True
     )
 
-    urgentes = int(
-        datos.get("urgentes", 0) or 0
+
+def _clave_planta_corazon(planta, trabajos, planta_recomendada):
+    mejor = max(
+        (_clave_prioridad_corazon(t) for t in trabajos),
+        default=(0, 0, 0, 0, 0, 0)
     )
-
-    atrasadas = int(
-        datos.get("atrasadas", 0) or 0
-    )
-
-    if urgentes > 0:
-        return (
-            f"**Hoy empezaría por {edificio}.** "
-            f"Es donde tienes "
-            f"{urgentes} "
-            f"{'urgencia' if urgentes == 1 else 'urgencias'}. "
-            f"Aprovecha que estarás allí para revisar también "
-            f"las otras "
-            f"{max(total - urgentes, 0)} "
-            f"{'actuación' if max(total - urgentes, 0) == 1 else 'actuaciones'} "
-            f"del edificio."
-        )
-
-    if atrasadas > 0:
-        return (
-            f"**Hoy empezaría por {edificio}.** "
-            f"Es donde tienes más trabajo atrasado: "
-            f"{atrasadas} "
-            f"{'actuación' if atrasadas == 1 else 'actuaciones'}. "
-            f"En total puedes aprovechar el desplazamiento "
-            f"para revisar {total} trabajos."
-        )
 
     return (
-        f"**Hoy empezaría por {edificio}.** "
-        f"Es donde concentras más trabajo para hoy: "
-        f"{total} "
-        f"{'actuación' if total == 1 else 'actuaciones'}."
+        1 if planta == planta_recomendada else 0,
+        mejor,
+        len(trabajos),
+    )
+
+
+def _mensaje_ruta_corazon(
+    edificio,
+    planta,
+    primera,
+    trabajos_planta
+):
+    riesgo = _tipo_riesgo_corazon(primera)
+    nivel = _nivel_riesgo_corazon(primera)
+    dias = _dias_abierta_corazon(primera)
+    cantidad = len(trabajos_planta)
+
+    motivos = []
+
+    if nivel >= 4:
+        motivos.append(
+            f"hay una actuación de {riesgo}"
+        )
+    elif _trabajo_en_curso_corazon(primera):
+        motivos.append(
+            "hay un trabajo ya iniciado que puede terminarse"
+        )
+
+    if dias >= 1:
+        motivos.append(
+            f"la primera OT lleva {dias} "
+            f"{'día' if dias == 1 else 'días'} abierta"
+        )
+
+    motivos.append(
+        f"en {planta} hay {cantidad} "
+        f"{'actuación' if cantidad == 1 else 'actuaciones'}"
+    )
+
+    return (
+        f"**Hoy empezaría por {edificio}, {planta}.** "
+        + "; ".join(motivos).capitalize()
+        + ". Cuando termines la primera, aprovecha para revisar "
+        + "las demás actuaciones de esta misma planta."
     )
 
 
 def _icono_trabajo_corazon(trabajo):
-    prioridad = str(
-        trabajo.get("prioridad", "") or ""
-    ).strip().lower()
+    tipo = _tipo_riesgo_corazon(trabajo)
+    icono = ICONOS_RIESGO_CORAZON.get(
+        tipo,
+        "📋"
+    )
 
-    if "urgente" in prioridad:
+    if _nivel_riesgo_corazon(trabajo) == 5:
         return "🚨"
 
-    if "alta" in prioridad:
-        return "🔴"
-
-    if "media" in prioridad:
+    if _trabajo_en_curso_corazon(trabajo):
         return "🟠"
 
-    if "baja" in prioridad:
-        return "🟢"
-
-    return "📋"
+    return icono
 
 
-def _mostrar_trabajo_compacto_corazon(
+def _mostrar_trabajo_accion_corazon(
     trabajo,
-    key_extra
+    key_extra,
+    principal=False
 ):
     numero_ot = str(
         trabajo.get("numero_ot", "") or ""
@@ -1506,17 +1643,8 @@ def _mostrar_trabajo_compacto_corazon(
         "-"
     )
 
-    score = int(
-        trabajo.get("score", 0) or 0
-    )
-
-    dias = _dias_abierta_corazon(
-        trabajo
-    )
-
-    icono = _icono_trabajo_corazon(
-        trabajo
-    )
+    dias = _dias_abierta_corazon(trabajo)
+    icono = _icono_trabajo_corazon(trabajo)
 
     with st.container(border=True):
         col_info, col_accion = st.columns(
@@ -1526,22 +1654,35 @@ def _mostrar_trabajo_compacto_corazon(
         )
 
         with col_info:
-            st.markdown(
-                f"{icono} **{espacio}** · "
-                f"`{numero_ot or '-'}`"
+            etiqueta = (
+                " · PRIMERA ACTUACIÓN"
+                if principal
+                else ""
             )
 
-            st.markdown(titulo)
+            st.markdown(
+                f"{icono} **{espacio}**"
+                f"{etiqueta}"
+            )
+
+            st.markdown(
+                f"### {titulo}"
+                if principal
+                else titulo
+            )
 
             detalle = (
-                f"{prioridad} · {area} · "
-                f"Confianza {score}/100"
+                f"{numero_ot or '-'} · "
+                f"{prioridad} · {area}"
             )
 
+            if _trabajo_en_curso_corazon(trabajo):
+                detalle += " · En curso"
+
             if dias == 1:
-                detalle += " · Hace 1 día"
+                detalle += " · Abierta hace 1 día"
             elif dias > 1:
-                detalle += f" · Hace {dias} días"
+                detalle += f" · Abierta hace {dias} días"
 
             st.caption(detalle)
 
@@ -1550,100 +1691,97 @@ def _mostrar_trabajo_compacto_corazon(
                 numero_ot=numero_ot,
                 key_extra=key_extra,
                 texto="▶ Empezar",
-                tipo=(
-                    "primary"
-                    if _es_urgente_corazon(trabajo)
-                    else "secondary"
-                )
+                tipo="primary" if principal else "secondary"
             )
 
 
-def _mostrar_edificio_operario_corazon(
+def _mostrar_edificio_jornada(
     edificio,
-    datos
+    datos_edificio,
+    edificio_recomendado,
+    planta_recomendada,
+    primera_ot
 ):
-    trabajos = datos.get(
-        "trabajos",
-        []
-    )
-
-    plantas = datos.get(
+    plantas = datos_edificio.get(
         "plantas",
         {}
     )
 
-    urgentes = int(
-        datos.get("urgentes", 0) or 0
-    )
-
-    atrasadas = int(
-        datos.get("atrasadas", 0) or 0
-    )
-
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric(
-        "Actuaciones",
-        len(trabajos)
-    )
-
-    c2.metric(
-        "Urgentes",
-        urgentes
-    )
-
-    c3.metric(
-        "Atrasadas",
-        atrasadas
-    )
-
     plantas_ordenadas = sorted(
         plantas,
-        key=lambda planta: (
-            planta == "Sin planta",
-            planta
-        )
+        key=lambda planta: _clave_planta_corazon(
+            planta,
+            plantas[planta],
+            planta_recomendada
+            if edificio == edificio_recomendado
+            else None
+        ),
+        reverse=True
     )
 
     for indice_planta, planta in enumerate(
-        plantas_ordenadas,
-        start=1
+        plantas_ordenadas
     ):
-        trabajos_planta = plantas[
-            planta
-        ]
-
-        hay_urgencia = any(
-            _es_urgente_corazon(trabajo)
-            for trabajo in trabajos_planta
+        trabajos = _ordenar_trabajos_corazon(
+            plantas[planta]
         )
 
-        titulo_planta = (
-            f"{'🚨' if hay_urgencia else '📍'} "
-            f"{planta} · "
-            f"{len(trabajos_planta)} "
-            f"{'actuación' if len(trabajos_planta) == 1 else 'actuaciones'}"
+        es_planta_recomendada = (
+            edificio == edificio_recomendado
+            and planta == planta_recomendada
         )
 
-        with st.expander(
-            titulo_planta,
-            expanded=(
-                indice_planta == 1
-                or hay_urgencia
-            )
+        st.markdown(
+            f"### 📍 {planta} · "
+            f"{len(trabajos)} "
+            f"{'actuación' if len(trabajos) == 1 else 'actuaciones'}"
+        )
+
+        limite_visible = (
+            len(trabajos)
+            if es_planta_recomendada
+            else min(3, len(trabajos))
+        )
+
+        for indice, trabajo in enumerate(
+            trabajos[:limite_visible],
+            start=1
         ):
-            for indice_trabajo, trabajo in enumerate(
-                trabajos_planta,
-                start=1
+            es_primera = (
+                es_planta_recomendada
+                and str(trabajo.get("numero_ot", "") or "")
+                == str(primera_ot.get("numero_ot", "") or "")
+            )
+
+            _mostrar_trabajo_accion_corazon(
+                trabajo,
+                key_extra=(
+                    f"jornada_{edificio}_"
+                    f"{planta}_{indice}"
+                ),
+                principal=es_primera
+            )
+
+        if len(trabajos) > limite_visible:
+            with st.expander(
+                f"Ver las otras "
+                f"{len(trabajos) - limite_visible} "
+                f"actuaciones de {planta}"
             ):
-                _mostrar_trabajo_compacto_corazon(
-                    trabajo,
-                    key_extra=(
-                        f"edificio_{edificio}_"
-                        f"planta_{planta}_"
-                        f"{indice_trabajo}"
+                for indice, trabajo in enumerate(
+                    trabajos[limite_visible:],
+                    start=limite_visible + 1
+                ):
+                    _mostrar_trabajo_accion_corazon(
+                        trabajo,
+                        key_extra=(
+                            f"jornada_extra_{edificio}_"
+                            f"{planta}_{indice}"
+                        )
                     )
-                )
+
+        if indice_planta < len(plantas_ordenadas) - 1:
+            st.markdown("---")
 
 
 def mostrar_corazon_operario():
@@ -1716,130 +1854,181 @@ def mostrar_corazon_operario():
         []
     ) or []
 
-    prioridad_hoy = panel.get(
-        "prioridad_hoy"
-    ) or {}
-
-    edificios = _agrupar_prioridades_por_edificio(
-        prioridades
+    edificios, bloqueadas = (
+        _agrupar_prioridades_operativas(
+            prioridades
+        )
     )
 
-    if not edificios:
+    _estadisticas_ruta(
+        edificios
+    )
+
+    primera_ot = _elegir_primera_actuacion(
+        edificios
+    )
+
+    if not primera_ot:
         st.success(
-            "🟢 No tienes actuaciones prioritarias pendientes. "
-            "Puedes aprovechar para revisar preventivos, "
-            "Legionella o apoyar otras tareas del centro."
+            "🟢 No tienes actuaciones realizables pendientes. "
+            "Puedes revisar preventivos, Legionella o consultar "
+            "los trabajos bloqueados."
         )
+
+        if bloqueadas:
+            with st.expander(
+                f"📦 Trabajos bloqueados ({len(bloqueadas)})"
+            ):
+                for trabajo in bloqueadas:
+                    st.caption(
+                        f"{trabajo.get('numero_ot', '')} · "
+                        f"{trabajo.get('titulo', '')} · "
+                        f"{trabajo.get('estado', '')}"
+                    )
+
         return
 
-    recomendado = _elegir_edificio_recomendado(
-        edificios,
-        prioridad_hoy
+    edificio_recomendado = _texto_valido_corazon(
+        primera_ot.get("edificio"),
+        "Sin edificio"
     )
 
-    datos_recomendado = edificios[
-        recomendado
+    planta_recomendada = _texto_valido_corazon(
+        primera_ot.get("planta"),
+        "Sin planta"
+    )
+
+    trabajos_planta = edificios[
+        edificio_recomendado
+    ]["plantas"][
+        planta_recomendada
     ]
 
     st.info(
-        _mensaje_recomendacion_operario(
-            recomendado,
-            datos_recomendado
+        _mensaje_ruta_corazon(
+            edificio_recomendado,
+            planta_recomendada,
+            primera_ot,
+            trabajos_planta
         )
-    )
-
-    total_urgentes = sum(
-        datos["urgentes"]
-        for datos in edificios.values()
-    )
-
-    total_atrasadas = sum(
-        datos["atrasadas"]
-        for datos in edificios.values()
-    )
-
-    k1, k2, k3 = st.columns(3)
-
-    k1.metric(
-        "🚨 Urgentes",
-        total_urgentes
-    )
-
-    k2.metric(
-        "⏰ Atrasadas",
-        total_atrasadas
-    )
-
-    k3.metric(
-        "📋 Activas",
-        len(prioridades)
     )
 
     edificios_ordenados = sorted(
         edificios,
         key=lambda edificio: (
-            edificio != recomendado,
-            -edificios[edificio]["urgentes"],
-            -edificios[edificio]["atrasadas"],
-            -edificios[edificio]["score_max"],
-            edificio,
-        )
+            edificio == edificio_recomendado,
+            max(
+                (
+                    _clave_prioridad_corazon(t)
+                    for t in edificios[edificio]["trabajos"]
+                ),
+                default=(0, 0, 0, 0, 0, 0)
+            ),
+            len(edificios[edificio]["trabajos"]),
+        ),
+        reverse=True
     )
 
     etiquetas = [
         (
-            f"{'🏆' if edificio == recomendado else '🏫'} "
+            f"{'🏆' if edificio == edificio_recomendado else '🏫'} "
             f"{edificio} "
             f"({len(edificios[edificio]['trabajos'])})"
         )
         for edificio in edificios_ordenados
     ]
 
-    tabs = st.tabs(etiquetas)
+    tabs = st.tabs(
+        etiquetas
+    )
 
     for tab, edificio in zip(
         tabs,
         edificios_ordenados
     ):
         with tab:
-            if edificio == recomendado:
+            if edificio == edificio_recomendado:
                 st.success(
-                    "🏆 Edificio recomendado para empezar hoy."
+                    f"Empieza por {planta_recomendada}. "
+                    "La primera actuación ya aparece preparada."
                 )
 
-            _mostrar_edificio_operario_corazon(
-                edificio,
-                edificios[edificio]
+            _mostrar_edificio_jornada(
+                edificio=edificio,
+                datos_edificio=edificios[edificio],
+                edificio_recomendado=edificio_recomendado,
+                planta_recomendada=planta_recomendada,
+                primera_ot=primera_ot,
             )
 
+    if bloqueadas:
+        with st.expander(
+            f"📦 Trabajos bloqueados que no condicionan la ruta "
+            f"({len(bloqueadas)})"
+        ):
+            st.caption(
+                "Pendientes de material, proveedor o presupuesto. "
+                "Se muestran para consulta, pero no deciden "
+                "por dónde empezar."
+            )
+
+            for trabajo in bloqueadas:
+                numero = str(
+                    trabajo.get("numero_ot", "") or ""
+                ).strip()
+
+                st.markdown(
+                    f"**{numero or '-'}** · "
+                    f"{trabajo.get('titulo', '')}"
+                )
+
+                st.caption(
+                    " · ".join(
+                        [
+                            _texto_valido_corazon(
+                                trabajo.get("edificio"),
+                                "Sin edificio"
+                            ),
+                            _texto_valido_corazon(
+                                trabajo.get("planta"),
+                                "Sin planta"
+                            ),
+                            _texto_valido_corazon(
+                                trabajo.get("estado"),
+                                "Bloqueada"
+                            ),
+                        ]
+                    )
+                )
+
+                boton_abrir_ot(
+                    numero_ot=numero,
+                    key_extra=f"bloqueada_{numero}",
+                    texto="🔎 Consultar OT"
+                )
+
     with st.expander(
-        "🧠 Ver por qué se ha elegido esta ruta",
+        "🧠 Cómo se ha elegido esta ruta",
         expanded=False
     ):
         st.markdown(
-            "La recomendación combina urgencias, "
-            "antigüedad, prioridad, puntuación del Corazón "
-            "y concentración de trabajos en el mismo edificio."
+            """
+1. Riesgo inmediato: agua, electricidad, seguridad, Legionella y climatización.
+2. Trabajos ya iniciados que pueden terminarse.
+3. Mayor antigüedad.
+4. Planta con más incidencias.
+5. Edificio con más incidencias.
+6. Las OT bloqueadas no condicionan la ruta.
+            """
         )
-
-        prioridad_numero = str(
-            prioridad_hoy.get("numero_ot", "") or ""
-        ).strip()
-
-        if prioridad_numero:
-            st.caption(
-                f"La primera actuación recomendada por el Corazón "
-                f"es la OT {prioridad_numero}."
-            )
 
 
 def mostrar_corazon_sistema():
     """
-    Entrada pública conservada para app.py.
+    Entrada pública utilizada por app.py.
 
-    El operario recibe la nueva jornada inteligente.
-    Administración y el resto de perfiles mantienen
-    exactamente la pantalla clásica anterior.
+    - Operario: Corazón 2.0.
+    - Administración y otros perfiles: pantalla clásica intacta.
     """
     perfil = str(
         st.session_state.get("perfil")
