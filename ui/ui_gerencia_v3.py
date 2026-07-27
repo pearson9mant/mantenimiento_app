@@ -1,4 +1,5 @@
 import html
+import unicodedata
 from urllib.parse import urlencode
 
 import pandas as pd
@@ -35,61 +36,240 @@ ALIAS_EDIFICIOS = {
 
 
 def _norm(texto):
-    return " ".join(str(texto or "").lower().replace("/", " ").replace("-", " ").split())
+    texto = str(texto or "").lower().strip()
+    texto = "".join(
+        caracter
+        for caracter in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(caracter) != "Mn"
+    )
+    for caracter in ["/", "-", "_", ".", ",", ";", ":"]:
+        texto = texto.replace(caracter, " ")
+    return " ".join(texto.split())
+
+
+ALIAS_CENTROS = {
+    "Pearson 22": ["pearson 22", "pearson22", "p22", "pearson nº 22", "pearson numero 22"],
+    "Pearson 9": ["pearson 9", "pearson9", "p9", "pearson nº 9", "pearson numero 9"],
+}
+
+
+def _coincide_centro(valor, centro):
+    texto = _norm(valor)
+    if not texto:
+        return False
+
+    alias = ALIAS_CENTROS.get(centro, [centro])
+    return any(
+        _norm(nombre) == texto
+        or _norm(nombre) in texto
+        or texto in _norm(nombre)
+        for nombre in alias
+    )
 
 
 def _norm_planta(valor):
     texto = _norm(valor)
-    if "terrado" in texto or "cubierta" in texto:
+
+    if not texto:
+        return ""
+
+    if any(palabra in texto for palabra in ["terrado", "cubierta", "azotea", "tejado"]):
         return "terrado"
+
+    equivalencias = {
+        "baja": 0,
+        "pb": 0,
+        "principal": 0,
+        "cero": 0,
+        "primera": 1,
+        "primero": 1,
+        "segunda": 2,
+        "segundo": 2,
+        "tercera": 3,
+        "tercero": 3,
+        "cuarta": 4,
+        "cuarto": 4,
+        "quinta": 5,
+        "quinto": 5,
+    }
+
+    palabras = texto.split()
+
     for numero in range(10):
-        if texto in {str(numero), f"p{numero}", f"p {numero}", f"planta {numero}"}:
+        patrones = {
+            str(numero),
+            f"p{numero}",
+            f"p {numero}",
+            f"planta {numero}",
+            f"piso {numero}",
+            f"nivel {numero}",
+        }
+
+        if texto in patrones:
             return f"planta {numero}"
-        if f"planta {numero}" in texto or f"p {numero}" in texto:
+
+        if any(patron in texto for patron in patrones if len(patron) > 1):
             return f"planta {numero}"
-    return texto
+
+    for palabra, numero in equivalencias.items():
+        if palabra in palabras or f"planta {palabra}" in texto:
+            return f"planta {numero}"
+
+    return ""
 
 
 def _coincide_edificio(valor, edificio):
     texto = _norm(valor)
+
     if not texto:
         return False
-    return any(
-        _norm(alias) in texto or texto in _norm(alias)
-        for alias in ALIAS_EDIFICIOS.get(edificio, [edificio])
+
+    alias_ampliados = {
+        "Infantil / Primaria": [
+            "infantil primaria",
+            "infantil",
+            "primaria",
+            "edificio infantil",
+            "edificio primaria",
+            "edif infantil",
+            "edif primaria",
+            "principal",
+        ],
+        "Llar": [
+            "llar",
+            "llar infants",
+            "llar d infants",
+            "guarderia",
+            "anexo",
+            "edificio llar",
+            "edif llar",
+        ],
+        "Edificio A": [
+            "edificio a",
+            "edif a",
+            "bloque a",
+            "pabellon a",
+            "modulo a",
+        ],
+        "Edificio B": [
+            "edificio b",
+            "edif b",
+            "bloque b",
+            "pabellon b",
+            "modulo b",
+        ],
+        "Edificio C": [
+            "edificio c",
+            "edif c",
+            "bloque c",
+            "pabellon c",
+            "modulo c",
+        ],
+    }
+
+    alias = alias_ampliados.get(
+        edificio,
+        ALIAS_EDIFICIOS.get(edificio, [edificio]),
     )
+
+    return any(
+        _norm(nombre) == texto
+        or _norm(nombre) in texto
+        or texto in _norm(nombre)
+        for nombre in alias
+    )
+
+
+def _texto_ubicacion_fila(fila):
+    campos = [
+        "centro",
+        "edificio",
+        "planta",
+        "espacio",
+        "descripcion",
+        "solicitante",
+        "observaciones",
+    ]
+
+    return " ".join(
+        str(fila.get(campo, "") or "")
+        for campo in campos
+        if campo in fila.index
+    )
+
+
+def _inferir_edificio_fila(fila, centro, edificio):
+    texto = _norm(_texto_ubicacion_fila(fila))
+
+    if _coincide_edificio(texto, edificio):
+        return True
+
+    edificio_guardado = _norm(fila.get("edificio", ""))
+
+    # Compatibilidad con órdenes antiguas de Pearson 22:
+    # si no indican edificio y no contienen Llar, pertenecen al edificio principal.
+    if centro == "Pearson 22" and not edificio_guardado:
+        contiene_llar = any(
+            palabra in texto
+            for palabra in ["llar", "guarderia", "anexo"]
+        )
+
+        if edificio == "Llar":
+            return contiene_llar
+
+        if edificio == "Infantil / Primaria":
+            return not contiene_llar
+
+    return False
+
+
+def _inferir_planta_fila(fila):
+    planta_directa = _norm_planta(fila.get("planta", ""))
+
+    if planta_directa:
+        return planta_directa
+
+    texto_apoyo = " ".join(
+        str(fila.get(campo, "") or "")
+        for campo in ["edificio", "espacio", "descripcion", "observaciones"]
+        if campo in fila.index
+    )
+
+    return _norm_planta(texto_apoyo)
 
 
 def _filtrar_ubicacion(df, centro, edificio, planta):
     if df.empty:
         return df.copy()
 
-    datos = df[df["centro"].fillna("").astype(str).str.strip().eq(centro)].copy()
+    datos = df.copy()
+
+    # Centro tolerante: Pearson 22, Pearson22, P22, etc.
+    datos = datos[
+        datos["centro"]
+        .fillna("")
+        .astype(str)
+        .apply(lambda valor: _coincide_centro(valor, centro))
+    ].copy()
+
     if datos.empty:
         return datos
 
+    # Edificio: consulta tanto el campo edificio como espacio y descripción.
     datos = datos[
-        datos["edificio"].fillna("").astype(str).apply(
-            lambda valor: _coincide_edificio(valor, edificio)
+        datos.apply(
+            lambda fila: _inferir_edificio_fila(fila, centro, edificio),
+            axis=1,
         )
     ].copy()
+
     if datos.empty:
         return datos
 
     objetivo = _norm_planta(planta)
-    datos["_planta"] = datos["planta"].fillna("").astype(str).apply(_norm_planta)
-
-    vacias = datos["_planta"].eq("")
-    if vacias.any():
-        apoyo = (
-            datos.loc[vacias, "espacio"].fillna("").astype(str)
-            + " "
-            + datos.loc[vacias, "descripcion"].fillna("").astype(str)
-        ).apply(_norm_planta)
-        datos.loc[vacias, "_planta"] = apoyo
+    datos["_planta"] = datos.apply(_inferir_planta_fila, axis=1)
 
     return datos[datos["_planta"].eq(objetivo)].copy()
-
 
 def _activas(datos):
     if datos.empty:
@@ -407,7 +587,7 @@ def pantalla_gerencia():
             columns=[
                 "numero_ot", "fecha_creacion", "fecha_cierre", "centro", "edificio", "planta",
                 "espacio", "descripcion", "estado", "operario", "solicitante", "origen", "area",
-                "prioridad", "origen_tabla", "fecha_dt", "fecha_cierre_dt",
+                "prioridad", "observaciones", "origen_tabla", "fecha_dt", "fecha_cierre_dt",
             ]
         )
 
