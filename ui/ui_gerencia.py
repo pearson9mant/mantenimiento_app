@@ -1179,9 +1179,8 @@ def mostrar_detalle(df):
     mostrar_detalle_ordenes(df, centro, tipo, titulo)
 
 
-
 # =====================================================
-# COLEGIO VIVO · GERENCIA
+# COLEGIO VIVO · GERENCIA · VISTA LIMPIA
 # =====================================================
 
 EDIFICIOS_GERENCIA = {
@@ -1196,7 +1195,6 @@ EDIFICIOS_GERENCIA = {
     },
 }
 
-
 ALIAS_EDIFICIOS_GERENCIA = {
     "Infantil / Primaria": ["infantil primaria", "infantil/primaria", "edif infantil primaria", "edificio infantil primaria"],
     "Llar": ["llar", "anexo", "edif llar", "edificio llar"],
@@ -1205,57 +1203,58 @@ ALIAS_EDIFICIOS_GERENCIA = {
     "Edificio C": ["edificio c", "edif c", "bloque c"],
 }
 
+VERSION_VISTA_GERENCIA = "colegio_vivo_limpio_v1"
+
 
 def aplicar_estilo_colegio_vivo():
     st.markdown("""
     <style>
+    .block-container {
+        padding-top: .55rem !important;
+        padding-bottom: .65rem !important;
+        max-width: 1700px !important;
+    }
     .cv-hero {
         display:flex; align-items:center; justify-content:space-between;
-        gap:16px; padding:14px 18px; margin:0 0 12px 0;
+        gap:14px; padding:12px 18px; margin:0 0 10px 0;
         background:linear-gradient(135deg,#0f172a 0%,#1d4ed8 100%);
-        border-radius:18px; color:white;
-        box-shadow:0 8px 24px rgba(15,23,42,.14);
+        border-radius:16px; color:white;
     }
-    .cv-title {font-size:27px;font-weight:900;line-height:1.05}
-    .cv-subtitle {font-size:13px;font-weight:600;opacity:.9;margin-top:4px}
-    .cv-status {padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.14);font-weight:800}
-    .cv-section {font-size:17px;font-weight:900;color:#0f172a;margin:2px 0 8px}
-    .cv-building {
-        border:1px solid #e2e8f0;border-radius:16px;padding:10px 10px 8px;
-        background:#fff;box-shadow:0 5px 16px rgba(15,23,42,.06);margin-bottom:8px;
+    .cv-title {font-size:25px;font-weight:900;line-height:1.05}
+    .cv-subtitle {font-size:12px;font-weight:650;opacity:.88;margin-top:3px}
+    .cv-status {padding:8px 13px;border-radius:12px;background:rgba(255,255,255,.14);font-size:13px;font-weight:850}
+    .cv-centro {font-size:16px;font-weight:900;color:#0f172a;margin:4px 0 6px}
+    .cv-edificio {
+        border:1px solid #dbe3ef; border-radius:15px; background:#fff;
+        padding:8px; box-shadow:0 4px 14px rgba(15,23,42,.05);
     }
-    .cv-building-title {font-size:14px;font-weight:900;color:#1e3a8a;margin-bottom:6px}
-    .cv-panel {
-        border:1px solid #dbe3ef;border-radius:18px;padding:14px 16px;background:#fff;
-        box-shadow:0 8px 22px rgba(15,23,42,.07);
+    .cv-edificio-nombre {
+        text-align:center; font-size:14px; font-weight:900; color:#1e3a8a;
+        padding:5px 6px 8px; border-bottom:1px solid #e2e8f0; margin-bottom:6px;
     }
-    .cv-panel-title {font-size:21px;font-weight:900;color:#0f172a;margin-bottom:2px}
-    .cv-panel-subtitle {font-size:13px;color:#64748b;font-weight:650;margin-bottom:10px}
-    .cv-priority {
-        border:1px solid #fecaca;background:#fff7f7;border-radius:14px;padding:11px 13px;
-        margin-top:6px;
+    .cv-leyenda {text-align:center;color:#64748b;font-size:12px;font-weight:700;margin-top:8px}
+    .cv-detalle-titulo {font-size:24px;font-weight:900;color:#0f172a;margin:4px 0}
+    .cv-detalle-sub {font-size:13px;color:#64748b;font-weight:650;margin-bottom:10px}
+    .cv-kpis {
+        border:1px solid #dbe3ef;border-radius:14px;padding:11px 14px;
+        background:#f8fafc;font-size:15px;font-weight:850;color:#0f172a;
+        margin:8px 0 12px;
     }
-    .cv-priority-title {font-size:16px;font-weight:900;color:#991b1b}
-    .cv-priority-text {font-size:13px;color:#334155;margin-top:3px}
-    .cv-kpi {
-        border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;background:#f8fafc;
-        min-height:82px;
+    .cv-prioridad {
+        border:1px solid #fecaca;background:#fff7f7;border-radius:14px;padding:13px 15px;
     }
-    .cv-kpi-label {font-size:12px;color:#64748b;font-weight:700}
-    .cv-kpi-value {font-size:25px;color:#0f172a;font-weight:900;line-height:1.15;margin-top:4px}
-    .cv-footer-card {border:1px solid #e2e8f0;border-radius:15px;padding:10px 12px;background:#fff;min-height:82px}
-    .cv-footer-label {font-size:12px;font-weight:800;color:#475569}
-    .cv-footer-value {font-size:20px;font-weight:900;color:#0f172a;margin-top:5px}
+    .cv-prioridad-label {font-size:11px;font-weight:900;color:#dc2626;letter-spacing:.06em}
+    .cv-prioridad-titulo {font-size:18px;font-weight:900;color:#991b1b;margin:5px 0}
+    .cv-prioridad-meta {font-size:13px;color:#475569;line-height:1.55}
     div[data-testid="stButton"] > button {
-        min-height:42px !important; height:auto !important; border-radius:11px !important;
-        padding:7px 8px !important; font-size:13px !important; line-height:1.15 !important;
-        white-space:pre-line !important; box-shadow:none !important;
+        min-height:37px !important; height:37px !important;
+        border-radius:8px !important; padding:4px 8px !important;
+        font-size:13px !important; font-weight:800 !important;
+        box-shadow:none !important; white-space:nowrap !important;
     }
-    div[data-testid="stMetric"] {background:#f8fafc;border:1px solid #e2e8f0;border-radius:13px;padding:8px 10px}
-    div[data-testid="stDataFrame"] {border-radius:12px;overflow:hidden}
-    .block-container {padding-top:1rem;padding-bottom:1rem;max-width:1700px}
-    @media (max-width: 900px) {
-        .cv-hero {display:block}.cv-status{margin-top:10px}.cv-title{font-size:23px}
+    div[data-testid="stVerticalBlock"] {gap:.28rem !important}
+    @media (max-width:900px){
+        .cv-hero{display:block}.cv-status{margin-top:8px}.cv-title{font-size:22px}
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1267,8 +1266,8 @@ def _normalizar_planta(valor):
         return ""
     if "terrado" in texto or "cubierta" in texto:
         return "terrado"
-    for numero in range(0, 10):
-        if texto in {str(numero), f"p {numero}", f"planta {numero}", f"p{numero}"}:
+    for numero in range(10):
+        if texto in {str(numero), f"p {numero}", f"p{numero}", f"planta {numero}"}:
             return f"planta {numero}"
         if f"planta {numero}" in texto or f"p {numero}" in texto:
             return f"planta {numero}"
@@ -1287,14 +1286,11 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     if df.empty:
         return df.copy()
     datos = df[df["centro"].fillna("").astype(str).str.strip() == centro].copy()
-    if datos.empty:
-        return datos
     datos = datos[datos["edificio"].fillna("").astype(str).apply(lambda x: _coincide_edificio(x, edificio))].copy()
     if datos.empty:
         return datos
     planta_obj = _normalizar_planta(planta)
     datos["_planta_norm"] = datos["planta"].fillna("").astype(str).apply(_normalizar_planta)
-    # Compatibilidad con órdenes antiguas sin planta: intentar localizarla en espacio/descripcion.
     vacias = datos["_planta_norm"].eq("")
     if vacias.any():
         apoyo = (
@@ -1319,99 +1315,92 @@ def _urgentes_gerencia(datos):
         datos["area"].fillna("").astype(str) + " " +
         datos["descripcion"].fillna("").astype(str)
     ).str.lower()
-    return datos[
-        texto.str.contains("urgente|alta|fuga|gas|incendio|cuadro electr|legionella|acs|riesgo", na=False)
-    ].copy()
+    return datos[texto.str.contains(
+        "urgente|alta|fuga|gas|incendio|cuadro electr|legionella|acs|riesgo",
+        na=False,
+    )].copy()
 
 
 def _estado_planta(df, centro, edificio, planta):
-    datos = filtrar_por_ubicacion_gerencia(df, centro, edificio, planta)
-    activas = _activas_gerencia(datos)
+    activas = _activas_gerencia(filtrar_por_ubicacion_gerencia(df, centro, edificio, planta))
     urgentes = _urgentes_gerencia(activas)
     cantidad = len(activas)
-    if len(urgentes) > 0:
+    if len(urgentes):
         return "🔴", cantidad, 3
     if cantidad >= 3:
         return "🟠", cantidad, 2
-    if cantidad > 0:
+    if cantidad:
         return "🟡", cantidad, 1
     return "🟢", 0, 0
 
 
-def _seleccion_mas_relevante(df):
-    mejor = ("Pearson 22", "Infantil / Primaria", "Planta 2")
-    mejor_peso = -1
-    for centro, edificios in EDIFICIOS_GERENCIA.items():
-        for edificio, plantas in edificios.items():
-            for planta in plantas:
-                _, cantidad, nivel = _estado_planta(df, centro, edificio, planta)
-                peso = nivel * 1000 + cantidad
-                if peso > mejor_peso:
-                    mejor = (centro, edificio, planta)
-                    mejor_peso = peso
-    return mejor
-
-
-def _iniciar_seleccion_colegio_vivo(df):
-    claves = ["gerencia_cv_centro", "gerencia_cv_edificio", "gerencia_cv_planta"]
-    if not all(st.session_state.get(k) for k in claves):
-        centro, edificio, planta = _seleccion_mas_relevante(df)
-        st.session_state["gerencia_cv_centro"] = centro
-        st.session_state["gerencia_cv_edificio"] = edificio
-        st.session_state["gerencia_cv_planta"] = planta
+def _estado_centro_cv(df, centro):
+    nivel_maximo = 0
+    total = 0
+    for edificio, plantas in EDIFICIOS_GERENCIA[centro].items():
+        for planta in plantas:
+            _, cantidad, nivel = _estado_planta(df, centro, edificio, planta)
+            total += cantidad
+            nivel_maximo = max(nivel_maximo, nivel)
+    if nivel_maximo >= 3:
+        return "🔴", "Atención prioritaria", total
+    if nivel_maximo >= 1:
+        return "🟡", "Seguimiento", total
+    return "🟢", "Bajo control", total
 
 
 def _seleccionar_planta_cv(centro, edificio, planta):
     st.session_state["gerencia_cv_centro"] = centro
     st.session_state["gerencia_cv_edificio"] = edificio
     st.session_state["gerencia_cv_planta"] = planta
+    st.session_state["gerencia_cv_vista"] = "detalle"
 
 
-def _estado_centro_cv(df, centro):
-    max_nivel = 0
-    total = 0
-    for edificio, plantas in EDIFICIOS_GERENCIA[centro].items():
-        for planta in plantas:
-            _, cantidad, nivel = _estado_planta(df, centro, edificio, planta)
-            total += cantidad
-            max_nivel = max(max_nivel, nivel)
-    if max_nivel >= 3:
-        return "🔴", "Atención prioritaria", total
-    if max_nivel >= 1:
-        return "🟡", "Seguimiento", total
-    return "🟢", "Bajo control", total
+def _volver_a_edificios_cv():
+    st.session_state["gerencia_cv_vista"] = "edificios"
 
 
-def _tarjeta_html(label, value):
+def _texto_planta(df, centro, edificio, planta):
+    icono, cantidad, _ = _estado_planta(df, centro, edificio, planta)
+    etiqueta = "Terrado" if planta == "Terrado" else planta.replace("Planta ", "P")
+    return f"{icono} {etiqueta}" + (f" · {cantidad}" if cantidad else "")
+
+
+def mostrar_edificio_vertical(df, centro, edificio, plantas):
+    st.markdown("<div class='cv-edificio'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='cv-edificio-nombre'>{edificio}</div>", unsafe_allow_html=True)
+    for planta in plantas:
+        st.button(
+            _texto_planta(df, centro, edificio, planta),
+            key=f"cv_planta_{centro}_{edificio}_{planta}",
+            use_container_width=True,
+            on_click=_seleccionar_planta_cv,
+            args=(centro, edificio, planta),
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def mostrar_vista_edificios(df):
+    st.markdown("<div class='cv-centro'>Pearson 22</div>", unsafe_allow_html=True)
+    infantil, llar = st.columns([1.25, .85], gap="medium")
+    with infantil:
+        mostrar_edificio_vertical(df, "Pearson 22", "Infantil / Primaria", EDIFICIOS_GERENCIA["Pearson 22"]["Infantil / Primaria"])
+    with llar:
+        mostrar_edificio_vertical(df, "Pearson 22", "Llar", EDIFICIOS_GERENCIA["Pearson 22"]["Llar"])
+
+    st.markdown("<div class='cv-centro'>Pearson 9</div>", unsafe_allow_html=True)
+    columnas = st.columns(3, gap="medium")
+    for col, edificio in zip(columnas, ("Edificio A", "Edificio B", "Edificio C")):
+        with col:
+            mostrar_edificio_vertical(df, "Pearson 9", edificio, EDIFICIOS_GERENCIA["Pearson 9"][edificio])
+
+    e22, estado22, total22 = _estado_centro_cv(df, "Pearson 22")
+    e9, estado9, total9 = _estado_centro_cv(df, "Pearson 9")
     st.markdown(
-        f"<div class='cv-kpi'><div class='cv-kpi-label'>{label}</div>"
-        f"<div class='cv-kpi-value'>{value}</div></div>",
+        f"<div class='cv-leyenda'>{e22} Pearson 22 · {estado22} · {total22} activas &nbsp;&nbsp; "
+        f"{e9} Pearson 9 · {estado9} · {total9} activas</div>",
         unsafe_allow_html=True,
     )
-
-
-def mostrar_edificio_cv(df, centro, edificio, plantas):
-    st.markdown(f"<div class='cv-building'><div class='cv-building-title'>{edificio}</div>", unsafe_allow_html=True)
-    columnas = st.columns(len(plantas))
-    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
-    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
-    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
-    for col, planta in zip(columnas, plantas):
-        icono, cantidad, _ = _estado_planta(df, centro, edificio, planta)
-        etiqueta_planta = planta.replace("Planta ", "P")
-        sufijo = f"\n{cantidad}" if cantidad else "\nOK"
-        seleccionada = centro == seleccionado_centro and edificio == seleccionado_edificio and planta == seleccionado_planta
-        prefijo = "▸ " if seleccionada else ""
-        with col:
-            st.button(
-                f"{prefijo}{icono} {etiqueta_planta}{sufijo}",
-                key=f"cv_{centro}_{edificio}_{planta}",
-                use_container_width=True,
-                on_click=_seleccionar_planta_cv,
-                args=(centro, edificio, planta),
-                type="primary" if seleccionada else "secondary",
-            )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _cerradas_mes_planta(datos):
@@ -1420,31 +1409,28 @@ def _cerradas_mes_planta(datos):
     cerradas = datos[es_cerrada(datos)].copy()
     if cerradas.empty:
         return cerradas
-    fecha_ref = cerradas["fecha_cierre_dt"].copy()
-    fecha_ref = fecha_ref.where(fecha_ref.notna(), cerradas["fecha_dt"])
+    fecha_ref = cerradas["fecha_cierre_dt"].where(cerradas["fecha_cierre_dt"].notna(), cerradas["fecha_dt"])
     hoy = pd.Timestamp.today()
     return cerradas[(fecha_ref.dt.month == hoy.month) & (fecha_ref.dt.year == hoy.year)].copy()
 
 
+def _limpiar_descripcion_gerencia(texto):
+    texto = str(texto or "").replace("[CORRECTIVA DESDE INVENTARIO]", "").strip()
+    lineas = [l.strip() for l in texto.splitlines() if l.strip() and not l.strip().lower().startswith("ot origen:")]
+    return " ".join(lineas).strip(" -")
+
+
 def _mostrar_areas_cv(activas):
     if activas.empty:
-        st.success("Sin incidencias activas en esta planta.")
+        st.success("Sin incidencias activas.")
         return
     areas = activas["area"].fillna("Sin área").replace("", "Sin área").value_counts().head(5)
-    maximo = max(int(areas.max()), 1)
-    for area, cantidad in areas.items():
-        porcentaje = max(8, int((int(cantidad) / maximo) * 100))
-        st.markdown(
-            f"<div style='display:grid;grid-template-columns:110px 1fr 28px;gap:8px;align-items:center;margin:5px 0'>"
-            f"<span style='font-size:12px;font-weight:700;color:#334155'>{area}</span>"
-            f"<div style='height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden'>"
-            f"<div style='height:8px;width:{porcentaje}%;background:#3b82f6;border-radius:999px'></div></div>"
-            f"<strong style='font-size:12px'>{int(cantidad)}</strong></div>",
-            unsafe_allow_html=True,
-        )
+    st.bar_chart(areas, horizontal=True, height=220)
 
 
-def mostrar_panel_planta_cv(df):
+def mostrar_detalle_planta(df):
+    st.button("← Volver a edificios", key="cv_volver", use_container_width=True, on_click=_volver_a_edificios_cv)
+
     centro = st.session_state["gerencia_cv_centro"]
     edificio = st.session_state["gerencia_cv_edificio"]
     planta = st.session_state["gerencia_cv_planta"]
@@ -1454,154 +1440,82 @@ def mostrar_panel_planta_cv(df):
     en_curso = activas[activas["estado"].isin(["En curso", "En ejecución"])] if not activas.empty else activas
     cerradas_mes = _cerradas_mes_planta(datos)
 
+    st.markdown(f"<div class='cv-detalle-titulo'>📍 {centro} · {edificio} · {planta}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='cv-detalle-sub'>Situación de la planta seleccionada</div>", unsafe_allow_html=True)
     st.markdown(
-        f"<div class='cv-panel-title'>📍 {centro} · {edificio} · {planta}</div>"
-        f"<div class='cv-panel-subtitle'>Situación operativa de la planta seleccionada</div>",
+        f"<div class='cv-kpis'>Pendientes: {len(activas)} &nbsp;·&nbsp; "
+        f"Urgentes/altas: {len(urgentes)} &nbsp;·&nbsp; En curso: {len(en_curso)} &nbsp;·&nbsp; "
+        f"Finalizadas este mes: {len(cerradas_mes)}</div>",
         unsafe_allow_html=True,
     )
 
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: _tarjeta_html("Pendientes", len(activas))
-    with k2: _tarjeta_html("Urgentes / altas", len(urgentes))
-    with k3: _tarjeta_html("En curso", len(en_curso))
-    with k4: _tarjeta_html("Finalizadas mes", len(cerradas_mes))
-
-    c_areas, c_prioridad = st.columns([1.05, 1])
-    with c_areas:
-        st.markdown("#### Por áreas")
+    izquierda, derecha = st.columns([1, 1.15], gap="large")
+    with izquierda:
+        st.markdown("### Por áreas")
         _mostrar_areas_cv(activas)
-    with c_prioridad:
-        st.markdown("#### Actuación prioritaria")
+    with derecha:
+        st.markdown("### Actuación prioritaria")
         if activas.empty:
             st.success("No hay actuaciones pendientes.")
         else:
             candidatos = urgentes if not urgentes.empty else activas
-            candidatos = candidatos.sort_values(["fecha_dt"], ascending=True, na_position="last")
-            fila = candidatos.iloc[0]
+            fila = candidatos.sort_values("fecha_dt", ascending=True, na_position="last").iloc[0]
+            descripcion = _limpiar_descripcion_gerencia(fila.get("descripcion", "")) or "Actuación pendiente"
             st.markdown(
-                f"<div class='cv-priority'><div class='cv-priority-title'>"
-                f"{fila.get('descripcion','') or 'Actuación pendiente'}</div>"
-                f"<div class='cv-priority-text'>📍 {fila.get('espacio','') or planta}<br>"
-                f"{fila.get('prioridad','') or 'Prioridad pendiente de valorar'} · "
+                f"<div class='cv-prioridad'><div class='cv-prioridad-label'>ACTUACIÓN PRIORITARIA</div>"
+                f"<div class='cv-prioridad-titulo'>{descripcion}</div>"
+                f"<div class='cv-prioridad-meta'>📍 {fila.get('espacio','') or planta}<br>"
+                f"{fila.get('prioridad','') or 'Sin prioridad'} · {fila.get('estado','') or 'Pendiente'} · "
                 f"{fila.get('numero_ot','') or ''}</div></div>",
                 unsafe_allow_html=True,
             )
 
-    st.markdown("#### Incidencias de esta planta")
-    if activas.empty:
-        st.success("Planta sin incidencias activas.")
-    else:
-        columnas = ["numero_ot", "descripcion", "area", "prioridad", "estado"]
-        vista = activas.sort_values("fecha_dt", ascending=True, na_position="last").head(6)[columnas].copy()
-        vista.columns = ["OT", "Descripción", "Área", "Prioridad", "Estado"]
-        st.dataframe(vista, use_container_width=True, hide_index=True, height=238)
-
-
-def _cumplimiento_simple(df, centro, palabra):
-    datos = df[df["centro"] == centro].copy()
-    if datos.empty:
-        return 100
-    texto = (datos["origen"].fillna("").astype(str) + " " + datos["area"].fillna("").astype(str) + " " + datos["descripcion"].fillna("").astype(str)).str.lower()
-    objetivo = datos[texto.str.contains(palabra, na=False)].copy()
-    if objetivo.empty:
-        return 100
-    total = len(objetivo)
-    cerradas = len(objetivo[es_cerrada(objetivo)])
-    return round((cerradas / max(total, 1)) * 100)
-
-
-def mostrar_resumen_inferior_cv(df):
-    centro = st.session_state["gerencia_cv_centro"]
-    color, porcentaje, mensaje = evaluar_estado_centro(df, centro)
-    preventivo = _cumplimiento_simple(df, centro, "preventivo")
-    legionella = _cumplimiento_simple(df, centro, "legionella")
-    inventario = preparar_inventario()
-    inv_centro = filtrar_inventario_por_centro(inventario, centro)
-    stock_bajo = 0
-    if not inv_centro.empty and "stock_minimo" in inv_centro.columns:
-        minimo = pd.to_numeric(inv_centro["stock_minimo"], errors="coerce").fillna(0)
-        stock_bajo = int((inv_centro["stock_num"] <= minimo).sum())
-
-    cols = st.columns(4)
-    valores = [
-        ("Estado general", f"{porcentaje}% · {mensaje}"),
-        ("Preventivo", f"{preventivo}% cumplido"),
-        ("Legionella", f"{legionella}% cumplido"),
-        ("Inventario", "Correcto" if stock_bajo == 0 else f"{stock_bajo} alertas"),
-    ]
-    for col, (label, value) in zip(cols, valores):
-        with col:
-            st.markdown(
-                f"<div class='cv-footer-card'><div class='cv-footer-label'>{label}</div>"
-                f"<div class='cv-footer-value'>{value}</div></div>",
-                unsafe_allow_html=True,
-            )
+    if not activas.empty:
+        with st.expander(f"Ver {len(activas)} incidencias de esta planta", expanded=False):
+            vista = activas.sort_values("fecha_dt", ascending=True, na_position="last")[["numero_ot", "descripcion", "area", "prioridad", "estado"]].copy()
+            vista["descripcion"] = vista["descripcion"].apply(_limpiar_descripcion_gerencia)
+            vista.columns = ["OT", "Descripción", "Área", "Prioridad", "Estado"]
+            st.dataframe(vista, use_container_width=True, hide_index=True)
 
 
 def mostrar_colegio_vivo_gerencia(df):
-    _iniciar_seleccion_colegio_vivo(df)
+    if st.session_state.get("gerencia_cv_version") != VERSION_VISTA_GERENCIA:
+        st.session_state["gerencia_cv_version"] = VERSION_VISTA_GERENCIA
+        st.session_state["gerencia_cv_vista"] = "edificios"
 
-    e22, estado22, total22 = _estado_centro_cv(df, "Pearson 22")
-    e9, estado9, total9 = _estado_centro_cv(df, "Pearson 9")
-    estado_global = "El colegio está bajo control"
-    icono_global = "🟢"
-    if "🔴" in [e22, e9]:
-        estado_global = "Hay una zona que requiere atención prioritaria"
-        icono_global = "🔴"
-    elif "🟡" in [e22, e9]:
-        estado_global = "El colegio requiere seguimiento operativo"
-        icono_global = "🟡"
+    e22, _, _ = _estado_centro_cv(df, "Pearson 22")
+    e9, _, _ = _estado_centro_cv(df, "Pearson 9")
+    if "🔴" in (e22, e9):
+        icono, estado = "🔴", "Hay una zona que requiere atención"
+    elif "🟡" in (e22, e9):
+        icono, estado = "🟡", "El colegio requiere seguimiento"
+    else:
+        icono, estado = "🟢", "El colegio está bajo control"
 
     st.markdown(
         f"<div class='cv-hero'><div><div class='cv-title'>🏫 Colegio vivo</div>"
-        f"<div class='cv-subtitle'>Gerencia · Estado real de Pearson 22 y Pearson 9</div></div>"
-        f"<div class='cv-status'>{icono_global} {estado_global}</div></div>",
+        f"<div class='cv-subtitle'>Pearson 22 y Pearson 9</div></div>"
+        f"<div class='cv-status'>{icono} {estado}</div></div>",
         unsafe_allow_html=True,
     )
 
-    s1, s2 = st.columns(2)
-    with s1:
-        st.info(f"{e22} **Pearson 22 · {estado22}** · {total22} actuaciones activas")
-    with s2:
-        st.info(f"{e9} **Pearson 9 · {estado9}** · {total9} actuaciones activas")
+    if st.session_state.get("gerencia_cv_vista") == "detalle":
+        mostrar_detalle_planta(df)
+        return
 
-    izquierda, derecha = st.columns([1.08, 1.35], gap="large")
-    with izquierda:
-        st.markdown("<div class='cv-section'>Mapa operativo del colegio</div>", unsafe_allow_html=True)
-        st.caption("Pulsa una planta para ver sus datos. El color refleja el riesgo, no solo la cantidad.")
-        for centro, edificios in EDIFICIOS_GERENCIA.items():
-            st.markdown(f"**{centro}**")
-            for edificio, plantas in edificios.items():
-                mostrar_edificio_cv(df, centro, edificio, plantas)
-
-    with derecha:
-        with st.container(border=True):
-            mostrar_panel_planta_cv(df)
-
-    mostrar_resumen_inferior_cv(df)
-
-    with st.expander("📈 Evolución, inventario y detalle ejecutivo", expanded=False):
-        centro = st.session_state["gerencia_cv_centro"]
-        mostrar_evolucion_mantenimiento(df, centro)
-        total_inv = total_inventario_centro(centro)
-        total_usado = total_utilizado_centro(centro, df)
-        c1, c2 = st.columns(2)
-        c1.metric("Valor de inventario", euros(total_inv))
-        c2.metric("Material utilizado", euros(total_usado))
+    mostrar_vista_edificios(df)
 
 
 def pantalla_gerencia():
-    aplicar_estilo_gerencia()
     aplicar_estilo_colegio_vivo()
     iniciar_estado_gerencia()
 
     df = preparar_ordenes()
     if df.empty:
-        st.warning("No hay órdenes para mostrar todavía.")
         df = pd.DataFrame(columns=[
             "numero_ot", "fecha_creacion", "fecha_cierre", "centro", "edificio",
             "planta", "espacio", "descripcion", "estado", "operario", "solicitante",
-            "origen", "area", "prioridad", "origen_tabla", "fecha_dt", "fecha_cierre_dt"
+            "origen", "area", "prioridad", "origen_tabla", "fecha_dt", "fecha_cierre_dt",
         ])
 
     detalle_actual = st.session_state.get("gerencia_detalle")
