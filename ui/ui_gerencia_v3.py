@@ -481,14 +481,40 @@ def _estado_planta(df, centro, edificio, planta):
 def _cerradas_mes(datos):
     if datos.empty:
         return datos
+
     cerradas = datos[es_cerrada(datos)].copy()
+
     if cerradas.empty:
         return cerradas
-    fecha = cerradas["fecha_cierre_dt"].where(
-        cerradas["fecha_cierre_dt"].notna(), cerradas["fecha_dt"]
+
+    # Algunas órdenes antiguas guardan las fechas como texto.
+    # Convertimos siempre antes de usar el accesor .dt.
+    fecha_cierre = pd.to_datetime(
+        cerradas.get("fecha_cierre_dt"),
+        errors="coerce",
+        dayfirst=True,
     )
+
+    fecha_creacion = pd.to_datetime(
+        cerradas.get("fecha_dt"),
+        errors="coerce",
+        dayfirst=True,
+    )
+
+    fecha = fecha_cierre.where(
+        fecha_cierre.notna(),
+        fecha_creacion,
+    )
+
     hoy = pd.Timestamp.today()
-    return cerradas[(fecha.dt.month == hoy.month) & (fecha.dt.year == hoy.year)].copy()
+
+    mascara = (
+        fecha.notna()
+        & fecha.dt.month.eq(hoy.month)
+        & fecha.dt.year.eq(hoy.year)
+    )
+
+    return cerradas[mascara].copy()
 
 
 def _limpiar_descripcion(texto):
