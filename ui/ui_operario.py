@@ -14,7 +14,7 @@ from modules.ordenes import (
     crear_correctiva_desde_ot
 )
 
-from modules.corazon import latido_corazon
+from modules.corazon_sistema import latido_corazon
 
 from modules.inventario import (
     obtener_material_por_codigo,
