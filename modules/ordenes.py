@@ -16,6 +16,7 @@ except Exception:
 ESTADOS_VALIDOS = [
     "Abierta",
     "En curso",
+    "En pausa",
     "Pendiente material",
     "Finalizada",
     "Pendiente proveedor",
