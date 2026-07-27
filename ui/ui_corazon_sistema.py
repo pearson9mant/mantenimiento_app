@@ -464,7 +464,7 @@ def etiqueta_motivo_principal(datos):
     return "📋 Prioritaria"
 
 
-def mostrar_corazon_sistema():
+def mostrar_corazon_sistema_clasico():
     perfil = str(
         st.session_state.get("perfil", "") or ""
     ).strip().lower()
@@ -1238,3 +1238,617 @@ def mostrar_corazon_sistema():
         "Sanitario",
         f"{panel.get('score_legionella', 0)}%"
     )
+
+
+# =====================================================
+# NUEVA ENTRADA INTELIGENTE DEL OPERARIO
+# La vista clásica se conserva para administración.
+# =====================================================
+
+def _nombre_corto_corazon(operario):
+    texto = str(operario or "").strip()
+    limpio = (
+        texto.lower()
+        .replace(".", "")
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+    if "almeda" in limpio or "juanantonio" in limpio:
+        return "Juan Antonio"
+
+    if "luis" in limpio or "lozano" in limpio:
+        return "Luis"
+
+    if "abel" in limpio or "vasquez" in limpio:
+        return "Abel"
+
+    if not texto:
+        return "Operario"
+
+    return texto.split()[0]
+
+
+def _centro_operario_corazon(operario):
+    limpio = (
+        str(operario or "")
+        .lower()
+        .replace(".", "")
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+    if "luis" in limpio or "lozano" in limpio:
+        return "Pearson 9"
+
+    if "almeda" in limpio or "juanantonio" in limpio:
+        return "Pearson 22"
+
+    return None
+
+
+def _texto_valido_corazon(valor, defecto):
+    texto = str(valor or "").strip()
+
+    if not texto or texto.lower() in [
+        "nan",
+        "none",
+        "null",
+        "-",
+    ]:
+        return defecto
+
+    return texto
+
+
+def _es_urgente_corazon(trabajo):
+    prioridad = str(
+        trabajo.get("prioridad", "") or ""
+    ).strip().lower()
+
+    return "urgente" in prioridad
+
+
+def _dias_abierta_corazon(trabajo):
+    try:
+        return max(
+            0,
+            int(trabajo.get("dias_abierta", 0) or 0)
+        )
+    except (TypeError, ValueError):
+        return 0
+
+
+def _orden_trabajo_corazon(trabajo):
+    return (
+        0 if _es_urgente_corazon(trabajo) else 1,
+        -int(trabajo.get("score", 0) or 0),
+        -_dias_abierta_corazon(trabajo),
+        str(trabajo.get("numero_ot", "") or ""),
+    )
+
+
+def _agrupar_prioridades_por_edificio(prioridades):
+    edificios = {}
+
+    for trabajo in prioridades or []:
+        edificio = _texto_valido_corazon(
+            trabajo.get("edificio"),
+            "Sin edificio"
+        )
+
+        planta = _texto_valido_corazon(
+            trabajo.get("planta"),
+            "Sin planta"
+        )
+
+        if edificio not in edificios:
+            edificios[edificio] = {
+                "trabajos": [],
+                "plantas": {},
+                "urgentes": 0,
+                "atrasadas": 0,
+                "score_max": 0,
+            }
+
+        datos = edificios[edificio]
+        datos["trabajos"].append(trabajo)
+        datos["plantas"].setdefault(
+            planta,
+            []
+        ).append(trabajo)
+
+        if _es_urgente_corazon(trabajo):
+            datos["urgentes"] += 1
+
+        if _dias_abierta_corazon(trabajo) >= 7:
+            datos["atrasadas"] += 1
+
+        datos["score_max"] = max(
+            datos["score_max"],
+            int(trabajo.get("score", 0) or 0)
+        )
+
+    for datos in edificios.values():
+        datos["trabajos"] = sorted(
+            datos["trabajos"],
+            key=_orden_trabajo_corazon
+        )
+
+        for planta in list(datos["plantas"]):
+            datos["plantas"][planta] = sorted(
+                datos["plantas"][planta],
+                key=_orden_trabajo_corazon
+            )
+
+    return edificios
+
+
+def _elegir_edificio_recomendado(
+    edificios,
+    prioridad_hoy=None
+):
+    if not edificios:
+        return None
+
+    edificio_prioridad = _texto_valido_corazon(
+        (prioridad_hoy or {}).get("edificio"),
+        ""
+    )
+
+    if edificio_prioridad in edificios:
+        return edificio_prioridad
+
+    return max(
+        edificios,
+        key=lambda edificio: (
+            edificios[edificio]["urgentes"],
+            edificios[edificio]["atrasadas"],
+            edificios[edificio]["score_max"],
+            len(edificios[edificio]["trabajos"]),
+        )
+    )
+
+
+def _mensaje_recomendacion_operario(
+    edificio,
+    datos
+):
+    total = len(
+        datos.get("trabajos", [])
+    )
+
+    urgentes = int(
+        datos.get("urgentes", 0) or 0
+    )
+
+    atrasadas = int(
+        datos.get("atrasadas", 0) or 0
+    )
+
+    if urgentes > 0:
+        return (
+            f"**Hoy empezaría por {edificio}.** "
+            f"Es donde tienes "
+            f"{urgentes} "
+            f"{'urgencia' if urgentes == 1 else 'urgencias'}. "
+            f"Aprovecha que estarás allí para revisar también "
+            f"las otras "
+            f"{max(total - urgentes, 0)} "
+            f"{'actuación' if max(total - urgentes, 0) == 1 else 'actuaciones'} "
+            f"del edificio."
+        )
+
+    if atrasadas > 0:
+        return (
+            f"**Hoy empezaría por {edificio}.** "
+            f"Es donde tienes más trabajo atrasado: "
+            f"{atrasadas} "
+            f"{'actuación' if atrasadas == 1 else 'actuaciones'}. "
+            f"En total puedes aprovechar el desplazamiento "
+            f"para revisar {total} trabajos."
+        )
+
+    return (
+        f"**Hoy empezaría por {edificio}.** "
+        f"Es donde concentras más trabajo para hoy: "
+        f"{total} "
+        f"{'actuación' if total == 1 else 'actuaciones'}."
+    )
+
+
+def _icono_trabajo_corazon(trabajo):
+    prioridad = str(
+        trabajo.get("prioridad", "") or ""
+    ).strip().lower()
+
+    if "urgente" in prioridad:
+        return "🚨"
+
+    if "alta" in prioridad:
+        return "🔴"
+
+    if "media" in prioridad:
+        return "🟠"
+
+    if "baja" in prioridad:
+        return "🟢"
+
+    return "📋"
+
+
+def _mostrar_trabajo_compacto_corazon(
+    trabajo,
+    key_extra
+):
+    numero_ot = str(
+        trabajo.get("numero_ot", "") or ""
+    ).strip()
+
+    titulo = str(
+        trabajo.get("titulo", "") or "Sin descripción"
+    ).strip()
+
+    espacio = _texto_valido_corazon(
+        trabajo.get("espacio"),
+        "Sin espacio"
+    )
+
+    area = _texto_valido_corazon(
+        trabajo.get("area"),
+        "-"
+    )
+
+    prioridad = _texto_valido_corazon(
+        trabajo.get("prioridad"),
+        "-"
+    )
+
+    score = int(
+        trabajo.get("score", 0) or 0
+    )
+
+    dias = _dias_abierta_corazon(
+        trabajo
+    )
+
+    icono = _icono_trabajo_corazon(
+        trabajo
+    )
+
+    with st.container(border=True):
+        col_info, col_accion = st.columns(
+            [8, 2],
+            gap="small",
+            vertical_alignment="center"
+        )
+
+        with col_info:
+            st.markdown(
+                f"{icono} **{espacio}** · "
+                f"`{numero_ot or '-'}`"
+            )
+
+            st.markdown(titulo)
+
+            detalle = (
+                f"{prioridad} · {area} · "
+                f"Confianza {score}/100"
+            )
+
+            if dias == 1:
+                detalle += " · Hace 1 día"
+            elif dias > 1:
+                detalle += f" · Hace {dias} días"
+
+            st.caption(detalle)
+
+        with col_accion:
+            boton_abrir_ot(
+                numero_ot=numero_ot,
+                key_extra=key_extra,
+                texto="▶ Empezar",
+                tipo=(
+                    "primary"
+                    if _es_urgente_corazon(trabajo)
+                    else "secondary"
+                )
+            )
+
+
+def _mostrar_edificio_operario_corazon(
+    edificio,
+    datos
+):
+    trabajos = datos.get(
+        "trabajos",
+        []
+    )
+
+    plantas = datos.get(
+        "plantas",
+        {}
+    )
+
+    urgentes = int(
+        datos.get("urgentes", 0) or 0
+    )
+
+    atrasadas = int(
+        datos.get("atrasadas", 0) or 0
+    )
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "Actuaciones",
+        len(trabajos)
+    )
+
+    c2.metric(
+        "Urgentes",
+        urgentes
+    )
+
+    c3.metric(
+        "Atrasadas",
+        atrasadas
+    )
+
+    plantas_ordenadas = sorted(
+        plantas,
+        key=lambda planta: (
+            planta == "Sin planta",
+            planta
+        )
+    )
+
+    for indice_planta, planta in enumerate(
+        plantas_ordenadas,
+        start=1
+    ):
+        trabajos_planta = plantas[
+            planta
+        ]
+
+        hay_urgencia = any(
+            _es_urgente_corazon(trabajo)
+            for trabajo in trabajos_planta
+        )
+
+        titulo_planta = (
+            f"{'🚨' if hay_urgencia else '📍'} "
+            f"{planta} · "
+            f"{len(trabajos_planta)} "
+            f"{'actuación' if len(trabajos_planta) == 1 else 'actuaciones'}"
+        )
+
+        with st.expander(
+            titulo_planta,
+            expanded=(
+                indice_planta == 1
+                or hay_urgencia
+            )
+        ):
+            for indice_trabajo, trabajo in enumerate(
+                trabajos_planta,
+                start=1
+            ):
+                _mostrar_trabajo_compacto_corazon(
+                    trabajo,
+                    key_extra=(
+                        f"edificio_{edificio}_"
+                        f"planta_{planta}_"
+                        f"{indice_trabajo}"
+                    )
+                )
+
+
+def mostrar_corazon_operario():
+    operario = str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("nombre")
+        or st.session_state.get("usuario")
+        or ""
+    ).strip()
+
+    nombre_corto = _nombre_corto_corazon(
+        operario
+    )
+
+    centro_motor = _centro_operario_corazon(
+        operario
+    )
+
+    if not centro_motor:
+        st.error(
+            "No se ha podido determinar el centro asignado "
+            "a este operario."
+        )
+        return
+
+    panel = diagnosticar_corazon_sistema(
+        centro=centro_motor
+    )
+
+    ot_abierta = st.session_state.get(
+        "corazon_ot_abierta"
+    )
+
+    if ot_abierta:
+        fila_ot = obtener_fila_ot_por_numero(
+            ot_abierta
+        )
+
+        if not fila_ot:
+            st.session_state.pop(
+                "corazon_ot_abierta",
+                None
+            )
+            st.rerun()
+
+        pantalla_trabajar_ot(
+            fila=fila_ot,
+            operario_sel=str(
+                fila_ot[10] or operario
+            ),
+            modo="corazon",
+            clave_ot_abierta="corazon_ot_abierta",
+            texto_volver="⬅ Volver a mi jornada",
+            key_boton_volver="volver_corazon_desde_ot",
+            titulo="## 🛠 Trabajar OT",
+        )
+
+        st.stop()
+
+    st.title(
+        f"👷 Buenos días, {nombre_corto}"
+    )
+
+    st.caption(
+        f"📍 Centro asignado: {centro_motor}"
+    )
+
+    prioridades = panel.get(
+        "prioridades",
+        []
+    ) or []
+
+    prioridad_hoy = panel.get(
+        "prioridad_hoy"
+    ) or {}
+
+    edificios = _agrupar_prioridades_por_edificio(
+        prioridades
+    )
+
+    if not edificios:
+        st.success(
+            "🟢 No tienes actuaciones prioritarias pendientes. "
+            "Puedes aprovechar para revisar preventivos, "
+            "Legionella o apoyar otras tareas del centro."
+        )
+        return
+
+    recomendado = _elegir_edificio_recomendado(
+        edificios,
+        prioridad_hoy
+    )
+
+    datos_recomendado = edificios[
+        recomendado
+    ]
+
+    st.info(
+        _mensaje_recomendacion_operario(
+            recomendado,
+            datos_recomendado
+        )
+    )
+
+    total_urgentes = sum(
+        datos["urgentes"]
+        for datos in edificios.values()
+    )
+
+    total_atrasadas = sum(
+        datos["atrasadas"]
+        for datos in edificios.values()
+    )
+
+    k1, k2, k3 = st.columns(3)
+
+    k1.metric(
+        "🚨 Urgentes",
+        total_urgentes
+    )
+
+    k2.metric(
+        "⏰ Atrasadas",
+        total_atrasadas
+    )
+
+    k3.metric(
+        "📋 Activas",
+        len(prioridades)
+    )
+
+    edificios_ordenados = sorted(
+        edificios,
+        key=lambda edificio: (
+            edificio != recomendado,
+            -edificios[edificio]["urgentes"],
+            -edificios[edificio]["atrasadas"],
+            -edificios[edificio]["score_max"],
+            edificio,
+        )
+    )
+
+    etiquetas = [
+        (
+            f"{'🏆' if edificio == recomendado else '🏫'} "
+            f"{edificio} "
+            f"({len(edificios[edificio]['trabajos'])})"
+        )
+        for edificio in edificios_ordenados
+    ]
+
+    tabs = st.tabs(etiquetas)
+
+    for tab, edificio in zip(
+        tabs,
+        edificios_ordenados
+    ):
+        with tab:
+            if edificio == recomendado:
+                st.success(
+                    "🏆 Edificio recomendado para empezar hoy."
+                )
+
+            _mostrar_edificio_operario_corazon(
+                edificio,
+                edificios[edificio]
+            )
+
+    with st.expander(
+        "🧠 Ver por qué se ha elegido esta ruta",
+        expanded=False
+    ):
+        st.markdown(
+            "La recomendación combina urgencias, "
+            "antigüedad, prioridad, puntuación del Corazón "
+            "y concentración de trabajos en el mismo edificio."
+        )
+
+        prioridad_numero = str(
+            prioridad_hoy.get("numero_ot", "") or ""
+        ).strip()
+
+        if prioridad_numero:
+            st.caption(
+                f"La primera actuación recomendada por el Corazón "
+                f"es la OT {prioridad_numero}."
+            )
+
+
+def mostrar_corazon_sistema():
+    """
+    Entrada pública conservada para app.py.
+
+    El operario recibe la nueva jornada inteligente.
+    Administración y el resto de perfiles mantienen
+    exactamente la pantalla clásica anterior.
+    """
+    perfil = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    if perfil == "operario":
+        return mostrar_corazon_operario()
+
+    return mostrar_corazon_sistema_clasico()
+
