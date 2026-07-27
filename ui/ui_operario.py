@@ -1082,7 +1082,7 @@ def pantalla_mi_jornada_operario(
 
     st.info(
         _texto_recomendacion_edificio(
-            nombre_operario,
+            nombre_corto,
             recomendado,
             datos_recomendado
         )
@@ -1408,7 +1408,13 @@ def pantalla_operario(modo="ordenes"):
             st.caption(str(e))
             return
 
-        # La nueva entrada muestra su propia cabecera y resumen.
+        # La administración conserva la cabecera clásica.
+        # El operario real utiliza la cabecera de Mi jornada.
+        if not es_operario():
+            mostrar_cabecera_resumen_operario(
+                operario_sel,
+                ordenes_activas
+            )
 
     # =====================================================
     # MODO ÓRDENES
@@ -1455,10 +1461,25 @@ def pantalla_operario(modo="ordenes"):
             )
             return
 
-        pantalla_entrada_operario(
-            operario_sel,
-            ordenes_activas
-        )
+        # =================================================
+        # ENTRADA SEGÚN QUIÉN ESTÁ VIENDO LA PANTALLA
+        #
+        # - Operario real: nueva jornada inteligente.
+        # - Administración viendo a un operario: listado clásico.
+        #
+        # Así no se modifica la pantalla de gestión que ya funcionaba.
+        # =================================================
+        if es_operario():
+            pantalla_entrada_operario(
+                operario_sel,
+                ordenes_activas
+            )
+        else:
+            pantalla_listado_ordenes_operario(
+                operario_sel,
+                ordenes_activas
+            )
+
         return
 
     # =====================================================
