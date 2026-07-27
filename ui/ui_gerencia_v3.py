@@ -602,6 +602,9 @@ def _css():
         .rv-area-row{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eef2f7;padding:10px 2px}
         .rv-area-row:last-child{border-bottom:0}.rv-area-name{font-size:14px;font-weight:850;color:#334155}
         .rv-area-count{min-width:30px;height:30px;border-radius:999px;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:950}
+        .rv-trend{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:900;margin-top:10px}
+        .rv-trend.good{background:#dcfce7;color:#166534}.rv-trend.bad{background:#fee2e2;color:#991b1b}.rv-trend.flat{background:#e2e8f0;color:#334155}
+        .rv-exec-list{margin:0;padding:0;list-style:none}.rv-exec-list li{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:9px 0;border-bottom:1px solid #eef2f7;font-size:14px}.rv-exec-list li:last-child{border-bottom:0}.rv-exec-list span{color:#475569;font-weight:750}.rv-exec-list strong{color:#0f172a;font-weight:950;text-align:right}
         @media(max-width:1100px){.rv-buildings{gap:18px}.rv-building{width:150px;flex-basis:150px}.rv-building.tall{width:170px;flex-basis:170px}}
         @media(max-width:760px){.rv-buildings{overflow-x:auto;justify-content:flex-start;padding-bottom:8px}.rv-hero{display:block}.rv-alert{display:inline-block;margin-top:8px}}
         
@@ -801,17 +804,17 @@ def _mostrar_detalle(df, centro, edificio, planta):
         clase_estado = "critical"
         icono_estado = "🔴"
         texto_estado = "REQUIERE ATENCIÓN PRIORITARIA"
-        nota_estado = "Existe al menos una actuación urgente o de prioridad alta."
+        nota_estado = "Se recomienda priorizar y realizar seguimiento inmediato."
     elif len(activas) >= 3:
         clase_estado = "alert"
         icono_estado = "🟠"
         texto_estado = "REQUIERE ATENCIÓN"
-        nota_estado = "La concentración de incidencias aconseja seguimiento."
+        nota_estado = "Conviene reforzar el seguimiento de esta planta."
     elif len(activas) > 0:
         clase_estado = "watch"
         icono_estado = "🟡"
         texto_estado = "EN SEGUIMIENTO"
-        nota_estado = "Hay actuaciones activas, pero sin riesgo crítico detectado."
+        nota_estado = "La situación está controlada, con actuaciones pendientes de seguimiento."
     else:
         clase_estado = "good"
         icono_estado = "🟢"
@@ -888,37 +891,59 @@ def _mostrar_detalle(df, centro, edificio, planta):
         if not operarios.empty:
             responsable = str(operarios.value_counts().index[0])
 
-    # Prioridad ejecutiva sin mostrar la descripción completa.
-    prioridad_mas_alta = "Sin prioridad"
-    ubicacion_prioritaria = planta
-    estado_prioritario = "Sin actuaciones"
-    ot_prioritaria = "—"
-    operario_prioritario = responsable
+    # Datos ejecutivos globales de la planta.
+    numero_areas = int(len(areas))
+
+    # Responsable predominante ya calculado arriba.
+    ot_mas_antigua = "—"
+    antiguedad_dias = None
 
     if not activas.empty:
-        candidatos = urgentes if not urgentes.empty else activas
-        candidatos = candidatos.sort_values(
+        ordenadas = activas.sort_values(
             "fecha_dt",
             ascending=True,
             na_position="last",
         )
-        fila = candidatos.iloc[0]
+        primera = ordenadas.iloc[0]
+        ot_mas_antigua = str(primera.get("numero_ot", "") or "—")
 
-        prioridad_mas_alta = str(
-            fila.get("prioridad", "") or "Sin prioridad"
+        fecha_antigua = pd.to_datetime(
+            primera.get("fecha_dt"),
+            errors="coerce",
         )
-        ubicacion_prioritaria = str(
-            fila.get("espacio", "") or planta
-        )
-        estado_prioritario = str(
-            fila.get("estado", "") or "Abierta"
-        )
-        ot_prioritaria = str(
-            fila.get("numero_ot", "") or "—"
-        )
-        operario_prioritario = str(
-            fila.get("operario", "") or responsable
-        )
+        if pd.notna(fecha_antigua):
+            antiguedad_dias = max(0, (pd.Timestamp.today().normalize() - fecha_antigua.normalize()).days)
+
+    # Tendencia: incidencias creadas en los últimos 7 días frente a los 7 anteriores.
+    fechas_creacion = pd.to_datetime(
+        datos.get("fecha_dt"),
+        errors="coerce",
+    )
+    hoy_normalizado = pd.Timestamp.today().normalize()
+    inicio_actual = hoy_normalizado - pd.Timedelta(days=6)
+    inicio_anterior = hoy_normalizado - pd.Timedelta(days=13)
+    fin_anterior = hoy_normalizado - pd.Timedelta(days=7)
+
+    nuevas_actual = int(
+        ((fechas_creacion >= inicio_actual) & (fechas_creacion <= hoy_normalizado + pd.Timedelta(days=1))).sum()
+    )
+    nuevas_anterior = int(
+        ((fechas_creacion >= inicio_anterior) & (fechas_creacion <= fin_anterior)).sum()
+    )
+    diferencia_tendencia = nuevas_actual - nuevas_anterior
+
+    if diferencia_tendencia < 0:
+        clase_tendencia = "good"
+        icono_tendencia = "↘"
+        texto_tendencia = f"{abs(diferencia_tendencia)} menos que la semana anterior"
+    elif diferencia_tendencia > 0:
+        clase_tendencia = "bad"
+        icono_tendencia = "↗"
+        texto_tendencia = f"{diferencia_tendencia} más que la semana anterior"
+    else:
+        clase_tendencia = "flat"
+        icono_tendencia = "→"
+        texto_tendencia = "Sin cambios respecto a la semana anterior"
 
     izquierda, derecha = st.columns([0.9, 1.1], gap="large")
 
@@ -945,21 +970,25 @@ def _mostrar_detalle(df, centro, edificio, planta):
     with derecha:
         st.markdown("### Resumen ejecutivo")
 
+        antiguedad_texto = (
+            f"{antiguedad_dias} días abierta"
+            if antiguedad_dias is not None
+            else "Fecha no disponible"
+        )
+
         st.markdown(
             '<div class="rv-summary">'
-            '<div class="rv-summary-title">Situación que requiere mayor seguimiento</div>'
-            '<div class="rv-summary-grid">'
-            f'<div class="rv-summary-key">Ubicación</div>'
-            f'<div class="rv-summary-value">{html.escape(ubicacion_prioritaria)}</div>'
-            f'<div class="rv-summary-key">Prioridad</div>'
-            f'<div class="rv-summary-value">{html.escape(prioridad_mas_alta)}</div>'
-            f'<div class="rv-summary-key">Estado</div>'
-            f'<div class="rv-summary-value">{html.escape(estado_prioritario)}</div>'
-            f'<div class="rv-summary-key">Responsable</div>'
-            f'<div class="rv-summary-value">{html.escape(operario_prioritario)}</div>'
-            f'<div class="rv-summary-key">OT</div>'
-            f'<div class="rv-summary-value">{html.escape(ot_prioritaria)}</div>'
-            '</div></div>',
+            '<div class="rv-summary-title">Visión global de la planta</div>'
+            '<ul class="rv-exec-list">'
+            f'<li><span>Incidencias activas</span><strong>{len(activas)}</strong></li>'
+            f'<li><span>Atención prioritaria</span><strong>{len(urgentes)}</strong></li>'
+            f'<li><span>Pendientes de material</span><strong>{len(pendiente_material)}</strong></li>'
+            f'<li><span>Áreas afectadas</span><strong>{numero_areas}</strong></li>'
+            f'<li><span>Responsable principal</span><strong>{html.escape(responsable)}</strong></li>'
+            f'<li><span>OT más antigua</span><strong>{html.escape(ot_mas_antigua)} · {html.escape(antiguedad_texto)}</strong></li>'
+            '</ul>'
+            f'<div class="rv-trend {clase_tendencia}">{icono_tendencia} {html.escape(texto_tendencia)}</div>'
+            '</div>',
             unsafe_allow_html=True,
         )
 
