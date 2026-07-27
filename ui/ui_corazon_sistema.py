@@ -1257,8 +1257,8 @@ ESTADOS_BLOQUEADOS_CORAZON = {
 PALABRAS_RIESGO_CORAZON = {
     "agua": [
         "agua", "fuga", "inund", "goteo", "pérdida", "perdida",
-        "tubería", "tuberia", "desagüe", "desague", "atasco",
-        "grifo", "cisterna", "wc", "lavabo", "acs",
+        "tubería", "tuberia", "desagüe", "desague",
+        "grifo", "cisterna", "lavabo", "acs",
     ],
     "electricidad": [
         "eléctr", "electric", "enchufe", "cuadro", "cable",
@@ -1393,11 +1393,71 @@ def _texto_trabajo_corazon(trabajo):
 
 
 def _tipo_riesgo_corazon(trabajo):
+    """
+    Determina el tipo de riesgo evitando falsos positivos.
+
+    Prioriza el área real de la OT y después analiza la descripción.
+    Palabras ambiguas como baño, WC o aseo no clasifican por sí solas
+    una actuación como agua.
+    """
+    area = str(
+        trabajo.get("area", "") or ""
+    ).strip().lower()
+
     texto = _texto_trabajo_corazon(trabajo)
 
-    for tipo, palabras in PALABRAS_RIESGO_CORAZON.items():
-        if any(palabra in texto for palabra in palabras):
-            return tipo
+    # El área manda cuando está claramente informada.
+    if any(
+        palabra in area
+        for palabra in [
+            "fontan", "agua", "acs", "saneamiento"
+        ]
+    ):
+        return "agua"
+
+    if any(
+        palabra in area
+        for palabra in [
+            "eléctr", "electric"
+        ]
+    ):
+        return "electricidad"
+
+    if any(
+        palabra in area
+        for palabra in [
+            "seguridad", "cerrajería", "cerrajeria"
+        ]
+    ):
+        return "seguridad"
+
+    if "legionella" in area:
+        return "legionella"
+
+    if any(
+        palabra in area
+        for palabra in [
+            "climat", "calefacción", "calefaccion",
+            "refrigeración", "refrigeracion"
+        ]
+    ):
+        return "climatizacion"
+
+    # Si el área indica otra especialidad, no dejamos que palabras
+    # ambiguas de la descripción la conviertan en agua.
+    area_no_hidraulica = any(
+        palabra in area
+        for palabra in [
+            "mobiliario", "carpinter", "pintura",
+            "equipamiento", "informática", "informatica",
+            "albañiler", "limpieza", "jardiner"
+        ]
+    )
+
+    if not area_no_hidraulica:
+        for tipo, palabras in PALABRAS_RIESGO_CORAZON.items():
+            if any(palabra in texto for palabra in palabras):
+                return tipo
 
     return "general"
 
@@ -1558,7 +1618,56 @@ def _clave_planta_corazon(planta, trabajos, planta_recomendada):
     )
 
 
+def _siguiente_destino_corazon(
+    edificios,
+    edificio_actual,
+    planta_actual,
+):
+    """
+    Devuelve el siguiente destino lógico después de la planta actual.
+    """
+    candidatos = []
+
+    for edificio, datos_edificio in edificios.items():
+        for planta, trabajos in datos_edificio.get("plantas", {}).items():
+            if (
+                edificio == edificio_actual
+                and planta == planta_actual
+            ):
+                continue
+
+            trabajos_ordenados = _ordenar_trabajos_corazon(
+                trabajos
+            )
+
+            if not trabajos_ordenados:
+                continue
+
+            mejor = trabajos_ordenados[0]
+
+            candidatos.append({
+                "edificio": edificio,
+                "planta": planta,
+                "cantidad": len(trabajos),
+                "clave": _clave_prioridad_corazon(mejor),
+            })
+
+    if not candidatos:
+        return None
+
+    # Se favorece seguir en el mismo edificio antes de cambiar.
+    return max(
+        candidatos,
+        key=lambda item: (
+            1 if item["edificio"] == edificio_actual else 0,
+            item["clave"],
+            item["cantidad"],
+        )
+    )
+
+
 def _mensaje_ruta_corazon(
+    edificios,
     edificio,
     planta,
     primera,
@@ -1572,8 +1681,16 @@ def _mensaje_ruta_corazon(
     motivos = []
 
     if nivel >= 4:
+        nombres = {
+            "agua": "agua",
+            "electricidad": "electricidad",
+            "seguridad": "seguridad",
+            "legionella": "Legionella",
+            "climatizacion": "climatización",
+        }
         motivos.append(
-            f"hay una actuación de {riesgo}"
+            f"hay una actuación prioritaria de "
+            f"{nombres.get(riesgo, riesgo)}"
         )
     elif _trabajo_en_curso_corazon(primera):
         motivos.append(
@@ -1586,16 +1703,48 @@ def _mensaje_ruta_corazon(
             f"{'día' if dias == 1 else 'días'} abierta"
         )
 
-    motivos.append(
-        f"en {planta} hay {cantidad} "
-        f"{'actuación' if cantidad == 1 else 'actuaciones'}"
+    siguiente = _siguiente_destino_corazon(
+        edificios,
+        edificio,
+        planta
+    )
+
+    if cantidad > 1:
+        cierre = (
+            f"Cuando termines la primera, continúa con las otras "
+            f"{cantidad - 1} "
+            f"{'actuación' if cantidad - 1 == 1 else 'actuaciones'} "
+            f"de esta misma planta."
+        )
+    elif siguiente:
+        if siguiente["edificio"] == edificio:
+            cierre = (
+                f"Después continúa por {siguiente['planta']}, "
+                f"donde tienes {siguiente['cantidad']} "
+                f"{'actuación' if siguiente['cantidad'] == 1 else 'actuaciones'}."
+            )
+        else:
+            cierre = (
+                f"Después desplázate a {siguiente['edificio']}, "
+                f"{siguiente['planta']}, donde tienes "
+                f"{siguiente['cantidad']} "
+                f"{'actuación' if siguiente['cantidad'] == 1 else 'actuaciones'}."
+            )
+    else:
+        cierre = (
+            "Después de esta actuación habrás completado "
+            "la ruta prioritaria disponible."
+        )
+
+    motivo_txt = (
+        "; ".join(motivos).capitalize() + ". "
+        if motivos
+        else ""
     )
 
     return (
-        f"**Hoy empezaría por {edificio}, {planta}.** "
-        + "; ".join(motivos).capitalize()
-        + ". Cuando termines la primera, aprovecha para revisar "
-        + "las demás actuaciones de esta misma planta."
+        f"**Tu misión empieza en {edificio}, {planta}.** "
+        f"{motivo_txt}{cierre}"
     )
 
 
@@ -1695,6 +1844,72 @@ def _mostrar_trabajo_accion_corazon(
             )
 
 
+
+def _mostrar_mision_hoy_corazon(
+    edificios,
+    edificio,
+    planta,
+    primera_ot,
+    trabajos_planta,
+):
+    titulo = str(
+        primera_ot.get("titulo", "") or "Sin descripción"
+    ).strip()
+
+    numero = str(
+        primera_ot.get("numero_ot", "") or ""
+    ).strip()
+
+    espacio = _texto_valido_corazon(
+        primera_ot.get("espacio"),
+        "Sin espacio"
+    )
+
+    icono = _icono_trabajo_corazon(
+        primera_ot
+    )
+
+    st.markdown("## 🎯 Mi misión de hoy")
+
+    with st.container(border=True):
+        st.markdown(
+            f"### 🏫 {edificio}"
+        )
+
+        st.markdown(
+            f"#### 📍 {planta}"
+        )
+
+        st.markdown(
+            f"{icono} **Primera actuación:** "
+            f"{espacio}"
+        )
+
+        st.markdown(
+            f"### {titulo}"
+        )
+
+        if numero:
+            st.caption(f"OT {numero}")
+
+        st.info(
+            _mensaje_ruta_corazon(
+                edificios,
+                edificio,
+                planta,
+                primera_ot,
+                trabajos_planta
+            )
+        )
+
+        boton_abrir_ot(
+            numero_ot=numero,
+            key_extra="mision_principal",
+            texto="▶ Comenzar jornada",
+            tipo="primary"
+        )
+
+
 def _mostrar_edificio_jornada(
     edificio,
     datos_edificio,
@@ -1743,33 +1958,48 @@ def _mostrar_edificio_jornada(
             else min(3, len(trabajos))
         )
 
-        for indice, trabajo in enumerate(
-            trabajos[:limite_visible],
-            start=1
-        ):
+        trabajos_visibles = []
+
+        for trabajo in trabajos:
             es_primera = (
                 es_planta_recomendada
                 and str(trabajo.get("numero_ot", "") or "")
                 == str(primera_ot.get("numero_ot", "") or "")
             )
 
+            # La primera actuación ya aparece arriba dentro de
+            # "Mi misión de hoy"; no se duplica.
+            if es_primera:
+                continue
+
+            trabajos_visibles.append(trabajo)
+
+        limite_visible = min(
+            limite_visible,
+            len(trabajos_visibles)
+        )
+
+        for indice, trabajo in enumerate(
+            trabajos_visibles[:limite_visible],
+            start=1
+        ):
             _mostrar_trabajo_accion_corazon(
                 trabajo,
                 key_extra=(
                     f"jornada_{edificio}_"
                     f"{planta}_{indice}"
                 ),
-                principal=es_primera
+                principal=False
             )
 
-        if len(trabajos) > limite_visible:
+        if len(trabajos_visibles) > limite_visible:
             with st.expander(
                 f"Ver las otras "
-                f"{len(trabajos) - limite_visible} "
+                f"{len(trabajos_visibles) - limite_visible} "
                 f"actuaciones de {planta}"
             ):
                 for indice, trabajo in enumerate(
-                    trabajos[limite_visible:],
+                    trabajos_visibles[limite_visible:],
                     start=limite_visible + 1
                 ):
                     _mostrar_trabajo_accion_corazon(
@@ -1904,13 +2134,12 @@ def mostrar_corazon_operario():
         planta_recomendada
     ]
 
-    st.info(
-        _mensaje_ruta_corazon(
-            edificio_recomendado,
-            planta_recomendada,
-            primera_ot,
-            trabajos_planta
-        )
+    _mostrar_mision_hoy_corazon(
+        edificios=edificios,
+        edificio=edificio_recomendado,
+        planta=planta_recomendada,
+        primera_ot=primera_ot,
+        trabajos_planta=trabajos_planta,
     )
 
     edificios_ordenados = sorted(
