@@ -706,6 +706,25 @@ def selector_material_inteligente(
         "cantidad": cantidad_material,
     }
 
+
+def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
+    """
+    Libera la OT finalizada y solicita al Corazón una nueva misión.
+
+    No calcula prioridades aquí: únicamente deja la interfaz preparada
+    para que ui_operario vuelva a ejecutar latido_corazon().
+    """
+    if str(modo or "").strip().lower() != "operario":
+        return
+
+    st.session_state.pop("operario_ot_abierta_id", None)
+    st.session_state["corazon_mision_finalizada"] = {
+        "id": id_orden,
+        "numero_ot": str(num_ot or "").strip(),
+    }
+    st.session_state["recalcular_corazon"] = True
+
+
 def mostrar_tarjeta_ot(
     fila,
     materiales_select,
@@ -885,7 +904,7 @@ def mostrar_tarjeta_ot(
                         finalizar_orden(id_orden, "")
                         st.session_state[f"{modo}_confirmar_fin_rapido_{id_orden}"] = False
                         st.session_state.pop(f"legionella_guardada_{id_orden}", None)
-                        st.success(f"{num_ot} finalizada correctamente.")
+                        preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
                         st.rerun()
 
             with c2:
@@ -1020,7 +1039,7 @@ def mostrar_tarjeta_ot(
                                     st.session_state[f"{modo}_confirmar_fin_completo_{id_orden}"] = False
                                     st.session_state.pop(f"{modo}_materiales_confirmados_{id_orden}", None)
                                     st.session_state.pop(f"legionella_guardada_{id_orden}", None)
-                                    st.success(f"{num_ot} finalizada y materiales descontados correctamente.")
+                                    preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
                                     st.rerun()
 
                         else:
@@ -1029,7 +1048,7 @@ def mostrar_tarjeta_ot(
                             st.session_state[f"{modo}_confirmar_fin_completo_{id_orden}"] = False
                             st.session_state.pop(f"{modo}_materiales_confirmados_{id_orden}", None)
                             st.session_state.pop(f"legionella_guardada_{id_orden}", None)
-                            st.success(f"{num_ot} finalizada correctamente.")
+                            preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
                             st.rerun()
 
                 with c2:
