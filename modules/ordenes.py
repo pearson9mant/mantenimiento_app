@@ -759,31 +759,144 @@ def obtener_detalle_orden_externa(id_orden):
 # ACTUALIZAR ESTADO / OBSERVACIONES
 # =====================================================
 
+def _pausar_ot_en_curso_del_operario(
+    cursor,
+    id_orden_nueva,
+    operario,
+    numero_ot_nueva="",
+):
+    """
+    Garantiza una sola OT en curso por operario.
+
+    Las demás OT en curso del mismo operario pasan a En pausa.
+    No toca órdenes bloqueadas, finalizadas ni de otros operarios.
+    """
+    operario_txt = str(operario or "").strip()
+
+    if not operario_txt:
+        return []
+
+    cursor.execute(_sql("""
+        SELECT id, numero_ot, observaciones_estado
+        FROM ordenes_trabajo
+        WHERE operario = ?
+          AND estado = 'En curso'
+          AND id <> ?
+    """), (operario_txt, id_orden_nueva))
+
+    anteriores = cursor.fetchall()
+    pausadas = []
+    fecha_pausa = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for id_anterior, numero_ot_anterior, observaciones_anteriores in anteriores:
+        nota = (
+            f"Pausada automáticamente el {fecha_pausa} al iniciar "
+            f"la OT {numero_ot_nueva or id_orden_nueva}."
+        )
+
+        observaciones_previas = str(observaciones_anteriores or "").strip()
+        observaciones_nuevas = (
+            f"{observaciones_previas}\n{nota}"
+            if observaciones_previas
+            else nota
+        )
+
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET estado = 'En pausa',
+                observaciones_estado = ?
+            WHERE id = ?
+        """), (observaciones_nuevas, id_anterior))
+
+        pausadas.append({
+            "id": id_anterior,
+            "numero_ot": numero_ot_anterior,
+        })
+
+    return pausadas
+
+
 def actualizar_estado(id_orden, nuevo_estado, observaciones_estado=None):
+    """
+    Actualiza el estado de una OT.
+
+    Regla Corazón 4.0:
+    al poner una OT En curso, cualquier otra OT En curso del mismo
+    operario pasa automáticamente a En pausa.
+    """
     if nuevo_estado not in ESTADOS_VALIDOS:
-        return
+        return {
+            "ok": False,
+            "motivo": "estado_no_valido",
+            "estado": nuevo_estado,
+            "pausadas": [],
+        }
 
     asegurar_columnas_observaciones_estado()
 
     conn = conectar()
     cursor = conn.cursor()
 
-    if observaciones_estado is None:
+    try:
         cursor.execute(_sql("""
-            UPDATE ordenes_trabajo
-            SET estado = ?
+            SELECT numero_ot, operario, estado
+            FROM ordenes_trabajo
             WHERE id = ?
-        """), (nuevo_estado, id_orden))
-    else:
-        cursor.execute(_sql("""
-            UPDATE ordenes_trabajo
-            SET estado = ?,
-                observaciones_estado = ?
-            WHERE id = ?
-        """), (nuevo_estado, observaciones_estado, id_orden))
+        """), (id_orden,))
 
-    conn.commit()
-    conn.close()
+        orden = cursor.fetchone()
+
+        if not orden:
+            return {
+                "ok": False,
+                "motivo": "orden_no_encontrada",
+                "estado": nuevo_estado,
+                "pausadas": [],
+            }
+
+        numero_ot, operario, estado_anterior = orden
+        pausadas = []
+
+        if nuevo_estado == "En curso":
+            pausadas = _pausar_ot_en_curso_del_operario(
+                cursor=cursor,
+                id_orden_nueva=id_orden,
+                operario=operario,
+                numero_ot_nueva=numero_ot,
+            )
+
+        if observaciones_estado is None:
+            cursor.execute(_sql("""
+                UPDATE ordenes_trabajo
+                SET estado = ?
+                WHERE id = ?
+            """), (nuevo_estado, id_orden))
+        else:
+            cursor.execute(_sql("""
+                UPDATE ordenes_trabajo
+                SET estado = ?,
+                    observaciones_estado = ?
+                WHERE id = ?
+            """), (nuevo_estado, observaciones_estado, id_orden))
+
+        conn.commit()
+
+        return {
+            "ok": True,
+            "id_orden": id_orden,
+            "numero_ot": numero_ot,
+            "operario": operario,
+            "estado_anterior": estado_anterior,
+            "estado": nuevo_estado,
+            "pausadas": pausadas,
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 def actualizar_observaciones_estado(id_orden, observaciones_estado):
