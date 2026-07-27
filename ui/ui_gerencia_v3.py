@@ -602,6 +602,16 @@ def _css():
         .rv-area-row{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eef2f7;padding:10px 2px}
         .rv-area-row:last-child{border-bottom:0}.rv-area-name{font-size:14px;font-weight:850;color:#334155}
         .rv-area-count{min-width:30px;height:30px;border-radius:999px;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:950}
+        .rv-health{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid #dbe3ef;border-radius:16px;background:linear-gradient(135deg,#f8fafc,#eef6ff);padding:15px 18px;margin:12px 0}
+        .rv-health-label{font-size:12px;font-weight:850;color:#64748b;text-transform:uppercase;letter-spacing:.45px}
+        .rv-health-value{font-size:30px;font-weight:950;color:#0f172a;line-height:1.05;margin-top:3px}
+        .rv-health-bar{width:260px;max-width:38vw;height:12px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+        .rv-health-fill{height:100%;border-radius:999px}.rv-health-fill.good{background:#22c55e}.rv-health-fill.watch{background:#eab308}.rv-health-fill.alert{background:#f97316}.rv-health-fill.critical{background:#ef4444}
+        .rv-exec-sentence{border-left:5px solid #1d4ed8;background:#eff6ff;border-radius:12px;padding:13px 15px;margin:0 0 14px;font-size:14px;font-weight:800;color:#1e3a8a;line-height:1.55}
+        .rv-kpi.good{background:#f0fdf4;border-color:#bbf7d0}.rv-kpi.good .rv-kpi-value{color:#15803d}
+        .rv-kpi.watch{background:#fffbeb;border-color:#fde68a}.rv-kpi.watch .rv-kpi-value{color:#a16207}
+        .rv-kpi.alert{background:#fff7ed;border-color:#fed7aa}.rv-kpi.alert .rv-kpi-value{color:#c2410c}
+        .rv-kpi.critical{background:#fef2f2;border-color:#fecaca}.rv-kpi.critical .rv-kpi-value{color:#b91c1c}
         .rv-trend{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:900;margin-top:10px}
         .rv-trend.good{background:#dcfce7;color:#166534}.rv-trend.bad{background:#fee2e2;color:#991b1b}.rv-trend.flat{background:#e2e8f0;color:#334155}
         .rv-exec-list{margin:0;padding:0;list-style:none}.rv-exec-list li{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:9px 0;border-bottom:1px solid #eef2f7;font-size:14px}.rv-exec-list li:last-child{border-bottom:0}.rv-exec-list span{color:#475569;font-weight:750}.rv-exec-list strong{color:#0f172a;font-weight:950;text-align:right}
@@ -840,27 +850,60 @@ def _mostrar_detalle(df, centro, edificio, planta):
         unsafe_allow_html=True,
     )
 
+    # Índice de salud de la planta.
+    dias_maximos = 0
+    if not activas.empty and "fecha_dt" in activas.columns:
+        fechas_activas = pd.to_datetime(
+            activas["fecha_dt"],
+            errors="coerce",
+            dayfirst=True,
+        )
+        antiguedades = (
+            pd.Timestamp.today().normalize()
+            - fechas_activas.dt.normalize()
+        ).dt.days.dropna()
+        if not antiguedades.empty:
+            dias_maximos = max(0, int(antiguedades.max()))
+
+    penalizacion = (
+        len(urgentes) * 15
+        + len(activas) * 4
+        + len(pendiente_material) * 5
+        + min(dias_maximos // 7, 15)
+    )
+    salud = max(0, min(100, 100 - penalizacion))
+
+    if salud >= 85:
+        clase_salud, icono_salud = "good", "🟢"
+    elif salud >= 65:
+        clase_salud, icono_salud = "watch", "🟡"
+    elif salud >= 40:
+        clase_salud, icono_salud = "alert", "🟠"
+    else:
+        clase_salud, icono_salud = "critical", "🔴"
+
+    st.markdown(
+        f'<div class="rv-health">'
+        f'<div><div class="rv-health-label">Salud de la planta</div>'
+        f'<div class="rv-health-value">{icono_salud} {salud}%</div></div>'
+        f'<div class="rv-health-bar"><div class="rv-health-fill {clase_salud}" style="width:{salud}%"></div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    valores_kpi = [
+        ("Activas", len(activas), "critical" if len(activas) >= 6 else "alert" if len(activas) >= 3 else "watch" if len(activas) else "good"),
+        ("En curso", len(en_curso), "good" if len(en_curso) > 0 else "watch" if len(activas) else "good"),
+        ("Pendiente material", len(pendiente_material), "alert" if len(pendiente_material) > 0 else "good"),
+        ("Urgentes / altas", len(urgentes), "critical" if len(urgentes) > 0 else "good"),
+        ("Finalizadas mes", len(cerradas_mes), "good" if len(cerradas_mes) > 0 else "watch"),
+    ]
+
     columnas = st.columns(5)
-    for columna, etiqueta, valor in zip(
-        columnas,
-        [
-            "Activas",
-            "En curso",
-            "Pendiente material",
-            "Urgentes / altas",
-            "Finalizadas mes",
-        ],
-        [
-            len(activas),
-            len(en_curso),
-            len(pendiente_material),
-            len(urgentes),
-            len(cerradas_mes),
-        ],
-    ):
+    for columna, (etiqueta, valor, clase_kpi) in zip(columnas, valores_kpi):
         with columna:
             st.markdown(
-                f'<div class="rv-kpi">'
+                f'<div class="rv-kpi {clase_kpi}">'
                 f'<div class="rv-kpi-label">{etiqueta}</div>'
                 f'<div class="rv-kpi-value">{valor}</div>'
                 f'</div>',
@@ -869,13 +912,16 @@ def _mostrar_detalle(df, centro, edificio, planta):
 
     # Resumen de áreas.
     if activas.empty:
-        areas = pd.Series(dtype="int64")
+        areas = pd.DataFrame(columns=["area", "cantidad"])
     else:
         areas = (
             activas["area"]
             .fillna("Sin área")
             .replace("", "Sin área")
             .value_counts()
+            .rename_axis("area")
+            .reset_index(name="cantidad")
+            .sort_values(["cantidad", "area"], ascending=[False, True])
         )
 
     # Responsable predominante.
@@ -954,7 +1000,9 @@ def _mostrar_detalle(df, centro, edificio, planta):
             st.success("No hay áreas afectadas.")
         else:
             filas_html = ""
-            for area, cantidad in areas.head(6).items():
+            for _, fila_area in areas.head(6).iterrows():
+                area = fila_area["area"]
+                cantidad = fila_area["cantidad"]
                 filas_html += (
                     '<div class="rv-area-row">'
                     f'<div class="rv-area-name">{html.escape(str(area))}</div>'
@@ -969,6 +1017,53 @@ def _mostrar_detalle(df, centro, edificio, planta):
 
     with derecha:
         st.markdown("### Resumen ejecutivo")
+
+        texto_impacto = ""
+        if not activas.empty:
+            partes_impacto = []
+            for columna in ["descripcion", "espacio"]:
+                if columna in activas.columns:
+                    partes_impacto.append(
+                        activas[columna]
+                        .fillna("")
+                        .astype(str)
+                        .str.lower()
+                        .str.cat(sep=" ")
+                    )
+            texto_impacto = " ".join(partes_impacto)
+
+        impacto_docente = any(
+            expresion in texto_impacto
+            for expresion in [
+                "no podemos dar clase",
+                "sin clase",
+                "peligro",
+                "se cae",
+                "inutilizable",
+                "cerrada",
+            ]
+        )
+
+        if impacto_docente:
+            frase_impacto = "Existe riesgo de afectar la actividad docente."
+        elif len(urgentes) > 0:
+            frase_impacto = "Se recomienda actuar con prioridad para evitar afectación a la actividad."
+        elif len(activas) > 0:
+            frase_impacto = "La situación está controlada y requiere seguimiento ordinario."
+        else:
+            frase_impacto = "La planta se encuentra operativamente bajo control."
+
+        frase_resumen = (
+            f"La planta presenta {len(activas)} incidencias activas, "
+            f"{len(urgentes)} requieren atención prioritaria y "
+            f"{len(pendiente_material)} están pendientes de material. "
+            f"{frase_impacto}"
+        )
+
+        st.markdown(
+            f'<div class="rv-exec-sentence">{html.escape(frase_resumen)}</div>',
+            unsafe_allow_html=True,
+        )
 
         antiguedad_texto = (
             f"{antiguedad_dias} días abierta"
