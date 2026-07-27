@@ -162,6 +162,25 @@ def _query_detalle(centro, edificio, planta):
     )
 
 
+def _abrir_detalle(centro, edificio, planta):
+    st.session_state["gerencia_v3_vista"] = "detalle"
+    st.session_state["gerencia_v3_centro"] = centro
+    st.session_state["gerencia_v3_edificio"] = edificio
+    st.session_state["gerencia_v3_planta"] = planta
+
+
+def _volver_mapa():
+    st.session_state["gerencia_v3_vista"] = "mapa"
+    st.session_state.pop("gerencia_v3_centro", None)
+    st.session_state.pop("gerencia_v3_edificio", None)
+    st.session_state.pop("gerencia_v3_planta", None)
+
+
+def _clave_segura(*partes):
+    texto = "_".join(_norm(p) for p in partes)
+    return "".join(c if c.isalnum() else "_" for c in texto)
+
+
 def _css():
     st.markdown(
         """
@@ -196,31 +215,61 @@ def _css():
         .rv-priority{border:1px solid #fecaca;background:#fff7f7;border-radius:14px;padding:14px}.rv-priority-title{font-size:18px;font-weight:950;color:#991b1b}.rv-priority-meta{font-size:13px;color:#475569;margin-top:6px;line-height:1.65}
         @media(max-width:1100px){.rv-buildings{gap:18px}.rv-building{width:150px;flex-basis:150px}.rv-building.tall{width:170px;flex-basis:170px}}
         @media(max-width:760px){.rv-buildings{overflow-x:auto;justify-content:flex-start;padding-bottom:8px}.rv-hero{display:block}.rv-alert{display:inline-block;margin-top:8px}}
+        
+        div[data-testid="stButton"] > button{
+            min-height:48px!important;
+            border-radius:0!important;
+            border:1px solid rgba(80,70,50,.25)!important;
+            font-weight:900!important;
+            text-align:left!important;
+            justify-content:flex-start!important;
+            background:#f8fafc!important;
+            color:#102033!important;
+            box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)!important;
+        }
+        div[data-testid="stButton"] > button:hover{
+            border-color:#2563eb!important;
+            transform:translateY(-1px);
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-def _building_html(df, centro, edificio, plantas, tall=False):
-    pisos = []
+def _render_building_native(df, centro, edificio, plantas, tall=False):
+    clase = "rv-building tall" if tall else "rv-building"
+    st.markdown(
+        f'<div class="{clase}" style="width:100%;filter:none">'
+        '<div class="rv-roof"></div>'
+        f'<div class="rv-name">{html.escape(edificio.upper())}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     for planta in plantas:
         estado, cantidad = _estado_planta(df, centro, edificio, planta)
         etiqueta = "TERRADO" if planta == "Terrado" else planta.replace("Planta ", "P")
         badge = "✓" if cantidad == 0 else str(cantidad)
-        pisos.append(
-            f'<a target="_self" class="rv-floor {estado}" href="{html.escape(_query_detalle(centro, edificio, planta), quote=True)}">'
-            f'<span>{html.escape(etiqueta)}</span><span class="rv-badge">{badge}</span></a>'
+        icono = {
+            "correcta": "🟢",
+            "seguimiento": "🟡",
+            "atencion": "🟠",
+            "critica": "🔴",
+        }[estado]
+
+        clave = _clave_segura("rv", centro, edificio, planta)
+        st.button(
+            f"{icono}  {etiqueta}                         {badge}",
+            key=clave,
+            use_container_width=True,
+            on_click=_abrir_detalle,
+            args=(centro, edificio, planta),
         )
 
-    clase = "rv-building tall" if tall else "rv-building"
-    return (
-        f'<div class="{clase}">'
-        '<div class="rv-roof"></div>'
-        f'<div class="rv-name">{html.escape(edificio.upper())}</div>'
-        '<div class="rv-body">'
-        + "".join(pisos)
-        + '</div><div class="rv-ground"><div class="rv-door"></div></div><div class="rv-base"></div></div>'
+    st.markdown(
+        '<div class="rv-ground"><div class="rv-door"></div></div><div class="rv-base"></div>',
+        unsafe_allow_html=True,
     )
 
 
@@ -247,20 +296,23 @@ def _mostrar_mapa(df):
     )
 
     st.markdown('<div class="rv-campus">Pearson 22</div>', unsafe_allow_html=True)
-    p22 = (
-        '<div class="rv-buildings">'
-        + _building_html(df, "Pearson 22", "Infantil / Primaria", EDIFICIOS["Pearson 22"]["Infantil / Primaria"], tall=True)
-        + _building_html(df, "Pearson 22", "Llar", EDIFICIOS["Pearson 22"]["Llar"])
-        + '</div>'
-    )
-    st.markdown(p22, unsafe_allow_html=True)
+    margen_1, col_inf, col_llar, margen_2 = st.columns([1.5, 1.15, 1, 1.5], gap="large")
+    with col_inf:
+        _render_building_native(
+            df, "Pearson 22", "Infantil / Primaria",
+            EDIFICIOS["Pearson 22"]["Infantil / Primaria"], tall=True,
+        )
+    with col_llar:
+        _render_building_native(df, "Pearson 22", "Llar", EDIFICIOS["Pearson 22"]["Llar"])
 
     st.markdown('<div class="rv-separator"></div><div class="rv-campus">Pearson 9</div>', unsafe_allow_html=True)
-    p9 = '<div class="rv-buildings">' + ''.join(
-        _building_html(df, "Pearson 9", edificio, EDIFICIOS["Pearson 9"][edificio])
-        for edificio in ["Edificio A", "Edificio B", "Edificio C"]
-    ) + '</div>'
-    st.markdown(p9, unsafe_allow_html=True)
+    margen_3, col_a, col_b, col_c, margen_4 = st.columns([1, 1, 1, 1, 1], gap="large")
+    with col_a:
+        _render_building_native(df, "Pearson 9", "Edificio A", EDIFICIOS["Pearson 9"]["Edificio A"])
+    with col_b:
+        _render_building_native(df, "Pearson 9", "Edificio B", EDIFICIOS["Pearson 9"]["Edificio B"])
+    with col_c:
+        _render_building_native(df, "Pearson 9", "Edificio C", EDIFICIOS["Pearson 9"]["Edificio C"])
 
     st.markdown(
         '<div class="rv-legend">'
@@ -280,7 +332,7 @@ def _mostrar_detalle(df, centro, edificio, planta):
     en_curso = activas[activas["estado"].isin(["En curso", "En ejecución"])] if not activas.empty else activas
     cerradas_mes = _cerradas_mes(datos)
 
-    st.markdown('<a target="_self" class="rv-back" href="?gerencia_v3=mapa">← Volver al colegio</a>', unsafe_allow_html=True)
+    st.button("← Volver al colegio", key="gerencia_v3_volver", on_click=_volver_mapa)
     st.markdown(
         f'<div class="rv-detail"><div class="rv-detail-title">📍 {html.escape(centro)} · {html.escape(edificio)} · {html.escape(planta)}</div>'
         '<div class="rv-detail-sub">Situación operativa de la planta</div></div>',
@@ -359,11 +411,10 @@ def pantalla_gerencia():
             ]
         )
 
-    params = st.query_params
-    vista = params.get("gerencia_v3", "mapa")
-    centro = params.get("cv_centro", "")
-    edificio = params.get("cv_edificio", "")
-    planta = params.get("cv_planta", "")
+    vista = st.session_state.get("gerencia_v3_vista", "mapa")
+    centro = st.session_state.get("gerencia_v3_centro", "")
+    edificio = st.session_state.get("gerencia_v3_edificio", "")
+    planta = st.session_state.get("gerencia_v3_planta", "")
 
     if vista == "detalle" and centro and edificio and planta:
         _mostrar_detalle(df, centro, edificio, planta)
