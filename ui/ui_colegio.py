@@ -236,10 +236,11 @@ def _mostrar_selector_rapido(
 
 def _mostrar_hoy(centros, modo):
     """
-    Vista de trabajo diario.
+    Vista diaria compacta.
 
-    Los selectores de centro y edificio se mantienen visibles porque
-    delimitan el panel de actividad que se consulta.
+    Mantiene las mismas consultas y el mismo flujo de apertura:
+    únicamente reorganiza la información para mostrar más actividad
+    en pantalla y reducir el espacio vertical.
     """
     col_centro, col_edificio = st.columns(2, gap="small")
 
@@ -280,12 +281,6 @@ def _mostrar_hoy(centros, modo):
         st.exception(error)
         return
 
-    st.markdown("### 📌 Lo importante hoy")
-
-    st.caption(
-        "Trabajos, preventivos y controles que requieren atención."
-    )
-
     if not mapa_actividad:
         st.success(
             "🟢 No hay actividad pendiente en este edificio."
@@ -300,10 +295,12 @@ def _mostrar_hoy(centros, modo):
     for items in mapa_actividad.values():
         for item in items:
             actuaciones = item.get("actuaciones", []) or []
+
             preventivos = (
                 item.get("preventivos_pendientes", [])
                 or []
             )
+
             tiene_legionella = bool(
                 item.get("tiene_legionella", False)
             )
@@ -317,20 +314,73 @@ def _mostrar_hoy(centros, modo):
             if actuaciones or preventivos or tiene_legionella:
                 total_espacios += 1
 
-    c1, c2, c3, c4 = st.columns(4, gap="small")
+    st.markdown("### 📌 Lo importante hoy")
 
-    c1.metric("Espacios", total_espacios)
-    c2.metric("Trabajos", total_trabajos)
-    c3.metric("Preventivos", total_preventivos)
-    c4.metric("Legionella", total_legionella)
+    # Indicadores compactos sin utilizar st.metric(), que ocupa
+    # más altura de la necesaria en esta pantalla operativa.
+    indicadores = [
+        ("🚪", "Espacios", total_espacios),
+        ("🔧", "Trabajos", total_trabajos),
+        ("📅", "Preventivos", total_preventivos),
+        ("🦠", "Legionella", total_legionella),
+    ]
 
-    st.divider()
+    columnas_kpi = st.columns(4, gap="small")
+
+    for columna, (icono_kpi, titulo_kpi, valor_kpi) in zip(
+        columnas_kpi,
+        indicadores
+    ):
+        with columna:
+            st.markdown(
+                (
+                    "<div style='"
+                    "border:1px solid rgba(128,128,128,.25);"
+                    "border-radius:10px;"
+                    "padding:8px 12px;"
+                    "margin-bottom:4px;"
+                    "line-height:1.15;"
+                    "'>"
+                    f"<div style='font-size:.82rem;opacity:.75;'>"
+                    f"{icono_kpi} {titulo_kpi}</div>"
+                    f"<div style='font-size:1.55rem;font-weight:700;"
+                    f"margin-top:3px;'>{valor_kpi}</div>"
+                    "</div>"
+                ),
+                unsafe_allow_html=True
+            )
+
+    st.caption(
+        "Trabajos, preventivos y controles que requieren atención."
+    )
 
     for planta, items in mapa_actividad.items():
-        st.markdown(f"#### 📍 {planta}")
+        total_planta = 0
 
         for item in items:
-            espacio = item.get("espacio", "")
+            total_planta += len(
+                item.get("actuaciones", []) or []
+            )
+
+            total_planta += len(
+                item.get("preventivos_pendientes", []) or []
+            )
+
+            if item.get("tiene_legionella", False):
+                total_planta += 1
+
+        if total_planta <= 0:
+            continue
+
+        st.markdown(
+            f"#### 📍 {planta} · {total_planta}"
+        )
+
+        for item in items:
+            espacio = str(
+                item.get("espacio", "") or ""
+            ).strip()
+
             actuaciones = item.get("actuaciones", []) or []
 
             preventivos_pend = (
@@ -363,11 +413,15 @@ def _mostrar_hoy(centros, modo):
                 except Exception:
                     continue
 
-                c_info, c_btn = st.columns([12, 1], gap="small")
+                c_info, c_btn = st.columns(
+                    [24, 1],
+                    gap="small",
+                    vertical_alignment="center"
+                )
 
                 with c_info:
                     st.markdown(
-                        f"🔴 **{espacio}**  \n"
+                        f"🔴 **{espacio or '-'}** · "
                         f"`{numero_ot or '-'}` · "
                         f"{prioridad or '-'} · "
                         f"{area or '-'}  \n"
@@ -376,13 +430,14 @@ def _mostrar_hoy(centros, modo):
 
                 with c_btn:
                     if st.button(
-                        "Abrir",
+                        "›",
                         key=(
                             f"abrir_ot_colegio_"
                             f"{id_ot}_{numero_ot}_"
                             f"{planta}_{espacio}"
                         ),
-                        use_container_width=True
+                        help="Abrir actuación",
+                        use_container_width=False
                     ):
                         _abrir_ficha_desde_colegio(
                             centro,
@@ -413,11 +468,15 @@ def _mostrar_hoy(centros, modo):
                     obs_prev = ""
                     num_prev = ""
 
-                c_info, c_btn = st.columns([12, 1], gap="small")
+                c_info, c_btn = st.columns(
+                    [24, 1],
+                    gap="small",
+                    vertical_alignment="center"
+                )
 
                 with c_info:
                     st.markdown(
-                        f"🛠️ **{espacio}**  \n"
+                        f"🛠️ **{espacio or '-'}** · "
                         f"`{num_prev or '-'}` · "
                         f"{estado_prev or '-'} · "
                         f"{operario_prev or '-'}  \n"
@@ -426,12 +485,13 @@ def _mostrar_hoy(centros, modo):
 
                 with c_btn:
                     if st.button(
-                        "Abrir",
+                        "›",
                         key=(
                             f"abrir_prev_colegio_"
                             f"{id_prev}_{planta}_{espacio}"
                         ),
-                        use_container_width=True
+                        help="Abrir preventivo",
+                        use_container_width=False
                     ):
                         _abrir_ficha_desde_colegio(
                             centro,
@@ -469,12 +529,16 @@ def _mostrar_hoy(centros, modo):
                 elif color_leg in ["amarillo", "naranja"]:
                     icono_leg = "🟠🦠"
 
-                c_info, c_btn = st.columns([12, 1], gap="small")
+                c_info, c_btn = st.columns(
+                    [24, 1],
+                    gap="small",
+                    vertical_alignment="center"
+                )
 
                 with c_info:
                     st.markdown(
-                        f"{icono_leg} **{espacio}**  \n"
-                        f"{estado_leg} · "
+                        f"{icono_leg} **{espacio or '-'}** · "
+                        f"{estado_leg}  \n"
                         f"{puntos} puntos · "
                         f"{tareas} tareas · "
                         f"{inc_leg} incidencias"
@@ -482,12 +546,13 @@ def _mostrar_hoy(centros, modo):
 
                 with c_btn:
                     if st.button(
-                        "Abrir",
+                        "›",
                         key=(
                             f"abrir_leg_colegio_"
                             f"{planta}_{espacio}"
                         ),
-                        use_container_width=True
+                        help="Abrir control de Legionella",
+                        use_container_width=False
                     ):
                         _abrir_ficha_desde_colegio(
                             centro,
@@ -497,6 +562,7 @@ def _mostrar_hoy(centros, modo):
                             "legionella"
                         )
 
+        st.divider()
 
 def _mostrar_explorador_colegio(centros, modo):
     """
