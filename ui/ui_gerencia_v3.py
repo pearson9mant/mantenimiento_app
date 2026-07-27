@@ -587,6 +587,21 @@ def _css():
         .rv-detail{border:1px solid #e2e8f0;border-radius:17px;background:#fff;padding:15px 17px}.rv-detail-title{font-size:23px;font-weight:950;color:#0f172a}.rv-detail-sub{font-size:13px;color:#64748b;margin-top:3px}
         .rv-kpi{border:1px solid #e2e8f0;border-radius:13px;background:#f8fafc;padding:11px}.rv-kpi-label{font-size:12px;color:#64748b;font-weight:750}.rv-kpi-value{font-size:28px;font-weight:950;color:#0f172a}
         .rv-priority{border:1px solid #fecaca;background:#fff7f7;border-radius:14px;padding:14px}.rv-priority-title{font-size:18px;font-weight:950;color:#991b1b}.rv-priority-meta{font-size:13px;color:#475569;margin-top:6px;line-height:1.65}
+        .rv-exec-state{display:flex;align-items:center;justify-content:space-between;gap:16px;border-radius:16px;padding:14px 17px;margin:12px 0 14px;border:1px solid #dbe3ef;background:#f8fafc}
+        .rv-exec-state.good{background:#f0fdf4;border-color:#bbf7d0}
+        .rv-exec-state.watch{background:#fffbeb;border-color:#fde68a}
+        .rv-exec-state.alert{background:#fff7ed;border-color:#fed7aa}
+        .rv-exec-state.critical{background:#fef2f2;border-color:#fecaca}
+        .rv-exec-label{font-size:12px;font-weight:850;color:#64748b;text-transform:uppercase;letter-spacing:.45px}
+        .rv-exec-value{font-size:22px;font-weight:950;color:#0f172a;margin-top:2px}
+        .rv-exec-note{font-size:13px;color:#475569;font-weight:650;text-align:right}
+        .rv-summary{border:1px solid #dbe3ef;background:#fff;border-radius:15px;padding:14px 16px;min-height:220px}
+        .rv-summary-title{font-size:17px;font-weight:950;color:#0f172a;margin-bottom:11px}
+        .rv-summary-grid{display:grid;grid-template-columns:145px 1fr;gap:9px 12px;font-size:14px}
+        .rv-summary-key{color:#64748b;font-weight:750}.rv-summary-value{color:#0f172a;font-weight:900}
+        .rv-area-row{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eef2f7;padding:10px 2px}
+        .rv-area-row:last-child{border-bottom:0}.rv-area-name{font-size:14px;font-weight:850;color:#334155}
+        .rv-area-count{min-width:30px;height:30px;border-radius:999px;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:950}
         @media(max-width:1100px){.rv-buildings{gap:18px}.rv-building{width:150px;flex-basis:150px}.rv-building.tall{width:170px;flex-basis:170px}}
         @media(max-width:760px){.rv-buildings{overflow-x:auto;justify-content:flex-start;padding-bottom:8px}.rv-hero{display:block}.rv-alert{display:inline-block;margin-top:8px}}
         
@@ -781,10 +796,44 @@ def _mostrar_detalle(df, centro, edificio, planta):
     pendiente_material = _pendiente_material(activas)
     cerradas_mes = _cerradas_mes(datos)
 
+    # Estado ejecutivo de la planta.
+    if len(urgentes) > 0:
+        clase_estado = "critical"
+        icono_estado = "🔴"
+        texto_estado = "REQUIERE ATENCIÓN PRIORITARIA"
+        nota_estado = "Existe al menos una actuación urgente o de prioridad alta."
+    elif len(activas) >= 3:
+        clase_estado = "alert"
+        icono_estado = "🟠"
+        texto_estado = "REQUIERE ATENCIÓN"
+        nota_estado = "La concentración de incidencias aconseja seguimiento."
+    elif len(activas) > 0:
+        clase_estado = "watch"
+        icono_estado = "🟡"
+        texto_estado = "EN SEGUIMIENTO"
+        nota_estado = "Hay actuaciones activas, pero sin riesgo crítico detectado."
+    else:
+        clase_estado = "good"
+        icono_estado = "🟢"
+        texto_estado = "BAJO CONTROL"
+        nota_estado = "No hay incidencias activas en esta planta."
+
     st.button("← Volver al colegio", key="gerencia_v3_volver", on_click=_volver_mapa)
+
     st.markdown(
-        f'<div class="rv-detail"><div class="rv-detail-title">📍 {html.escape(centro)} · {html.escape(edificio)} · {html.escape(planta)}</div>'
-        '<div class="rv-detail-sub">Situación operativa de la planta</div></div>',
+        f'<div class="rv-detail">'
+        f'<div class="rv-detail-title">📍 {html.escape(centro)} · {html.escape(edificio)} · {html.escape(planta)}</div>'
+        '<div class="rv-detail-sub">Resumen ejecutivo para Gerencia</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f'<div class="rv-exec-state {clase_estado}">'
+        f'<div><div class="rv-exec-label">Estado de la planta</div>'
+        f'<div class="rv-exec-value">{icono_estado} {texto_estado}</div></div>'
+        f'<div class="rv-exec-note">{html.escape(nota_estado)}</div>'
+        '</div>',
         unsafe_allow_html=True,
     )
 
@@ -808,40 +857,128 @@ def _mostrar_detalle(df, centro, edificio, planta):
     ):
         with columna:
             st.markdown(
-                f'<div class="rv-kpi"><div class="rv-kpi-label">{etiqueta}</div><div class="rv-kpi-value">{valor}</div></div>',
+                f'<div class="rv-kpi">'
+                f'<div class="rv-kpi-label">{etiqueta}</div>'
+                f'<div class="rv-kpi-value">{valor}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
 
-    izquierda, derecha = st.columns([1, 1.15], gap="large")
+    # Resumen de áreas.
+    if activas.empty:
+        areas = pd.Series(dtype="int64")
+    else:
+        areas = (
+            activas["area"]
+            .fillna("Sin área")
+            .replace("", "Sin área")
+            .value_counts()
+        )
+
+    # Responsable predominante.
+    responsable = "Sin asignar"
+    if not activas.empty and "operario" in activas.columns:
+        operarios = (
+            activas["operario"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+        operarios = operarios[operarios.ne("")]
+        if not operarios.empty:
+            responsable = str(operarios.value_counts().index[0])
+
+    # Prioridad ejecutiva sin mostrar la descripción completa.
+    prioridad_mas_alta = "Sin prioridad"
+    ubicacion_prioritaria = planta
+    estado_prioritario = "Sin actuaciones"
+    ot_prioritaria = "—"
+    operario_prioritario = responsable
+
+    if not activas.empty:
+        candidatos = urgentes if not urgentes.empty else activas
+        candidatos = candidatos.sort_values(
+            "fecha_dt",
+            ascending=True,
+            na_position="last",
+        )
+        fila = candidatos.iloc[0]
+
+        prioridad_mas_alta = str(
+            fila.get("prioridad", "") or "Sin prioridad"
+        )
+        ubicacion_prioritaria = str(
+            fila.get("espacio", "") or planta
+        )
+        estado_prioritario = str(
+            fila.get("estado", "") or "Abierta"
+        )
+        ot_prioritaria = str(
+            fila.get("numero_ot", "") or "—"
+        )
+        operario_prioritario = str(
+            fila.get("operario", "") or responsable
+        )
+
+    izquierda, derecha = st.columns([0.9, 1.1], gap="large")
+
     with izquierda:
-        st.markdown("### Por áreas")
-        if activas.empty:
-            st.success("Sin incidencias activas.")
+        st.markdown("### Áreas afectadas")
+
+        if areas.empty:
+            st.success("No hay áreas afectadas.")
         else:
-            areas = activas["area"].fillna("Sin área").replace("", "Sin área").value_counts()
-            st.bar_chart(areas, horizontal=True, height=220)
+            filas_html = ""
+            for area, cantidad in areas.head(6).items():
+                filas_html += (
+                    '<div class="rv-area-row">'
+                    f'<div class="rv-area-name">{html.escape(str(area))}</div>'
+                    f'<div class="rv-area-count">{int(cantidad)}</div>'
+                    '</div>'
+                )
+
+            st.markdown(
+                f'<div class="rv-summary">{filas_html}</div>',
+                unsafe_allow_html=True,
+            )
 
     with derecha:
-        st.markdown("### Actuación prioritaria")
-        if activas.empty:
-            st.success("No hay actuaciones pendientes.")
-        else:
-            candidatos = urgentes if not urgentes.empty else activas
-            fila = candidatos.sort_values("fecha_dt", ascending=True, na_position="last").iloc[0]
-            st.markdown(
-                f'<div class="rv-priority"><div class="rv-priority-title">{html.escape(_limpiar_descripcion(fila.get("descripcion", "")))}</div>'
-                f'<div class="rv-priority-meta">📍 {html.escape(str(fila.get("espacio", "") or planta))}<br>'
-                f'{html.escape(str(fila.get("prioridad", "") or "Sin prioridad"))} · {html.escape(str(fila.get("estado", "") or ""))}<br>'
-                f'{html.escape(str(fila.get("numero_ot", "") or ""))}</div></div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown("### Resumen ejecutivo")
 
-    with st.expander(f"Ver {len(activas)} incidencias de esta planta", expanded=False):
+        st.markdown(
+            '<div class="rv-summary">'
+            '<div class="rv-summary-title">Situación que requiere mayor seguimiento</div>'
+            '<div class="rv-summary-grid">'
+            f'<div class="rv-summary-key">Ubicación</div>'
+            f'<div class="rv-summary-value">{html.escape(ubicacion_prioritaria)}</div>'
+            f'<div class="rv-summary-key">Prioridad</div>'
+            f'<div class="rv-summary-value">{html.escape(prioridad_mas_alta)}</div>'
+            f'<div class="rv-summary-key">Estado</div>'
+            f'<div class="rv-summary-value">{html.escape(estado_prioritario)}</div>'
+            f'<div class="rv-summary-key">Responsable</div>'
+            f'<div class="rv-summary-value">{html.escape(operario_prioritario)}</div>'
+            f'<div class="rv-summary-key">OT</div>'
+            f'<div class="rv-summary-value">{html.escape(ot_prioritaria)}</div>'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with st.expander(
+        f"Ver detalle de las {len(activas)} incidencias activas",
+        expanded=False,
+    ):
         if activas.empty:
             st.info("No hay incidencias activas.")
         else:
-            vista = activas.sort_values("fecha_dt", ascending=True, na_position="last").copy()
-            vista["descripcion"] = vista["descripcion"].apply(_limpiar_descripcion)
+            vista = activas.sort_values(
+                "fecha_dt",
+                ascending=True,
+                na_position="last",
+            ).copy()
+
+            vista["descripcion"] = vista["descripcion"].apply(
+                _limpiar_descripcion
+            )
 
             def _estado_visual(valor):
                 estado = str(valor or "").strip()
@@ -861,18 +998,64 @@ def _mostrar_detalle(df, centro, edificio, planta):
                 return f"📋 {estado}" if estado else "📋 Abierta"
 
             vista["estado"] = vista["estado"].apply(_estado_visual)
-            columnas_vista = ["numero_ot", "descripcion", "area", "prioridad", "estado", "operario"]
-            columnas_vista = [columna for columna in columnas_vista if columna in vista.columns]
-            st.dataframe(vista[columnas_vista], use_container_width=True, hide_index=True)
 
-    with st.expander("Indicadores del centro", expanded=False):
+            columnas_vista = [
+                "numero_ot",
+                "espacio",
+                "descripcion",
+                "area",
+                "prioridad",
+                "estado",
+                "operario",
+            ]
+            columnas_vista = [
+                columna
+                for columna in columnas_vista
+                if columna in vista.columns
+            ]
+
+            nombres_columnas = {
+                "numero_ot": "OT",
+                "espacio": "Ubicación",
+                "descripcion": "Descripción",
+                "area": "Área",
+                "prioridad": "Prioridad",
+                "estado": "Estado",
+                "operario": "Responsable",
+            }
+
+            vista = vista[columnas_vista].rename(
+                columns=nombres_columnas
+            )
+
+            st.dataframe(
+                vista,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with st.expander("Indicadores generales del centro", expanded=False):
         _, porcentaje, mensaje = evaluar_estado_centro(df, centro)
         inventario = preparar_inventario()
-        inventario_centro = filtrar_inventario_por_centro(inventario, centro)
+        inventario_centro = filtrar_inventario_por_centro(
+            inventario,
+            centro,
+        )
+
         stock_bajo = 0
-        if not inventario_centro.empty and "stock_minimo" in inventario_centro.columns:
-            minimo = pd.to_numeric(inventario_centro["stock_minimo"], errors="coerce").fillna(0)
-            stock_bajo = int((inventario_centro["stock_num"] <= minimo).sum())
+        if (
+            not inventario_centro.empty
+            and "stock_minimo" in inventario_centro.columns
+        ):
+            minimo = pd.to_numeric(
+                inventario_centro["stock_minimo"],
+                errors="coerce",
+            ).fillna(0)
+
+            stock_bajo = int(
+                (inventario_centro["stock_num"] <= minimo).sum()
+            )
+
         c1, c2 = st.columns(2)
         c1.metric("Estado del centro", f"{porcentaje}%")
         c2.metric("Alertas de stock", stock_bajo)
