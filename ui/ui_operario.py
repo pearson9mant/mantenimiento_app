@@ -681,6 +681,560 @@ def mostrar_resumen_ot_operario(fila):
                 st.rerun()
 
 
+
+def _nombre_corto_operario(operario):
+    nombre = str(operario or "").strip()
+
+    normalizado = normalizar_operario_nombre(nombre)
+
+    if normalizado == "j.a. almeda":
+        return "Juan Antonio"
+
+    if normalizado == "luis lozano":
+        return "Luis"
+
+    if normalizado == "abel vasquez":
+        return "Abel"
+
+    if not nombre:
+        return "Operario"
+
+    return nombre.split()[0]
+
+
+def _fecha_orden_atrasada(valor):
+    """
+    Considera atrasada una OT con fecha anterior a hoy.
+    Admite fechas YYYY-MM-DD y otros valores convertibles a texto.
+    """
+    texto = str(valor or "").strip()
+
+    if not texto:
+        return False
+
+    try:
+        fecha_orden = date.fromisoformat(texto[:10])
+    except Exception:
+        return False
+
+    return fecha_orden < date.today()
+
+
+def _datos_resumen_orden(fila):
+    try:
+        return {
+            "id": fila[0],
+            "numero": fila[1],
+            "descripcion": fila[2],
+            "estado": fila[3],
+            "fecha": fila[4],
+            "centro": fila[5],
+            "edificio": fila[6],
+            "espacio": fila[7],
+            "area": fila[8],
+            "prioridad": fila[9],
+            "operario": fila[10],
+            "origen": fila[11] if len(fila) > 11 else "",
+        }
+    except Exception:
+        return None
+
+
+def _prioridad_peso(prioridad):
+    prioridad_txt = normalizar_txt(prioridad)
+
+    pesos = {
+        "urgente": 100,
+        "alta": 40,
+        "media": 15,
+        "normal": 10,
+        "baja": 5,
+    }
+
+    return pesos.get(prioridad_txt, 8)
+
+
+def _resumir_edificios_operario(ordenes_activas):
+    """
+    Agrupa en memoria las OT ya cargadas.
+    No realiza nuevas consultas.
+    """
+    resumen = {}
+
+    for fila in ordenes_activas or []:
+        datos = _datos_resumen_orden(fila)
+
+        if not datos:
+            continue
+
+        edificio = str(
+            datos.get("edificio") or "Sin edificio"
+        ).strip()
+
+        if edificio not in resumen:
+            resumen[edificio] = {
+                "ordenes": [],
+                "total": 0,
+                "urgentes": 0,
+                "altas": 0,
+                "atrasadas": 0,
+                "en_curso": 0,
+                "puntuacion": 0,
+            }
+
+        bloque = resumen[edificio]
+        bloque["ordenes"].append(fila)
+        bloque["total"] += 1
+
+        prioridad = normalizar_txt(
+            datos.get("prioridad")
+        )
+
+        estado = normalizar_txt(
+            datos.get("estado")
+        )
+
+        if prioridad == "urgente":
+            bloque["urgentes"] += 1
+
+        if prioridad == "alta":
+            bloque["altas"] += 1
+
+        if estado in ["en curso", "en proceso"]:
+            bloque["en_curso"] += 1
+
+        atrasada = _fecha_orden_atrasada(
+            datos.get("fecha")
+        )
+
+        if atrasada:
+            bloque["atrasadas"] += 1
+
+        bloque["puntuacion"] += _prioridad_peso(
+            datos.get("prioridad")
+        )
+
+        if atrasada:
+            bloque["puntuacion"] += 20
+
+        if estado in ["en curso", "en proceso"]:
+            bloque["puntuacion"] += 6
+
+    return resumen
+
+
+def _edificio_recomendado(resumen_edificios):
+    if not resumen_edificios:
+        return None
+
+    return max(
+        resumen_edificios,
+        key=lambda edificio: (
+            resumen_edificios[edificio]["urgentes"],
+            resumen_edificios[edificio]["atrasadas"],
+            resumen_edificios[edificio]["puntuacion"],
+            resumen_edificios[edificio]["total"],
+        )
+    )
+
+
+def _texto_recomendacion_edificio(
+    nombre_operario,
+    edificio,
+    datos
+):
+    urgentes = int(datos.get("urgentes", 0) or 0)
+    atrasadas = int(datos.get("atrasadas", 0) or 0)
+    total = int(datos.get("total", 0) or 0)
+
+    if urgentes > 0:
+        return (
+            f"**Hoy empezaría por {edificio}.** "
+            f"Es donde tienes {urgentes} "
+            f"{'urgencia' if urgentes == 1 else 'urgencias'} y puedes "
+            f"aprovechar para resolver {total} "
+            f"{'actuación' if total == 1 else 'actuaciones'} "
+            f"en el mismo edificio."
+        )
+
+    if atrasadas > 0:
+        return (
+            f"**Hoy empezaría por {edificio}.** "
+            f"Es donde tienes más trabajo atrasado "
+            f"({atrasadas} "
+            f"{'actuación' if atrasadas == 1 else 'actuaciones'}) "
+            f"y puedes aprovechar el desplazamiento para atender "
+            f"{total} trabajos."
+        )
+
+    return (
+        f"**Hoy empezaría por {edificio}.** "
+        f"Es el edificio donde concentras más trabajo "
+        f"({total} "
+        f"{'actuación' if total == 1 else 'actuaciones'})."
+    )
+
+
+def _icono_prioridad_operario(prioridad):
+    prioridad_txt = normalizar_txt(prioridad)
+
+    return {
+        "urgente": "🚨",
+        "alta": "🔴",
+        "media": "🟠",
+        "normal": "🟡",
+        "baja": "🟢",
+    }.get(prioridad_txt, "⚪")
+
+
+def _ordenar_ordenes_jornada(ordenes):
+    def clave(fila):
+        datos = _datos_resumen_orden(fila) or {}
+
+        urgente = (
+            1
+            if normalizar_txt(datos.get("prioridad"))
+            == "urgente"
+            else 0
+        )
+
+        atrasada = (
+            1
+            if _fecha_orden_atrasada(datos.get("fecha"))
+            else 0
+        )
+
+        peso = _prioridad_peso(
+            datos.get("prioridad")
+        )
+
+        return (
+            -urgente,
+            -atrasada,
+            -peso,
+            str(datos.get("fecha") or ""),
+        )
+
+    return sorted(
+        ordenes or [],
+        key=clave
+    )
+
+
+def _mostrar_fila_jornada_operario(fila):
+    datos = _datos_resumen_orden(fila)
+
+    if not datos:
+        return
+
+    id_ot = datos["id"]
+    numero = datos["numero"]
+    descripcion = str(
+        datos["descripcion"] or "Sin descripción."
+    ).replace("\n", " ").strip()
+
+    if len(descripcion) > 150:
+        descripcion = (
+            descripcion[:150].rstrip()
+            + "..."
+        )
+
+    espacio = str(
+        datos["espacio"] or "Sin espacio"
+    ).strip()
+
+    prioridad = str(
+        datos["prioridad"] or "-"
+    ).strip()
+
+    area = str(
+        datos["area"] or "-"
+    ).strip()
+
+    estado = str(
+        datos["estado"] or "-"
+    ).strip()
+
+    icono = _icono_prioridad_operario(
+        prioridad
+    )
+
+    atrasada = _fecha_orden_atrasada(
+        datos["fecha"]
+    )
+
+    marca_atrasada = (
+        " · ⏰ Atrasada"
+        if atrasada
+        else ""
+    )
+
+    col_info, col_abrir = st.columns(
+        [18, 2],
+        gap="small",
+        vertical_alignment="center"
+    )
+
+    with col_info:
+        st.markdown(
+            f"{icono} **{espacio}** · "
+            f"`{numero or '-'}` · "
+            f"{prioridad} · {area}"
+            f"{marca_atrasada}  \n"
+            f"{descripcion}"
+        )
+
+        st.caption(
+            f"Estado: {estado}"
+        )
+
+    with col_abrir:
+        if st.button(
+            "▶",
+            key=f"jornada_abrir_ot_{id_ot}",
+            help="Abrir y trabajar esta OT",
+            use_container_width=True
+        ):
+            try:
+                st.session_state[
+                    "operario_ot_abierta_id"
+                ] = int(id_ot)
+            except (TypeError, ValueError):
+                st.error(
+                    "No se ha podido abrir esta orden."
+                )
+            else:
+                st.rerun()
+
+
+def _agrupar_ordenes_por_planta(ordenes):
+    """
+    La tabla de OT no dispone siempre de planta.
+    Se utiliza el espacio como agrupación operativa cuando no existe
+    una planta explícita en la fila.
+    """
+    grupos = {}
+
+    for fila in ordenes or []:
+        datos = _datos_resumen_orden(fila)
+
+        if not datos:
+            continue
+
+        espacio = str(
+            datos.get("espacio") or "Sin ubicación"
+        ).strip()
+
+        # Agrupación estable y compatible con la estructura actual.
+        grupo = "Ubicaciones"
+
+        grupos.setdefault(
+            grupo,
+            []
+        ).append(fila)
+
+    return grupos
+
+
+def pantalla_mi_jornada_operario(
+    operario_sel,
+    ordenes_activas
+):
+    """
+    Entrada inteligente del operario.
+
+    Reutiliza exclusivamente las órdenes activas ya cargadas.
+    No consulta fotos, materiales, histórico, checklists ni controles.
+    """
+    nombre_corto = _nombre_corto_operario(
+        operario_sel
+    )
+
+    st.markdown(
+        f"## 👷 Buenos días, {nombre_corto}"
+    )
+
+    if not ordenes_activas:
+        st.success(
+            "🟢 No tienes órdenes activas. "
+            "Es un buen momento para revisar preventivos "
+            "o apoyar otras tareas del centro."
+        )
+        return
+
+    resumen = _resumir_edificios_operario(
+        ordenes_activas
+    )
+
+    recomendado = _edificio_recomendado(
+        resumen
+    )
+
+    if recomendado is None:
+        st.info(
+            "No se ha podido determinar un edificio recomendado."
+        )
+        return
+
+    datos_recomendado = resumen[
+        recomendado
+    ]
+
+    st.info(
+        _texto_recomendacion_edificio(
+            nombre_operario,
+            recomendado,
+            datos_recomendado
+        )
+    )
+
+    urgentes_totales = sum(
+        datos["urgentes"]
+        for datos in resumen.values()
+    )
+
+    atrasadas_totales = sum(
+        datos["atrasadas"]
+        for datos in resumen.values()
+    )
+
+    c1, c2, c3 = st.columns(
+        3,
+        gap="small"
+    )
+
+    c1.metric(
+        "🚨 Urgentes",
+        urgentes_totales
+    )
+
+    c2.metric(
+        "⏰ Atrasadas",
+        atrasadas_totales
+    )
+
+    c3.metric(
+        "📋 Activas",
+        len(ordenes_activas)
+    )
+
+    edificios_ordenados = sorted(
+        resumen.keys(),
+        key=lambda edificio: (
+            edificio != recomendado,
+            -resumen[edificio]["urgentes"],
+            -resumen[edificio]["atrasadas"],
+            -resumen[edificio]["total"],
+            edificio,
+        )
+    )
+
+    etiquetas = [
+        (
+            f"🏫 {edificio} "
+            f"({resumen[edificio]['total']})"
+        )
+        for edificio in edificios_ordenados
+    ]
+
+    indice_recomendado = edificios_ordenados.index(
+        recomendado
+    )
+
+    etiqueta_edificio = st.radio(
+        "Edificios",
+        options=etiquetas,
+        index=indice_recomendado,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="jornada_edificio_activo"
+    )
+
+    indice_edificio = etiquetas.index(
+        etiqueta_edificio
+    )
+
+    edificio_activo = edificios_ordenados[
+        indice_edificio
+    ]
+
+    datos_edificio = resumen[
+        edificio_activo
+    ]
+
+    urgencias = datos_edificio["urgentes"]
+    atrasadas = datos_edificio["atrasadas"]
+
+    resumen_texto = (
+        f"{datos_edificio['total']} actuaciones"
+    )
+
+    if urgencias:
+        resumen_texto += (
+            f" · {urgencias} urgentes"
+        )
+
+    if atrasadas:
+        resumen_texto += (
+            f" · {atrasadas} atrasadas"
+        )
+
+    st.caption(resumen_texto)
+
+    ordenes_edificio = _ordenar_ordenes_jornada(
+        datos_edificio["ordenes"]
+    )
+
+    # Se mantienen agrupadas en un bloque compacto.
+    # Cuando las OT incorporen planta explícita, esta función
+    # podrá agruparlas por planta sin cambiar el resto del flujo.
+    grupos = _agrupar_ordenes_por_planta(
+        ordenes_edificio
+    )
+
+    for nombre_grupo, ordenes_grupo in grupos.items():
+        with st.expander(
+            f"📍 {nombre_grupo} "
+            f"({len(ordenes_grupo)})",
+            expanded=True
+        ):
+            for fila in ordenes_grupo:
+                _mostrar_fila_jornada_operario(
+                    fila
+                )
+
+
+def pantalla_entrada_operario(
+    operario_sel,
+    ordenes_activas
+):
+    """
+    Permite alternar entre la nueva jornada inteligente
+    y el listado tradicional, que se conserva intacto.
+    """
+    vista = st.radio(
+        "Vista del operario",
+        [
+            "🎯 Mi jornada",
+            "📋 Todas mis órdenes",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="vista_principal_operario"
+    )
+
+    if vista == "🎯 Mi jornada":
+        pantalla_mi_jornada_operario(
+            operario_sel,
+            ordenes_activas
+        )
+        return
+
+    pantalla_listado_ordenes_operario(
+        operario_sel,
+        ordenes_activas
+    )
+
 def pantalla_listado_ordenes_operario(operario_sel, ordenes_activas):
     """Pantalla ligera: filtros, paginación y resúmenes de OT."""
     st.markdown("## 📋 Mis órdenes")
@@ -854,10 +1408,7 @@ def pantalla_operario(modo="ordenes"):
             st.caption(str(e))
             return
 
-        mostrar_cabecera_resumen_operario(
-            operario_sel,
-            ordenes_activas
-        )
+        # La nueva entrada muestra su propia cabecera y resumen.
 
     # =====================================================
     # MODO ÓRDENES
@@ -904,7 +1455,7 @@ def pantalla_operario(modo="ordenes"):
             )
             return
 
-        pantalla_listado_ordenes_operario(
+        pantalla_entrada_operario(
             operario_sel,
             ordenes_activas
         )
