@@ -1348,3 +1348,192 @@ def diagnosticar_corazon_sistema(centro=None, operario=None):
         "carga_edificios": carga_edificios,
         "datos_incompletos": datos_incompletos,
     }
+
+# =====================================================
+# MISIÓN ACTUAL · CORAZÓN 4.0
+# =====================================================
+
+ESTADOS_BLOQUEADOS_CORAZON = {
+    "pendiente material",
+    "pendiente proveedor",
+    "pendiente presupuesto",
+    "avisado",
+}
+
+ESTADOS_EJECUTABLES_CORAZON = {
+    "abierta",
+    "en pausa",
+    "en curso",
+    "en ejecución",
+}
+
+
+def _fila_corazon_a_dict(row):
+    """Convierte una fila pandas en un diccionario limpio y serializable."""
+    if row is None:
+        return None
+
+    datos = row.to_dict() if hasattr(row, "to_dict") else dict(row)
+
+    for clave, valor in list(datos.items()):
+        try:
+            if pd.isna(valor):
+                datos[clave] = None
+        except Exception:
+            pass
+
+    return datos
+
+
+def obtener_ot_en_curso_corazon(operario, centro=None):
+    """Devuelve la única OT en curso del operario, si existe."""
+    operario_txt = str(operario or "").strip()
+
+    if not operario_txt:
+        return None
+
+    params = [operario_txt]
+    filtro_centro = ""
+
+    if centro:
+        filtro_centro = " AND centro = ?"
+        params.append(centro)
+
+    df = leer_df_corazon(f"""
+        SELECT *
+        FROM ordenes_trabajo
+        WHERE operario = ?
+          AND LOWER(TRIM(COALESCE(estado, ''))) = 'en curso'
+          {filtro_centro}
+        ORDER BY id DESC
+        LIMIT 1
+    """, tuple(params))
+
+    if df.empty:
+        return None
+
+    return _fila_corazon_a_dict(df.iloc[0])
+
+
+def obtener_ordenes_bloqueadas_corazon(operario=None, centro=None):
+    """Devuelve las OT que esperan material, proveedor, aviso o presupuesto."""
+    df = obtener_ordenes_abiertas_corazon(centro=centro, operario=operario)
+
+    if df.empty or "estado" not in df.columns:
+        return []
+
+    estados = df["estado"].fillna("").astype(str).str.strip().str.lower()
+    bloqueadas = df[estados.isin(ESTADOS_BLOQUEADOS_CORAZON)].copy()
+
+    return [
+        _fila_corazon_a_dict(fila)
+        for _, fila in bloqueadas.iterrows()
+    ]
+
+
+def obtener_mision_actual(operario, centro=None):
+    """
+    Responde a la pregunta principal del Corazón:
+    ¿qué debe hacer ahora este operario?
+
+    1. Si ya tiene una OT En curso, la mantiene.
+    2. Si no, descarta bloqueadas y selecciona la mejor OT ejecutable.
+    3. No cambia estados por sí sola; la pantalla confirma con Empezar.
+    """
+    operario_txt = str(operario or "").strip()
+
+    if not operario_txt:
+        return {
+            "estado_corazon": "sin_operario",
+            "mision": None,
+            "mensaje": "No hay operario seleccionado.",
+            "bloqueadas": 0,
+        }
+
+    en_curso = obtener_ot_en_curso_corazon(
+        operario=operario_txt,
+        centro=centro,
+    )
+
+    if en_curso:
+        return {
+            "estado_corazon": "continuar",
+            "mision": en_curso,
+            "mensaje": "Continúa con la OT que ya está en curso.",
+            "bloqueadas": len(
+                obtener_ordenes_bloqueadas_corazon(
+                    operario=operario_txt,
+                    centro=centro,
+                )
+            ),
+        }
+
+    df = obtener_ordenes_abiertas_corazon(
+        centro=centro,
+        operario=operario_txt,
+    )
+
+    if df.empty:
+        return {
+            "estado_corazon": "sin_mision",
+            "mision": None,
+            "mensaje": "No hay órdenes activas para este operario.",
+            "bloqueadas": 0,
+        }
+
+    estados = df["estado"].fillna("").astype(str).str.strip().str.lower()
+    bloqueadas = int(estados.isin(ESTADOS_BLOQUEADOS_CORAZON).sum())
+    ejecutables = df[estados.isin(ESTADOS_EJECUTABLES_CORAZON)].copy()
+
+    if ejecutables.empty:
+        return {
+            "estado_corazon": "todo_bloqueado",
+            "mision": None,
+            "mensaje": "Todas las órdenes activas están bloqueadas o esperando.",
+            "bloqueadas": bloqueadas,
+        }
+
+    prioridades = construir_prioridades_globales(
+        centro=centro,
+        operario=operario_txt,
+        limite=1,
+        df_ordenes_abiertas=ejecutables,
+    )
+
+    if not prioridades:
+        return {
+            "estado_corazon": "sin_mision",
+            "mision": None,
+            "mensaje": "El Corazón no ha encontrado una misión ejecutable.",
+            "bloqueadas": bloqueadas,
+        }
+
+    prioridad = prioridades[0]
+    numero_ot = str(prioridad.get("numero_ot") or "").strip()
+    fila_mision = ejecutables[
+        ejecutables["numero_ot"].fillna("").astype(str).str.strip() == numero_ot
+    ]
+
+    mision = (
+        _fila_corazon_a_dict(fila_mision.iloc[0])
+        if not fila_mision.empty
+        else dict(prioridad)
+    )
+
+    mision["score_corazon"] = prioridad.get("score")
+    mision["motivos_corazon"] = prioridad.get("motivos", [])
+    mision["recurrencia_corazon"] = prioridad.get("recurrencia")
+    mision["planta_resuelta_corazon"] = prioridad.get("planta")
+
+    return {
+        "estado_corazon": "propuesta",
+        "mision": mision,
+        "mensaje": "Esta es la siguiente misión recomendada por el Corazón.",
+        "bloqueadas": bloqueadas,
+    }
+
+
+def latido_corazon(operario, centro=None):
+    """Alias estable para que las pantallas consulten el Corazón."""
+    return obtener_mision_actual(operario=operario, centro=centro)
+
