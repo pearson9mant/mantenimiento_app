@@ -14,6 +14,8 @@ from modules.ordenes import (
     crear_correctiva_desde_ot
 )
 
+from modules.corazon import latido_corazon
+
 from modules.inventario import (
     obtener_material_por_codigo,
     registrar_movimiento_inventario
@@ -545,7 +547,12 @@ def cargar_ordenes_activas_operario(operario_sel):
         in [
             "Abierta",
             "En curso",
-            "Pendiente material"
+            "En pausa",
+            "En ejecución",
+            "Pendiente material",
+            "Pendiente proveedor",
+            "Pendiente presupuesto",
+            "Avisado",
         ]
     ]
 
@@ -628,7 +635,12 @@ def mostrar_resumen_ot_operario(fila):
     icono_estado = {
         "Abierta": "🔴",
         "En curso": "🟠",
+        "En pausa": "⏸️",
+        "En ejecución": "🟠",
         "Pendiente material": "📦",
+        "Pendiente proveedor": "🏢",
+        "Pendiente presupuesto": "💶",
+        "Avisado": "📨",
     }.get(estado_txt, "⚪")
 
     icono_prioridad = {
@@ -1036,6 +1048,211 @@ def _agrupar_ordenes_por_planta(ordenes):
     return grupos
 
 
+
+def _buscar_fila_mision_en_ordenes(ordenes_activas, mision):
+    """Relaciona la misión del Corazón con la fila ligera ya cargada."""
+    if not mision:
+        return None
+
+    id_mision = mision.get("id")
+    numero_mision = str(mision.get("numero_ot") or "").strip()
+
+    for fila in ordenes_activas or []:
+        try:
+            if id_mision is not None and int(fila[0]) == int(id_mision):
+                return fila
+        except (TypeError, ValueError, IndexError):
+            pass
+
+        try:
+            if numero_mision and str(fila[1] or "").strip() == numero_mision:
+                return fila
+        except (TypeError, IndexError):
+            pass
+
+    return None
+
+
+def _abrir_ot_desde_corazon(id_ot):
+    try:
+        st.session_state["operario_ot_abierta_id"] = int(id_ot)
+    except (TypeError, ValueError):
+        st.error("No se ha podido abrir la misión seleccionada.")
+        return False
+
+    st.rerun()
+    return True
+
+
+def _urgencia_nueva_mientras_trabaja(ordenes_activas, id_actual):
+    """Detecta una urgencia abierta distinta de la misión en curso."""
+    candidatas = []
+
+    for fila in ordenes_activas or []:
+        datos = _datos_resumen_orden(fila)
+        if not datos:
+            continue
+
+        try:
+            misma = int(datos.get("id")) == int(id_actual)
+        except (TypeError, ValueError):
+            misma = False
+
+        if misma:
+            continue
+
+        if normalizar_txt(datos.get("estado")) not in ["abierta", "en pausa"]:
+            continue
+
+        if normalizar_txt(datos.get("prioridad")) != "urgente":
+            continue
+
+        candidatas.append(fila)
+
+    if not candidatas:
+        return None
+
+    return _ordenar_ordenes_jornada(candidatas)[0]
+
+
+def mostrar_mision_corazon_operario(operario_sel, ordenes_activas):
+    """Muestra una única misión accionable antes de la ruta de jornada."""
+    try:
+        latido = latido_corazon(operario=operario_sel)
+    except Exception as e:
+        st.warning("El Corazón no ha podido calcular la misión actual.")
+        st.caption(str(e))
+        return
+
+    estado_corazon = str(latido.get("estado_corazon") or "").strip()
+    mision = latido.get("mision") or {}
+    bloqueadas = int(latido.get("bloqueadas", 0) or 0)
+
+    st.markdown("### ❤️ Misión actual")
+
+    if not mision:
+        if estado_corazon == "todo_bloqueado":
+            st.info(
+                f"Tienes {bloqueadas} órdenes activas esperando material, "
+                "proveedor, aviso o presupuesto."
+            )
+        else:
+            st.success(latido.get("mensaje") or "No hay una misión pendiente.")
+        return
+
+    fila_mision = _buscar_fila_mision_en_ordenes(ordenes_activas, mision)
+    id_ot = mision.get("id")
+    numero = str(mision.get("numero_ot") or "-").strip()
+    descripcion = str(mision.get("descripcion") or "Sin descripción.").strip()
+    centro = str(mision.get("centro") or "-").strip()
+    edificio = str(mision.get("edificio") or "-").strip()
+    planta = str(
+        mision.get("planta_resuelta_corazon")
+        or mision.get("planta")
+        or "Sin planta"
+    ).strip()
+    espacio = str(mision.get("espacio") or "-").strip()
+    prioridad = str(mision.get("prioridad") or "-").strip()
+    area = str(mision.get("area") or "-").strip()
+    score = mision.get("score_corazon")
+    motivos = mision.get("motivos_corazon") or []
+
+    icono = _icono_prioridad_operario(prioridad)
+    trabajando = estado_corazon == "continuar"
+
+    with st.container(border=True):
+        titulo = "❤️ TRABAJANDO" if trabajando else "🎯 SIGUIENTE MISIÓN"
+        st.markdown(f"#### {titulo}")
+        st.markdown(f"### {icono} {numero}")
+        st.markdown(descripcion)
+        st.caption(
+            f"🏢 {centro} · {edificio} · {planta} · {espacio}  |  "
+            f"{prioridad} · {area}"
+        )
+
+        if score is not None and not trabajando:
+            st.caption(f"Prioridad calculada por el Corazón: {score}/100")
+
+        if motivos:
+            with st.expander("Por qué recomienda esta misión", expanded=False):
+                for motivo in motivos[:5]:
+                    st.markdown(f"• {motivo}")
+
+        if bloqueadas:
+            st.caption(f"📦 {bloqueadas} órdenes quedan fuera de la ruta por estar bloqueadas.")
+
+        if trabajando:
+            urgencia = _urgencia_nueva_mientras_trabaja(
+                ordenes_activas,
+                id_actual=id_ot,
+            )
+
+            if urgencia is not None:
+                datos_urgencia = _datos_resumen_orden(urgencia) or {}
+                st.warning(
+                    "🚨 Ha entrado otra OT urgente. Puedes atenderla ahora; "
+                    "la misión actual pasará automáticamente a En pausa."
+                )
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button(
+                        "🚨 Atender urgencia",
+                        key=f"corazon_atender_urgencia_{datos_urgencia.get('id')}",
+                        use_container_width=True,
+                    ):
+                        resultado = actualizar_estado(
+                            datos_urgencia.get("id"),
+                            "En curso",
+                        )
+                        if isinstance(resultado, dict) and not resultado.get("ok", False):
+                            st.error("No se ha podido iniciar la urgencia.")
+                        else:
+                            _abrir_ot_desde_corazon(datos_urgencia.get("id"))
+
+                with c2:
+                    if st.button(
+                        "▶ Continuar la actual",
+                        key=f"corazon_continuar_actual_{id_ot}",
+                        use_container_width=True,
+                    ):
+                        _abrir_ot_desde_corazon(id_ot)
+            else:
+                if st.button(
+                    "▶ Continuar misión",
+                    key=f"corazon_continuar_{id_ot}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    _abrir_ot_desde_corazon(id_ot)
+
+        else:
+            c1, c2 = st.columns([2, 1])
+
+            with c1:
+                if st.button(
+                    "▶ Empezar misión",
+                    key=f"corazon_empezar_{id_ot}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    resultado = actualizar_estado(id_ot, "En curso")
+
+                    if isinstance(resultado, dict) and not resultado.get("ok", False):
+                        st.error("No se ha podido iniciar la misión.")
+                    else:
+                        _abrir_ot_desde_corazon(id_ot)
+
+            with c2:
+                if st.button(
+                    "🔎 Solo abrir",
+                    key=f"corazon_abrir_{id_ot}",
+                    use_container_width=True,
+                ):
+                    _abrir_ot_desde_corazon(id_ot)
+
+    st.markdown("---")
+
+
 def pantalla_mi_jornada_operario(
     operario_sel,
     ordenes_activas
@@ -1052,6 +1269,11 @@ def pantalla_mi_jornada_operario(
 
     st.markdown(
         f"## 👷 Buenos días, {nombre_corto}"
+    )
+
+    mostrar_mision_corazon_operario(
+        operario_sel,
+        ordenes_activas,
     )
 
     if not ordenes_activas:
