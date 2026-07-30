@@ -46,6 +46,7 @@ from ui.ui_operario import (
     pantalla_operario,
     pantalla_operario_prueba,
 )
+from ui.ui_colegio_vivo_operario import pantalla_colegio_vivo_operario
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
