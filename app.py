@@ -992,7 +992,7 @@ if perfil == "admin":
         pantalla_placas_qr()
 
     elif seccion == "Corazón sistema":
-        mostrar_corazon_sistema()
+        st.info("🚧 Corazón en desarrollo")
 
     
         
