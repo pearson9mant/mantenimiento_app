@@ -684,7 +684,7 @@ def mostrar_menu_operario():
         and not st.session_state.get("inicio_operario_mostrado", False)
     ):
         st.session_state["inicio_operario_mostrado"] = True
-        st.session_state["seccion_actual"] = "Prioridades"
+        st.session_state["seccion_actual"] = "Colegio Vivo"
         st.rerun()
 
     # ===========================
