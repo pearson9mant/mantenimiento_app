@@ -1037,8 +1037,8 @@ else:
     # -----------------------------------------------------
     # PERFIL OPERARIO
     # -----------------------------------------------------
-    if seccion == "Prioridades":
-        mostrar_corazon_sistema()
+    if seccion == "Colegio Vivo":
+        pantalla_colegio_vivo_operario()
 
     elif seccion == "Órdenes":
         pantalla_operario()
