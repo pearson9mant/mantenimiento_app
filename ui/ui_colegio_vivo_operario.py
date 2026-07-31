@@ -40,7 +40,10 @@ def _todas_las_ordenes(colegio):
             for planta_datos in edificio_datos.get("plantas", []):
                 nombre_planta = planta_datos.get("nombre", "")
 
-                for ot in planta_datos.get("ordenes", []):
+                for ot in planta_datos.get(
+                    "ordenes_ejecutables",
+                    planta_datos.get("ordenes", []),
+                ):
                     fila = dict(ot)
 
                     fila["_centro_vivo"] = nombre_centro
