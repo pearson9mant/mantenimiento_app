@@ -6,18 +6,32 @@ from modules.ordenes import obtener_ordenes_operario
 
 
 # =========================================================
-# ESTADOS QUE EL OPERARIO PUEDE EJECUTAR
+# ESTADOS
 # =========================================================
 
-ESTADOS_EJECUTABLES = {
-    "abierta",
+ESTADOS_CERRADOS = {
+    "finalizada",
+    "finalizado",
+    "cerrada",
+    "cerrado",
+    "cancelada",
+    "cancelado",
+}
+
+ESTADOS_BLOQUEADOS = {
+    "pendiente material",
+    "esperando material",
+    "pendiente proveedor",
+    "pendiente presupuesto",
+}
+
+ESTADOS_EN_CURSO = {
     "en curso",
     "en ejecucion",
-    "avisado",
 }
 
 
-# Deben coincidir exactamente con el SELECT de
+# Debe coincidir exactamente con el SELECT de
 # obtener_ordenes_operario().
 COLUMNAS_ORDEN_OPERARIO = [
     "id",
@@ -50,7 +64,51 @@ COLUMNAS_ORDEN_OPERARIO = [
 
 
 # =========================================================
-# NORMALIZACIÓN
+# ESTRUCTURA REAL DEL COLEGIO
+# =========================================================
+
+EDIFICIOS = {
+    "Pearson 22": {
+        "Infantil / Primaria": [
+            "Terrado",
+            "Planta 5",
+            "Planta 4",
+            "Planta 3",
+            "Planta 2",
+            "Planta 1",
+        ],
+        "Llar": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+    },
+    "Pearson 9": {
+        "Edificio A": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+        "Edificio B": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+        "Edificio C": [
+            "Terrado",
+            "Planta 2",
+            "Planta 1",
+            "Planta 0",
+        ],
+    },
+}
+
+
+# =========================================================
+# NORMALIZACIÓN GENERAL
 # =========================================================
 
 def _normalizar_texto(valor):
@@ -62,7 +120,18 @@ def _normalizar_texto(valor):
         if unicodedata.category(caracter) != "Mn"
     )
 
-    for caracter in ["/", "\\", "-", "_", ".", ",", ";", ":"]:
+    for caracter in [
+        "/",
+        "\\",
+        "-",
+        "_",
+        ".",
+        ",",
+        ";",
+        ":",
+        "º",
+        "ª",
+    ]:
         texto = texto.replace(caracter, " ")
 
     return " ".join(texto.split())
@@ -72,8 +141,8 @@ def _convertir_ot_diccionario(ot):
     """
     obtener_ordenes_operario() devuelve tuplas.
 
-    Este módulo las convierte internamente a diccionario sin
-    modificar la función original ni afectar otras pantallas.
+    Aquí se convierten internamente a diccionario sin modificar
+    modules/ordenes.py ni afectar las pantallas que ya funcionan.
     """
     if isinstance(ot, dict):
         return dict(ot)
@@ -98,47 +167,67 @@ def _normalizar_prioridad(valor):
 
 
 # =========================================================
-# CENTROS Y EDIFICIOS
+# CENTRO
 # =========================================================
 
 def _normalizar_centro(valor):
     texto = _normalizar_texto(valor)
 
-    if (
-        texto in {
-            "pearson 22",
-            "pearson22",
-            "p22",
-            "pearson numero 22",
-        }
-        or "pearson 22" in texto
-    ):
+    alias_p22 = {
+        "pearson 22",
+        "pearson22",
+        "p22",
+        "pearson numero 22",
+    }
+
+    alias_p9 = {
+        "pearson 9",
+        "pearson9",
+        "p9",
+        "pearson numero 9",
+    }
+
+    if texto in alias_p22 or "pearson 22" in texto:
         return "Pearson 22"
 
-    if (
-        texto in {
-            "pearson 9",
-            "pearson9",
-            "p9",
-            "pearson numero 9",
-        }
-        or "pearson 9" in texto
-    ):
+    if texto in alias_p9 or "pearson 9" in texto:
         return "Pearson 9"
 
     return str(valor or "Centro").strip()
+
+
+# =========================================================
+# EDIFICIO
+# =========================================================
+
+def _texto_ubicacion_ot(ot):
+    campos = [
+        "centro",
+        "edificio",
+        "planta",
+        "espacio",
+        "descripcion",
+        "solicitante",
+        "observaciones_estado",
+    ]
+
+    return " ".join(
+        str(ot.get(campo) or "")
+        for campo in campos
+    )
 
 
 def _normalizar_edificio(valor, centro, ot=None):
     texto = _normalizar_texto(valor)
 
     if ot:
-        texto_apoyo = " ".join(
-            [
-                texto,
-                _normalizar_texto(ot.get("espacio")),
-                _normalizar_texto(ot.get("descripcion")),
-            ]
+        texto_apoyo = _normalizar_texto(
+            " ".join(
+                [
+                    texto,
+                    _texto_ubicacion_ot(ot),
+                ]
+            )
         )
     else:
         texto_apoyo = texto
@@ -160,13 +249,10 @@ def _normalizar_edificio(valor, centro, ot=None):
         alias in texto_apoyo
         for alias in [
             "infantil primaria",
-            "infantil",
-            "primaria",
             "edificio infantil",
             "edificio primaria",
             "edif infantil",
             "edif primaria",
-            "principal",
         ]
     ):
         return "Infantil / Primaria"
@@ -209,6 +295,16 @@ def _normalizar_edificio(valor, centro, ot=None):
 
     # Compatibilidad con órdenes antiguas.
     if centro == "Pearson 22":
+        if any(
+            palabra in texto_apoyo
+            for palabra in [
+                "llar",
+                "guarderia",
+                "anexo",
+            ]
+        ):
+            return "Llar"
+
         return "Infantil / Primaria"
 
     if centro == "Pearson 9":
@@ -218,7 +314,7 @@ def _normalizar_edificio(valor, centro, ot=None):
 
 
 # =========================================================
-# DETECCIÓN DE PLANTA
+# PLANTA
 # =========================================================
 
 def _normalizar_planta(valor):
@@ -255,14 +351,12 @@ def _normalizar_planta(valor):
         "quinto": 5,
     }
 
-    # Casos claros:
-    # Planta 4, P4, P 4, Piso 4, Nivel 4.
     patrones = [
         r"\bplanta\s*([0-9])\b",
         r"\bpiso\s*([0-9])\b",
         r"\bnivel\s*([0-9])\b",
         r"\bp\s*([0-9])\b",
-        r"\b([0-9])\s*(?:a|ª|o|º)\s*planta\b",
+        r"\b([0-9])\s*planta\b",
     ]
 
     for patron in patrones:
@@ -275,6 +369,13 @@ def _normalizar_planta(valor):
         if coincidencia:
             return f"Planta {int(coincidencia.group(1))}"
 
+    # Si el contenido completo es solamente un número.
+    if texto.isdigit():
+        numero = int(texto)
+
+        if 0 <= numero <= 9:
+            return f"Planta {numero}"
+
     palabras = texto.split()
 
     for palabra, numero in equivalencias.items():
@@ -286,21 +387,16 @@ def _normalizar_planta(valor):
 
 def _obtener_planta(ot):
     """
-    Intenta encontrar la planta sin inventarla.
+    Busca la planta en todos los campos disponibles.
 
-    Orden de confianza:
-    1. Campo planta, si existiera en algún resultado futuro.
-    2. Campo edificio.
-    3. Campo espacio.
-    4. Descripción.
-    5. Observaciones de estado.
+    No depende únicamente de espacio.
     """
-
     candidatos = [
         ot.get("planta"),
         ot.get("edificio"),
         ot.get("espacio"),
         ot.get("descripcion"),
+        ot.get("solicitante"),
         ot.get("observaciones_estado"),
     ]
 
@@ -310,7 +406,35 @@ def _obtener_planta(ot):
         if planta:
             return planta
 
+    return ""
+
+
+def _planta_respaldo(centro, edificio):
+    """
+    Las órdenes antiguas sin planta no desaparecen.
+
+    Se muestran provisionalmente en una planta de respaldo,
+    siguiendo el criterio usado en el mapa de Gerencia.
+    """
+    if centro == "Pearson 22":
+        if edificio == "Llar":
+            return "Planta 0"
+
+        return "Planta 1"
+
+    if centro == "Pearson 9":
+        return "Planta 0"
+
     return "Sin planta"
+
+
+def _obtener_planta_con_respaldo(ot, centro, edificio):
+    planta = _obtener_planta(ot)
+
+    if planta:
+        return planta, False
+
+    return _planta_respaldo(centro, edificio), True
 
 
 def _orden_planta(nombre):
@@ -328,24 +452,90 @@ def _orden_planta(nombre):
 
 
 # =========================================================
-# ESTADO VISUAL
+# IDENTIFICACIÓN Y DUPLICADOS
 # =========================================================
 
-def color_planta(total, urgentes, altas):
+def _clave_ot(ot):
+    numero_ot = str(
+        ot.get("numero_ot") or ""
+    ).strip()
+
+    if numero_ot:
+        return f"ot::{numero_ot}"
+
+    identificador = str(
+        ot.get("id") or ""
+    ).strip()
+
+    if identificador:
+        return f"id::{identificador}"
+
+    return "fila::" + "||".join(
+        str(ot.get(campo) or "").strip()
+        for campo in [
+            "fecha_creacion",
+            "centro",
+            "edificio",
+            "espacio",
+            "descripcion",
+        ]
+    )
+
+
+def _eliminar_duplicados(ordenes):
+    resultado = []
+    claves = set()
+
+    for ot in ordenes:
+        clave = _clave_ot(ot)
+
+        if clave in claves:
+            continue
+
+        claves.add(clave)
+        resultado.append(ot)
+
+    return resultado
+
+
+# =========================================================
+# CLASIFICACIÓN
+# =========================================================
+
+def _es_cerrada(estado):
+    return estado in ESTADOS_CERRADOS
+
+
+def _es_bloqueada(estado):
+    return estado in ESTADOS_BLOQUEADOS
+
+
+def _es_ejecutable(estado):
+    return (
+        not _es_cerrada(estado)
+        and not _es_bloqueada(estado)
+    )
+
+
+def _es_en_curso(estado):
+    return estado in ESTADOS_EN_CURSO
+
+
+def color_planta(total_ejecutables, urgentes, altas):
     if urgentes > 0:
         return "🔴"
 
     if altas > 0:
         return "🟠"
 
-    if total > 0:
+    if total_ejecutables > 0:
         return "🟡"
 
     return "🟢"
 
 
 # =========================================================
-# FUNCIÓN PÚBLICA
+# CONSTRUCCIÓN DEL COLEGIO VIVO
 # =========================================================
 
 def obtener_colegio_vivo(operario):
@@ -367,7 +557,8 @@ def obtener_colegio_vivo(operario):
             ot.get("estado")
         )
 
-        if estado not in ESTADOS_EJECUTABLES:
+        # Solo se excluyen las realmente cerradas.
+        if _es_cerrada(estado):
             continue
 
         centro = _normalizar_centro(
@@ -380,13 +571,26 @@ def obtener_colegio_vivo(operario):
             ot,
         )
 
-        planta = _obtener_planta(ot)
+        planta, sin_ubicar = _obtener_planta_con_respaldo(
+            ot,
+            centro,
+            edificio,
+        )
 
-        # Guardamos también los valores normalizados en la OT.
-        # Así la misión y el edificio usan la misma ubicación.
+        bloqueada = _es_bloqueada(estado)
+        ejecutable = _es_ejecutable(estado)
+        en_curso = _es_en_curso(estado)
+
+        # Información normalizada para la interfaz.
+        ot["_estado_normalizado"] = estado
         ot["_centro_normalizado"] = centro
         ot["_edificio_normalizado"] = edificio
         ot["_planta_normalizada"] = planta
+
+        ot["_sin_ubicar"] = sin_ubicar
+        ot["_bloqueada"] = bloqueada
+        ot["_ejecutable"] = ejecutable
+        ot["_en_curso"] = en_curso
 
         colegio[centro][edificio][planta].append(ot)
 
@@ -411,9 +615,35 @@ def obtener_colegio_vivo(operario):
             )
 
             for planta, ordenes in plantas_ordenadas:
+                ordenes = _eliminar_duplicados(ordenes)
+
+                ordenes_ejecutables = [
+                    ot
+                    for ot in ordenes
+                    if ot.get("_ejecutable", False)
+                ]
+
+                ordenes_bloqueadas = [
+                    ot
+                    for ot in ordenes
+                    if ot.get("_bloqueada", False)
+                ]
+
+                ordenes_en_curso = [
+                    ot
+                    for ot in ordenes
+                    if ot.get("_en_curso", False)
+                ]
+
+                ordenes_sin_ubicar = [
+                    ot
+                    for ot in ordenes
+                    if ot.get("_sin_ubicar", False)
+                ]
+
                 urgentes = sum(
                     1
-                    for ot in ordenes
+                    for ot in ordenes_ejecutables
                     if _normalizar_prioridad(
                         ot.get("prioridad")
                     ) == "urgente"
@@ -421,26 +651,49 @@ def obtener_colegio_vivo(operario):
 
                 altas = sum(
                     1
-                    for ot in ordenes
+                    for ot in ordenes_ejecutables
                     if _normalizar_prioridad(
                         ot.get("prioridad")
                     ) == "alta"
                 )
 
                 total = len(ordenes)
+                total_ejecutables = len(ordenes_ejecutables)
+                total_bloqueadas = len(ordenes_bloqueadas)
+                total_en_curso = len(ordenes_en_curso)
+                total_sin_ubicar = len(ordenes_sin_ubicar)
 
                 bloque_edificio["plantas"].append(
                     {
                         "nombre": planta,
+
+                        # Todas las órdenes activas.
                         "total": total,
+
+                        # Trabajo disponible.
+                        "ejecutables": total_ejecutables,
+
+                        # Estados especiales.
+                        "bloqueadas": total_bloqueadas,
+                        "en_curso": total_en_curso,
+                        "sin_ubicar": total_sin_ubicar,
+
+                        # Prioridad del trabajo ejecutable.
                         "urgentes": urgentes,
                         "altas": altas,
+
                         "color": color_planta(
-                            total,
+                            total_ejecutables,
                             urgentes,
                             altas,
                         ),
+
+                        # Listas completas.
                         "ordenes": ordenes,
+                        "ordenes_ejecutables": ordenes_ejecutables,
+                        "ordenes_bloqueadas": ordenes_bloqueadas,
+                        "ordenes_en_curso": ordenes_en_curso,
+                        "ordenes_sin_ubicar": ordenes_sin_ubicar,
                     }
                 )
 
