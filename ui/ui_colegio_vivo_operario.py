@@ -32,18 +32,32 @@ def _todas_las_ordenes(colegio):
     ordenes = []
 
     for centro_datos in colegio:
-        nombre_centro = centro_datos.get("centro", "")
+        nombre_centro = centro_datos.get(
+            "centro",
+            "",
+        )
 
-        for edificio_datos in centro_datos.get("edificios", []):
-            nombre_edificio = edificio_datos.get("nombre", "")
+        for edificio_datos in centro_datos.get(
+            "edificios",
+            [],
+        ):
+            nombre_edificio = edificio_datos.get(
+                "nombre",
+                "",
+            )
 
-            for planta_datos in edificio_datos.get("plantas", []):
-                nombre_planta = planta_datos.get("nombre", "")
+            for planta_datos in edificio_datos.get(
+                "plantas",
+                [],
+            ):
+                nombre_planta = planta_datos.get(
+                    "nombre",
+                    "",
+                )
 
-                # La misión solo usa órdenes ejecutables.
                 ordenes_planta = planta_datos.get(
                     "ordenes_ejecutables",
-                    planta_datos.get("ordenes", []),
+                    [],
                 )
 
                 for ot in ordenes_planta:
@@ -71,7 +85,6 @@ def _ordenar_misiones(ordenes):
         fecha = str(
             ot.get("fecha_creacion")
             or ot.get("fecha")
-            or ot.get("fecha_alta")
             or ""
         ).strip()
 
@@ -95,12 +108,14 @@ def _texto_averia(ot):
         ot.get("descripcion")
         or ot.get("titulo")
         or ot.get("incidencia")
-        or ot.get("trabajo")
         or "Orden de trabajo"
     ).strip()
 
 
-def _centro_del_operario(operario, colegio):
+def _centro_del_operario(
+    operario,
+    colegio,
+):
     centro_configurado = MAPA_OPERARIO_CENTRO.get(
         operario
     )
@@ -116,7 +131,10 @@ def _centro_del_operario(operario, colegio):
     return ""
 
 
-def _planta_respaldo(centro, edificio):
+def _planta_respaldo(
+    centro,
+    edificio,
+):
     if centro == "Pearson 22":
         if edificio == "Llar":
             return "Planta 0"
@@ -185,39 +203,18 @@ def _crear_resumen_edificios(colegio):
 
                 destino = resumen[clave]
 
-                destino["total"] += int(
-                    planta_datos.get("total") or 0
-                )
-
-                destino["ejecutables"] += int(
-                    planta_datos.get("ejecutables")
-                    or 0
-                )
-
-                destino["bloqueadas"] += int(
-                    planta_datos.get("bloqueadas")
-                    or 0
-                )
-
-                destino["en_curso"] += int(
-                    planta_datos.get("en_curso")
-                    or 0
-                )
-
-                destino["sin_ubicar"] += int(
-                    planta_datos.get("sin_ubicar")
-                    or 0
-                )
-
-                destino["urgentes"] += int(
-                    planta_datos.get("urgentes")
-                    or 0
-                )
-
-                destino["altas"] += int(
-                    planta_datos.get("altas")
-                    or 0
-                )
+                for campo in [
+                    "total",
+                    "ejecutables",
+                    "bloqueadas",
+                    "en_curso",
+                    "sin_ubicar",
+                    "urgentes",
+                    "altas",
+                ]:
+                    destino[campo] += int(
+                        planta_datos.get(campo) or 0
+                    )
 
                 destino["ordenes"].extend(
                     planta_datos.get(
@@ -226,18 +223,14 @@ def _crear_resumen_edificios(colegio):
                     )
                 )
 
-                destino[
-                    "ordenes_ejecutables"
-                ].extend(
+                destino["ordenes_ejecutables"].extend(
                     planta_datos.get(
                         "ordenes_ejecutables",
                         [],
                     )
                 )
 
-                destino[
-                    "ordenes_bloqueadas"
-                ].extend(
+                destino["ordenes_bloqueadas"].extend(
                     planta_datos.get(
                         "ordenes_bloqueadas",
                         [],
@@ -324,8 +317,6 @@ def _css_pantalla_operario():
         }
 
         .cv-mission{
-            display:grid;
-            grid-template-columns:1fr;
             background:linear-gradient(
                 135deg,
                 #0f2747,
@@ -333,36 +324,39 @@ def _css_pantalla_operario():
             );
             color:#fff;
             border-radius:11px;
-            padding:7px 10px;
-            margin:0 0 3px;
-            box-shadow:0 4px 12px rgba(15,39,71,.16);
+            padding:9px 11px;
+            margin:0 auto 3px;
+            width:min(100%,900px);
+            box-shadow:
+                0 4px 12px rgba(15,39,71,.16);
         }
 
         .cv-mission-top{
-            font-size:10px;
+            font-size:11px;
             line-height:1;
             font-weight:950;
-            margin-bottom:2px;
+            margin-bottom:3px;
         }
 
         .cv-mission-place{
-            font-size:12px;
-            line-height:1.1;
+            font-size:13px;
+            line-height:1.15;
             font-weight:950;
         }
 
         .cv-mission-description{
-            margin-top:2px;
+            margin-top:3px;
             overflow:hidden;
-            color:rgba(255,255,255,.93);
+            color:rgba(255,255,255,.94);
             font-size:10px;
-            line-height:1.1;
+            line-height:1.25;
             white-space:nowrap;
             text-overflow:ellipsis;
         }
 
         .cv-school-title{
-            margin:4px 0 0 1px;
+            width:min(100%,760px);
+            margin:5px auto 1px;
             color:#0f2747;
             font-size:13px;
             line-height:1;
@@ -370,7 +364,8 @@ def _css_pantalla_operario():
         }
 
         .cv-no-work{
-            margin-bottom:3px;
+            width:min(100%,900px);
+            margin:0 auto 3px;
             padding:7px 9px;
             border:1px solid #bbf7d0;
             border-radius:10px;
@@ -382,9 +377,11 @@ def _css_pantalla_operario():
 
         div[data-testid="stButton"]
         button[kind="primary"]{
+            display:block !important;
+            width:min(100%,900px) !important;
             min-height:31px !important;
             height:31px !important;
-            margin:0 !important;
+            margin:0 auto !important;
             padding:1px 8px !important;
             border-radius:8px !important;
             font-size:10px !important;
@@ -401,12 +398,13 @@ def _css_pantalla_operario():
 
         @media(max-width:760px){
             .block-container{
-                padding-left:.16rem !important;
-                padding-right:.16rem !important;
+                padding-left:.14rem !important;
+                padding-right:.14rem !important;
             }
 
             .cv-mission{
-                padding:6px 8px;
+                width:100%;
+                padding:7px 8px;
                 border-radius:9px;
             }
 
@@ -423,11 +421,13 @@ def _css_pantalla_operario():
             }
 
             .cv-school-title{
+                width:100%;
                 font-size:11px;
             }
 
             div[data-testid="stButton"]
             button[kind="primary"]{
+                width:100% !important;
                 min-height:29px !important;
                 height:29px !important;
                 font-size:9px !important;
@@ -466,7 +466,7 @@ def pantalla_colegio_vivo_operario():
     )
 
     # =====================================================
-    # MISIÓN
+    # MI MISIÓN
     # =====================================================
     if ordenes:
         mision = ordenes[0]
@@ -484,8 +484,6 @@ def pantalla_colegio_vivo_operario():
             mision
         )
 
-        # Sin sangrías internas para que Streamlit
-        # no lo interprete como código.
         html_mision = (
             '<div class="cv-mission">'
             f'<div class="cv-mission-top">'
@@ -500,7 +498,7 @@ def pantalla_colegio_vivo_operario():
             f'<div class="cv-mission-description">'
             f'{html.escape(descripcion)}'
             f'</div>'
-            f'</div>'
+            '</div>'
         )
 
         st.markdown(
@@ -523,9 +521,7 @@ def pantalla_colegio_vivo_operario():
             type="primary",
             use_container_width=True,
         ):
-            _guardar_ot_recomendada(
-                mision
-            )
+            _guardar_ot_recomendada(mision)
             st.rerun()
 
     else:
