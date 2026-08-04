@@ -242,8 +242,32 @@ def _crear_resumen_edificios(colegio):
 
 
 def _guardar_ot_recomendada(ot):
-    st.session_state["colegio_vivo_ot"] = ot
-    st.session_state["colegio_vivo_ot_id"] = ot.get("id")
+    """
+    Abre una OT utilizando la única clave que entiende ui_operario.py.
+    """
+    id_ot = ot.get("id")
+
+    if id_ot is None:
+        return False
+
+    try:
+        id_ot = int(id_ot)
+    except (TypeError, ValueError):
+        return False
+
+    st.session_state["operario_ot_abierta_id"] = id_ot
+
+    for clave in [
+        "colegio_vivo_ot",
+        "colegio_vivo_ot_id",
+        "ot_seleccionada",
+        "ot_seleccionada_id",
+        "orden_abierta",
+        "orden_abierta_id",
+    ]:
+        st.session_state.pop(clave, None)
+
+    return True
 
 
 def _ubicacion_mision(ot):
@@ -290,14 +314,19 @@ def _texto_aula(ot):
     return aula or "Espacio pendiente"
 
 
-def _abrir_ot_para_trabajar(ot):
-    _guardar_ot_recomendada(ot)
-    st.session_state["ot_seleccionada"] = ot
-    st.session_state["ot_seleccionada_id"] = ot.get("id")
-    st.session_state["orden_abierta"] = ot
-    st.session_state["orden_abierta_id"] = ot.get("id")
+def _abrir_ot_para_trabajar(ot, origen="mision"):
+    """
+    Abre directamente la OT seleccionada sin pasar por el listado general.
+    """
+    if not _guardar_ot_recomendada(ot):
+        return
+
+    st.session_state["colegio_vivo_origen_ot"] = origen
+
+    if origen != "planta":
+        st.session_state["colegio_vivo_vista"] = "mapa"
+
     st.session_state["seccion_actual"] = "Órdenes"
-    st.session_state["colegio_vivo_vista"] = "mapa"
 
 
 def _mostrar_planta_seleccionada():
@@ -362,7 +391,7 @@ def _mostrar_planta_seleccionada():
                 key=f"cv_empezar_planta_{ot.get('id')}",
                 use_container_width=True,
                 on_click=_abrir_ot_para_trabajar,
-                args=(ot,),
+                args=(ot, "planta"),
             )
 
     return True
@@ -594,7 +623,7 @@ def pantalla_colegio_vivo_operario():
             type="primary",
             use_container_width=True,
             on_click=_abrir_ot_para_trabajar,
-            args=(mision,),
+            args=(mision, "mision"),
         )
 
     else:
