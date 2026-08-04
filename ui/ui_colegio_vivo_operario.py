@@ -40,10 +40,13 @@ def _todas_las_ordenes(colegio):
             for planta_datos in edificio_datos.get("plantas", []):
                 nombre_planta = planta_datos.get("nombre", "")
 
-                for ot in planta_datos.get(
+                # La misión solo usa órdenes ejecutables.
+                ordenes_planta = planta_datos.get(
                     "ordenes_ejecutables",
                     planta_datos.get("ordenes", []),
-                ):
+                )
+
+                for ot in ordenes_planta:
                     fila = dict(ot)
 
                     fila["_centro_vivo"] = nombre_centro
@@ -61,6 +64,10 @@ def _ordenar_misiones(ordenes):
             ot.get("prioridad") or ""
         ).strip().lower()
 
+        en_curso = bool(
+            ot.get("_en_curso", False)
+        )
+
         fecha = str(
             ot.get("fecha_creacion")
             or ot.get("fecha")
@@ -71,12 +78,16 @@ def _ordenar_misiones(ordenes):
         identificador = ot.get("id") or 0
 
         return (
+            0 if en_curso else 1,
             ORDEN_PRIORIDAD.get(prioridad, 9),
             fecha,
             identificador,
         )
 
-    return sorted(ordenes, key=clave)
+    return sorted(
+        ordenes,
+        key=clave,
+    )
 
 
 def _texto_averia(ot):
@@ -90,7 +101,9 @@ def _texto_averia(ot):
 
 
 def _centro_del_operario(operario, colegio):
-    centro_configurado = MAPA_OPERARIO_CENTRO.get(operario)
+    centro_configurado = MAPA_OPERARIO_CENTRO.get(
+        operario
+    )
 
     if centro_configurado:
         return centro_configurado
@@ -103,16 +116,20 @@ def _centro_del_operario(operario, colegio):
     return ""
 
 
-def _crear_resumen_edificios(colegio):
-    """
-    Genera un único resumen por:
-    centro + edificio normalizado + planta normalizada.
+def _planta_respaldo(centro, edificio):
+    if centro == "Pearson 22":
+        if edificio == "Llar":
+            return "Planta 0"
 
-    Esto evita duplicados como:
-    - Edif. Infantil/Primaria
-    - Infantil / Primaria
-    - Infantil/Primaria
-    """
+        return "Planta 1"
+
+    if centro == "Pearson 9":
+        return "Planta 0"
+
+    return ""
+
+
+def _crear_resumen_edificios(colegio):
     resumen = {}
 
     for centro_datos in colegio:
@@ -120,18 +137,29 @@ def _crear_resumen_edificios(colegio):
             centro_datos.get("centro", "")
         )
 
-        for edificio_datos in centro_datos.get("edificios", []):
+        for edificio_datos in centro_datos.get(
+            "edificios",
+            [],
+        ):
             edificio = normalizar_edificio(
                 edificio_datos.get("nombre", ""),
                 centro,
             )
 
-            for planta_datos in edificio_datos.get("plantas", []):
-                planta_original = planta_datos.get("nombre", "")
+            for planta_datos in edificio_datos.get(
+                "plantas",
+                [],
+            ):
+                planta = normalizar_planta(
+                    planta_datos.get("nombre", "")
+                )
 
-                planta = normalizar_planta(planta_original)
+                if not planta:
+                    planta = _planta_respaldo(
+                        centro,
+                        edificio,
+                    )
 
-                # Las OT sin planta no se colocan en una planta incorrecta.
                 if not planta:
                     continue
 
@@ -144,25 +172,76 @@ def _crear_resumen_edificios(colegio):
                 if clave not in resumen:
                     resumen[clave] = {
                         "total": 0,
+                        "ejecutables": 0,
+                        "bloqueadas": 0,
+                        "en_curso": 0,
+                        "sin_ubicar": 0,
                         "urgentes": 0,
                         "altas": 0,
                         "ordenes": [],
+                        "ordenes_ejecutables": [],
+                        "ordenes_bloqueadas": [],
                     }
 
-                resumen[clave]["total"] += int(
+                destino = resumen[clave]
+
+                destino["total"] += int(
                     planta_datos.get("total") or 0
                 )
 
-                resumen[clave]["urgentes"] += int(
-                    planta_datos.get("urgentes") or 0
+                destino["ejecutables"] += int(
+                    planta_datos.get("ejecutables")
+                    or 0
                 )
 
-                resumen[clave]["altas"] += int(
-                    planta_datos.get("altas") or 0
+                destino["bloqueadas"] += int(
+                    planta_datos.get("bloqueadas")
+                    or 0
                 )
 
-                resumen[clave]["ordenes"].extend(
-                    planta_datos.get("ordenes", [])
+                destino["en_curso"] += int(
+                    planta_datos.get("en_curso")
+                    or 0
+                )
+
+                destino["sin_ubicar"] += int(
+                    planta_datos.get("sin_ubicar")
+                    or 0
+                )
+
+                destino["urgentes"] += int(
+                    planta_datos.get("urgentes")
+                    or 0
+                )
+
+                destino["altas"] += int(
+                    planta_datos.get("altas")
+                    or 0
+                )
+
+                destino["ordenes"].extend(
+                    planta_datos.get(
+                        "ordenes",
+                        [],
+                    )
+                )
+
+                destino[
+                    "ordenes_ejecutables"
+                ].extend(
+                    planta_datos.get(
+                        "ordenes_ejecutables",
+                        [],
+                    )
+                )
+
+                destino[
+                    "ordenes_bloqueadas"
+                ].extend(
+                    planta_datos.get(
+                        "ordenes_bloqueadas",
+                        [],
+                    )
                 )
 
     return resumen
@@ -175,168 +254,183 @@ def _guardar_ot_recomendada(ot):
 
 def _ubicacion_mision(ot):
     centro = normalizar_centro(
-        ot.get("_centro_vivo")
+        ot.get("_centro_normalizado")
+        or ot.get("_centro_vivo")
         or ot.get("centro")
         or ""
     )
 
     edificio = normalizar_edificio(
-        ot.get("_edificio_vivo")
+        ot.get("_edificio_normalizado")
+        or ot.get("_edificio_vivo")
         or ot.get("edificio")
         or "",
         centro,
     )
 
     planta = normalizar_planta(
-        ot.get("_planta_vivo")
+        ot.get("_planta_normalizada")
+        or ot.get("_planta_vivo")
         or ot.get("planta")
         or ot.get("espacio")
         or ""
     )
 
     if not planta:
-        planta = "Pendiente de ubicar"
+        planta = _planta_respaldo(
+            centro,
+            edificio,
+        )
 
     return centro, edificio, planta
+
+
+def _recoger_planta_query():
+    params = st.query_params
+
+    if params.get("cv_accion") != "planta":
+        return
+
+    centro = str(
+        params.get("cv_centro") or ""
+    ).strip()
+
+    edificio = str(
+        params.get("cv_edificio") or ""
+    ).strip()
+
+    planta = str(
+        params.get("cv_planta") or ""
+    ).strip()
+
+    if not centro or not edificio or not planta:
+        return
+
+    st.session_state["colegio_vivo_centro"] = centro
+    st.session_state["colegio_vivo_edificio"] = edificio
+    st.session_state["colegio_vivo_planta"] = planta
 
 
 def _css_pantalla_operario():
     st.markdown(
         """
         <style>
-        /* ================================================
-           PANTALLA PRINCIPAL DEL OPERARIO
-        ================================================= */
-
-        .block-container {
-            padding-top: 0.10rem !important;
-            padding-left: 0.50rem !important;
-            padding-right: 0.50rem !important;
-            padding-bottom: 0.50rem !important;
-            max-width: 1500px !important;
+        .block-container{
+            padding-top:.08rem !important;
+            padding-left:.30rem !important;
+            padding-right:.30rem !important;
+            padding-bottom:.30rem !important;
+            max-width:1500px !important;
         }
 
-        .cv-mission {
-            background:
-                linear-gradient(
-                    135deg,
-                    #0f2747 0%,
-                    #164f91 100%
-                );
-            color: #ffffff;
-            border-radius: 14px;
-            padding: 10px 13px;
-            margin: 0 0 4px 0;
-            box-shadow:
-                0 6px 16px rgba(15, 39, 71, 0.18);
+        .cv-mission{
+            display:grid;
+            grid-template-columns:1fr;
+            background:linear-gradient(
+                135deg,
+                #0f2747,
+                #164f91
+            );
+            color:#fff;
+            border-radius:11px;
+            padding:7px 10px;
+            margin:0 0 3px;
+            box-shadow:0 4px 12px rgba(15,39,71,.16);
         }
 
-        .cv-mission-top {
-            font-size: 12px;
-            line-height: 1.1;
-            font-weight: 950;
-            margin-bottom: 3px;
+        .cv-mission-top{
+            font-size:10px;
+            line-height:1;
+            font-weight:950;
+            margin-bottom:2px;
         }
 
-        .cv-mission-place {
-            font-size: 15px;
-            line-height: 1.15;
-            font-weight: 950;
+        .cv-mission-place{
+            font-size:12px;
+            line-height:1.1;
+            font-weight:950;
         }
 
-        .cv-mission-description {
-            font-size: 12px;
-            line-height: 1.2;
-            margin-top: 4px;
-            opacity: 0.95;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .cv-mission-description{
+            margin-top:2px;
+            overflow:hidden;
+            color:rgba(255,255,255,.93);
+            font-size:10px;
+            line-height:1.1;
+            white-space:nowrap;
+            text-overflow:ellipsis;
         }
 
-        .cv-school-title {
-            font-size: 16px;
-            line-height: 1.1;
-            font-weight: 950;
-            color: #0f2747;
-            margin: 6px 0 1px 2px;
+        .cv-school-title{
+            margin:4px 0 0 1px;
+            color:#0f2747;
+            font-size:13px;
+            line-height:1;
+            font-weight:950;
         }
 
-        .cv-no-work {
-            border: 1px solid #bbf7d0;
-            background: #f0fdf4;
-            color: #166534;
-            border-radius: 12px;
-            padding: 9px 12px;
-            font-size: 13px;
-            font-weight: 900;
-            margin-bottom: 5px;
+        .cv-no-work{
+            margin-bottom:3px;
+            padding:7px 9px;
+            border:1px solid #bbf7d0;
+            border-radius:10px;
+            background:#f0fdf4;
+            color:#166534;
+            font-size:11px;
+            font-weight:900;
         }
 
-        /* Botón principal de misión */
-        div[data-testid="stButton"] button[kind="primary"] {
-            min-height: 36px !important;
-            height: 36px !important;
-            border-radius: 10px !important;
-            padding: 2px 10px !important;
-            font-size: 12px !important;
-            font-weight: 950 !important;
-            margin: 0 !important;
+        div[data-testid="stButton"]
+        button[kind="primary"]{
+            min-height:31px !important;
+            height:31px !important;
+            margin:0 !important;
+            padding:1px 8px !important;
+            border-radius:8px !important;
+            font-size:10px !important;
+            font-weight:950 !important;
         }
 
-        div[data-testid="stButton"] {
-            margin-bottom: 0 !important;
+        div[data-testid="stButton"]{
+            margin-bottom:0 !important;
         }
 
-        div[data-testid="stVerticalBlock"] {
-            gap: 0.18rem !important;
+        div[data-testid="stVerticalBlock"]{
+            gap:.10rem !important;
         }
 
-        div[data-testid="stHorizontalBlock"] {
-            gap: 0.40rem !important;
-        }
-
-        hr {
-            margin: 4px 0 !important;
-        }
-
-        @media (max-width: 760px) {
-            .block-container {
-                padding-left: 0.28rem !important;
-                padding-right: 0.28rem !important;
+        @media(max-width:760px){
+            .block-container{
+                padding-left:.16rem !important;
+                padding-right:.16rem !important;
             }
 
-            .cv-mission {
-                padding: 8px 9px;
-                border-radius: 11px;
+            .cv-mission{
+                padding:6px 8px;
+                border-radius:9px;
             }
 
-            .cv-mission-top {
-                font-size: 10px;
+            .cv-mission-top{
+                font-size:9px;
             }
 
-            .cv-mission-place {
-                font-size: 12px;
+            .cv-mission-place{
+                font-size:10px;
             }
 
-            .cv-mission-description {
-                font-size: 10px;
+            .cv-mission-description{
+                font-size:8px;
             }
 
-            .cv-school-title {
-                font-size: 13px;
-                margin-top: 4px;
+            .cv-school-title{
+                font-size:11px;
             }
 
             div[data-testid="stButton"]
-            button[kind="primary"] {
-                min-height: 33px !important;
-                height: 33px !important;
-                font-size: 11px !important;
-            }
-
-            div[data-testid="stHorizontalBlock"] {
-                gap: 0.20rem !important;
+            button[kind="primary"]{
+                min-height:29px !important;
+                height:29px !important;
+                font-size:9px !important;
             }
         }
         </style>
@@ -348,6 +442,7 @@ def _css_pantalla_operario():
 def pantalla_colegio_vivo_operario():
     _css_pantalla_operario()
     css_edificio_vivo()
+    _recoger_planta_query()
 
     operario = str(
         st.session_state.get("operario_activo")
@@ -362,54 +457,65 @@ def pantalla_colegio_vivo_operario():
         colegio,
     )
 
-    resumen = _crear_resumen_edificios(colegio)
+    resumen = _crear_resumen_edificios(
+        colegio
+    )
 
     ordenes = _ordenar_misiones(
         _todas_las_ordenes(colegio)
     )
 
     # =====================================================
-    # MISIÓN RECOMENDADA
-    # Siempre aparece en primera línea.
+    # MISIÓN
     # =====================================================
     if ordenes:
         mision = ordenes[0]
 
-        centro, edificio, planta = _ubicacion_mision(mision)
+        centro, edificio, planta = _ubicacion_mision(
+            mision
+        )
 
         prioridad = str(
             mision.get("prioridad")
             or "Media"
         ).strip()
 
-        descripcion = _texto_averia(mision)
+        descripcion = _texto_averia(
+            mision
+        )
+
+        # Sin sangrías internas para que Streamlit
+        # no lo interprete como código.
+        html_mision = (
+            '<div class="cv-mission">'
+            f'<div class="cv-mission-top">'
+            f'❤️ MI MISIÓN · '
+            f'{html.escape(prioridad.upper())}'
+            f'</div>'
+            f'<div class="cv-mission-place">'
+            f'{html.escape(centro)} · '
+            f'{html.escape(edificio)} · '
+            f'{html.escape(planta)}'
+            f'</div>'
+            f'<div class="cv-mission-description">'
+            f'{html.escape(descripcion)}'
+            f'</div>'
+            f'</div>'
+        )
 
         st.markdown(
-            f"""
-            <div class="cv-mission">
-                <div class="cv-mission-top">
-                    ❤️ MI MISIÓN ·
-                    {html.escape(prioridad.upper())}
-                </div>
-
-                <div class="cv-mission-place">
-                    {html.escape(centro)}
-                    ·
-                    {html.escape(edificio)}
-                    ·
-                    {html.escape(planta)}
-                </div>
-
-                <div class="cv-mission-description">
-                    {html.escape(descripcion)}
-                </div>
-            </div>
-            """,
+            html_mision,
             unsafe_allow_html=True,
         )
 
+        texto_boton = (
+            "▶ CONTINUAR AHORA"
+            if mision.get("_en_curso", False)
+            else "▶ EMPEZAR AHORA"
+        )
+
         if st.button(
-            "▶ EMPEZAR AHORA",
+            texto_boton,
             key=(
                 f"cv_empezar_"
                 f"{mision.get('id', 'primera')}"
@@ -417,16 +523,16 @@ def pantalla_colegio_vivo_operario():
             type="primary",
             use_container_width=True,
         ):
-            _guardar_ot_recomendada(mision)
+            _guardar_ot_recomendada(
+                mision
+            )
             st.rerun()
 
     else:
         st.markdown(
-            """
-            <div class="cv-no-work">
-                ✅ No tienes órdenes ejecutables.
-            </div>
-            """,
+            '<div class="cv-no-work">'
+            '✅ No tienes órdenes ejecutables.'
+            '</div>',
             unsafe_allow_html=True,
         )
 
@@ -434,16 +540,16 @@ def pantalla_colegio_vivo_operario():
     # COLEGIO VIVO
     # =====================================================
     st.markdown(
-        """
-        <div class="cv-school-title">
-            🏫 COLEGIO VIVO
-        </div>
-        """,
+        '<div class="cv-school-title">'
+        '🏫 COLEGIO VIVO'
+        '</div>',
         unsafe_allow_html=True,
     )
 
     if not centro_operario:
-        st.info("No hay un centro asignado a este operario.")
+        st.info(
+            "No hay un centro asignado a este operario."
+        )
         return
 
     pintar_campus_operario(
