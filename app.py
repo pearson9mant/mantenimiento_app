@@ -478,19 +478,6 @@ def pintar_barra_operario_compacta():
         unsafe_allow_html=True,
     )
 
-    with col2:
-        st.markdown(
-            f'<div class="pro-header">'
-            f'<div class="pro-header-meta">'
-            f'<b>{APP_VERSION}</b><br>'
-            f'{fecha}<br>'
-            f'{usuario}<br>'
-            f'{etiqueta_perfil(perfil)}'
-            f'</div>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-
 
 def pintar_footer():
     st.markdown(
