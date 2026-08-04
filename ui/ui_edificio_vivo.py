@@ -258,24 +258,20 @@ def _icono_estado(estado):
     }.get(estado, "🟢")
 
 
-def _contador_planta(datos):
+def _texto_contador(datos):
     total = int(datos.get("total") or 0)
     ejecutables = int(datos.get("ejecutables") or 0)
-    bloqueadas = int(datos.get("bloqueadas") or 0)
 
     if total == 0:
         return "✓"
 
-    if ejecutables > 0 and bloqueadas > 0:
-        return f"{ejecutables}+{bloqueadas}"
+    if ejecutables == 1:
+        return "1 OT"
 
-    if ejecutables > 0:
-        return str(ejecutables)
+    if ejecutables > 1:
+        return f"{ejecutables} OT"
 
-    if bloqueadas > 0:
-        return str(bloqueadas)
-
-    return str(total)
+    return f"{total} OT"
 
 
 # =========================================================
@@ -338,11 +334,11 @@ def css_edificio_vivo():
         """
         <style>
         .cv-campus-title{
-            width:min(100%,760px);
+            width:min(100%,1180px);
             margin:2px auto 4px;
             text-align:center;
             color:#0f172a;
-            font-size:15px;
+            font-size:22px;
             line-height:1;
             font-weight:950;
             letter-spacing:.4px;
@@ -350,7 +346,7 @@ def css_edificio_vivo():
         }
 
         .cv-roof{
-            height:22px;
+            height:42px;
             position:relative;
             margin:0 5px -1px;
             background:#172b47;
@@ -367,17 +363,17 @@ def css_edificio_vivo():
             content:"";
             position:absolute;
             left:50%;
-            top:6px;
+            top:13px;
             transform:translateX(-50%);
-            width:8px;
-            height:8px;
-            border:2px solid #f4e6bd;
+            width:13px;
+            height:13px;
+            border:3px solid #f4e6bd;
             border-radius:50%;
             background:#27496f;
         }
 
         .cv-building-name{
-            height:24px;
+            height:46px;
             display:flex;
             align-items:center;
             justify-content:center;
@@ -389,7 +385,7 @@ def css_edificio_vivo():
                 #0e284d
             );
             color:#fff;
-            font-size:9px;
+            font-size:16px;
             line-height:1;
             font-weight:950;
             white-space:nowrap;
@@ -401,7 +397,7 @@ def css_edificio_vivo():
         }
 
         .cv-ground{
-            height:20px;
+            height:42px;
             position:relative;
             background:linear-gradient(
                 #d4c29b,
@@ -416,8 +412,8 @@ def css_edificio_vivo():
             left:50%;
             bottom:0;
             transform:translateX(-50%);
-            width:14px;
-            height:16px;
+            width:23px;
+            height:33px;
             background:linear-gradient(
                 90deg,
                 #16345b 48%,
@@ -429,7 +425,7 @@ def css_edificio_vivo():
         }
 
         .cv-base{
-            height:5px;
+            height:7px;
             background:#354154;
             border-bottom:2px solid #1f2937;
             border-radius:0 0 3px 3px;
@@ -441,18 +437,18 @@ def css_edificio_vivo():
         */
         div[data-testid="stHorizontalBlock"]
         div[data-testid="stButton"] > button{
-            min-height:27px !important;
-            height:27px !important;
-            padding:0 5px !important;
+            min-height:58px !important;
+            height:58px !important;
+            padding:0 18px !important;
             margin:0 !important;
             border-radius:0 !important;
             border:1px solid rgba(80,70,50,.24) !important;
             color:#102033 !important;
-            font-size:10px !important;
+            font-size:16px !important;
             line-height:1 !important;
             font-weight:900 !important;
             text-align:center !important;
-            justify-content:center !important;
+            justify-content:space-between !important;
             box-shadow:
                 inset 0 0 0 1px rgba(255,255,255,.30)
                 !important;
@@ -540,26 +536,26 @@ def css_edificio_vivo():
 
             .cv-campus-title{
                 width:100%;
-                font-size:12px;
-                margin-bottom:3px;
+                font-size:15px;
+                margin-bottom:5px;
             }
 
             .cv-roof{
-                height:18px;
-                margin:0 2px -1px;
+                height:28px;
+                margin:0 3px -1px;
             }
 
             .cv-roof:after{
-                top:5px;
-                width:6px;
-                height:6px;
-                border-width:1px;
+                top:8px;
+                width:8px;
+                height:8px;
+                border-width:2px;
             }
 
             .cv-building-name{
-                height:21px;
+                height:31px;
                 padding:0 1px;
-                font-size:7px;
+                font-size:9px;
                 border-left-width:2px;
                 border-right-width:2px;
                 border-top-width:2px;
@@ -568,21 +564,21 @@ def css_edificio_vivo():
 
             div[data-testid="stHorizontalBlock"]
             div[data-testid="stButton"] > button{
-                min-height:25px !important;
-                height:25px !important;
-                padding:0 2px !important;
-                font-size:7px !important;
+                min-height:43px !important;
+                height:43px !important;
+                padding:0 5px !important;
+                font-size:10px !important;
             }
 
             .cv-ground{
-                height:17px;
+                height:25px;
                 border-width:2px;
                 border-top-width:2px;
             }
 
             .cv-door{
-                width:11px;
-                height:13px;
+                width:15px;
+                height:20px;
                 border-width:1px;
             }
 
@@ -634,22 +630,20 @@ def _pintar_edificio(
         estado = _estado_planta(datos)
         icono = _icono_estado(estado)
         etiqueta = etiqueta_planta(planta)
-        contador = _contador_planta(datos)
+        contador = _texto_contador(datos)
 
         ejecutables = int(
             datos.get("ejecutables") or 0
         )
 
-        flecha = " ▶" if ejecutables > 0 else ""
-
-        # Marcador para el color del botón siguiente.
+                # Marcador para el color del botón siguiente.
         st.markdown(
             f'<span class="cv-floor-{estado}"></span>',
             unsafe_allow_html=True,
         )
 
         st.button(
-            f"{icono} {etiqueta}   {contador}{flecha}",
+            f"{icono} {etiqueta}     {contador}  ›",
             key=(
                 f"cv_planta_"
                 f"{centro}_"
