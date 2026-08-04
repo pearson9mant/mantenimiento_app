@@ -959,8 +959,15 @@ perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
 
-pintar_cabecera()
-barra_sesion()
+procesar_accion_barra_operario()
+
+modo_colegio_vivo = es_colegio_vivo_operario()
+
+if modo_colegio_vivo:
+    pintar_barra_operario_compacta()
+else:
+    pintar_cabecera()
+    barra_sesion()
 
 
 if perfil == "admin" and st.session_state.get("vista_operario", False):
