@@ -1,6 +1,7 @@
 import html
 import re
 import unicodedata
+from urllib.parse import urlencode
 
 import streamlit as st
 
@@ -46,7 +47,7 @@ EDIFICIOS = {
 
 
 def _norm(texto):
-    texto = str(texto or "").lower().strip()
+    texto = str(texto or "").strip().lower()
 
     texto = "".join(
         caracter
@@ -54,7 +55,16 @@ def _norm(texto):
         if unicodedata.category(caracter) != "Mn"
     )
 
-    for caracter in ["/", "-", "_", ".", ",", ";", ":"]:
+    for caracter in [
+        "/",
+        "\\",
+        "-",
+        "_",
+        ".",
+        ",",
+        ";",
+        ":",
+    ]:
         texto = texto.replace(caracter, " ")
 
     return " ".join(texto.split())
@@ -67,24 +77,16 @@ def normalizar_centro(valor):
         "pearson 22",
         "pearson22",
         "p22",
-        "pearson nº 22",
         "pearson numero 22",
-    }:
+    } or "pearson 22" in texto:
         return "Pearson 22"
 
     if texto in {
         "pearson 9",
         "pearson9",
         "p9",
-        "pearson nº 9",
         "pearson numero 9",
-    }:
-        return "Pearson 9"
-
-    if "22" in texto:
-        return "Pearson 22"
-
-    if re.search(r"\b9\b", texto):
+    } or "pearson 9" in texto:
         return "Pearson 9"
 
     return str(valor or "").strip()
@@ -109,9 +111,10 @@ def normalizar_edificio(valor, centro=""):
             "infantil primaria",
             "infantil",
             "primaria",
-            "edif infantil",
             "edificio infantil",
-            "principal",
+            "edificio primaria",
+            "edif infantil",
+            "edif primaria",
         ]
     ):
         return "Infantil / Primaria"
@@ -178,44 +181,98 @@ def normalizar_planta(valor):
     ):
         return "Terrado"
 
-    equivalencias = {
-        "baja": 0,
-        "pb": 0,
-        "principal": 0,
-        "cero": 0,
-        "primera": 1,
-        "primero": 1,
-        "segunda": 2,
-        "segundo": 2,
-        "tercera": 3,
-        "tercero": 3,
-        "cuarta": 4,
-        "cuarto": 4,
-        "quinta": 5,
-        "quinto": 5,
-    }
+    patrones = [
+        r"\bplanta\s*([0-9])\b",
+        r"\bpiso\s*([0-9])\b",
+        r"\bnivel\s*([0-9])\b",
+        r"\bp\s*([0-9])\b",
+    ]
 
-    for numero in range(10):
-        patrones = [
-            rf"\bp\s*{numero}\b",
-            rf"\bplanta\s*{numero}\b",
-            rf"\bpiso\s*{numero}\b",
-            rf"\bnivel\s*{numero}\b",
-        ]
+    for patron in patrones:
+        coincidencia = re.search(patron, texto)
 
-        if any(re.search(patron, texto) for patron in patrones):
-            return f"Planta {numero}"
-
-        if texto == str(numero):
-            return f"Planta {numero}"
-
-    palabras = texto.split()
-
-    for palabra, numero in equivalencias.items():
-        if palabra in palabras:
-            return f"Planta {numero}"
+        if coincidencia:
+            return f"Planta {int(coincidencia.group(1))}"
 
     return ""
+
+
+def etiqueta_planta(planta):
+    if planta == "Terrado":
+        return "T"
+
+    return str(planta).replace("Planta ", "P")
+
+
+def _estado_planta(datos):
+    total = int(datos.get("total") or 0)
+    ejecutables = int(datos.get("ejecutables") or 0)
+    bloqueadas = int(datos.get("bloqueadas") or 0)
+    urgentes = int(datos.get("urgentes") or 0)
+    altas = int(datos.get("altas") or 0)
+    en_curso = int(datos.get("en_curso") or 0)
+
+    if en_curso > 0:
+        return "curso"
+
+    if urgentes > 0:
+        return "critica"
+
+    if altas > 0:
+        return "atencion"
+
+    if ejecutables >= 3:
+        return "atencion"
+
+    if ejecutables > 0:
+        return "seguimiento"
+
+    if bloqueadas > 0 or total > 0:
+        return "bloqueada"
+
+    return "correcta"
+
+
+def _icono_estado(estado):
+    return {
+        "correcta": "🟢",
+        "seguimiento": "🟡",
+        "atencion": "🟠",
+        "critica": "🔴",
+        "curso": "🔵",
+        "bloqueada": "📦",
+    }.get(estado, "🟢")
+
+
+def _contador_planta(datos):
+    total = int(datos.get("total") or 0)
+    ejecutables = int(datos.get("ejecutables") or 0)
+    bloqueadas = int(datos.get("bloqueadas") or 0)
+
+    if total == 0:
+        return "✓"
+
+    if ejecutables > 0 and bloqueadas > 0:
+        return f"{ejecutables}+{bloqueadas}"
+
+    if ejecutables > 0:
+        return str(ejecutables)
+
+    if bloqueadas > 0:
+        return str(bloqueadas)
+
+    return str(total)
+
+
+def _query_planta(centro, edificio, planta):
+    return "?" + urlencode(
+        {
+            "cv_accion": "planta",
+            "cv_centro": centro,
+            "cv_edificio": edificio,
+            "cv_planta": planta,
+        }
+    )
 
 
 def css_edificio_vivo():
@@ -223,24 +280,43 @@ def css_edificio_vivo():
         """
         <style>
         .cv-campus-title{
-            font-size:17px;
-            font-weight:950;
-            color:#0f172a;
+            width:min(100%,760px);
+            margin:2px auto 4px;
             text-align:center;
-            margin:3px 0 6px;
-            text-transform:uppercase;
+            color:#0f172a;
+            font-size:15px;
+            line-height:1;
+            font-weight:950;
             letter-spacing:.4px;
+            text-transform:uppercase;
         }
 
-        .cv-building-wrap{
-            width:100%;
-            filter:drop-shadow(0 6px 7px rgba(15,23,42,.10));
+        .cv-campus-grid{
+            display:flex;
+            flex-direction:row;
+            flex-wrap:nowrap;
+            align-items:flex-end;
+            justify-content:center;
+            gap:16px;
+            width:min(100%,760px);
+            margin:0 auto;
+            overflow:hidden;
+        }
+
+        .cv-building{
+            flex:0 1 330px;
+            width:330px;
+            min-width:0;
+            max-width:330px;
+            filter:drop-shadow(
+                0 3px 4px rgba(15,23,42,.08)
+            );
         }
 
         .cv-roof{
-            height:38px;
+            height:22px;
             position:relative;
-            margin:0 7px -1px;
+            margin:0 5px -1px;
             background:#172b47;
             clip-path:polygon(
                 50% 0,
@@ -255,38 +331,152 @@ def css_edificio_vivo():
             content:"";
             position:absolute;
             left:50%;
-            top:12px;
+            top:6px;
             transform:translateX(-50%);
-            width:13px;
-            height:13px;
+            width:8px;
+            height:8px;
             border:2px solid #f4e6bd;
             border-radius:50%;
             background:#27496f;
         }
 
         .cv-building-name{
-            min-height:34px;
+            height:24px;
             display:flex;
             align-items:center;
             justify-content:center;
-            background:linear-gradient(180deg,#173a6e,#0e284d);
+            overflow:hidden;
+            padding:0 2px;
+            background:linear-gradient(
+                180deg,
+                #173a6e,
+                #0e284d
+            );
             color:#fff;
-            text-align:center;
-            font-size:11px;
-            line-height:1.05;
+            font-size:9px;
+            line-height:1;
             font-weight:950;
-            padding:5px 3px;
-            border-left:5px solid #d9caa7;
-            border-right:5px solid #d9caa7;
+            white-space:nowrap;
+            text-align:center;
+            border-left:4px solid #d9caa7;
+            border-right:4px solid #d9caa7;
             border-top:3px solid #e8dab5;
             border-bottom:3px solid #caba93;
         }
 
+        .cv-floors{
+            border-left:4px solid #ded1ad;
+            border-right:4px solid #ded1ad;
+            background:#efe7d2;
+        }
+
+        a.cv-floor{
+            height:27px;
+            display:grid;
+            grid-template-columns:17px 1fr auto 9px;
+            align-items:center;
+            gap:2px;
+            padding:0 4px;
+            border-bottom:1px solid rgba(80,70,50,.24);
+            color:#102033 !important;
+            font-size:10px;
+            line-height:1;
+            font-weight:900;
+            text-decoration:none !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.30);
+        }
+
+        a.cv-floor:hover{
+            filter:brightness(.97) saturate(1.05);
+        }
+
+        .cv-floor.correcta{
+            background:linear-gradient(
+                90deg,
+                #d9f7c9,
+                #bfeaa7
+            );
+        }
+
+        .cv-floor.seguimiento{
+            background:linear-gradient(
+                90deg,
+                #fff1ad,
+                #ffd763
+            );
+        }
+
+        .cv-floor.atencion{
+            background:linear-gradient(
+                90deg,
+                #ffd2aa,
+                #ff9b54
+            );
+        }
+
+        .cv-floor.critica{
+            background:linear-gradient(
+                90deg,
+                #ffc2c2,
+                #ff7f7f
+            );
+        }
+
+        .cv-floor.curso{
+            background:linear-gradient(
+                90deg,
+                #c7dcff,
+                #79aaff
+            );
+        }
+
+        .cv-floor.bloqueada{
+            background:linear-gradient(
+                90deg,
+                #e7e5e4,
+                #cbd5e1
+            );
+        }
+
+        .cv-floor-icon{
+            font-size:10px;
+            text-align:center;
+        }
+
+        .cv-floor-name{
+            overflow:hidden;
+            white-space:nowrap;
+            text-overflow:ellipsis;
+        }
+
+        .cv-floor-count{
+            min-width:19px;
+            height:19px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:0 4px;
+            border-radius:999px;
+            background:rgba(255,255,255,.80);
+            color:#0f172a;
+            font-size:8px;
+            font-weight:950;
+        }
+
+        .cv-floor-arrow{
+            font-size:7px;
+            text-align:right;
+        }
+
         .cv-ground{
-            height:35px;
+            height:20px;
             position:relative;
-            background:linear-gradient(#d4c29b,#bd9f72);
-            border:6px solid #ded1ad;
+            background:linear-gradient(
+                #d4c29b,
+                #bd9f72
+            );
+            border:4px solid #ded1ad;
             border-top:3px solid #b89e72;
         }
 
@@ -295,125 +485,119 @@ def css_edificio_vivo():
             left:50%;
             bottom:0;
             transform:translateX(-50%);
-            width:23px;
-            height:28px;
+            width:14px;
+            height:16px;
             background:linear-gradient(
                 90deg,
                 #16345b 48%,
                 #0c2442 50%
             );
-            border:3px solid #10233c;
+            border:2px solid #10233c;
             border-bottom:0;
-            border-radius:3px 3px 0 0;
+            border-radius:2px 2px 0 0;
         }
 
         .cv-base{
-            height:8px;
+            height:5px;
             background:#354154;
-            border-radius:0 0 4px 4px;
-            border-bottom:3px solid #1f2937;
-        }
-
-        div[data-testid="stButton"] button[kind="secondary"]{
-            min-height:36px !important;
-            height:36px !important;
-            padding:2px 5px !important;
-            margin:0 !important;
-            border-radius:0 !important;
-            font-size:11px !important;
-            font-weight:900 !important;
-            white-space:nowrap !important;
-            border:1px solid rgba(80,70,50,.24) !important;
-            box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.35)
-                !important;
-        }
-
-        div[data-testid="stButton"]{
-            margin-bottom:0 !important;
-        }
-
-        .cv-floor-correcta button{
-            background:linear-gradient(
-                90deg,
-                #d9f7c9,
-                #bfeaa7
-            ) !important;
-        }
-
-        .cv-floor-seguimiento button{
-            background:linear-gradient(
-                90deg,
-                #fff1ad,
-                #ffd763
-            ) !important;
-        }
-
-        .cv-floor-atencion button{
-            background:linear-gradient(
-                90deg,
-                #ffd2aa,
-                #ff9b54
-            ) !important;
-        }
-
-        .cv-floor-critica button{
-            background:linear-gradient(
-                90deg,
-                #ffc2c2,
-                #ff7f7f
-            ) !important;
+            border-bottom:2px solid #1f2937;
+            border-radius:0 0 3px 3px;
         }
 
         @media(max-width:760px){
             .block-container{
-                padding-left:.45rem !important;
-                padding-right:.45rem !important;
+                padding-left:.16rem !important;
+                padding-right:.16rem !important;
             }
 
-            div[data-testid="stHorizontalBlock"]{
-                gap:.28rem !important;
+            .cv-campus-title{
+                width:100%;
+                font-size:12px;
+                margin-bottom:3px;
+            }
+
+            .cv-campus-grid{
+                display:flex !important;
+                flex-direction:row !important;
+                flex-wrap:nowrap !important;
+                align-items:flex-end !important;
+                justify-content:center !important;
+                gap:4px !important;
+                width:100% !important;
+                overflow:hidden !important;
+            }
+
+            .cv-building{
+                flex:1 1 0 !important;
+                width:auto !important;
+                min-width:0 !important;
+                max-width:none !important;
             }
 
             .cv-roof{
-                height:30px;
-                margin:0 4px -1px;
+                height:18px;
+                margin:0 2px -1px;
             }
 
             .cv-roof:after{
-                top:9px;
-                width:10px;
-                height:10px;
+                top:5px;
+                width:6px;
+                height:6px;
+                border-width:1px;
             }
 
             .cv-building-name{
-                min-height:30px;
-                font-size:9px;
-                padding:4px 1px;
-                border-left-width:3px;
-                border-right-width:3px;
+                height:21px;
+                padding:0 1px;
+                font-size:7px;
+                border-left-width:2px;
+                border-right-width:2px;
+                border-top-width:2px;
+                border-bottom-width:2px;
             }
 
-            div[data-testid="stButton"]
-            button[kind="secondary"]{
-                min-height:34px !important;
-                height:34px !important;
-                padding:1px 2px !important;
-                font-size:9px !important;
+            .cv-floors{
+                border-left-width:2px;
+                border-right-width:2px;
+            }
+
+            a.cv-floor{
+                height:25px;
+                grid-template-columns:12px 1fr auto 6px;
+                gap:1px;
+                padding:0 2px;
+                font-size:7px;
+            }
+
+            .cv-floor-icon{
+                font-size:8px;
+            }
+
+            .cv-floor-count{
+                min-width:15px;
+                height:15px;
+                padding:0 2px;
+                font-size:6px;
+            }
+
+            .cv-floor-arrow{
+                font-size:5px;
             }
 
             .cv-ground{
-                height:27px;
-                border-width:4px;
+                height:17px;
+                border-width:2px;
+                border-top-width:2px;
             }
 
             .cv-door{
-                width:18px;
-                height:22px;
+                width:11px;
+                height:13px;
+                border-width:1px;
             }
 
             .cv-base{
-                height:6px;
+                height:4px;
             }
         }
         </style>
@@ -422,116 +606,72 @@ def css_edificio_vivo():
     )
 
 
-def clase_estado_planta(total, urgentes, altas):
-    if urgentes > 0:
-        return "critica"
-
-    if altas > 0:
-        return "atencion"
-
-    if total > 0:
-        return "seguimiento"
-
-    return "correcta"
-
-
-def icono_estado_planta(clase):
-    return {
-        "correcta": "🟢",
-        "seguimiento": "🟡",
-        "atencion": "🟠",
-        "critica": "🔴",
-    }.get(clase, "🟢")
-
-
-def etiqueta_planta(planta):
-    if planta == "Terrado":
-        return "T"
-
-    return planta.replace("Planta ", "P")
-
-
-def pintar_edificio_operario(
+def _html_edificio(
     centro,
     edificio,
     plantas,
     resumen,
 ):
-    st.markdown(
-        '<div class="cv-building-wrap">'
-        '<div class="cv-roof"></div>'
-        f'<div class="cv-building-name">'
-        f'{html.escape(edificio.upper())}'
-        '</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    plantas_html = ""
 
     for planta in plantas:
         datos = resumen.get(
             (centro, edificio, planta),
-            {},
+            {
+                "total": 0,
+                "ejecutables": 0,
+                "bloqueadas": 0,
+                "en_curso": 0,
+                "urgentes": 0,
+                "altas": 0,
+                "ordenes": [],
+            },
         )
 
-        total = int(datos.get("total") or 0)
-        urgentes = int(datos.get("urgentes") or 0)
-        altas = int(datos.get("altas") or 0)
-
-        clase = clase_estado_planta(
-            total,
-            urgentes,
-            altas,
-        )
-
-        icono = icono_estado_planta(clase)
+        estado = _estado_planta(datos)
+        icono = _icono_estado(estado)
         etiqueta = etiqueta_planta(planta)
-        contador = "✓" if total == 0 else str(total)
+        contador = _contador_planta(datos)
 
-        contenedor = st.container()
-
-        with contenedor:
-            if st.button(
-                f"{icono} {etiqueta}  {contador}",
-                key=(
-                    f"cv_planta_"
-                    f"{centro}_"
-                    f"{edificio}_"
-                    f"{planta}"
-                ),
-                use_container_width=True,
-            ):
-                st.session_state[
-                    "colegio_vivo_centro"
-                ] = centro
-
-                st.session_state[
-                    "colegio_vivo_edificio"
-                ] = edificio
-
-                st.session_state[
-                    "colegio_vivo_planta"
-                ] = planta
-
-                st.session_state[
-                    "colegio_vivo_ordenes_planta"
-                ] = datos.get("ordenes", [])
-
-                st.rerun()
-
-        st.markdown(
-            f"""
-            <script>
-            </script>
-            """,
-            unsafe_allow_html=True,
+        ejecutables = int(
+            datos.get("ejecutables") or 0
         )
 
-    st.markdown(
+        flecha = "▶" if ejecutables > 0 else ""
+
+        query = _query_planta(
+            centro,
+            edificio,
+            planta,
+        )
+
+        plantas_html += (
+            f'<a class="cv-floor {estado}" '
+            f'href="{html.escape(query)}" '
+            f'target="_self">'
+            f'<span class="cv-floor-icon">{icono}</span>'
+            f'<span class="cv-floor-name">'
+            f'{html.escape(etiqueta)}'
+            f'</span>'
+            f'<span class="cv-floor-count">'
+            f'{html.escape(contador)}'
+            f'</span>'
+            f'<span class="cv-floor-arrow">{flecha}</span>'
+            f'</a>'
+        )
+
+    return (
+        '<div class="cv-building">'
+        '<div class="cv-roof"></div>'
+        f'<div class="cv-building-name">'
+        f'{html.escape(edificio.upper())}'
+        f'</div>'
+        f'<div class="cv-floors">{plantas_html}</div>'
         '<div class="cv-ground">'
         '<div class="cv-door"></div>'
         '</div>'
-        '<div class="cv-base"></div>',
-        unsafe_allow_html=True,
+        '<div class="cv-base"></div>'
+        '</div>'
     )
 
 
@@ -547,26 +687,24 @@ def pintar_campus_operario(
         )
         return
 
+    edificios_html = "".join(
+        _html_edificio(
+            centro,
+            edificio,
+            plantas,
+            resumen,
+        )
+        for edificio, plantas in edificios.items()
+    )
+
     st.markdown(
-        f'<div class="cv-campus-title">'
-        f'{html.escape(centro)}'
-        f'</div>',
+        (
+            f'<div class="cv-campus-title">'
+            f'{html.escape(centro)}'
+            f'</div>'
+            f'<div class="cv-campus-grid">'
+            f'{edificios_html}'
+            f'</div>'
+        ),
         unsafe_allow_html=True,
     )
-
-    columnas = st.columns(
-        len(edificios),
-        gap="small",
-    )
-
-    for columna, (edificio, plantas) in zip(
-        columnas,
-        edificios.items(),
-    ):
-        with columna:
-            pintar_edificio_operario(
-                centro,
-                edificio,
-                plantas,
-                resumen,
-            )
