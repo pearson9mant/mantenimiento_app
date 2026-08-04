@@ -508,6 +508,10 @@ def _css_pantalla_operario():
 def pantalla_colegio_vivo_operario():
     _css_pantalla_operario()
     css_edificio_vivo()
+
+    if _mostrar_planta_seleccionada():
+        return
+
     operario = str(
         st.session_state.get("operario_activo")
         or st.session_state.get("usuario")
@@ -536,6 +540,10 @@ def pantalla_colegio_vivo_operario():
         mision = ordenes[0]
 
         centro, edificio, planta = _ubicacion_mision(
+            mision
+        )
+
+        aula = _texto_aula(
             mision
         )
 
