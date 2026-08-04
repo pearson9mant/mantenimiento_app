@@ -10,6 +10,7 @@ from ui.ui_edificio_vivo import (
     normalizar_edificio,
     normalizar_planta,
     pintar_campus_operario,
+    volver_colegio_vivo,
 )
 
 
@@ -74,6 +75,8 @@ def _todas_las_ordenes(colegio):
 
 def _ordenar_misiones(ordenes):
     def clave(ot):
+        aula = _texto_aula(mision)
+
         prioridad = str(
             ot.get("prioridad") or ""
         ).strip().lower()
@@ -278,30 +281,93 @@ def _ubicacion_mision(ot):
     return centro, edificio, planta
 
 
-def _recoger_planta_query():
-    params = st.query_params
-
-    if params.get("cv_accion") != "planta":
-        return
-
-    centro = str(
-        params.get("cv_centro") or ""
+def _texto_aula(ot):
+    aula = str(
+        ot.get("espacio")
+        or ot.get("aula")
+        or ot.get("ubicacion")
+        or ""
     ).strip()
 
-    edificio = str(
-        params.get("cv_edificio") or ""
-    ).strip()
+    return aula or "Espacio pendiente"
 
-    planta = str(
-        params.get("cv_planta") or ""
-    ).strip()
 
-    if not centro or not edificio or not planta:
-        return
+def _abrir_ot_para_trabajar(ot):
+    _guardar_ot_recomendada(ot)
+    st.session_state["ot_seleccionada"] = ot
+    st.session_state["ot_seleccionada_id"] = ot.get("id")
+    st.session_state["orden_abierta"] = ot
+    st.session_state["orden_abierta_id"] = ot.get("id")
+    st.session_state["seccion_actual"] = "Órdenes"
+    st.session_state["colegio_vivo_vista"] = "mapa"
 
-    st.session_state["colegio_vivo_centro"] = centro
-    st.session_state["colegio_vivo_edificio"] = edificio
-    st.session_state["colegio_vivo_planta"] = planta
+
+def _mostrar_planta_seleccionada():
+    if st.session_state.get("colegio_vivo_vista") != "planta":
+        return False
+
+    centro = st.session_state.get("colegio_vivo_centro", "")
+    edificio = st.session_state.get("colegio_vivo_edificio", "")
+    planta = st.session_state.get("colegio_vivo_planta", "")
+    ordenes = st.session_state.get("colegio_vivo_ordenes_planta", [])
+
+    if st.button(
+        "← VOLVER AL EDIFICIO",
+        key="cv_volver_edificio",
+        use_container_width=True,
+    ):
+        volver_colegio_vivo()
+        st.rerun()
+
+    st.markdown(
+        (
+            '<div class="cv-planta-detalle">'
+            '<div class="cv-planta-detalle-titulo">'
+            f'📍 {html.escape(centro)} · '
+            f'{html.escape(edificio)} · '
+            f'{html.escape(planta)}'
+            '</div>'
+            f'<div>{len(ordenes)} OT activas</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if not ordenes:
+        st.success("✅ No hay órdenes activas en esta planta.")
+        return True
+
+    for ot in ordenes:
+        numero_ot = str(ot.get("numero_ot") or ot.get("id") or "OT")
+        aula = _texto_aula(ot)
+        descripcion = _texto_averia(ot)
+        estado = str(ot.get("estado") or "Abierta").strip()
+        prioridad = str(ot.get("prioridad") or "Media").strip()
+        es_ejecutable = bool(ot.get("_ejecutable", False))
+
+        st.markdown(
+            (
+                '<div class="cv-planta-detalle">'
+                f'<strong>{html.escape(numero_ot)}</strong> · '
+                f'<strong>{html.escape(aula)}</strong><br>'
+                f'{html.escape(descripcion)}<br>'
+                f'<small>{html.escape(prioridad)} · '
+                f'{html.escape(estado)}</small>'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
+        )
+
+        if es_ejecutable:
+            st.button(
+                f"▶ EMPEZAR {numero_ot}",
+                key=f"cv_empezar_planta_{ot.get('id')}",
+                use_container_width=True,
+                on_click=_abrir_ot_para_trabajar,
+                args=(ot,),
+            )
+
+    return True
 
 
 def _css_pantalla_operario():
@@ -323,48 +389,50 @@ def _css_pantalla_operario():
                 #164f91
             );
             color:#fff;
-            border-radius:11px;
-            padding:9px 11px;
+            border-radius:15px;
+            padding:17px 20px 15px;
             margin:0 auto 3px;
-            width:min(100%,900px);
+            width:min(100%,1180px);
             box-shadow:
                 0 4px 12px rgba(15,39,71,.16);
         }
 
         .cv-mission-top{
-            font-size:11px;
+            font-size:16px;
             line-height:1;
             font-weight:950;
-            margin-bottom:3px;
+            margin-bottom:9px;
         }
 
         .cv-mission-place{
-            font-size:13px;
+            font-size:22px;
             line-height:1.15;
             font-weight:950;
         }
 
         .cv-mission-description{
-            margin-top:3px;
+            margin-top:10px;
             overflow:hidden;
             color:rgba(255,255,255,.94);
-            font-size:10px;
-            line-height:1.25;
-            white-space:nowrap;
-            text-overflow:ellipsis;
+            font-size:15px;
+            line-height:1.35;
+            white-space:normal;
+            display:-webkit-box;
+            -webkit-line-clamp:2;
+            -webkit-box-orient:vertical;
         }
 
         .cv-school-title{
-            width:min(100%,760px);
+            width:min(100%,1180px);
             margin:5px auto 1px;
             color:#0f2747;
-            font-size:13px;
+            font-size:20px;
             line-height:1;
             font-weight:950;
         }
 
         .cv-no-work{
-            width:min(100%,900px);
+            width:min(100%,1180px);
             margin:0 auto 3px;
             padding:7px 9px;
             border:1px solid #bbf7d0;
@@ -378,13 +446,13 @@ def _css_pantalla_operario():
         div[data-testid="stButton"]
         button[kind="primary"]{
             display:block !important;
-            width:min(100%,900px) !important;
-            min-height:31px !important;
-            height:31px !important;
+            width:min(100%,1180px) !important;
+            min-height:50px !important;
+            height:50px !important;
             margin:0 auto !important;
             padding:1px 8px !important;
             border-radius:8px !important;
-            font-size:10px !important;
+            font-size:17px !important;
             font-weight:950 !important;
         }
 
@@ -404,20 +472,20 @@ def _css_pantalla_operario():
 
             .cv-mission{
                 width:100%;
-                padding:7px 8px;
-                border-radius:9px;
+                padding:11px 12px 10px;
+                border-radius:11px;
             }
 
             .cv-mission-top{
-                font-size:9px;
+                font-size:11px;
             }
 
             .cv-mission-place{
-                font-size:10px;
+                font-size:14px;
             }
 
             .cv-mission-description{
-                font-size:8px;
+                font-size:10px;
             }
 
             .cv-school-title{
@@ -428,9 +496,9 @@ def _css_pantalla_operario():
             div[data-testid="stButton"]
             button[kind="primary"]{
                 width:100% !important;
-                min-height:29px !important;
-                height:29px !important;
-                font-size:9px !important;
+                min-height:37px !important;
+                height:37px !important;
+                font-size:12px !important;
             }
         }
         </style>
@@ -442,8 +510,6 @@ def _css_pantalla_operario():
 def pantalla_colegio_vivo_operario():
     _css_pantalla_operario()
     css_edificio_vivo()
-    _recoger_planta_query()
-
     operario = str(
         st.session_state.get("operario_activo")
         or st.session_state.get("usuario")
@@ -493,7 +559,8 @@ def pantalla_colegio_vivo_operario():
             f'<div class="cv-mission-place">'
             f'{html.escape(centro)} · '
             f'{html.escape(edificio)} · '
-            f'{html.escape(planta)}'
+            f'{html.escape(planta)} · '
+            f'{html.escape(aula)}'
             f'</div>'
             f'<div class="cv-mission-description">'
             f'{html.escape(descripcion)}'
@@ -512,7 +579,7 @@ def pantalla_colegio_vivo_operario():
             else "▶ EMPEZAR AHORA"
         )
 
-        if st.button(
+        st.button(
             texto_boton,
             key=(
                 f"cv_empezar_"
@@ -520,9 +587,9 @@ def pantalla_colegio_vivo_operario():
             ),
             type="primary",
             use_container_width=True,
-        ):
-            _guardar_ot_recomendada(mision)
-            st.rerun()
+            on_click=_abrir_ot_para_trabajar,
+            args=(mision,),
+        )
 
     else:
         st.markdown(
