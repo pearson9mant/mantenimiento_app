@@ -1539,6 +1539,7 @@ def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
 
     if fila_abierta is None:
         st.session_state.pop("operario_ot_abierta_id", None)
+        st.session_state.pop("colegio_vivo_origen_ot", None)
         st.warning(
             "La OT seleccionada ya no está disponible o ya ha sido finalizada."
         )
@@ -1557,13 +1558,27 @@ def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
     except Exception:
         numero_ot = ""
 
+    origen_colegio_vivo = st.session_state.get(
+        "colegio_vivo_origen_ot"
+    )
+
+    if origen_colegio_vivo == "planta":
+        texto_volver = "⬅ Volver a las OT de la planta"
+        key_volver = "volver_ot_planta_colegio_vivo"
+    elif origen_colegio_vivo == "mision":
+        texto_volver = "⬅ Volver a Colegio Vivo"
+        key_volver = "volver_ot_mision_colegio_vivo"
+    else:
+        texto_volver = "⬅ Volver al listado de órdenes"
+        key_volver = "volver_listado_ordenes_operario"
+
     pantalla_trabajar_ot(
         fila=fila_abierta,
         operario_sel=operario_sel,
         modo="operario",
         clave_ot_abierta="operario_ot_abierta_id",
-        texto_volver="⬅ Volver al listado de órdenes",
-        key_boton_volver="volver_listado_ordenes_operario",
+        texto_volver=texto_volver,
+        key_boton_volver=key_volver,
         titulo=f"## 🛠️ Trabajar OT {numero_ot or ''}",
     )
 
@@ -1574,6 +1589,7 @@ def pantalla_operario(modo="ordenes"):
     # Al entrar en histórico nunca se conserva una OT abierta.
     if solo_historico:
         st.session_state.pop("operario_ot_abierta_id", None)
+        st.session_state.pop("colegio_vivo_origen_ot", None)
         st.title("📁 Mi histórico")
     else:
         st.title("👷 Operario")
