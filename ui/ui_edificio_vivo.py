@@ -1,10 +1,13 @@
 import html
 import re
 import unicodedata
-from urllib.parse import urlencode
 
 import streamlit as st
 
+
+# =========================================================
+# ESTRUCTURA DEL COLEGIO
+# =========================================================
 
 EDIFICIOS = {
     "Pearson 22": {
@@ -46,6 +49,10 @@ EDIFICIOS = {
 }
 
 
+# =========================================================
+# NORMALIZACIÓN
+# =========================================================
+
 def _norm(texto):
     texto = str(texto or "").strip().lower()
 
@@ -73,20 +80,26 @@ def _norm(texto):
 def normalizar_centro(valor):
     texto = _norm(valor)
 
-    if texto in {
-        "pearson 22",
-        "pearson22",
-        "p22",
-        "pearson numero 22",
-    } or "pearson 22" in texto:
+    if (
+        texto in {
+            "pearson 22",
+            "pearson22",
+            "p22",
+            "pearson numero 22",
+        }
+        or "pearson 22" in texto
+    ):
         return "Pearson 22"
 
-    if texto in {
-        "pearson 9",
-        "pearson9",
-        "p9",
-        "pearson numero 9",
-    } or "pearson 9" in texto:
+    if (
+        texto in {
+            "pearson 9",
+            "pearson9",
+            "p9",
+            "pearson numero 9",
+        }
+        or "pearson 9" in texto
+    ):
         return "Pearson 9"
 
     return str(valor or "").strip()
@@ -204,6 +217,10 @@ def etiqueta_planta(planta):
     return str(planta).replace("Planta ", "P")
 
 
+# =========================================================
+# ESTADO VISUAL
+# =========================================================
+
 def _estado_planta(datos):
     total = int(datos.get("total") or 0)
     ejecutables = int(datos.get("ejecutables") or 0)
@@ -218,10 +235,7 @@ def _estado_planta(datos):
     if urgentes > 0:
         return "critica"
 
-    if altas > 0:
-        return "atencion"
-
-    if ejecutables >= 3:
+    if altas > 0 or ejecutables >= 3:
         return "atencion"
 
     if ejecutables > 0:
@@ -264,16 +278,60 @@ def _contador_planta(datos):
     return str(total)
 
 
-def _query_planta(centro, edificio, planta):
-    return "?" + urlencode(
-        {
-            "cv_accion": "planta",
-            "cv_centro": centro,
-            "cv_edificio": edificio,
-            "cv_planta": planta,
-        }
+# =========================================================
+# APERTURA DE PLANTA SIN RECARGAR LA URL
+# =========================================================
+
+def _abrir_planta(
+    centro,
+    edificio,
+    planta,
+    ordenes,
+    ordenes_ejecutables,
+):
+    st.session_state["colegio_vivo_vista"] = "planta"
+
+    st.session_state["colegio_vivo_centro"] = centro
+    st.session_state["colegio_vivo_edificio"] = edificio
+    st.session_state["colegio_vivo_planta"] = planta
+
+    st.session_state["colegio_vivo_ordenes_planta"] = list(
+        ordenes or []
     )
 
+    st.session_state["colegio_vivo_ejecutables_planta"] = list(
+        ordenes_ejecutables or []
+    )
+
+
+def volver_colegio_vivo():
+    st.session_state["colegio_vivo_vista"] = "mapa"
+
+    st.session_state.pop(
+        "colegio_vivo_centro",
+        None,
+    )
+    st.session_state.pop(
+        "colegio_vivo_edificio",
+        None,
+    )
+    st.session_state.pop(
+        "colegio_vivo_planta",
+        None,
+    )
+    st.session_state.pop(
+        "colegio_vivo_ordenes_planta",
+        None,
+    )
+    st.session_state.pop(
+        "colegio_vivo_ejecutables_planta",
+        None,
+    )
+
+
+# =========================================================
+# CSS
+# =========================================================
 
 def css_edificio_vivo():
     st.markdown(
@@ -289,28 +347,6 @@ def css_edificio_vivo():
             font-weight:950;
             letter-spacing:.4px;
             text-transform:uppercase;
-        }
-
-        .cv-campus-grid{
-            display:flex;
-            flex-direction:row;
-            flex-wrap:nowrap;
-            align-items:flex-end;
-            justify-content:center;
-            gap:16px;
-            width:min(100%,760px);
-            margin:0 auto;
-            overflow:hidden;
-        }
-
-        .cv-building{
-            flex:0 1 330px;
-            width:330px;
-            min-width:0;
-            max-width:330px;
-            filter:drop-shadow(
-                0 3px 4px rgba(15,23,42,.08)
-            );
         }
 
         .cv-roof{
@@ -364,111 +400,6 @@ def css_edificio_vivo():
             border-bottom:3px solid #caba93;
         }
 
-        .cv-floors{
-            border-left:4px solid #ded1ad;
-            border-right:4px solid #ded1ad;
-            background:#efe7d2;
-        }
-
-        a.cv-floor{
-            height:27px;
-            display:grid;
-            grid-template-columns:17px 1fr auto 9px;
-            align-items:center;
-            gap:2px;
-            padding:0 4px;
-            border-bottom:1px solid rgba(80,70,50,.24);
-            color:#102033 !important;
-            font-size:10px;
-            line-height:1;
-            font-weight:900;
-            text-decoration:none !important;
-            box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.30);
-        }
-
-        a.cv-floor:hover{
-            filter:brightness(.97) saturate(1.05);
-        }
-
-        .cv-floor.correcta{
-            background:linear-gradient(
-                90deg,
-                #d9f7c9,
-                #bfeaa7
-            );
-        }
-
-        .cv-floor.seguimiento{
-            background:linear-gradient(
-                90deg,
-                #fff1ad,
-                #ffd763
-            );
-        }
-
-        .cv-floor.atencion{
-            background:linear-gradient(
-                90deg,
-                #ffd2aa,
-                #ff9b54
-            );
-        }
-
-        .cv-floor.critica{
-            background:linear-gradient(
-                90deg,
-                #ffc2c2,
-                #ff7f7f
-            );
-        }
-
-        .cv-floor.curso{
-            background:linear-gradient(
-                90deg,
-                #c7dcff,
-                #79aaff
-            );
-        }
-
-        .cv-floor.bloqueada{
-            background:linear-gradient(
-                90deg,
-                #e7e5e4,
-                #cbd5e1
-            );
-        }
-
-        .cv-floor-icon{
-            font-size:10px;
-            text-align:center;
-        }
-
-        .cv-floor-name{
-            overflow:hidden;
-            white-space:nowrap;
-            text-overflow:ellipsis;
-        }
-
-        .cv-floor-count{
-            min-width:19px;
-            height:19px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            padding:0 4px;
-            border-radius:999px;
-            background:rgba(255,255,255,.80);
-            color:#0f172a;
-            font-size:8px;
-            font-weight:950;
-        }
-
-        .cv-floor-arrow{
-            font-size:7px;
-            text-align:right;
-        }
-
         .cv-ground{
             height:20px;
             position:relative;
@@ -504,34 +435,113 @@ def css_edificio_vivo():
             border-radius:0 0 3px 3px;
         }
 
+        /*
+        Los botones de planta son nativos de Streamlit.
+        Se aplica un diseño compacto solamente dentro del mapa.
+        */
+        div[data-testid="stHorizontalBlock"]
+        div[data-testid="stButton"] > button{
+            min-height:27px !important;
+            height:27px !important;
+            padding:0 5px !important;
+            margin:0 !important;
+            border-radius:0 !important;
+            border:1px solid rgba(80,70,50,.24) !important;
+            color:#102033 !important;
+            font-size:10px !important;
+            line-height:1 !important;
+            font-weight:900 !important;
+            text-align:center !important;
+            justify-content:center !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.30)
+                !important;
+        }
+
+        .cv-floor-correcta + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #d9f7c9,
+                #bfeaa7
+            ) !important;
+        }
+
+        .cv-floor-seguimiento + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #fff1ad,
+                #ffd763
+            ) !important;
+        }
+
+        .cv-floor-atencion + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #ffd2aa,
+                #ff9b54
+            ) !important;
+        }
+
+        .cv-floor-critica + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #ffc2c2,
+                #ff7f7f
+            ) !important;
+        }
+
+        .cv-floor-curso + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #c7dcff,
+                #79aaff
+            ) !important;
+        }
+
+        .cv-floor-bloqueada + div
+        button{
+            background:linear-gradient(
+                90deg,
+                #e7e5e4,
+                #cbd5e1
+            ) !important;
+        }
+
+        .cv-planta-detalle{
+            width:min(100%,900px);
+            margin:4px auto;
+            padding:8px 10px;
+            border:1px solid #dbe3ef;
+            border-radius:11px;
+            background:#fff;
+        }
+
+        .cv-planta-detalle-titulo{
+            color:#0f2747;
+            font-size:14px;
+            font-weight:950;
+        }
+
         @media(max-width:760px){
-            .block-container{
-                padding-left:.16rem !important;
-                padding-right:.16rem !important;
+            div[data-testid="stHorizontalBlock"]{
+                flex-wrap:nowrap !important;
+                gap:4px !important;
+            }
+
+            div[data-testid="stHorizontalBlock"] > div{
+                min-width:0 !important;
+                flex:1 1 0 !important;
             }
 
             .cv-campus-title{
                 width:100%;
                 font-size:12px;
                 margin-bottom:3px;
-            }
-
-            .cv-campus-grid{
-                display:flex !important;
-                flex-direction:row !important;
-                flex-wrap:nowrap !important;
-                align-items:flex-end !important;
-                justify-content:center !important;
-                gap:4px !important;
-                width:100% !important;
-                overflow:hidden !important;
-            }
-
-            .cv-building{
-                flex:1 1 0 !important;
-                width:auto !important;
-                min-width:0 !important;
-                max-width:none !important;
             }
 
             .cv-roof{
@@ -556,32 +566,12 @@ def css_edificio_vivo():
                 border-bottom-width:2px;
             }
 
-            .cv-floors{
-                border-left-width:2px;
-                border-right-width:2px;
-            }
-
-            a.cv-floor{
-                height:25px;
-                grid-template-columns:12px 1fr auto 6px;
-                gap:1px;
-                padding:0 2px;
-                font-size:7px;
-            }
-
-            .cv-floor-icon{
-                font-size:8px;
-            }
-
-            .cv-floor-count{
-                min-width:15px;
-                height:15px;
-                padding:0 2px;
-                font-size:6px;
-            }
-
-            .cv-floor-arrow{
-                font-size:5px;
+            div[data-testid="stHorizontalBlock"]
+            div[data-testid="stButton"] > button{
+                min-height:25px !important;
+                height:25px !important;
+                padding:0 2px !important;
+                font-size:7px !important;
             }
 
             .cv-ground{
@@ -606,13 +596,25 @@ def css_edificio_vivo():
     )
 
 
-def _html_edificio(
+# =========================================================
+# DIBUJO NATIVO
+# =========================================================
+
+def _pintar_edificio(
     centro,
     edificio,
     plantas,
     resumen,
 ):
-    plantas_html = ""
+    st.markdown(
+        (
+            '<div class="cv-roof"></div>'
+            '<div class="cv-building-name">'
+            f'{html.escape(edificio.upper())}'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
 
     for planta in plantas:
         datos = resumen.get(
@@ -625,6 +627,7 @@ def _html_edificio(
                 "urgentes": 0,
                 "altas": 0,
                 "ordenes": [],
+                "ordenes_ejecutables": [],
             },
         )
 
@@ -637,41 +640,44 @@ def _html_edificio(
             datos.get("ejecutables") or 0
         )
 
-        flecha = "▶" if ejecutables > 0 else ""
+        flecha = " ▶" if ejecutables > 0 else ""
 
-        query = _query_planta(
-            centro,
-            edificio,
-            planta,
+        # Marcador para el color del botón siguiente.
+        st.markdown(
+            f'<span class="cv-floor-{estado}"></span>',
+            unsafe_allow_html=True,
         )
 
-        plantas_html += (
-            f'<a class="cv-floor {estado}" '
-            f'href="{html.escape(query)}" '
-            f'target="_self">'
-            f'<span class="cv-floor-icon">{icono}</span>'
-            f'<span class="cv-floor-name">'
-            f'{html.escape(etiqueta)}'
-            f'</span>'
-            f'<span class="cv-floor-count">'
-            f'{html.escape(contador)}'
-            f'</span>'
-            f'<span class="cv-floor-arrow">{flecha}</span>'
-            f'</a>'
+        st.button(
+            f"{icono} {etiqueta}   {contador}{flecha}",
+            key=(
+                f"cv_planta_"
+                f"{centro}_"
+                f"{edificio}_"
+                f"{planta}"
+            ),
+            use_container_width=True,
+            on_click=_abrir_planta,
+            args=(
+                centro,
+                edificio,
+                planta,
+                datos.get("ordenes", []),
+                datos.get(
+                    "ordenes_ejecutables",
+                    [],
+                ),
+            ),
         )
 
-    return (
-        '<div class="cv-building">'
-        '<div class="cv-roof"></div>'
-        f'<div class="cv-building-name">'
-        f'{html.escape(edificio.upper())}'
-        f'</div>'
-        f'<div class="cv-floors">{plantas_html}</div>'
-        '<div class="cv-ground">'
-        '<div class="cv-door"></div>'
-        '</div>'
-        '<div class="cv-base"></div>'
-        '</div>'
+    st.markdown(
+        (
+            '<div class="cv-ground">'
+            '<div class="cv-door"></div>'
+            '</div>'
+            '<div class="cv-base"></div>'
+        ),
+        unsafe_allow_html=True,
     )
 
 
@@ -679,7 +685,10 @@ def pintar_campus_operario(
     centro,
     resumen,
 ):
-    edificios = EDIFICIOS.get(centro, {})
+    edificios = EDIFICIOS.get(
+        centro,
+        {},
+    )
 
     if not edificios:
         st.warning(
@@ -687,24 +696,31 @@ def pintar_campus_operario(
         )
         return
 
-    edificios_html = "".join(
-        _html_edificio(
-            centro,
-            edificio,
-            plantas,
-            resumen,
-        )
-        for edificio, plantas in edificios.items()
-    )
-
     st.markdown(
         (
-            f'<div class="cv-campus-title">'
+            '<div class="cv-campus-title">'
             f'{html.escape(centro)}'
-            f'</div>'
-            f'<div class="cv-campus-grid">'
-            f'{edificios_html}'
-            f'</div>'
+            '</div>'
         ),
         unsafe_allow_html=True,
     )
+
+    columnas = st.columns(
+        len(edificios),
+        gap="small",
+    )
+
+    for columna, (
+        edificio,
+        plantas,
+    ) in zip(
+        columnas,
+        edificios.items(),
+    ):
+        with columna:
+            _pintar_edificio(
+                centro,
+                edificio,
+                plantas,
+                resumen,
+            )
