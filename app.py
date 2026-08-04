@@ -352,6 +352,132 @@ def pintar_cabecera():
             unsafe_allow_html=True
         )
 
+def es_colegio_vivo_operario():
+    return (
+        str(st.session_state.get("perfil") or "").strip().lower()
+        == "operario"
+        and st.session_state.get("seccion_actual") == "Colegio Vivo"
+    )
+
+
+def procesar_accion_barra_operario():
+    accion = str(
+        st.query_params.get("app_accion") or ""
+    ).strip().lower()
+
+    if accion == "menu":
+        st.query_params.clear()
+        st.session_state["seccion_actual"] = None
+        st.rerun()
+
+    if accion == "salir":
+        st.query_params.clear()
+        st.session_state.clear()
+        st.rerun()
+
+
+def pintar_barra_operario_compacta():
+    usuario = usuario_visible()
+
+    st.markdown(
+        """
+        <style>
+        .barra-operario-mini{
+            width:min(100%,900px);
+            min-height:34px;
+            display:flex;
+            align-items:center;
+            gap:5px;
+            margin:0 auto 3px;
+            padding:3px 5px 3px 9px;
+            border:1px solid #dbe3ef;
+            border-radius:10px;
+            background:#ffffff;
+            box-shadow:0 2px 7px rgba(15,23,42,.07);
+        }
+
+        .barra-operario-usuario{
+            flex:1;
+            min-width:0;
+            overflow:hidden;
+            color:#475569;
+            font-size:11px;
+            line-height:1;
+            font-weight:850;
+            white-space:nowrap;
+            text-overflow:ellipsis;
+        }
+
+        .barra-operario-accion{
+            min-height:27px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            padding:0 9px;
+            border:1px solid #dbe3ef;
+            border-radius:8px;
+            background:#f8fafc;
+            color:#0f2747 !important;
+            font-size:10px;
+            line-height:1;
+            font-weight:900;
+            text-decoration:none !important;
+            white-space:nowrap;
+        }
+
+        .barra-operario-salir{
+            color:#991b1b !important;
+            background:#fff7f7;
+            border-color:#fecaca;
+        }
+
+        @media(max-width:760px){
+            .block-container{
+                padding-top:.08rem !important;
+                padding-left:.15rem !important;
+                padding-right:.15rem !important;
+            }
+
+            .barra-operario-mini{
+                min-height:31px;
+                margin-bottom:2px;
+                padding:2px 3px 2px 7px;
+                border-radius:8px;
+            }
+
+            .barra-operario-usuario{
+                font-size:9px;
+            }
+
+            .barra-operario-accion{
+                min-height:25px;
+                padding:0 7px;
+                font-size:9px;
+                border-radius:7px;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        (
+            '<div class="barra-operario-mini">'
+            f'<div class="barra-operario-usuario">👷 {usuario}</div>'
+            '<a class="barra-operario-accion" '
+            'href="?app_accion=menu" target="_self">'
+            '☰ Menú'
+            '</a>'
+            '<a class="barra-operario-accion barra-operario-salir" '
+            'href="?app_accion=salir" target="_self">'
+            '⏻ Salir'
+            '</a>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
     with col2:
         st.markdown(
             f'<div class="pro-header">'
