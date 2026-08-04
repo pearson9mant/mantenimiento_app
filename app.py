@@ -1149,7 +1149,8 @@ elif perfil == "comunicacion":
 
 
 else:
-    st.caption(f"👷 {operario_activo}")
+    if not modo_colegio_vivo:
+        st.caption(f"👷 {operario_activo}")
 
     # -----------------------------------------------------
     # SEGURIDAD DEL PERFIL INVENTARIO
@@ -1201,4 +1202,5 @@ else:
         st.warning("La sección seleccionada no está disponible.")
 
 
-pintar_footer()
+if not modo_colegio_vivo:
+    pintar_footer()
