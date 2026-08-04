@@ -75,8 +75,6 @@ def _todas_las_ordenes(colegio):
 
 def _ordenar_misiones(ordenes):
     def clave(ot):
-        aula = _texto_aula(mision)
-
         prioridad = str(
             ot.get("prioridad") or ""
         ).strip().lower()
