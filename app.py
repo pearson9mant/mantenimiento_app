@@ -1024,26 +1024,26 @@ if st.session_state["seccion_actual"] is None:
     st.stop()
 
 
-col_volver1, col_volver2 = st.columns(2)
+if not modo_colegio_vivo:
+    col_volver1, col_volver2 = st.columns(2)
 
-with col_volver1:
-    if st.button(
-        "⬅\nVolver al menú",
-        key="volver_menu_general",
-        use_container_width=True
-    ):
-        volver_menu()
+    with col_volver1:
+        if st.button(
+            "⬅\nVolver al menú",
+            key="volver_menu_general",
+            use_container_width=True,
+        ):
+            volver_menu()
 
-with col_volver2:
-    if st.button(
-        "🏠\nInicio",
-        key="volver_inicio_general",
-        use_container_width=True
-    ):
-        volver_menu()
+    with col_volver2:
+        if st.button(
+            "🏠\nInicio",
+            key="volver_inicio_general",
+            use_container_width=True,
+        ):
+            volver_menu()
 
-
-st.markdown("---")
+    st.markdown("---")
 
 seccion = st.session_state["seccion_actual"]
 
