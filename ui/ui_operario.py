@@ -1615,36 +1615,69 @@ def _redirigir_regreso_colegio_vivo():
 
 
 def pantalla_operario(modo="ordenes"):
-    solo_historico = str(modo or "").strip().lower() == "historico"
+    solo_historico = (
+        str(modo or "").strip().lower()
+        == "historico"
+    )
 
     if not solo_historico:
         _redirigir_regreso_colegio_vivo()
 
+    id_ot_abierta = st.session_state.get(
+        "operario_ot_abierta_id"
+    )
+
+    ot_abierta = (
+        id_ot_abierta is not None
+    )
+
     # Al entrar en histórico nunca se conserva una OT abierta.
     if solo_historico:
-        st.session_state.pop("operario_ot_abierta_id", None)
-        st.session_state.pop("colegio_vivo_origen_ot", None)
+        st.session_state.pop(
+            "operario_ot_abierta_id",
+            None,
+        )
+
+        st.session_state.pop(
+            "colegio_vivo_origen_ot",
+            None,
+        )
+
         st.title("📁 Mi histórico")
-    else:
+
+    elif not ot_abierta:
         st.title("👷 Operario")
 
     # =====================================================
     # VOLVER A ADMINISTRACIÓN
     # =====================================================
-    if st.session_state.get("vista_operario", False):
+    if st.session_state.get(
+        "vista_operario",
+        False,
+    ):
         if st.button(
             "🔙 Volver a administración",
-            key="volver_admin_pantalla_operario"
+            key="volver_admin_pantalla_operario",
         ):
-            st.session_state["vista_operario"] = False
-            st.session_state.pop("operario_ot_abierta_id", None)
+            st.session_state[
+                "vista_operario"
+            ] = False
+
+            st.session_state.pop(
+                "operario_ot_abierta_id",
+                None,
+            )
+
             st.rerun()
 
     # =====================================================
     # OPERARIO ACTUAL
     # =====================================================
     operario_sel = str(
-        st.session_state.get("operario_activo", "")
+        st.session_state.get(
+            "operario_activo",
+            "",
+        )
         or ""
     ).strip()
 
@@ -1654,13 +1687,20 @@ def pantalla_operario(modo="ordenes"):
             or ""
         ).strip()
 
-        st.session_state["operario_activo"] = operario_sel
+        st.session_state[
+            "operario_activo"
+        ] = operario_sel
 
     if not operario_sel:
-        st.warning("No hay operario seleccionado.")
+        st.warning(
+            "No hay operario seleccionado."
+        )
         return
 
-    st.info(f"Operario: {operario_sel}")
+    if not ot_abierta:
+        st.info(
+            f"Operario: {operario_sel}"
+        )
 
     # =====================================================
     # CARGA ÚNICA DE ÓRDENES ACTIVAS
