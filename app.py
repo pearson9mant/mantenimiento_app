@@ -439,7 +439,7 @@ def pintar_barra_operario_compacta():
             div[data-testid="stButton"] > button{
                 min-height:29px !important;
                 height:29px !important;
-                padding:0 6px !important;
+                padding:0 7px !important;
                 border-radius:7px !important;
                 font-size:9px !important;
             }
@@ -449,8 +449,8 @@ def pintar_barra_operario_compacta():
         unsafe_allow_html=True,
     )
 
-    col_usuario, col_menu, col_salir = st.columns(
-        [7, 1.3, 1.3],
+    col_usuario, col_salir = st.columns(
+        [8.7, 1.3],
         gap="small",
         vertical_alignment="center",
     )
@@ -463,14 +463,6 @@ def pintar_barra_operario_compacta():
                 '</div>'
             ),
             unsafe_allow_html=True,
-        )
-
-    with col_menu:
-        st.button(
-            "☰ Menú",
-            key="barra_operario_menu",
-            use_container_width=True,
-            on_click=_accion_menu_operario,
         )
 
     with col_salir:
