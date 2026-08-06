@@ -265,13 +265,8 @@ def _texto_contador(datos):
     if total == 0:
         return "✓"
 
-    if ejecutables == 1:
-        return "1 OT"
-
-    if ejecutables > 1:
-        return f"{ejecutables} OT"
-
-    return f"{total} OT"
+    cantidad = ejecutables if ejecutables > 0 else total
+    return f"({cantidad})"
 
 
 # =========================================================
@@ -290,6 +285,11 @@ def _abrir_planta(
     st.session_state["colegio_vivo_centro"] = centro
     st.session_state["colegio_vivo_edificio"] = edificio
     st.session_state["colegio_vivo_planta"] = planta
+
+    # Se conserva para resaltar la última planta utilizada al volver al mapa.
+    st.session_state["colegio_vivo_ultima_centro"] = centro
+    st.session_state["colegio_vivo_ultimo_edificio"] = edificio
+    st.session_state["colegio_vivo_ultima_planta"] = planta
 
     st.session_state["colegio_vivo_ordenes_planta"] = list(
         ordenes or []
@@ -454,6 +454,33 @@ def css_edificio_vivo():
                 !important;
         }
 
+        /* Planta utilizada más recientemente */
+        div[data-testid="stHorizontalBlock"]
+        div[data-testid="stButton"] > button[kind="primary"]{
+            background:linear-gradient(
+                135deg,
+                #173a6e,
+                #2459a7
+            ) !important;
+            color:#ffffff !important;
+            border:3px solid #f0d58a !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.28),
+                0 4px 12px rgba(15,39,71,.20)
+                !important;
+        }
+
+        @keyframes cvAbrirPlanta{
+            from{
+                opacity:0;
+                transform:translateY(8px) scale(.992);
+            }
+            to{
+                opacity:1;
+                transform:translateY(0) scale(1);
+            }
+        }
+
         .cv-planta-detalle{
             width:min(100%,900px);
             margin:4px auto;
@@ -461,6 +488,7 @@ def css_edificio_vivo():
             border:1px solid #dbe3ef;
             border-radius:11px;
             background:#fff;
+            animation:cvAbrirPlanta .22s ease-out both;
         }
 
         .cv-planta-detalle-titulo{
@@ -579,14 +607,21 @@ def _pintar_edificio(
         contador = _texto_contador(datos)
 
 
+        planta_activa = (
+            st.session_state.get("colegio_vivo_ultima_centro") == centro
+            and st.session_state.get("colegio_vivo_ultimo_edificio") == edificio
+            and st.session_state.get("colegio_vivo_ultima_planta") == planta
+        )
+
         st.button(
-            f"{icono} {etiqueta}     {contador}  ›",
+            f"{icono} {etiqueta}     {contador}",
             key=(
                 f"cv_planta_"
                 f"{centro}_"
                 f"{edificio}_"
                 f"{planta}"
             ),
+            type="primary" if planta_activa else "secondary",
             use_container_width=True,
             on_click=_abrir_planta,
             args=(
