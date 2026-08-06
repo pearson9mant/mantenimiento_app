@@ -1733,10 +1733,7 @@ def pantalla_operario(modo="ordenes"):
     # Listado ligero o una única OT abierta
     # =====================================================
     if not solo_historico:
-        id_ot_abierta = st.session_state.get(
-            "operario_ot_abierta_id"
-        )
-
+    
         # Legionella se ofrece únicamente desde el listado.
         # Al trabajar una OT no se construyen otras pantallas.
         if (
@@ -1752,20 +1749,20 @@ def pantalla_operario(modo="ordenes"):
                 horizontal=True,
                 key="zona_operario_legionella"
             )
-
+    
             if zona_operario == "💧 Control Legionella":
                 try:
                     from ui.ui_legionella import pantalla_legionella
                     pantalla_legionella()
-
+    
                 except Exception as e:
                     st.error(
                         "No se ha podido abrir el módulo de Legionella."
                     )
                     st.exception(e)
-
+    
                 return
-
+    
         if id_ot_abierta is not None:
             pantalla_trabajar_ot_operario(
                 operario_sel,
