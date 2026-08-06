@@ -454,60 +454,6 @@ def css_edificio_vivo():
                 !important;
         }
 
-        .cv-floor-correcta + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #d9f7c9,
-                #bfeaa7
-            ) !important;
-        }
-
-        .cv-floor-seguimiento + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #fff1ad,
-                #ffd763
-            ) !important;
-        }
-
-        .cv-floor-atencion + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #ffd2aa,
-                #ff9b54
-            ) !important;
-        }
-
-        .cv-floor-critica + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #ffc2c2,
-                #ff7f7f
-            ) !important;
-        }
-
-        .cv-floor-curso + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #c7dcff,
-                #79aaff
-            ) !important;
-        }
-
-        .cv-floor-bloqueada + div
-        button{
-            background:linear-gradient(
-                90deg,
-                #e7e5e4,
-                #cbd5e1
-            ) !important;
-        }
-
         .cv-planta-detalle{
             width:min(100%,900px);
             margin:4px auto;
@@ -632,15 +578,6 @@ def _pintar_edificio(
         etiqueta = etiqueta_planta(planta)
         contador = _texto_contador(datos)
 
-        ejecutables = int(
-            datos.get("ejecutables") or 0
-        )
-
-                # Marcador para el color del botón siguiente.
-        st.markdown(
-            f'<span class="cv-floor-{estado}"></span>',
-            unsafe_allow_html=True,
-        )
 
         st.button(
             f"{icono} {etiqueta}     {contador}  ›",
