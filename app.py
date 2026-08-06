@@ -352,11 +352,22 @@ def pintar_cabecera():
             unsafe_allow_html=True
         )
 
-def es_colegio_vivo_operario():
+def es_modo_operario_compacto():
+    perfil_actual = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    seccion_actual = st.session_state.get("seccion_actual")
+    ot_abierta = st.session_state.get("operario_ot_abierta_id")
+
     return (
-        str(st.session_state.get("perfil") or "").strip().lower()
-        == "operario"
-        and st.session_state.get("seccion_actual") == "Colegio Vivo"
+        perfil_actual == "operario"
+        and (
+            seccion_actual == "Colegio Vivo"
+            or ot_abierta is not None
+        )
     )
 
 
@@ -948,9 +959,9 @@ operario_activo = st.session_state.get("operario_activo", "")
 
 procesar_accion_barra_operario()
 
-modo_colegio_vivo = es_colegio_vivo_operario()
+modo_operario_compacto = es_modo_operario_compacto()
 
-if modo_colegio_vivo:
+if modo_operario_compacto:
     pintar_barra_operario_compacta()
 else:
     pintar_cabecera()
@@ -1011,7 +1022,7 @@ if st.session_state["seccion_actual"] is None:
     st.stop()
 
 
-if not modo_colegio_vivo:
+if not modo_operario_compacto:
     col_volver1, col_volver2 = st.columns(2)
 
     with col_volver1:
@@ -1136,7 +1147,7 @@ elif perfil == "comunicacion":
 
 
 else:
-    if not modo_colegio_vivo:
+    if not modo_operario_compacto:
         st.caption(f"👷 {operario_activo}")
 
     # -----------------------------------------------------
@@ -1189,5 +1200,5 @@ else:
         st.warning("La sección seleccionada no está disponible.")
 
 
-if not modo_colegio_vivo:
+if not modo_operario_compacto:
     pintar_footer()
