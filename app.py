@@ -370,21 +370,23 @@ def es_modo_operario_compacto():
         )
     )
 
+def _accion_menu_operario():
+    st.session_state.pop(
+        "operario_ot_abierta_id",
+        None,
+    )
 
-def procesar_accion_barra_operario():
-    accion = str(
-        st.query_params.get("app_accion") or ""
-    ).strip().lower()
+    st.session_state.pop(
+        "colegio_vivo_origen_ot",
+        None,
+    )
 
-    if accion == "menu":
-        st.query_params.clear()
-        st.session_state["seccion_actual"] = None
-        st.rerun()
+    st.session_state["colegio_vivo_vista"] = "mapa"
+    st.session_state["seccion_actual"] = None
 
-    if accion == "salir":
-        st.query_params.clear()
-        st.session_state.clear()
-        st.rerun()
+
+def _accion_salir_operario():
+    st.session_state.clear()
 
 
 def pintar_barra_operario_compacta():
@@ -393,53 +395,30 @@ def pintar_barra_operario_compacta():
     st.markdown(
         """
         <style>
-        .barra-operario-mini{
-            width:min(100%,900px);
-            min-height:34px;
+        .barra-operario-nombre{
+            min-height:32px;
             display:flex;
             align-items:center;
-            gap:5px;
-            margin:0 auto 3px;
-            padding:3px 5px 3px 9px;
+            padding:0 9px;
             border:1px solid #dbe3ef;
-            border-radius:10px;
+            border-radius:9px;
             background:#ffffff;
+            color:#334155;
+            font-size:11px;
+            font-weight:900;
             box-shadow:0 2px 7px rgba(15,23,42,.07);
         }
 
-        .barra-operario-usuario{
-            flex:1;
-            min-width:0;
-            overflow:hidden;
-            color:#475569;
-            font-size:11px;
-            line-height:1;
-            font-weight:850;
-            white-space:nowrap;
-            text-overflow:ellipsis;
-        }
-
-        .barra-operario-accion{
-            min-height:27px;
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            padding:0 9px;
-            border:1px solid #dbe3ef;
-            border-radius:8px;
-            background:#f8fafc;
-            color:#0f2747 !important;
-            font-size:10px;
-            line-height:1;
-            font-weight:900;
-            text-decoration:none !important;
-            white-space:nowrap;
-        }
-
-        .barra-operario-salir{
-            color:#991b1b !important;
-            background:#fff7f7;
-            border-color:#fecaca;
+        div[data-testid="stHorizontalBlock"]
+        div[data-testid="stButton"] > button{
+            min-height:32px !important;
+            height:32px !important;
+            padding:0 9px !important;
+            margin:0 !important;
+            border-radius:9px !important;
+            font-size:11px !important;
+            font-weight:900 !important;
+            white-space:nowrap !important;
         }
 
         @media(max-width:760px){
@@ -449,22 +428,20 @@ def pintar_barra_operario_compacta():
                 padding-right:.15rem !important;
             }
 
-            .barra-operario-mini{
-                min-height:31px;
-                margin-bottom:2px;
-                padding:2px 3px 2px 7px;
-                border-radius:8px;
-            }
-
-            .barra-operario-usuario{
-                font-size:9px;
-            }
-
-            .barra-operario-accion{
-                min-height:25px;
-                padding:0 7px;
+            .barra-operario-nombre{
+                min-height:29px;
+                padding:0 6px;
                 font-size:9px;
                 border-radius:7px;
+            }
+
+            div[data-testid="stHorizontalBlock"]
+            div[data-testid="stButton"] > button{
+                min-height:29px !important;
+                height:29px !important;
+                padding:0 6px !important;
+                border-radius:7px !important;
+                font-size:9px !important;
             }
         }
         </style>
@@ -472,22 +449,37 @@ def pintar_barra_operario_compacta():
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        (
-            '<div class="barra-operario-mini">'
-            f'<div class="barra-operario-usuario">👷 {usuario}</div>'
-            '<a class="barra-operario-accion" '
-            'href="?app_accion=menu" target="_self">'
-            '☰ Menú'
-            '</a>'
-            '<a class="barra-operario-accion barra-operario-salir" '
-            'href="?app_accion=salir" target="_self">'
-            '⏻ Salir'
-            '</a>'
-            '</div>'
-        ),
-        unsafe_allow_html=True,
+    col_usuario, col_menu, col_salir = st.columns(
+        [7, 1.3, 1.3],
+        gap="small",
+        vertical_alignment="center",
     )
+
+    with col_usuario:
+        st.markdown(
+            (
+                '<div class="barra-operario-nombre">'
+                f'👷 {usuario}'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
+        )
+
+    with col_menu:
+        st.button(
+            "☰ Menú",
+            key="barra_operario_menu",
+            use_container_width=True,
+            on_click=_accion_menu_operario,
+        )
+
+    with col_salir:
+        st.button(
+            "⏻ Salir",
+            key="barra_operario_salir",
+            use_container_width=True,
+            on_click=_accion_salir_operario,
+        )
 
 
 def pintar_footer():
