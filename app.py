@@ -370,20 +370,6 @@ def es_modo_operario_compacto():
         )
     )
 
-def _accion_menu_operario():
-    st.session_state.pop(
-        "operario_ot_abierta_id",
-        None,
-    )
-
-    st.session_state.pop(
-        "colegio_vivo_origen_ot",
-        None,
-    )
-
-    st.session_state["colegio_vivo_vista"] = "mapa"
-    st.session_state["seccion_actual"] = None
-
 
 def _accion_salir_operario():
     st.session_state.clear()
