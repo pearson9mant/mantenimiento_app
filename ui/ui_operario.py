@@ -1586,21 +1586,23 @@ def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
 
 def _redirigir_regreso_colegio_vivo():
     """
-    Cuando el botón interno de ui_trabajar_ot cierra la OT,
-    esta función devuelve al punto exacto de origen.
+    Después de finalizar una OT, devuelve exactamente
+    al punto desde el que se abrió (Misión o Planta).
     """
-    id_ot_abierta = st.session_state.get(
-        "operario_ot_abierta_id"
-    )
 
     origen = str(
-        st.session_state.get("colegio_vivo_origen_ot")
-        or ""
+        st.session_state.get("colegio_vivo_origen_ot") or ""
     ).strip().lower()
 
-    # Mientras la OT siga abierta no hay nada que redirigir.
-    if id_ot_abierta is not None or origen not in ["mision", "planta"]:
+    if origen not in ("mision", "planta"):
         return False
+
+    # Solo actuamos cuando una OT ha sido finalizada.
+    if not st.session_state.pop("recalcular_corazon", False):
+        return False
+
+    # Ya no debe quedar ninguna OT abierta.
+    st.session_state.pop("operario_ot_abierta_id", None)
 
     st.session_state["seccion_actual"] = "Colegio Vivo"
 
@@ -1610,6 +1612,7 @@ def _redirigir_regreso_colegio_vivo():
         st.session_state["colegio_vivo_vista"] = "mapa"
 
     st.session_state.pop("colegio_vivo_origen_ot", None)
+
     st.rerun()
     return True
 
