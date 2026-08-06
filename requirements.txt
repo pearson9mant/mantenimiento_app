@@ -1,9 +1,9 @@
-streamlit
+streamlit==1.60.0
 pandas
 psycopg2-binary
 reportlab
 streamlit-autorefresh
 requests
-streamlit-image-coordinates
+streamlit-image-coordinates==0.4.0
 Pillow
 qrcode
