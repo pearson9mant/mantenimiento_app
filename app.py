@@ -949,8 +949,6 @@ perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
 
 
-procesar_accion_barra_operario()
-
 modo_operario_compacto = es_modo_operario_compacto()
 
 if modo_operario_compacto:
