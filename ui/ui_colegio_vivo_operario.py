@@ -329,6 +329,13 @@ def _abrir_ot_para_trabajar(ot, origen="mision"):
     st.session_state["seccion_actual"] = "Órdenes"
 
 
+def _volver_edificio_desde_planta():
+    """
+    Vuelve al edificio sin lanzar un rerun manual adicional.
+    """
+    volver_colegio_vivo()
+
+
 def _mostrar_planta_seleccionada():
     if st.session_state.get("colegio_vivo_vista") != "planta":
         return False
@@ -338,13 +345,12 @@ def _mostrar_planta_seleccionada():
     planta = st.session_state.get("colegio_vivo_planta", "")
     ordenes = st.session_state.get("colegio_vivo_ordenes_planta", [])
 
-    if st.button(
+    st.button(
         "← VOLVER AL EDIFICIO",
         key="cv_volver_edificio",
         use_container_width=True,
-    ):
-        volver_colegio_vivo()
-        st.rerun()
+        on_click=_volver_edificio_desde_planta,
+    )
 
     st.markdown(
         (
@@ -374,7 +380,7 @@ def _mostrar_planta_seleccionada():
 
         st.markdown(
             (
-                '<div class="cv-planta-detalle">'
+                '<div class="cv-planta-detalle cv-planta-ot">'
                 f'<strong>{html.escape(numero_ot)}</strong> · '
                 f'<strong>{html.escape(aula)}</strong><br>'
                 f'{html.escape(descripcion)}<br>'
@@ -456,6 +462,30 @@ def _css_pantalla_operario():
             font-size:20px;
             line-height:1;
             font-weight:950;
+        }
+
+        .cv-planta-ot{
+            margin-top:3px;
+        }
+
+        @media(max-width:760px){
+            .cv-planta-detalle{
+                padding:7px 9px !important;
+                margin:2px 0 !important;
+                border-radius:8px !important;
+                font-size:10px !important;
+                line-height:1.20 !important;
+            }
+
+            .cv-planta-detalle-titulo{
+                font-size:11px !important;
+                line-height:1.15 !important;
+            }
+
+            .cv-planta-ot{
+                padding:6px 8px !important;
+                margin-top:2px !important;
+            }
         }
 
         .cv-no-work{
