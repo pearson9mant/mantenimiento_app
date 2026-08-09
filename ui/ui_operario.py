@@ -1586,32 +1586,77 @@ def pantalla_trabajar_ot_operario(operario_sel, ordenes_activas):
 
 def _redirigir_regreso_colegio_vivo():
     """
-    Después de finalizar una OT, devuelve exactamente
-    al punto desde el que se abrió (Misión o Planta).
+    Gestiona los dos regresos desde una OT:
+
+    1. Volver manualmente:
+       - desde planta -> vuelve a las OT de esa planta
+       - desde misión -> vuelve al mapa Colegio Vivo
+
+    2. Finalizar OT:
+       - vuelve al mapa Colegio Vivo
+       - el Corazón recalcula la siguiente misión
     """
 
+    id_ot_abierta = st.session_state.get(
+        "operario_ot_abierta_id"
+    )
+
     origen = str(
-        st.session_state.get("colegio_vivo_origen_ot") or ""
+        st.session_state.get(
+            "colegio_vivo_origen_ot"
+        )
+        or ""
     ).strip().lower()
 
-    if origen not in ("mision", "planta"):
+    if origen not in ["mision", "planta"]:
         return False
 
-    # Solo actuamos cuando una OT ha sido finalizada.
-    if not st.session_state.pop("recalcular_corazon", False):
+    # -------------------------------------------------
+    # ¿La OT acaba de ser finalizada?
+    # -------------------------------------------------
+    finalizada = bool(
+        st.session_state.pop(
+            "recalcular_corazon",
+            False,
+        )
+    )
+
+    # -------------------------------------------------
+    # Si la OT sigue abierta y no se ha finalizado,
+    # seguimos trabajando en ella.
+    # -------------------------------------------------
+    if id_ot_abierta is not None and not finalizada:
         return False
 
-    # Ya no debe quedar ninguna OT abierta.
-    st.session_state.pop("operario_ot_abierta_id", None)
-
+    # -------------------------------------------------
+    # Entramos otra vez en Colegio Vivo
+    # -------------------------------------------------
     st.session_state["seccion_actual"] = "Colegio Vivo"
 
-    if origen == "planta":
-        st.session_state["colegio_vivo_vista"] = "planta"
-    else:
+    if finalizada:
+        # Al finalizar volvemos al edificio completo.
+        # Colegio Vivo cargará de nuevo las OT y
+        # el Corazón elegirá la siguiente misión.
         st.session_state["colegio_vivo_vista"] = "mapa"
 
-    st.session_state.pop("colegio_vivo_origen_ot", None)
+        st.session_state.pop(
+            "operario_ot_abierta_id",
+            None,
+        )
+
+    elif origen == "planta":
+        # Si solo hemos pulsado VOLVER,
+        # regresamos exactamente a la planta.
+        st.session_state["colegio_vivo_vista"] = "planta"
+
+    else:
+        # Si veníamos directamente de Mi misión.
+        st.session_state["colegio_vivo_vista"] = "mapa"
+
+    st.session_state.pop(
+        "colegio_vivo_origen_ot",
+        None,
+    )
 
     st.rerun()
     return True
