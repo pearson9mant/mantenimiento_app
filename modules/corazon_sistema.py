@@ -1694,6 +1694,12 @@ def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     )
 
     if en_curso:
+        en_curso["decision_humana_corazon"] = {
+            "nivel": "continuar",
+            "etiqueta": "🔵 CONTINÚA LO QUE ESTÁS HACIENDO",
+            "mensaje": "Ya tienes esta OT en curso.",
+        }
+
         return {
             "estado_corazon": "continuar",
             "mision": en_curso,
@@ -1763,6 +1769,9 @@ def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     mision["motivos_corazon"] = prioridad.get("motivos", [])
     mision["recurrencia_corazon"] = prioridad.get("recurrencia")
     mision["planta_resuelta_corazon"] = prioridad.get("planta")
+    mision["decision_humana_corazon"] = clasificar_decision_corazon(
+        mision
+    )
 
     return {
         "estado_corazon": "propuesta",
@@ -1999,6 +2008,118 @@ def buscar_antecedente_similar_corazon(
             mejor = candidato
 
     return mejor
+
+
+
+# =====================================================
+# LECTURA HUMANA DE LA DECISIÓN DEL CORAZÓN
+# =====================================================
+
+def clasificar_decision_corazon(mision):
+    """
+    Traduce la puntuación técnica a una recomendación comprensible
+    para el operario, sin cambiar el orden ni la puntuación.
+
+    No decide nada nuevo: solo explica la decisión ya tomada.
+    """
+    if not mision:
+        return {
+            "nivel": "sin_mision",
+            "etiqueta": "",
+            "mensaje": "",
+        }
+
+    score = int(
+        mision.get("score_corazon")
+        or mision.get("score")
+        or 0
+    )
+
+    prioridad = normalizar(
+        mision.get("prioridad")
+    )
+
+    area = normalizar(
+        mision.get("area")
+    )
+
+    origen = normalizar(
+        mision.get("origen")
+    )
+
+    descripcion = normalizar(
+        mision.get("descripcion")
+    )
+
+    motivos = [
+        str(motivo or "").strip()
+        for motivo in (
+            mision.get("motivos_corazon")
+            or mision.get("motivos")
+            or []
+        )
+        if str(motivo or "").strip()
+    ]
+
+    texto_global = " ".join(
+        [area, origen, descripcion] + motivos
+    ).lower()
+
+    critica = (
+        "urgente" in prioridad
+        or "legionella" in texto_global
+        or score >= 90
+    )
+
+    if critica:
+        return {
+            "nivel": "ahora",
+            "etiqueta": "🔴 HAZLO AHORA",
+            "mensaje": (
+                "Esta actuación tiene prioridad suficiente "
+                "para interrumpir la ruta normal."
+            ),
+        }
+
+    continuidad = any(
+        frase in texto_global
+        for frase in [
+            "ya estás trabajando en esta planta",
+            "ya estas trabajando en esta planta",
+            "ya estás en este edificio",
+            "ya estas en este edificio",
+            "actuaciones ejecutables en esta planta",
+        ]
+    )
+
+    if continuidad and score < 90:
+        return {
+            "nivel": "aprovecha",
+            "etiqueta": "🟡 APROVECHA QUE ESTÁS AQUÍ",
+            "mensaje": (
+                "No es una emergencia, pero resolverla ahora "
+                "evita desplazamientos y mejora la jornada."
+            ),
+        }
+
+    if score >= 70 or prioridad == "alta":
+        return {
+            "nivel": "ahora",
+            "etiqueta": "🟠 CONVIENE HACERLA AHORA",
+            "mensaje": (
+                "Es una de las actuaciones más importantes "
+                "que tienes disponibles."
+            ),
+        }
+
+    return {
+        "nivel": "puede_esperar",
+        "etiqueta": "🟢 PUEDE ESPERAR",
+        "mensaje": (
+            "Puede mantenerse en cola mientras existan "
+            "actuaciones de mayor impacto."
+        ),
+    }
 
 
 def latido_corazon(
