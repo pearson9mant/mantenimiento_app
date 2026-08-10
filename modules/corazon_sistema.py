@@ -725,15 +725,95 @@ def calcular_tipo_prioridad(row):
     return "Incidencia"
 
 
+# =====================================================
+# DECISIÓN OPERATIVA DEL CORAZÓN
+# =====================================================
+
+# Personas cuya solicitud debe recibir un refuerzo operativo.
+# Se puede ampliar sin tocar el algoritmo.
+SOLICITANTES_DIRECCION_CORAZON = {
+    "noemi",
+    "noemí",
+}
+
+# Áreas que, a igualdad de prioridad, deben subir por impacto.
+PESO_IMPACTO_AREA_CORAZON = {
+    "agua": 12,
+    "fontaneria": 12,
+    "fontanería": 12,
+    "electricidad": 10,
+    "electrico": 10,
+    "eléctrico": 10,
+    "climatizacion": 8,
+    "climatización": 8,
+    "acs": 12,
+    "legionella": 20,
+}
+
+
+def _peso_impacto_operativo_corazon(row):
+    area = normalizar(row.get("area"))
+    descripcion = normalizar(row.get("descripcion"))
+
+    texto = f"{area} {descripcion}"
+
+    mejor_peso = 0
+    motivo = ""
+
+    reglas = [
+        (["legionella"], 20, "Riesgo sanitario."),
+        (["fuga", "agua", "inund", "fontan"], 12, "Posible afectación por agua."),
+        (["electr", "enchufe", "tension", "tensión", "cuadro"], 10, "Posible afectación eléctrica."),
+        (["clima", "aire acondicionado", "calefaccion", "calefacción"], 8, "Afecta a climatización o confort."),
+    ]
+
+    for palabras, peso, texto_motivo in reglas:
+        if any(palabra in texto for palabra in palabras) and peso > mejor_peso:
+            mejor_peso = peso
+            motivo = texto_motivo
+
+    return mejor_peso, motivo
+
+
+def _es_solicitud_direccion_corazon(row):
+    solicitante = normalizar(row.get("solicitante"))
+
+    if not solicitante:
+        return False
+
+    return any(
+        nombre in solicitante
+        for nombre in SOLICITANTES_DIRECCION_CORAZON
+    )
+
+
+
 def puntuar_orden(row):
+    """
+    Puntuación base del Corazón.
+
+    Orden de decisión:
+    1. Riesgo sanitario / urgencia explícita.
+    2. Prioridad alta.
+    3. Impacto operativo: agua, electricidad, climatización.
+    4. Solicitud directa de dirección.
+    5. Antigüedad.
+
+    La concentración por planta se añade después, cuando todas las OT
+    ya tienen la planta resuelta.
+    """
     score = 0
     motivos = []
+    dias = None
 
     area = normalizar(row.get("area"))
     origen = normalizar(row.get("origen"))
     prioridad = normalizar(row.get("prioridad"))
     descripcion = normalizar(row.get("descripcion"))
 
+    # -------------------------------------------------
+    # 1. PRIORIDAD PRINCIPAL
+    # -------------------------------------------------
     if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
         score += 95
         motivos.append("Riesgo sanitario / Legionella.")
@@ -758,18 +838,27 @@ def puntuar_orden(row):
         score += 40
         motivos.append("Orden abierta pendiente de gestión.")
 
-    if "fuga" in descripcion or "agua" in descripcion or "perdida" in descripcion:
-        score += 10
-        motivos.append("Posible afectación por agua.")
+    # -------------------------------------------------
+    # 2. IMPACTO OPERATIVO
+    # -------------------------------------------------
+    peso_impacto, motivo_impacto = _peso_impacto_operativo_corazon(row)
 
-    if "eléctr" in descripcion or "electric" in descripcion:
-        score += 8
-        motivos.append("Posible riesgo eléctrico.")
+    if peso_impacto:
+        score += peso_impacto
+        if motivo_impacto and motivo_impacto not in motivos:
+            motivos.append(motivo_impacto)
 
-    if "clima" in descripcion or "aire" in descripcion:
-        score += 6
-        motivos.append("Afecta a climatización o confort.")
+    # -------------------------------------------------
+    # 3. SOLICITUD DIRECTA DE DIRECCIÓN
+    # No gana a una urgencia real, pero rompe empates y sube la OT.
+    # -------------------------------------------------
+    if _es_solicitud_direccion_corazon(row):
+        score += 12
+        motivos.append("Solicitud directa de dirección.")
 
+    # -------------------------------------------------
+    # 4. ANTIGÜEDAD
+    # -------------------------------------------------
     fecha_txt = (
         row.get("fecha")
         or row.get("fecha_creacion")
@@ -801,7 +890,8 @@ def puntuar_orden(row):
 
     score = min(score, 100)
 
-    return score, motivos, dias if 'dias' in locals() else None
+    return score, motivos, dias
+
 
 
 def construir_prioridades_globales(
@@ -947,7 +1037,70 @@ def construir_prioridades_globales(
             ),
         })
 
-    prioridades.sort(key=lambda x: x["score"], reverse=True)
+    # =================================================
+    # BONUS DE CONCENTRACIÓN POR PLANTA
+    # =================================================
+    # A igualdad razonable de riesgo, el Corazón favorece terminar
+    # varias actuaciones cercanas y evita desplazamientos innecesarios.
+    concentracion = {}
+
+    for prioridad_item in prioridades:
+        clave_zona = (
+            prioridad_item.get("centro", "") or "",
+            prioridad_item.get("edificio", "") or "",
+            prioridad_item.get("planta", "") or "",
+        )
+
+        if clave_zona[2] and clave_zona[2] != "Sin planta":
+            concentracion[clave_zona] = (
+                concentracion.get(clave_zona, 0) + 1
+            )
+
+    for prioridad_item in prioridades:
+        clave_zona = (
+            prioridad_item.get("centro", "") or "",
+            prioridad_item.get("edificio", "") or "",
+            prioridad_item.get("planta", "") or "",
+        )
+
+        cantidad_zona = concentracion.get(clave_zona, 0)
+
+        if cantidad_zona >= 5:
+            bonus_zona = 8
+        elif cantidad_zona >= 3:
+            bonus_zona = 5
+        elif cantidad_zona == 2:
+            bonus_zona = 2
+        else:
+            bonus_zona = 0
+
+        if bonus_zona:
+            prioridad_item["score"] = min(
+                100,
+                int(prioridad_item.get("score", 0) or 0) + bonus_zona,
+            )
+
+            prioridad_item.setdefault(
+                "motivos",
+                [],
+            ).append(
+                f"Hay {cantidad_zona} actuaciones ejecutables en esta planta."
+            )
+
+            prioridad_item["concentracion_planta"] = cantidad_zona
+        else:
+            prioridad_item["concentracion_planta"] = cantidad_zona
+
+    prioridades.sort(
+        key=lambda x: (
+            x.get("score", 0),
+            1 if normalizar(x.get("prioridad")) == "urgente" else 0,
+            x.get("concentracion_planta", 0),
+            x.get("dias_abierta") or 0,
+        ),
+        reverse=True,
+    )
+
     return prioridades[:limite]
 
 
@@ -1531,235 +1684,6 @@ def obtener_mision_actual(operario, centro=None):
         "mensaje": "Esta es la siguiente misión recomendada por el Corazón.",
         "bloqueadas": bloqueadas,
     }
-
-
-# =====================================================
-# MEMORIA DEL CORAZÓN · ANTECEDENTE SIMILAR
-# =====================================================
-
-_PALABRAS_VACIAS_CORAZON = {
-    "de", "del", "la", "las", "el", "los", "un", "una", "unos", "unas",
-    "y", "o", "en", "con", "por", "para", "que", "se", "no", "al", "a",
-    "esta", "este", "esto", "esa", "ese", "muy", "mas", "más",
-}
-
-
-def _normalizar_texto_averia_corazon(valor):
-    texto = normalizar(valor)
-
-    reemplazos = {
-        "á": "a",
-        "é": "e",
-        "í": "i",
-        "ó": "o",
-        "ú": "u",
-        "ü": "u",
-        "ñ": "n",
-    }
-
-    for origen, destino in reemplazos.items():
-        texto = texto.replace(origen, destino)
-
-    limpio = []
-    for caracter in texto:
-        limpio.append(
-            caracter
-            if caracter.isalnum() or caracter.isspace()
-            else " "
-        )
-
-    palabras = [
-        palabra
-        for palabra in "".join(limpio).split()
-        if palabra not in _PALABRAS_VACIAS_CORAZON
-        and len(palabra) >= 2
-    ]
-
-    return " ".join(palabras)
-
-
-def _similitud_textos_corazon(texto_a, texto_b):
-    a = _normalizar_texto_averia_corazon(texto_a)
-    b = _normalizar_texto_averia_corazon(texto_b)
-
-    if not a or not b:
-        return 0.0
-
-    ratio_secuencia = SequenceMatcher(None, a, b).ratio()
-
-    tokens_a = set(a.split())
-    tokens_b = set(b.split())
-
-    union = tokens_a | tokens_b
-    interseccion = tokens_a & tokens_b
-
-    ratio_tokens = (
-        len(interseccion) / len(union)
-        if union
-        else 0.0
-    )
-
-    return max(
-        ratio_secuencia,
-        (ratio_tokens * 0.75) + (ratio_secuencia * 0.25),
-    )
-
-
-def buscar_antecedente_similar_corazon(
-    ot_actual,
-    umbral=0.72,
-):
-    """
-    Busca una OT histórica realmente parecida a la misión actual.
-
-    Solo devuelve antecedentes:
-    - del mismo centro y espacio;
-    - con similitud textual suficiente;
-    - con solución real registrada.
-    """
-    if not ot_actual:
-        return None
-
-    centro = str(
-        ot_actual.get("centro")
-        or ot_actual.get("_centro_vivo")
-        or ""
-    ).strip()
-
-    edificio = str(
-        ot_actual.get("edificio")
-        or ot_actual.get("_edificio_vivo")
-        or ""
-    ).strip()
-
-    espacio = str(
-        ot_actual.get("espacio")
-        or ot_actual.get("aula")
-        or ot_actual.get("ubicacion")
-        or ""
-    ).strip()
-
-    area = str(
-        ot_actual.get("area")
-        or ""
-    ).strip()
-
-    descripcion_actual = str(
-        ot_actual.get("descripcion")
-        or ot_actual.get("titulo")
-        or ot_actual.get("incidencia")
-        or ""
-    ).strip()
-
-    numero_actual = str(
-        ot_actual.get("numero_ot")
-        or ""
-    ).strip()
-
-    if not centro or not espacio or not descripcion_actual:
-        return None
-
-    df = leer_df_corazon(
-        """
-        SELECT
-            numero_ot,
-            descripcion,
-            area,
-            edificio,
-            espacio,
-            fecha_cierre,
-            fecha_creacion,
-            observaciones_cierre,
-            trabajo_realizado
-        FROM historico_ordenes
-        WHERE centro = ?
-          AND espacio = ?
-        ORDER BY id DESC
-        LIMIT 80
-        """,
-        (centro, espacio),
-    )
-
-    if df.empty:
-        return None
-
-    edificio_actual_norm = normalizar_edificio(edificio)
-    area_actual_norm = normalizar(area)
-
-    mejor = None
-
-    for _, fila in df.iterrows():
-        numero_anterior = str(
-            fila.get("numero_ot") or ""
-        ).strip()
-
-        if numero_actual and numero_anterior == numero_actual:
-            continue
-
-        solucion = str(
-            fila.get("observaciones_cierre")
-            or fila.get("trabajo_realizado")
-            or ""
-        ).strip()
-
-        if not solucion:
-            continue
-
-        descripcion_anterior = str(
-            fila.get("descripcion")
-            or ""
-        ).strip()
-
-        similitud_textual = _similitud_textos_corazon(
-            descripcion_actual,
-            descripcion_anterior,
-        )
-
-        if similitud_textual < 0.45:
-            continue
-
-        puntuacion = similitud_textual
-
-        if normalizar_edificio(
-            fila.get("edificio")
-        ) == edificio_actual_norm:
-            puntuacion += 0.08
-
-        if (
-            area_actual_norm
-            and normalizar(fila.get("area")) == area_actual_norm
-        ):
-            puntuacion += 0.12
-
-        puntuacion = min(1.0, puntuacion)
-
-        if puntuacion < umbral:
-            continue
-
-        fecha = (
-            fila.get("fecha_cierre")
-            or fila.get("fecha_creacion")
-            or ""
-        )
-
-        candidato = {
-            "numero_ot": numero_anterior,
-            "fecha": str(fecha or "").strip(),
-            "descripcion": descripcion_anterior,
-            "solucion": solucion,
-            "area": str(fila.get("area") or "").strip(),
-            "edificio": str(fila.get("edificio") or "").strip(),
-            "espacio": str(fila.get("espacio") or "").strip(),
-            "similitud": round(puntuacion * 100),
-        }
-
-        if (
-            mejor is None
-            or candidato["similitud"] > mejor["similitud"]
-        ):
-            mejor = candidato
-
-    return mejor
 
 
 def latido_corazon(operario, centro=None):
