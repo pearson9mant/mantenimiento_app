@@ -13,6 +13,7 @@ from ui.procedimientos_legionella import (
     mostrar_control_depositos_solares,
     mostrar_revision_visual,
     mostrar_purga,
+    mostrar_puesta_en_servicio_acumulador_acs,
     mostrar_procedimiento_choque_termico,
     mostrar_limpieza_desinfeccion,
     mostrar_control_generico,
@@ -197,6 +198,13 @@ def mostrar_ejecucion_legionella_operario(
         resultado_procedimiento = mostrar_purga(
             id_orden,
             punto
+        )
+
+    elif tarea == "Puesta en servicio acumulador ACS":
+        resultado_procedimiento = (
+            mostrar_puesta_en_servicio_acumulador_acs(
+                id_orden
+            )
         )
 
     elif tarea in [
