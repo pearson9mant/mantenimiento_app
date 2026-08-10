@@ -383,6 +383,101 @@ def mostrar_purga(id_orden, punto):
     }
 
 
+
+def mostrar_puesta_en_servicio_acumulador_acs(id_orden):
+    st.markdown("### 💧 Puesta en servicio acumulador ACS")
+    st.info(
+        "Actuación extraordinaria tras vaciado, parada o intervención "
+        "importante de la instalación."
+    )
+
+    deposito_llenado = st.checkbox(
+        "☑ Acumulador / depósito completamente llenado",
+        key=f"puesta_servicio_llenado_{id_orden}"
+    )
+
+    renovacion_agua = st.checkbox(
+        "☑ Renovación completa de agua confirmada",
+        key=f"puesta_servicio_renovacion_{id_orden}"
+    )
+
+    sin_fugas = st.checkbox(
+        "☑ Sin fugas visibles",
+        key=f"puesta_servicio_fugas_{id_orden}"
+    )
+
+    produccion_acs = st.checkbox(
+        "☑ Producción ACS en servicio",
+        key=f"puesta_servicio_produccion_{id_orden}"
+    )
+
+    valor = st.number_input(
+        "🌡 Temperatura acumulador ºC",
+        min_value=0.0,
+        max_value=100.0,
+        value=60.0,
+        step=0.1,
+        key=f"puesta_servicio_acum_{id_orden}"
+    )
+
+    valor_2 = st.number_input(
+        "➡️ Temperatura impulsión ACS ºC",
+        min_value=0.0,
+        max_value=100.0,
+        value=50.0,
+        step=0.1,
+        key=f"puesta_servicio_impulsion_{id_orden}"
+    )
+
+    valor_3 = st.number_input(
+        "🔄 Temperatura retorno ACS ºC",
+        min_value=0.0,
+        max_value=100.0,
+        value=50.0,
+        step=0.1,
+        key=f"puesta_servicio_retorno_{id_orden}"
+    )
+
+    errores = []
+
+    if not deposito_llenado:
+        errores.append("Falta confirmar el llenado completo del acumulador.")
+
+    if not renovacion_agua:
+        errores.append("Falta confirmar la renovación completa del agua.")
+
+    if not sin_fugas:
+        errores.append("Falta confirmar ausencia de fugas visibles.")
+
+    if not produccion_acs:
+        errores.append("Falta confirmar que la producción ACS está en servicio.")
+
+    obs = (
+        "Puesta en servicio acumulador ACS: "
+        + ("Llenado completo: Sí" if deposito_llenado else "Llenado completo: No")
+        + " | "
+        + ("Renovación de agua: Sí" if renovacion_agua else "Renovación de agua: No")
+        + " | "
+        + ("Sin fugas: Sí" if sin_fugas else "Sin fugas: No")
+        + " | "
+        + ("Producción ACS en servicio: Sí" if produccion_acs else "Producción ACS en servicio: No")
+        + f" | Temperatura acumulador: {valor:.1f} ºC"
+        + f" | Impulsión ACS: {valor_2:.1f} ºC"
+        + f" | Retorno ACS: {valor_3:.1f} ºC"
+    )
+
+    return _base(
+        "Puesta en servicio acumulador ACS",
+        "ºC",
+        valor,
+        valor_2,
+        valor_3,
+        obs,
+        valido=len(errores) == 0,
+        errores=errores,
+    )
+
+
 def mostrar_procedimiento_choque_termico(id_orden, terminales):
     st.markdown("### 🔥 Procedimiento de choque térmico")
 
