@@ -1259,8 +1259,10 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
     if valor is None:
         return "ERROR", "Valor no válido. No se ha guardado el registro."
 
-    # PURGA PENDIENTE:
-    # no se guarda como realizada y no crea otra OT correctiva
+    # PURGA:
+    # valor = 1 confirma que la purga se ha realizado.
+    # valor_2 conserva la medición asociada (temperatura o cloro).
+    # Si valor != 1, no se guarda ni se avanza la planificación.
     if str(tipo_control or "").strip() == "Purga":
         try:
             purga_realizada = int(float(valor)) == 1
