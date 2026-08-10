@@ -3,7 +3,10 @@ import html
 import streamlit as st
 
 from modules.colegio_vivo import obtener_colegio_vivo
-from modules.corazon_sistema import buscar_antecedente_similar_corazon
+from modules.corazon_sistema import (
+    buscar_antecedente_similar_corazon,
+    latido_corazon,
+)
 
 from ui.ui_edificio_vivo import (
     css_edificio_vivo,
@@ -103,6 +106,87 @@ def _ordenar_misiones(ordenes):
         ordenes,
         key=clave,
     )
+
+
+
+def _buscar_ot_colegio_por_mision(ordenes, mision):
+    if not mision:
+        return None
+
+    id_mision = mision.get("id")
+    numero_mision = str(
+        mision.get("numero_ot")
+        or ""
+    ).strip()
+
+    for ot in ordenes or []:
+        try:
+            if (
+                id_mision is not None
+                and int(ot.get("id")) == int(id_mision)
+            ):
+                resultado = dict(ot)
+                resultado.update({
+                    "score_corazon": mision.get("score_corazon"),
+                    "motivos_corazon": mision.get("motivos_corazon", []),
+                })
+                return resultado
+        except (TypeError, ValueError):
+            pass
+
+        if (
+            numero_mision
+            and str(ot.get("numero_ot") or "").strip() == numero_mision
+        ):
+            resultado = dict(ot)
+            resultado.update({
+                "score_corazon": mision.get("score_corazon"),
+                "motivos_corazon": mision.get("motivos_corazon", []),
+            })
+            return resultado
+
+    return None
+
+
+def _obtener_mision_corazon_colegio(
+    operario,
+    centro,
+    ordenes,
+):
+    """
+    El Corazón decide la misión real.
+    Si por cualquier motivo no responde, conserva el criterio anterior
+    como respaldo para no romper la pantalla.
+    """
+    ubicacion_preferida = st.session_state.get(
+        "corazon_ubicacion_preferida"
+    )
+
+    try:
+        latido = latido_corazon(
+            operario=operario,
+            centro=centro or None,
+            ubicacion_preferida=ubicacion_preferida,
+        )
+
+        mision_corazon = latido.get("mision") or {}
+
+        encontrada = _buscar_ot_colegio_por_mision(
+            ordenes,
+            mision_corazon,
+        )
+
+        if encontrada:
+            return encontrada
+
+    except Exception:
+        pass
+
+    ordenadas = _ordenar_misiones(
+        ordenes
+    )
+
+    return ordenadas[0] if ordenadas else None
 
 
 def _texto_averia(ot):
@@ -318,11 +402,23 @@ def _texto_aula(ot):
 def _abrir_ot_para_trabajar(ot, origen="mision"):
     """
     Abre directamente la OT seleccionada sin pasar por el listado general.
+    También recuerda la ubicación para que el Corazón pueda continuar
+    cerca al terminar, salvo que aparezca algo más importante.
     """
     if not _guardar_ot_recomendada(ot):
         return
 
     st.session_state["colegio_vivo_origen_ot"] = origen
+
+    centro, edificio, planta = _ubicacion_mision(
+        ot
+    )
+
+    st.session_state["corazon_ubicacion_preferida"] = {
+        "centro": centro,
+        "edificio": edificio,
+        "planta": planta,
+    }
 
     if origen != "planta":
         st.session_state["colegio_vivo_vista"] = "mapa"
@@ -642,15 +738,20 @@ def pantalla_colegio_vivo_operario():
         colegio
     )
 
-    ordenes = _ordenar_misiones(
-        _todas_las_ordenes(colegio)
+    ordenes = _todas_las_ordenes(
+        colegio
+    )
+
+    mision = _obtener_mision_corazon_colegio(
+        operario=operario,
+        centro=centro_operario,
+        ordenes=ordenes,
     )
 
     # =====================================================
     # MI MISIÓN
     # =====================================================
-    if ordenes:
-        mision = ordenes[0]
+    if mision:
 
         centro, edificio, planta = _ubicacion_mision(
             mision
