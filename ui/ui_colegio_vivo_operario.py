@@ -337,6 +337,12 @@ def _volver_edificio_desde_planta():
 
 
 def _mostrar_planta_seleccionada():
+    """
+    Vista de planta estable y nativa de Streamlit.
+
+    No usa HTML personalizado en las tarjetas de OT para evitar
+    inconsistencias del DOM en navegadores móviles.
+    """
     if st.session_state.get("colegio_vivo_vista") != "planta":
         return False
 
@@ -353,54 +359,67 @@ def _mostrar_planta_seleccionada():
     )
 
     st.markdown(
-        (
-            '<div class="cv-planta-detalle">'
-            '<div class="cv-planta-detalle-titulo">'
-            f'📍 {html.escape(centro)} · '
-            f'{html.escape(edificio)} · '
-            f'{html.escape(planta)}'
-            '</div>'
-            f'<div>{len(ordenes)} OT activas</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True,
+        f"### 📍 {centro} · {edificio} · {planta}"
+    )
+    st.caption(
+        f"{len(ordenes)} OT activas"
     )
 
     if not ordenes:
-        st.success("✅ No hay órdenes activas en esta planta.")
+        st.success(
+            "✅ No hay órdenes activas en esta planta."
+        )
         return True
 
     for ot in ordenes:
-        numero_ot = str(ot.get("numero_ot") or ot.get("id") or "OT")
-        aula = _texto_aula(ot)
-        descripcion = _texto_averia(ot)
-        estado = str(ot.get("estado") or "Abierta").strip()
-        prioridad = str(ot.get("prioridad") or "Media").strip()
-        es_ejecutable = bool(ot.get("_ejecutable", False))
+        numero_ot = str(
+            ot.get("numero_ot")
+            or ot.get("id")
+            or "OT"
+        ).strip()
 
-        st.markdown(
-            (
-                '<div class="cv-planta-detalle cv-planta-ot">'
-                f'<strong>{html.escape(numero_ot)}</strong> · '
-                f'<strong>{html.escape(aula)}</strong><br>'
-                f'{html.escape(descripcion)}<br>'
-                f'<small>{html.escape(prioridad)} · '
-                f'{html.escape(estado)}</small>'
-                '</div>'
-            ),
-            unsafe_allow_html=True,
+        aula = _texto_aula(ot)
+
+        descripcion = _texto_averia(ot)
+
+        estado = str(
+            ot.get("estado")
+            or "Abierta"
+        ).strip()
+
+        prioridad = str(
+            ot.get("prioridad")
+            or "Media"
+        ).strip()
+
+        es_ejecutable = bool(
+            ot.get("_ejecutable", False)
         )
 
-        if es_ejecutable:
-            st.button(
-                f"▶ EMPEZAR {numero_ot}",
-                key=f"cv_empezar_planta_{ot.get('id')}",
-                use_container_width=True,
-                on_click=_abrir_ot_para_trabajar,
-                args=(ot, "planta"),
+        with st.container(border=True):
+            st.markdown(
+                f"**{numero_ot} · {aula}**"
             )
 
+            st.markdown(
+                descripcion or "Sin descripción."
+            )
+
+            st.caption(
+                f"{prioridad} · {estado}"
+            )
+
+            if es_ejecutable:
+                st.button(
+                    f"▶ EMPEZAR {numero_ot}",
+                    key=f"cv_empezar_planta_{ot.get('id')}",
+                    use_container_width=True,
+                    on_click=_abrir_ot_para_trabajar,
+                    args=(ot, "planta"),
+                )
+
     return True
+
 
 
 def _css_pantalla_operario():
@@ -462,30 +481,6 @@ def _css_pantalla_operario():
             font-size:20px;
             line-height:1;
             font-weight:950;
-        }
-
-        .cv-planta-ot{
-            margin-top:3px;
-        }
-
-        @media(max-width:760px){
-            .cv-planta-detalle{
-                padding:7px 9px !important;
-                margin:2px 0 !important;
-                border-radius:8px !important;
-                font-size:10px !important;
-                line-height:1.20 !important;
-            }
-
-            .cv-planta-detalle-titulo{
-                font-size:11px !important;
-                line-height:1.15 !important;
-            }
-
-            .cv-planta-ot{
-                padding:6px 8px !important;
-                margin-top:2px !important;
-            }
         }
 
         .cv-no-work{
