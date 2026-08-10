@@ -129,6 +129,10 @@ def _buscar_ot_colegio_por_mision(ordenes, mision):
                 resultado.update({
                     "score_corazon": mision.get("score_corazon"),
                     "motivos_corazon": mision.get("motivos_corazon", []),
+                    "decision_humana_corazon": mision.get(
+                        "decision_humana_corazon",
+                        {},
+                    ),
                 })
                 return resultado
         except (TypeError, ValueError):
@@ -520,6 +524,55 @@ def _mostrar_planta_seleccionada():
 
 
 
+
+def _mostrar_decision_humana_corazon(mision):
+    """
+    Explica de forma discreta por qué el Corazón propone esta misión.
+    No modifica puntuación, orden, navegación ni estado de la OT.
+    """
+    decision = (
+        mision.get("decision_humana_corazon")
+        or {}
+    )
+
+    etiqueta = str(
+        decision.get("etiqueta")
+        or ""
+    ).strip()
+
+    mensaje = str(
+        decision.get("mensaje")
+        or ""
+    ).strip()
+
+    motivos = [
+        str(motivo or "").strip()
+        for motivo in (
+            mision.get("motivos_corazon")
+            or []
+        )
+        if str(motivo or "").strip()
+    ]
+
+    if not etiqueta and not mensaje and not motivos:
+        return
+
+    with st.container(border=True):
+        if etiqueta:
+            st.markdown(f"**{etiqueta}**")
+
+        if mensaje:
+            st.caption(mensaje)
+
+        # Solo enseñamos los dos motivos principales para mantener
+        # Colegio Vivo limpio, especialmente en móvil.
+        if motivos:
+            motivos_visibles = motivos[:2]
+            st.caption(
+                " · ".join(motivos_visibles)
+            )
+
+
 def _mostrar_recuerdo_corazon(mision):
     """
     Muestra un único antecedente fiable antes de empezar la misión.
@@ -791,6 +844,10 @@ def pantalla_colegio_vivo_operario():
         st.markdown(
             html_mision,
             unsafe_allow_html=True,
+        )
+
+        _mostrar_decision_humana_corazon(
+            mision
         )
 
         _mostrar_recuerdo_corazon(
