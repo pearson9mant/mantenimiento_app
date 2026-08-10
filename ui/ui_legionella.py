@@ -543,6 +543,25 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
             return "OK", "Correcto"
         return "INCIDENCIA", "Purga no realizada"
 
+    if tipo_control == "Puesta en servicio acumulador ACS":
+        try:
+            acumulador = float(valor)
+            impulsion = float(valor_2)
+            retorno = float(valor_3)
+        except Exception:
+            return "INCIDENCIA", "Temperaturas de puesta en servicio no válidas"
+
+        if acumulador < 60:
+            return "RIESGO", "Acumulador inferior a 60 ºC en puesta en servicio"
+
+        if impulsion < 50:
+            return "RIESGO", "Impulsión ACS inferior a 50 ºC en puesta en servicio"
+
+        if retorno < 50:
+            return "RIESGO", "Retorno ACS inferior a 50 ºC en puesta en servicio"
+
+        return "OK", "Puesta en servicio ACS correcta"
+
     return "OK", "Registrado"
 
 def operario_por_centro(centro):
@@ -768,6 +787,9 @@ def unidad_por_tarea(tarea):
 
     if tarea == "Limpieza y desinfección depósito AFCH":
         return "Sí/No"
+
+    if tarea == "Puesta en servicio acumulador ACS":
+        return "ºC"
 
     return ""
 
@@ -1353,19 +1375,40 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         """, (centro, edificio, punto_nombre, tarea))
 
         if not df_plan.empty:
-            frecuencia = int(df_plan.iloc[0]["frecuencia_dias"] or dias_frecuencia(tarea))
-            proxima = pd.to_datetime(fecha_registro) + pd.Timedelta(days=frecuencia)
+            id_plan = int(df_plan.iloc[0]["id"])
 
-            ejecutar("""
-                UPDATE legionella_tareas
-                SET ultima_fecha = ?,
-                    proxima_fecha = ?
-                WHERE id = ?
-            """, (
-                fecha_registro,
-                proxima.strftime("%Y-%m-%d"),
-                int(df_plan.iloc[0]["id"])
-            ))
+            if tarea == "Puesta en servicio acumulador ACS":
+                ejecutar("""
+                    UPDATE legionella_tareas
+                    SET ultima_fecha = ?,
+                        proxima_fecha = NULL,
+                        activo = 0,
+                        generar_ot = 0
+                    WHERE id = ?
+                """, (
+                    fecha_registro,
+                    id_plan
+                ))
+            else:
+                frecuencia = int(
+                    df_plan.iloc[0]["frecuencia_dias"]
+                    or dias_frecuencia(tarea)
+                )
+                proxima = (
+                    pd.to_datetime(fecha_registro)
+                    + pd.Timedelta(days=frecuencia)
+                )
+
+                ejecutar("""
+                    UPDATE legionella_tareas
+                    SET ultima_fecha = ?,
+                        proxima_fecha = ?
+                    WHERE id = ?
+                """, (
+                    fecha_registro,
+                    proxima.strftime("%Y-%m-%d"),
+                    id_plan
+                ))
     except Exception:
         pass
 
@@ -1408,9 +1451,9 @@ def crear_tarea_legionella_manual(
     frecuencia_dias,
     unidad,
     operario,
-    generar_ot
+    generar_ot,
+    fecha_programada=None
 ):
-
     consigna_minima = 0
     controla_consigna = 0
 
@@ -1425,6 +1468,23 @@ def crear_tarea_legionella_manual(
     ]:
         consigna_minima = 50
         controla_consigna = 1
+
+    es_puesta_servicio = (
+        tarea == "Puesta en servicio acumulador ACS"
+    )
+
+    if fecha_programada:
+        fecha_inicio = str(fecha_programada)
+    else:
+        fecha_inicio = date.today().strftime("%Y-%m-%d")
+
+    frecuencia_real = 1 if es_puesta_servicio else int(frecuencia_dias)
+
+    observaciones_tarea = (
+        "Actuación extraordinaria de una sola ejecución"
+        if es_puesta_servicio
+        else "Tarea especial creada manualmente"
+    )
 
     ejecutar("""
         INSERT INTO legionella_tareas
@@ -1463,17 +1523,17 @@ def crear_tarea_legionella_manual(
         punto,
         tarea,
         tarea,
-        f"{int(frecuencia_dias)} días",
-        int(frecuencia_dias),
+        "Única ejecución" if es_puesta_servicio else f"{frecuencia_real} días",
+        frecuencia_real,
         unidad,
-        date.today().strftime("%Y-%m-%d"),
-        date.today().strftime("%Y-%m-%d"),
+        fecha_inicio,
+        fecha_inicio,
         operario,
         1 if generar_ot else 0,
-        "Especial",
+        "Especial única" if es_puesta_servicio else "Especial",
         consigna_minima,
         controla_consigna,
-        "Tarea especial creada manualmente",
+        observaciones_tarea,
     ))
 
 def asegurar_columnas_plano_legionella():
@@ -2821,17 +2881,46 @@ def pantalla_legionella():
                         "Revisión visual",
                         "Limpieza y desinfección acumulador",
                         "Limpieza y desinfección depósito AFCH",
+                        "Puesta en servicio acumulador ACS",
                     ],
                     key="tarea_manual_nombre"
                 )
+
+                es_puesta_servicio_manual = (
+                    tarea_manual == "Puesta en servicio acumulador ACS"
+                )
+
+                fecha_programada_manual = st.date_input(
+                    "Fecha prevista",
+                    value=date.today(),
+                    key="tarea_manual_fecha_programada",
+                    help=(
+                        "Fecha en la que quieres que esta actuación "
+                        "genere la OT. La fecha real del registro "
+                        "seguirá siendo editable al ejecutarla."
+                    ),
+                )
+
+                if es_puesta_servicio_manual:
+                    st.info(
+                        "Esta tarea será extraordinaria y se desactivará "
+                        "automáticamente después de guardarla una vez."
+                    )
 
                 frecuencia_manual = st.number_input(
                     "Frecuencia en días",
                     min_value=1,
                     max_value=730,
-                    value=30,
+                    value=1 if es_puesta_servicio_manual else 30,
                     step=1,
-                    key="tarea_manual_frecuencia"
+                    key="tarea_manual_frecuencia",
+                    disabled=es_puesta_servicio_manual,
+                    help=(
+                        "En puesta en servicio no se repite: "
+                        "es una sola ejecución."
+                        if es_puesta_servicio_manual
+                        else None
+                    ),
                 )
 
                 unidad_manual = unidad_por_tarea(tarea_manual)
@@ -2876,7 +2965,8 @@ def pantalla_legionella():
                         frecuencia_manual,
                         unidad_manual,
                         operario_manual,
-                        generar_ot_manual
+                        generar_ot_manual,
+                        fecha_programada_manual.strftime("%Y-%m-%d")
                     )
 
                     st.success("Tarea creada correctamente sobre el punto seleccionado.")
