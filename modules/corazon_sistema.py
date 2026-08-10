@@ -894,11 +894,67 @@ def puntuar_orden(row):
 
 
 
+
+def _bonus_continuidad_ubicacion_corazon(
+    prioridad_item,
+    ubicacion_preferida=None,
+):
+    """
+    Favorece continuar cerca de donde ya está el operario.
+
+    Es un bonus pequeño: nunca debe imponerse a una urgencia,
+    una sanitaria o una prioridad claramente superior.
+    """
+    if not ubicacion_preferida:
+        return 0, ""
+
+    centro_actual = _normalizar_ubicacion_corazon(
+        ubicacion_preferida.get("centro")
+    )
+    edificio_actual = _normalizar_ubicacion_corazon(
+        ubicacion_preferida.get("edificio")
+    )
+    planta_actual = normalizar_planta(
+        ubicacion_preferida.get("planta")
+    )
+
+    centro_ot = _normalizar_ubicacion_corazon(
+        prioridad_item.get("centro")
+    )
+    edificio_ot = _normalizar_ubicacion_corazon(
+        prioridad_item.get("edificio")
+    )
+    planta_ot = normalizar_planta(
+        prioridad_item.get("planta")
+    )
+
+    if (
+        centro_actual
+        and centro_ot == centro_actual
+        and edificio_actual
+        and edificio_ot == edificio_actual
+        and planta_actual != "Sin planta"
+        and planta_ot == planta_actual
+    ):
+        return 7, "Aprovecha que ya estás trabajando en esta planta."
+
+    if (
+        centro_actual
+        and centro_ot == centro_actual
+        and edificio_actual
+        and edificio_ot == edificio_actual
+    ):
+        return 3, "Aprovecha que ya estás en este edificio."
+
+    return 0, ""
+
+
 def construir_prioridades_globales(
     centro=None,
     operario=None,
     limite=100,
     df_ordenes_abiertas=None,
+    ubicacion_preferida=None,
 ):
     """
     Mantiene el mismo comportamiento, pero evita consultar el historial
@@ -1090,6 +1146,35 @@ def construir_prioridades_globales(
             prioridad_item["concentracion_planta"] = cantidad_zona
         else:
             prioridad_item["concentracion_planta"] = cantidad_zona
+
+    # =================================================
+    # CONTINUIDAD DE UBICACIÓN
+    # =================================================
+    # Si el operario ya está en una planta, intentamos resolver otra OT
+    # cercana siempre que no exista algo claramente más importante.
+    for prioridad_item in prioridades:
+        bonus_ubicacion, motivo_ubicacion = (
+            _bonus_continuidad_ubicacion_corazon(
+                prioridad_item,
+                ubicacion_preferida=ubicacion_preferida,
+            )
+        )
+
+        if bonus_ubicacion:
+            prioridad_item["score"] = min(
+                100,
+                int(prioridad_item.get("score", 0) or 0)
+                + bonus_ubicacion,
+            )
+            prioridad_item["bonus_ubicacion"] = bonus_ubicacion
+
+            if motivo_ubicacion:
+                prioridad_item.setdefault(
+                    "motivos",
+                    [],
+                ).append(motivo_ubicacion)
+        else:
+            prioridad_item["bonus_ubicacion"] = 0
 
     prioridades.sort(
         key=lambda x: (
@@ -1584,7 +1669,7 @@ def obtener_ordenes_bloqueadas_corazon(operario=None, centro=None):
     ]
 
 
-def obtener_mision_actual(operario, centro=None):
+def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     """
     Responde a la pregunta principal del Corazón:
     ¿qué debe hacer ahora este operario?
@@ -1651,6 +1736,7 @@ def obtener_mision_actual(operario, centro=None):
         operario=operario_txt,
         limite=1,
         df_ordenes_abiertas=ejecutables,
+        ubicacion_preferida=ubicacion_preferida,
     )
 
     if not prioridades:
@@ -1915,7 +2001,15 @@ def buscar_antecedente_similar_corazon(
     return mejor
 
 
-def latido_corazon(operario, centro=None):
+def latido_corazon(
+    operario,
+    centro=None,
+    ubicacion_preferida=None,
+):
     """Alias estable para que las pantallas consulten el Corazón."""
-    return obtener_mision_actual(operario=operario, centro=centro)
+    return obtener_mision_actual(
+        operario=operario,
+        centro=centro,
+        ubicacion_preferida=ubicacion_preferida,
+    )
 
