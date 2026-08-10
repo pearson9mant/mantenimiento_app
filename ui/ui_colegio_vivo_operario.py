@@ -1,10 +1,12 @@
 import html
 
 import streamlit as st
+import pandas as pd
 
 from modules.colegio_vivo import obtener_colegio_vivo
 from modules.corazon_sistema import (
     buscar_antecedente_similar_corazon,
+    construir_prioridades_globales,
     latido_corazon,
 )
 
@@ -193,49 +195,151 @@ def _obtener_mision_corazon_colegio(
 def _misma_ot(ot_a, ot_b):
     if not ot_a or not ot_b:
         return False
+
     try:
-        if ot_a.get("id") is not None and ot_b.get("id") is not None:
-            if int(ot_a.get("id")) == int(ot_b.get("id")):
-                return True
+        if (
+            ot_a.get("id") is not None
+            and ot_b.get("id") is not None
+            and int(ot_a.get("id")) == int(ot_b.get("id"))
+        ):
+            return True
     except (TypeError, ValueError):
         pass
-    numero_a = str(ot_a.get("numero_ot") or "").strip()
-    numero_b = str(ot_b.get("numero_ot") or "").strip()
-    return bool(numero_a and numero_b and numero_a == numero_b)
+
+    numero_a = str(
+        ot_a.get("numero_ot")
+        or ""
+    ).strip()
+
+    numero_b = str(
+        ot_b.get("numero_ot")
+        or ""
+    ).strip()
+
+    return bool(
+        numero_a
+        and numero_b
+        and numero_a == numero_b
+    )
 
 
-def _obtener_siguiente_ot_cercana(mision, ordenes):
-    """Devuelve otra OT ejecutable de la misma planta, sin alterar Mi misión."""
+def _buscar_ot_por_numero(ordenes, numero_ot):
+    numero_objetivo = str(
+        numero_ot
+        or ""
+    ).strip()
+
+    if not numero_objetivo:
+        return None
+
+    for ot in ordenes or []:
+        if (
+            str(ot.get("numero_ot") or "").strip()
+            == numero_objetivo
+        ):
+            return ot
+
+    return None
+
+
+def _obtener_siguiente_ot_cercana(
+    mision,
+    ordenes,
+):
+    """
+    Corazón local:
+    elige la mejor OT real de la misma planta usando el mismo
+    motor de prioridades que decide MI MISIÓN.
+
+    No modifica la misión principal ni ningún estado.
+    """
     if not mision:
         return None
 
-    centro_m, edificio_m, planta_m = _ubicacion_mision(mision)
+    centro_m, edificio_m, planta_m = (
+        _ubicacion_mision(mision)
+    )
+
     candidatas = []
 
     for ot in ordenes or []:
         if _misma_ot(ot, mision):
             continue
+
         if ot.get("_ejecutable") is False:
             continue
 
-        centro_o, edificio_o, planta_o = _ubicacion_mision(ot)
+        centro_o, edificio_o, planta_o = (
+            _ubicacion_mision(ot)
+        )
 
         if (
             centro_o == centro_m
             and edificio_o == edificio_m
             and planta_o == planta_m
         ):
-            candidatas.append(ot)
+            candidatas.append(dict(ot))
 
     if not candidatas:
         return None
 
-    ordenadas = _ordenar_misiones(candidatas)
+    try:
+        df_candidatas = pd.DataFrame(
+            candidatas
+        )
+
+        prioridades = construir_prioridades_globales(
+            centro=centro_m or None,
+            operario=str(
+                st.session_state.get("operario_activo")
+                or st.session_state.get("usuario")
+                or ""
+            ).strip() or None,
+            limite=1,
+            df_ordenes_abiertas=df_candidatas,
+            ubicacion_preferida={
+                "centro": centro_m,
+                "edificio": edificio_m,
+                "planta": planta_m,
+            },
+        )
+
+        if prioridades:
+            siguiente = _buscar_ot_por_numero(
+                candidatas,
+                prioridades[0].get("numero_ot"),
+            )
+
+            if siguiente:
+                siguiente = dict(siguiente)
+                siguiente["score_corazon"] = (
+                    prioridades[0].get("score")
+                )
+                siguiente["motivos_corazon"] = (
+                    prioridades[0].get("motivos", [])
+                )
+                return siguiente
+
+    except Exception:
+        # Respaldo conservador: si el motor local falla,
+        # conserva la selección anterior sin romper la pantalla.
+        pass
+
+    ordenadas = _ordenar_misiones(
+        candidatas
+    )
+
     return ordenadas[0] if ordenadas else None
 
 
-def _mostrar_siguiente_ot_corazon(mision, ordenes):
-    siguiente = _obtener_siguiente_ot_cercana(mision, ordenes)
+def _mostrar_siguiente_ot_corazon(
+    mision,
+    ordenes,
+):
+    siguiente = _obtener_siguiente_ot_cercana(
+        mision,
+        ordenes,
+    )
 
     if not siguiente:
         return
@@ -245,9 +349,19 @@ def _mostrar_siguiente_ot_corazon(mision, ordenes):
         or siguiente.get("id")
         or "OT"
     ).strip()
-    aula = _texto_aula(siguiente)
-    descripcion = _texto_averia(siguiente)
-    prioridad = str(siguiente.get("prioridad") or "Media").strip()
+
+    aula = _texto_aula(
+        siguiente
+    )
+
+    descripcion = _texto_averia(
+        siguiente
+    )
+
+    prioridad = str(
+        siguiente.get("prioridad")
+        or "Media"
+    ).strip()
 
     st.markdown(
         '<div class="cv-next">'
@@ -255,7 +369,9 @@ def _mostrar_siguiente_ot_corazon(mision, ordenes):
         '🔜 DESPUÉS, SI NO ENTRA NADA MÁS IMPORTANTE'
         '</div>'
         '<div class="cv-next-ref">'
-        f'{html.escape(numero_ot)} · {html.escape(aula)} · {html.escape(prioridad)}'
+        f'{html.escape(numero_ot)} · '
+        f'{html.escape(aula)} · '
+        f'{html.escape(prioridad)}'
         '</div>'
         '<div class="cv-next-description">'
         f'{html.escape(descripcion)}'
