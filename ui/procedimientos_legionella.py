@@ -356,11 +356,25 @@ def mostrar_purga(id_orden, punto):
     if observaciones:
         observaciones_extra += f" | {observaciones}"
 
+    # La purga tiene dos datos distintos:
+    # - valor: confirma si se ha realizado (1/0)
+    # - valor_2: conserva la medición real (temperatura o cloro)
+    medicion = valor
+
+    if unidad == "ºC":
+        observaciones_extra += (
+            f" | Temperatura alcanzada: {float(medicion):.1f} ºC"
+        )
+    elif unidad == "mg/L":
+        observaciones_extra += (
+            f" | Cloro residual: {float(medicion):.2f} mg/L"
+        )
+
     return {
         "tipo_control": "Purga",
         "unidad": unidad,
-        "valor": valor,
-        "valor_2": None,
+        "valor": 1 if purga_realizada else 0,
+        "valor_2": medicion,
         "valor_3": None,
         "foto": foto,
         "observaciones_extra": observaciones_extra,
