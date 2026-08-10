@@ -3,6 +3,7 @@ import html
 import streamlit as st
 
 from modules.colegio_vivo import obtener_colegio_vivo
+from modules.corazon_sistema import buscar_antecedente_similar_corazon
 
 from ui.ui_edificio_vivo import (
     css_edificio_vivo,
@@ -422,6 +423,64 @@ def _mostrar_planta_seleccionada():
 
 
 
+
+def _mostrar_recuerdo_corazon(mision):
+    """
+    Muestra un único antecedente fiable antes de empezar la misión.
+    Si no hay coincidencia suficiente, no ocupa espacio.
+    """
+    try:
+        antecedente = buscar_antecedente_similar_corazon(mision)
+    except Exception:
+        antecedente = None
+
+    if not antecedente:
+        return
+
+    numero_ot = str(
+        antecedente.get("numero_ot")
+        or "OT anterior"
+    ).strip()
+
+    fecha = str(
+        antecedente.get("fecha")
+        or ""
+    ).strip()
+
+    if fecha:
+        fecha = fecha[:10]
+
+    descripcion = str(
+        antecedente.get("descripcion")
+        or ""
+    ).strip()
+
+    solucion = str(
+        antecedente.get("solucion")
+        or ""
+    ).strip()
+
+    with st.container(border=True):
+        st.markdown("🧠 **EL CORAZÓN RECUERDA**")
+        st.caption(
+            "Ya resolvimos una avería parecida en este mismo espacio."
+        )
+
+        referencia = f"**{numero_ot}**"
+        if fecha:
+            referencia += f" · {fecha}"
+
+        st.markdown(referencia)
+
+        if descripcion:
+            st.markdown(descripcion)
+
+        if solucion:
+            st.success(
+                f"🔧 Solución registrada: {solucion}"
+            )
+
+
 def _css_pantalla_operario():
     st.markdown(
         """
@@ -631,6 +690,10 @@ def pantalla_colegio_vivo_operario():
         st.markdown(
             html_mision,
             unsafe_allow_html=True,
+        )
+
+        _mostrar_recuerdo_corazon(
+            mision
         )
 
         texto_boton = (
