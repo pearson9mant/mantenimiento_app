@@ -129,10 +129,6 @@ def _buscar_ot_colegio_por_mision(ordenes, mision):
                 resultado.update({
                     "score_corazon": mision.get("score_corazon"),
                     "motivos_corazon": mision.get("motivos_corazon", []),
-                    "decision_humana_corazon": mision.get(
-                        "decision_humana_corazon",
-                        {},
-                    ),
                 })
                 return resultado
         except (TypeError, ValueError):
@@ -191,6 +187,82 @@ def _obtener_mision_corazon_colegio(
     )
 
     return ordenadas[0] if ordenadas else None
+
+
+
+def _misma_ot(ot_a, ot_b):
+    if not ot_a or not ot_b:
+        return False
+    try:
+        if ot_a.get("id") is not None and ot_b.get("id") is not None:
+            if int(ot_a.get("id")) == int(ot_b.get("id")):
+                return True
+    except (TypeError, ValueError):
+        pass
+    numero_a = str(ot_a.get("numero_ot") or "").strip()
+    numero_b = str(ot_b.get("numero_ot") or "").strip()
+    return bool(numero_a and numero_b and numero_a == numero_b)
+
+
+def _obtener_siguiente_ot_cercana(mision, ordenes):
+    """Devuelve otra OT ejecutable de la misma planta, sin alterar Mi misión."""
+    if not mision:
+        return None
+
+    centro_m, edificio_m, planta_m = _ubicacion_mision(mision)
+    candidatas = []
+
+    for ot in ordenes or []:
+        if _misma_ot(ot, mision):
+            continue
+        if ot.get("_ejecutable") is False:
+            continue
+
+        centro_o, edificio_o, planta_o = _ubicacion_mision(ot)
+
+        if (
+            centro_o == centro_m
+            and edificio_o == edificio_m
+            and planta_o == planta_m
+        ):
+            candidatas.append(ot)
+
+    if not candidatas:
+        return None
+
+    ordenadas = _ordenar_misiones(candidatas)
+    return ordenadas[0] if ordenadas else None
+
+
+def _mostrar_siguiente_ot_corazon(mision, ordenes):
+    siguiente = _obtener_siguiente_ot_cercana(mision, ordenes)
+
+    if not siguiente:
+        return
+
+    numero_ot = str(
+        siguiente.get("numero_ot")
+        or siguiente.get("id")
+        or "OT"
+    ).strip()
+    aula = _texto_aula(siguiente)
+    descripcion = _texto_averia(siguiente)
+    prioridad = str(siguiente.get("prioridad") or "Media").strip()
+
+    st.markdown(
+        '<div class="cv-next">'
+        '<div class="cv-next-title">'
+        '🔜 DESPUÉS, SI NO ENTRA NADA MÁS IMPORTANTE'
+        '</div>'
+        '<div class="cv-next-ref">'
+        f'{html.escape(numero_ot)} · {html.escape(aula)} · {html.escape(prioridad)}'
+        '</div>'
+        '<div class="cv-next-description">'
+        f'{html.escape(descripcion)}'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _texto_averia(ot):
@@ -524,55 +596,6 @@ def _mostrar_planta_seleccionada():
 
 
 
-
-def _mostrar_decision_humana_corazon(mision):
-    """
-    Explica de forma discreta por qué el Corazón propone esta misión.
-    No modifica puntuación, orden, navegación ni estado de la OT.
-    """
-    decision = (
-        mision.get("decision_humana_corazon")
-        or {}
-    )
-
-    etiqueta = str(
-        decision.get("etiqueta")
-        or ""
-    ).strip()
-
-    mensaje = str(
-        decision.get("mensaje")
-        or ""
-    ).strip()
-
-    motivos = [
-        str(motivo or "").strip()
-        for motivo in (
-            mision.get("motivos_corazon")
-            or []
-        )
-        if str(motivo or "").strip()
-    ]
-
-    if not etiqueta and not mensaje and not motivos:
-        return
-
-    with st.container(border=True):
-        if etiqueta:
-            st.markdown(f"**{etiqueta}**")
-
-        if mensaje:
-            st.caption(mensaje)
-
-        # Solo enseñamos los dos motivos principales para mantener
-        # Colegio Vivo limpio, especialmente en móvil.
-        if motivos:
-            motivos_visibles = motivos[:2]
-            st.caption(
-                " · ".join(motivos_visibles)
-            )
-
-
 def _mostrar_recuerdo_corazon(mision):
     """
     Muestra un único antecedente fiable antes de empezar la misión.
@@ -682,6 +705,40 @@ def _css_pantalla_operario():
             -webkit-box-orient:vertical;
         }
 
+        .cv-next{
+            width:min(100%,1180px);
+            margin:4px auto 3px;
+            padding:8px 11px;
+            border:1px solid #dbe4ee;
+            border-radius:10px;
+            background:#f8fafc;
+            color:#334155;
+        }
+
+        .cv-next-title{
+            font-size:11px;
+            line-height:1.2;
+            font-weight:950;
+            color:#0f2747;
+        }
+
+        .cv-next-ref{
+            margin-top:3px;
+            font-size:12px;
+            line-height:1.2;
+            font-weight:900;
+        }
+
+        .cv-next-description{
+            margin-top:2px;
+            font-size:11px;
+            line-height:1.25;
+            overflow:hidden;
+            display:-webkit-box;
+            -webkit-line-clamp:1;
+            -webkit-box-orient:vertical;
+        }
+
         .cv-school-title{
             width:min(100%,1180px);
             margin:5px auto 1px;
@@ -747,6 +804,17 @@ def _css_pantalla_operario():
             .cv-mission-description{
                 font-size:10px;
             }
+
+            .cv-next{
+                width:100%;
+                margin-top:3px;
+                padding:6px 8px;
+                border-radius:8px;
+            }
+
+            .cv-next-title{font-size:9px;}
+            .cv-next-ref{font-size:10px;}
+            .cv-next-description{font-size:9px;}
 
             .cv-school-title{
                 width:100%;
@@ -846,10 +914,6 @@ def pantalla_colegio_vivo_operario():
             unsafe_allow_html=True,
         )
 
-        _mostrar_decision_humana_corazon(
-            mision
-        )
-
         _mostrar_recuerdo_corazon(
             mision
         )
@@ -870,6 +934,11 @@ def pantalla_colegio_vivo_operario():
             use_container_width=True,
             on_click=_abrir_ot_para_trabajar,
             args=(mision, "mision"),
+        )
+
+        _mostrar_siguiente_ot_corazon(
+            mision=mision,
+            ordenes=ordenes,
         )
 
     else:
