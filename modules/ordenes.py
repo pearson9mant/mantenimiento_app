@@ -100,7 +100,8 @@ def obtener_curso_escolar(fecha=None):
 
     año = fecha.year
 
-    if fecha.month >= 9:
+    # El nuevo curso de mantenimiento comienza el 24 de agosto.
+    if fecha.month > 8 or (fecha.month == 8 and fecha.day >= 24):
         return f"{año}-{año + 1}"
 
     return f"{año - 1}-{año}"
