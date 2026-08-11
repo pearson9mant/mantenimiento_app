@@ -58,22 +58,45 @@ def asegurar_columnas_checklist_preventivo():
     asegurar_estructura_preventivo()
 
 
+def frecuencia_a_dias(frecuencia, defecto=30):
+    """
+    Convierte la frecuencia a días.
+
+    Compatibilidad:
+    - Nuevas planificaciones: se guardan directamente como número de días.
+    - Planificaciones antiguas: Semanal, Mensual, Trimestral,
+      Semestral y Anual siguen funcionando sin migración previa.
+    """
+    texto = str(frecuencia or "").strip().lower()
+
+    if not texto:
+        return int(defecto)
+
+    try:
+        dias = int(float(texto.replace(",", ".")))
+        return max(1, dias)
+    except (TypeError, ValueError):
+        pass
+
+    equivalencias = {
+        "semanal": 7,
+        "mensual": 30,
+        "trimestral": 90,
+        "semestral": 180,
+        "anual": 365,
+    }
+
+    for nombre, dias in equivalencias.items():
+        if nombre in texto:
+            return dias
+
+    return int(defecto)
+
+
 def sumar_frecuencia(fecha, frecuencia):
-    fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
-    frecuencia = str(frecuencia or "").lower()
-
-    if "semanal" in frecuencia:
-        return (fecha_dt + timedelta(days=7)).strftime("%Y-%m-%d")
-    if "mensual" in frecuencia:
-        return (fecha_dt + timedelta(days=30)).strftime("%Y-%m-%d")
-    if "trimestral" in frecuencia:
-        return (fecha_dt + timedelta(days=90)).strftime("%Y-%m-%d")
-    if "semestral" in frecuencia:
-        return (fecha_dt + timedelta(days=180)).strftime("%Y-%m-%d")
-    if "anual" in frecuencia:
-        return (fecha_dt + timedelta(days=365)).strftime("%Y-%m-%d")
-
-    return (fecha_dt + timedelta(days=30)).strftime("%Y-%m-%d")
+    fecha_dt = datetime.strptime(str(fecha)[:10], "%Y-%m-%d")
+    dias = frecuencia_a_dias(frecuencia)
+    return (fecha_dt + timedelta(days=dias)).strftime("%Y-%m-%d")
 
 
 def operario_por_centro_preventivo(centro, operario=""):
@@ -645,7 +668,13 @@ Fecha límite: {fecha_limite or '-'}
                 operario
             ))
 
-            nueva_proxima = sumar_frecuencia(hoy, frecuencia)
+            # Mantiene el calendario anclado a la fecha programada.
+            # Si la OT se genera con retraso, no desplaza toda la planificación.
+            fecha_base_planificada = str(proxima_fecha or hoy)[:10]
+            nueva_proxima = sumar_frecuencia(
+                fecha_base_planificada,
+                frecuencia
+            )
 
             cursor.execute(_sql("""
                 UPDATE preventivo_tareas
