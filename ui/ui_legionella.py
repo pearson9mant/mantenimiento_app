@@ -1137,6 +1137,31 @@ def calcular_estado_control(proxima_fecha):
     return "🟢 OK"
 
 
+
+def ajustar_proxima_fecha_legionella(fecha_base, frecuencia_dias):
+    """
+    Mantiene la frecuencia configurada.
+
+    Solo para controles diarios (1 día):
+    si la siguiente fecha cae en sábado o domingo,
+    la mueve al lunes siguiente para no generar OT de fin de semana.
+
+    Las frecuencias de 7, 30, 90 días, etc. no se modifican.
+    """
+    fecha = pd.to_datetime(fecha_base)
+    frecuencia = int(frecuencia_dias or 1)
+
+    proxima = fecha + pd.Timedelta(days=frecuencia)
+
+    if frecuencia == 1:
+        if proxima.weekday() == 5:       # sábado
+            proxima += pd.Timedelta(days=2)
+        elif proxima.weekday() == 6:     # domingo
+            proxima += pd.Timedelta(days=1)
+
+    return proxima
+
+
 def generar_ots_legionella_planificadas():
     df = leer_df("""
         SELECT id, punto_id, centro, edificio, punto, tarea, frecuencia_dias, proxima_fecha, operario
@@ -1166,8 +1191,11 @@ def generar_ots_legionella_planificadas():
         if creada:
             creadas += 1
 
-            proxima = pd.to_datetime(fila["proxima_fecha"]) + pd.Timedelta(
-                days=int(fila["frecuencia_dias"] or 30)
+            frecuencia = int(fila["frecuencia_dias"] or 30)
+
+            proxima = ajustar_proxima_fecha_legionella(
+                fila["proxima_fecha"],
+                frecuencia
             )
 
             ejecutar("""
@@ -1394,9 +1422,9 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
                     df_plan.iloc[0]["frecuencia_dias"]
                     or dias_frecuencia(tarea)
                 )
-                proxima = (
-                    pd.to_datetime(fecha_registro)
-                    + pd.Timedelta(days=frecuencia)
+                proxima = ajustar_proxima_fecha_legionella(
+                    fecha_registro,
+                    frecuencia
                 )
 
                 ejecutar("""
