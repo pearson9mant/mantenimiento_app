@@ -2518,12 +2518,41 @@ def pantalla_legionella():
                 estado = "Activo" if int(row["activo"] or 0) == 1 else "Inactivo"
                 tipo_plan = str(row.get("tipo_planificacion") or "Automática")
 
-                icono_plan = "⭐ Especial" if tipo_plan == "Especial" else "🤖 Automática"
-                
-                titulo = (
-                    f"{row['estado_control']} · {icono_plan} · {row['centro']} · {row['edificio']} · "
-                    f"{row['punto']} · {row['tarea']} · {row['proxima_fecha']} · {estado}"
+                tipo_plan_normalizado = tipo_plan.strip().lower()
+
+                if tipo_plan_normalizado == "especial":
+                    icono_plan = "⭐ Especial"
+                elif tipo_plan_normalizado == "especial única":
+                    icono_plan = "⭐ Extraordinaria"
+                else:
+                    icono_plan = "🤖 Automática"
+
+                es_extraordinaria_finalizada = (
+                    tipo_plan_normalizado == "especial única"
+                    and int(row["activo"] or 0) == 0
+                    and (
+                        pd.isna(row.get("proxima_fecha"))
+                        or str(row.get("proxima_fecha") or "").strip().lower()
+                        in ["", "nan", "nat", "none"]
+                    )
                 )
+
+                if es_extraordinaria_finalizada:
+                    titulo = (
+                        f"✅ FINALIZADA · {icono_plan} · {row['centro']} · {row['edificio']} · "
+                        f"{row['punto']} · {row['tarea']} · {estado}"
+                    )
+                else:
+                    proxima_txt = (
+                        ""
+                        if pd.isna(row.get("proxima_fecha"))
+                        else str(row.get("proxima_fecha") or "").strip()
+                    )
+
+                    titulo = (
+                        f"{row['estado_control']} · {icono_plan} · {row['centro']} · {row['edificio']} · "
+                        f"{row['punto']} · {row['tarea']} · {proxima_txt or 'Sin fecha'} · {estado}"
+                    )
 
                 with st.expander(titulo, expanded=False):
                     c1, c2 = st.columns(2)
@@ -2539,44 +2568,17 @@ def pantalla_legionella():
                         )
 
                         fecha_base = date.today()
-                        tiene_proxima_fecha = (
-                            pd.notna(row.get("proxima_fecha"))
-                            and str(row.get("proxima_fecha") or "").strip() != ""
-                        )
-
-                        if tiene_proxima_fecha:
+                        if row["proxima_fecha"]:
                             try:
-                                fecha_convertida = pd.to_datetime(
-                                    row["proxima_fecha"],
-                                    errors="coerce"
-                                )
-
-                                if pd.notna(fecha_convertida):
-                                    fecha_base = fecha_convertida.date()
-
+                                fecha_base = pd.to_datetime(row["proxima_fecha"]).date()
                             except Exception:
                                 fecha_base = date.today()
 
-                        es_extraordinaria_finalizada = (
-                            str(row.get("tipo_planificacion") or "").strip().lower()
-                            == "especial única"
-                            and int(row.get("activo") or 0) == 0
-                            and not tiene_proxima_fecha
+                        proxima_fecha = st.date_input(
+                            "Próxima fecha",
+                            value=fecha_base,
+                            key=f"prox_leg_{row['id']}"
                         )
-
-                        if es_extraordinaria_finalizada:
-                            st.success(
-                                "✅ Actuación extraordinaria finalizada · "
-                                "sin próxima fecha"
-                            )
-                            proxima_fecha = None
-
-                        else:
-                            proxima_fecha = st.date_input(
-                                "Próxima fecha",
-                                value=fecha_base,
-                                key=f"prox_leg_{row['id']}"
-                            )
 
                     with c2:
                         operario = st.selectbox(
@@ -2625,16 +2627,10 @@ def pantalla_legionella():
                         )
 
                     if st.button("💾 Guardar cambios", key=f"guardar_plan_leg_{row['id']}", use_container_width=True):
-                        proxima_fecha_guardar = (
-                            proxima_fecha.strftime("%Y-%m-%d")
-                            if proxima_fecha is not None
-                            else None
-                        )
-
                         actualizar_plan_legionella(
                             row["id"],
                             frecuencia,
-                            proxima_fecha_guardar,
+                            proxima_fecha.strftime("%Y-%m-%d"),
                             operario,
                             generar_ot,
                             activo,
