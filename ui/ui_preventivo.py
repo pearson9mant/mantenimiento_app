@@ -4,7 +4,10 @@ from pathlib import Path
 
 from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
 from database.db import conectar, _sql
-from modules.preventivo import generar_ots_preventivo_si_toca
+from modules.preventivo import (
+    generar_ots_preventivo_si_toca,
+    frecuencia_a_dias,
+)
 from modules.espacios import (
     obtener_plantas_espacios,
     obtener_espacios_por_planta,
@@ -174,26 +177,6 @@ def limpiar_nombre_archivo(texto):
     for c in caracteres_malos:
         texto = texto.replace(c, "_")
     return texto.replace(" ", "_")
-
-
-def calcular_proxima_fecha(fecha_base, frecuencia):
-    if not fecha_base:
-        fecha_base = date.today()
-
-    frecuencia = str(frecuencia or "").lower()
-
-    if "semanal" in frecuencia:
-        return fecha_base + timedelta(days=7)
-    if "mensual" in frecuencia:
-        return fecha_base + timedelta(days=30)
-    if "trimestral" in frecuencia:
-        return fecha_base + timedelta(days=90)
-    if "semestral" in frecuencia:
-        return fecha_base + timedelta(days=180)
-    if "anual" in frecuencia:
-        return fecha_base + timedelta(days=365)
-
-    return fecha_base + timedelta(days=30)
 
 
 def operario_por_centro(centro):
@@ -577,7 +560,7 @@ def mostrar_historico_preventivo():
 🧱 **Planta:** {planta or "-"}  
 📍 **Espacio:** {espacio or "-"}  
 🔧 **Área:** {area or "-"}  
-🔁 **Frecuencia:** {frecuencia or "-"}  
+🔁 **Frecuencia:** {frecuencia_a_dias(frecuencia)} días  
 👷 **Operario:** {operario or "-"}  
 📅 **Fecha de cierre:** {fecha_cierre or "-"}
 """
@@ -776,7 +759,7 @@ def mostrar_historico_preventivo():
 
             st.markdown(
                 f"**Área:** {area or '-'} · "
-                f"**Frecuencia:** {frecuencia or '-'} · "
+                f"**Frecuencia:** {frecuencia_a_dias(frecuencia)} días · "
                 f"**Operario:** {operario or '-'}"
             )
 
@@ -859,21 +842,24 @@ def pantalla_preventivo():
         else:
             espacio = espacio_sel
 
-        frecuencia = st.selectbox(
-            "Frecuencia",
-            ["Semanal", "Mensual", "Trimestral", "Semestral", "Anual"],
-            key="prev_frecuencia"
+        frecuencia_dias = st.number_input(
+            "Frecuencia en días",
+            min_value=1,
+            max_value=3650,
+            value=30,
+            step=1,
+            key="prev_frecuencia_dias"
         )
 
-        ultima_fecha = st.date_input(
-            "Última revisión / fecha base",
+        proxima_fecha = st.date_input(
+            "Próxima fecha",
             value=date.today(),
-            key="prev_ultima_fecha"
+            key="prev_proxima_fecha"
         )
 
-        proxima_fecha = calcular_proxima_fecha(ultima_fecha, frecuencia)
-
-        st.info(f"📅 Próxima fecha calculada automáticamente: {proxima_fecha}")
+        # La última revisión es un dato histórico.
+        # Una tarea nueva todavía no ha sido revisada.
+        ultima_fecha = ""
 
         area = st.selectbox(
             "Área",
@@ -1007,7 +993,7 @@ def pantalla_preventivo():
                         espacio,
                         area,
                         tarea,
-                        frecuencia
+                        str(int(frecuencia_dias))
                     )
 
                     if duplicado and not crear_de_todas_formas:
@@ -1063,7 +1049,7 @@ def pantalla_preventivo():
                             espacio,
                             area,
                             tarea,
-                            frecuencia,
+                            str(int(frecuencia_dias)),
                             str(ultima_fecha),
                             str(proxima_fecha),
                             operario,
@@ -1114,7 +1100,7 @@ def pantalla_preventivo():
                 estado = "🟢 Activa" if activo else "🔴 Inactiva"
 
                 with st.expander(
-                    f"{tarea} | {frecuencia} | Próxima: {proxima_fecha or '-'} | {estado}"
+                    f"{tarea} | {frecuencia_a_dias(frecuencia)} días | Próxima: {proxima_fecha or '-'} | {estado}"
                 ):
                     st.markdown(
                         f"""
@@ -1277,14 +1263,6 @@ def pantalla_preventivo():
 
             st.markdown("---")
 
-            frecuencias_disponibles = [
-                "Semanal",
-                "Mensual",
-                "Trimestral",
-                "Semestral",
-                "Anual",
-            ]
-
             for fila in planificaciones_filtradas:
                 (
                     tarea_id,
@@ -1314,18 +1292,17 @@ def pantalla_preventivo():
                     col1, col2 = st.columns(2)
 
                     with col1:
-                        frecuencia_actual = (
-                            frecuencia
-                            if frecuencia in frecuencias_disponibles
-                            else "Mensual"
+                        frecuencia_actual_dias = frecuencia_a_dias(
+                            frecuencia,
+                            defecto=30
                         )
 
-                        frecuencia_editada = st.selectbox(
-                            "Frecuencia",
-                            frecuencias_disponibles,
-                            index=frecuencias_disponibles.index(
-                                frecuencia_actual
-                            ),
+                        frecuencia_editada = st.number_input(
+                            "Frecuencia en días",
+                            min_value=1,
+                            max_value=3650,
+                            value=int(frecuencia_actual_dias),
+                            step=1,
                             key=f"plan_prev_frecuencia_{tarea_id}"
                         )
 
@@ -1383,7 +1360,7 @@ def pantalla_preventivo():
                         try:
                             actualizado = actualizar_planificacion_preventivo(
                                 tarea_id=tarea_id,
-                                frecuencia=frecuencia_editada,
+                                frecuencia=str(int(frecuencia_editada)),
                                 proxima_fecha=proxima_fecha_editada.strftime(
                                     "%Y-%m-%d"
                                 ),
