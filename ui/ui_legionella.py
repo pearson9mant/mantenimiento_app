@@ -2143,23 +2143,77 @@ def pantalla_legionella():
     mostrar_panel_inteligente_legionella() 
     st.markdown("### 🗺️ Planos de puntos de control")
 
-    col1, col2 = st.columns(2)
+    centro_plano = st.session_state.get("legionella_panel_centro", "Todos")
     
-    with col1:
-        pdf_puntos = Path("assets/planos_legionella/Puntos_control_legionela.pdf")
+    planos_legionella = {
+        "Pearson 22": {
+            "ruta": Path("assets/planos_legionella/Puntos_control_legionela.pdf"),
+            "nombre": "Puntos_control_legionela.pdf",
+            "texto": "Plano general Pearson 22 con puntos AFS, ACS y muestras.",
+        },
+        "Pearson 9": {
+            "ruta": Path("assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"),
+            "nombre": "Puntos_control_legionela_Pearson_9_v2.pdf",
+            "texto": "Plano general Pearson 9 con puntos AFS, ACS y muestras.",
+        },
+    }
     
-        if pdf_puntos.exists():
-            with open(pdf_puntos, "rb") as f:
+    def mostrar_boton_plano(datos):
+        ruta = datos["ruta"]
+    
+        if ruta.exists():
+            with open(ruta, "rb") as f:
                 st.download_button(
-                    "📄 Abrir plano general Legionella",
+                    f"📄 Abrir plano Legionella · {centro_plano}",
                     data=f.read(),
-                    file_name="Puntos_control_legionela.pdf",
+                    file_name=datos["nombre"],
                     mime="application/pdf",
                     use_container_width=True
                 )
     
-    with col2:
-        st.info("Plano general con todos los puntos AFS, ACS y muestras.")
+            st.info(datos["texto"])
+        else:
+            st.warning(f"No se encuentra el plano: {ruta}")
+    
+    
+    if centro_plano in planos_legionella:
+        mostrar_boton_plano(planos_legionella[centro_plano])
+    
+    else:
+        col1, col2 = st.columns(2)
+    
+        with col1:
+            datos = planos_legionella["Pearson 22"]
+            ruta = datos["ruta"]
+    
+            if ruta.exists():
+                with open(ruta, "rb") as f:
+                    st.download_button(
+                        "📄 Abrir plano Pearson 22",
+                        data=f.read(),
+                        file_name=datos["nombre"],
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+    
+        with col2:
+            datos = planos_legionella["Pearson 9"]
+            ruta = datos["ruta"]
+    
+            if ruta.exists():
+                with open(ruta, "rb") as f:
+                    st.download_button(
+                        "📄 Abrir plano Pearson 9",
+                        data=f.read(),
+                        file_name=datos["nombre"],
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+    
+        st.info(
+            "Selecciona un centro en el panel sanitario para mostrar "
+            "directamente su plano."
+        )
 
     with st.expander("🛡️ Mantenimiento de datos Legionella", expanded=False):
         st.caption("Limpia registros antiguos incompletos. No toca los registros correctos.")
