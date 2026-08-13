@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 
 from database.db import conectar
 
@@ -205,24 +205,22 @@ def _dividir_periodo_comparable(df):
         }
 
     dias_anterior = dias_totales // 2
-    corte = desde + pd.Timedelta(days=dias_anterior)
+    corte = desde + timedelta(days=dias_anterior)
 
     anterior = df[
         (df["fecha"].dt.date >= desde)
-        & (df["fecha"].dt.date < corte.date())
+        & (df["fecha"].dt.date < corte)
     ].copy()
 
     reciente = df[
-        (df["fecha"].dt.date >= corte.date())
+        (df["fecha"].dt.date >= corte)
         & (df["fecha"].dt.date <= hasta)
     ].copy()
 
     meta = {
         "desde_anterior": desde,
-        "hasta_anterior": (
-            corte - pd.Timedelta(days=1)
-        ).date(),
-        "desde_reciente": corte.date(),
+        "hasta_anterior": corte - timedelta(days=1),
+        "desde_reciente": corte,
         "hasta_reciente": hasta,
     }
 
