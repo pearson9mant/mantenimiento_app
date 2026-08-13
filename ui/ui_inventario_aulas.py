@@ -562,28 +562,13 @@ def pantalla_inventario_aulas():
         ""
     )
 
-    perfil = st.session_state.get(
-        "perfil",
-        ""
+    # Inventario global: desde esta pantalla se puede trabajar
+    # con cualquiera de los centros del colegio.
+    centro = st.selectbox(
+        "Centro",
+        CENTROS,
+        key="inv_aula_centro"
     )
-
-    centro_fijo = (
-        centro_por_operario()
-        if perfil != "admin"
-        else ""
-    )
-
-    if centro_fijo:
-        st.info(
-            f"Centro asignado: **{centro_fijo}**"
-        )
-        centro = centro_fijo
-    else:
-        centro = st.selectbox(
-            "Centro",
-            CENTROS,
-            key="inv_aula_centro"
-        )
 
     edificios = obtener_edificios(
         centro
@@ -596,7 +581,8 @@ def pantalla_inventario_aulas():
     )
 
     espacios = obtener_espacios(
-        edificio
+        edificio,
+        centro
     )
 
     espacio = st.selectbox(
@@ -971,7 +957,8 @@ def pantalla_inventario_aulas():
         )
 
         espacios_origen = obtener_espacios(
-            edificio_origen
+            edificio_origen,
+            centro_origen
         )
 
         espacios_validos = [
