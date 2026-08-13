@@ -898,6 +898,24 @@ def pantalla_ordenes():
         ordenes = filtrar_por_operario_obligatorio(ordenes)
 
         if ordenes:
+            st.markdown("### 🔎 Buscar órdenes activas")
+
+            busqueda_activas = st.text_input(
+                "Buscar por espacio, nº OT, descripción, centro, edificio, área, operario u origen",
+                placeholder="Ejemplo: 6C",
+                key="buscar_ordenes_activas_admin"
+            )
+
+            if busqueda_activas:
+                texto_busqueda = busqueda_activas.strip().lower()
+
+                ordenes = [
+                    o for o in ordenes
+                    if texto_busqueda in " ".join(
+                        [str(campo or "") for campo in o]
+                    ).lower()
+                ]
+
             f1, f2, f3 = st.columns(3)
 
             with f1:
