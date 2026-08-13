@@ -143,11 +143,368 @@ def _filtros_evolucion(df):
     return filtrado
 
 
+
+def _correctivas(df):
+    if df.empty:
+        return df
+
+    return df[
+        df["tipo_evolucion"].isin(
+            [
+                "Incidencias / correctivas",
+                "OT correctivas",
+            ]
+        )
+    ].copy()
+
+
+def _preventivas(df):
+    if df.empty:
+        return df
+
+    return df[
+        df["tipo_evolucion"] == "Preventivas"
+    ].copy()
+
+
+def _dividir_periodo_comparable(df):
+    """
+    Divide el periodo seleccionado en dos mitades iguales:
+    - periodo anterior
+    - periodo reciente
+
+    Así la lectura siempre compara tiempos equivalentes y respeta
+    los filtros Desde / Hasta seleccionados por el usuario.
+    """
+    if df.empty:
+        return df.copy(), df.copy(), None
+
+    desde = st.session_state.get("evol_desde")
+    hasta = st.session_state.get("evol_hasta")
+
+    if not desde or not hasta:
+        fechas = df["fecha"].dropna()
+
+        if fechas.empty:
+            return df.copy(), df.copy(), None
+
+        desde = fechas.min().date()
+        hasta = fechas.max().date()
+
+    if hasta < desde:
+        desde, hasta = hasta, desde
+
+    dias_totales = (hasta - desde).days + 1
+
+    if dias_totales < 2:
+        return df.iloc[0:0].copy(), df.copy(), {
+            "desde_anterior": desde,
+            "hasta_anterior": desde,
+            "desde_reciente": desde,
+            "hasta_reciente": hasta,
+        }
+
+    dias_anterior = dias_totales // 2
+    corte = desde + pd.Timedelta(days=dias_anterior)
+
+    anterior = df[
+        (df["fecha"].dt.date >= desde)
+        & (df["fecha"].dt.date < corte.date())
+    ].copy()
+
+    reciente = df[
+        (df["fecha"].dt.date >= corte.date())
+        & (df["fecha"].dt.date <= hasta)
+    ].copy()
+
+    meta = {
+        "desde_anterior": desde,
+        "hasta_anterior": (
+            corte - pd.Timedelta(days=1)
+        ).date(),
+        "desde_reciente": corte.date(),
+        "hasta_reciente": hasta,
+    }
+
+    return anterior, reciente, meta
+
+
+def _variacion_porcentaje(actual, anterior):
+    if anterior == 0:
+        return None
+
+    return ((actual - anterior) / anterior) * 100.0
+
+
+def _texto_variacion(actual, anterior):
+    variacion = _variacion_porcentaje(
+        actual,
+        anterior
+    )
+
+    if variacion is None:
+        if actual == 0:
+            return "sin actividad en ninguno de los dos periodos"
+
+        return (
+            f"{actual} en el periodo reciente "
+            "sin registros comparables en el periodo anterior"
+        )
+
+    signo = "+" if variacion > 0 else ""
+
+    return (
+        f"{actual} frente a {anterior} "
+        f"({signo}{variacion:.0f}%)"
+    )
+
+
+def _mostrar_lectura_evolucion(df):
+    """
+    Interpreta tendencias con reglas matemáticas simples y explicables.
+    No usa IA externa ni modifica ningún dato.
+    """
+    anterior, reciente, meta = _dividir_periodo_comparable(
+        df
+    )
+
+    if meta is None:
+        return
+
+    st.markdown("### 🧠 Lectura de la evolución")
+
+    st.caption(
+        "Comparación automática entre dos periodos equivalentes: "
+        f"{meta['desde_anterior'].strftime('%d/%m/%Y')}–"
+        f"{meta['hasta_anterior'].strftime('%d/%m/%Y')} frente a "
+        f"{meta['desde_reciente'].strftime('%d/%m/%Y')}–"
+        f"{meta['hasta_reciente'].strftime('%d/%m/%Y')}."
+    )
+
+    corr_ant = _correctivas(anterior)
+    corr_rec = _correctivas(reciente)
+
+    prev_ant = _preventivas(anterior)
+    prev_rec = _preventivas(reciente)
+
+    n_corr_ant = len(corr_ant)
+    n_corr_rec = len(corr_rec)
+    n_prev_ant = len(prev_ant)
+    n_prev_rec = len(prev_rec)
+
+    variacion_corr = _variacion_porcentaje(
+        n_corr_rec,
+        n_corr_ant
+    )
+
+    if variacion_corr is None:
+        if n_corr_ant == 0 and n_corr_rec == 0:
+            st.success(
+                "🟢 **Correctivas:** no hay correctivas en ninguno "
+                "de los dos periodos comparados."
+            )
+        else:
+            st.info(
+                "🔵 **Correctivas:** "
+                + _texto_variacion(
+                    n_corr_rec,
+                    n_corr_ant
+                )
+                + "."
+            )
+
+    elif variacion_corr <= -10:
+        st.success(
+            "🟢 **Las correctivas disminuyen:** "
+            + _texto_variacion(
+                n_corr_rec,
+                n_corr_ant
+            )
+            + ". La evolución operativa es favorable."
+        )
+
+    elif variacion_corr >= 10:
+        st.warning(
+            "🟠 **Las correctivas aumentan:** "
+            + _texto_variacion(
+                n_corr_rec,
+                n_corr_ant
+            )
+            + ". Conviene revisar dónde se concentra el incremento."
+        )
+
+    else:
+        st.info(
+            "🔵 **Correctivas estables:** "
+            + _texto_variacion(
+                n_corr_rec,
+                n_corr_ant
+            )
+            + "."
+        )
+
+    variacion_prev = _variacion_porcentaje(
+        n_prev_rec,
+        n_prev_ant
+    )
+
+    if variacion_prev is None:
+        st.info(
+            "🔧 **Preventivas:** "
+            + _texto_variacion(
+                n_prev_rec,
+                n_prev_ant
+            )
+            + "."
+        )
+    elif variacion_prev >= 10:
+        st.success(
+            "🟢 **Actividad preventiva al alza:** "
+            + _texto_variacion(
+                n_prev_rec,
+                n_prev_ant
+            )
+            + "."
+        )
+    elif variacion_prev <= -10:
+        st.warning(
+            "🟠 **Actividad preventiva a la baja:** "
+            + _texto_variacion(
+                n_prev_rec,
+                n_prev_ant
+            )
+            + ". Conviene comprobar si responde a planificación "
+            "o a preventivos pendientes."
+        )
+    else:
+        st.info(
+            "🔵 **Preventivas estables:** "
+            + _texto_variacion(
+                n_prev_rec,
+                n_prev_ant
+            )
+            + "."
+        )
+
+    # Relación preventivo / correctivo.
+    if n_corr_rec > 0:
+        ratio_rec = n_prev_rec / n_corr_rec
+        st.info(
+            f"⚖️ **Relación preventivo/correctivo:** "
+            f"{ratio_rec:.2f} preventivas por cada correctiva "
+            "en el periodo reciente."
+        )
+    elif n_prev_rec > 0:
+        st.success(
+            "⚖️ **Relación preventivo/correctivo:** hay actividad "
+            "preventiva y ninguna correctiva en el periodo reciente."
+        )
+
+    # Reincidencias: mismo centro + edificio + espacio + área.
+    if not corr_rec.empty:
+        agrupacion = (
+            corr_rec.assign(
+                centro_r=corr_rec["centro"].fillna("").astype(str),
+                edificio_r=corr_rec["edificio"].fillna("").astype(str),
+                espacio_r=corr_rec["espacio"].fillna("").astype(str),
+                area_r=corr_rec["area"].fillna("").astype(str),
+            )
+            .groupby(
+                [
+                    "centro_r",
+                    "edificio_r",
+                    "espacio_r",
+                    "area_r",
+                ],
+                dropna=False,
+            )
+            .size()
+            .sort_values(ascending=False)
+        )
+
+        reincidentes = agrupacion[
+            agrupacion >= 2
+        ]
+
+        if not reincidentes.empty:
+            clave = reincidentes.index[0]
+            repeticiones = int(
+                reincidentes.iloc[0]
+            )
+
+            centro_r, edificio_r, espacio_r, area_r = clave
+
+            st.warning(
+                "🔁 **Reincidencia detectada:** "
+                f"{centro_r or '-'} · {edificio_r or '-'} · "
+                f"{espacio_r or '-'} · {area_r or '-'} "
+                f"acumula {repeticiones} correctivas en el periodo reciente."
+            )
+
+    # Área que más empeora en correctivas.
+    if not corr_rec.empty:
+        areas_ant = (
+            corr_ant.assign(
+                area_limpia=corr_ant["area"]
+                .fillna("Sin área")
+                .astype(str)
+                .replace("", "Sin área")
+            )
+            .groupby("area_limpia")
+            .size()
+        )
+
+        areas_rec = (
+            corr_rec.assign(
+                area_limpia=corr_rec["area"]
+                .fillna("Sin área")
+                .astype(str)
+                .replace("", "Sin área")
+            )
+            .groupby("area_limpia")
+            .size()
+        )
+
+        todas_areas = sorted(
+            set(areas_ant.index)
+            | set(areas_rec.index)
+        )
+
+        cambios = []
+
+        for area in todas_areas:
+            ant = int(
+                areas_ant.get(area, 0)
+            )
+            rec = int(
+                areas_rec.get(area, 0)
+            )
+
+            cambios.append(
+                (
+                    rec - ant,
+                    rec,
+                    ant,
+                    area,
+                )
+            )
+
+        cambios.sort(reverse=True)
+
+        if cambios and cambios[0][0] > 0:
+            incremento, rec, ant, area = cambios[0]
+
+            st.warning(
+                f"📍 **Área a vigilar:** {area} es la que más aumenta "
+                f"en correctivas ({rec} frente a {ant}, "
+                f"+{incremento})."
+            )
+
 def pantalla_evolucion():
     st.subheader("📈 Evolución")
 
     st.caption(
-        "Solo gráficos. La pantalla muestra la evolución real "
+        "Gráficos e interpretación automática de tendencias "
         "a partir del histórico de trabajos finalizados."
     )
 
@@ -164,6 +521,12 @@ def pantalla_evolucion():
     if df.empty:
         st.info("No hay datos en el periodo seleccionado.")
         return
+
+    _mostrar_lectura_evolucion(
+        df
+    )
+
+    st.markdown("---")
 
     # =====================================================
     # GRÁFICO 1 · EVOLUCIÓN MENSUAL POR TIPO
@@ -185,6 +548,48 @@ def pantalla_evolucion():
         graf_mes,
         use_container_width=True
     )
+
+    # =====================================================
+    # GRÁFICO 1B · PREVENTIVAS VS CORRECTIVAS
+    # =====================================================
+    comparativa = mensual[
+        mensual["tipo_evolucion"].isin(
+            [
+                "Preventivas",
+                "Incidencias / correctivas",
+                "OT correctivas",
+            ]
+        )
+    ].copy()
+
+    if not comparativa.empty:
+        comparativa["familia"] = comparativa[
+            "tipo_evolucion"
+        ].replace(
+            {
+                "Incidencias / correctivas": "Correctivas",
+                "OT correctivas": "Correctivas",
+                "Preventivas": "Preventivas",
+            }
+        )
+
+        prev_corr_mes = (
+            comparativa.groupby(
+                ["mes", "familia"]
+            )
+            .size()
+            .unstack(fill_value=0)
+            .sort_index()
+        )
+
+        st.markdown(
+            "### Preventivas frente a correctivas"
+        )
+
+        st.line_chart(
+            prev_corr_mes,
+            use_container_width=True
+        )
 
     # =====================================================
     # GRÁFICO 2 · OT POR ÁREA
