@@ -543,95 +543,56 @@ def mostrar_menu_admin():
         "<div class='section-title'>Menú principal</div>",
         unsafe_allow_html=True
     )
-    try:
 
+    try:
         resumen_recordatorios = obtener_resumen_recordatorios()
 
         if resumen_recordatorios["vencidos"]:
-
             st.error("🔴 Recordatorios vencidos")
-
             for item in resumen_recordatorios["vencidos"]:
                 st.markdown(f"- {item}")
 
         if resumen_recordatorios["hoy"]:
-
             st.warning("🟠 Recordatorios para hoy")
-
             for item in resumen_recordatorios["hoy"]:
                 st.markdown(f"- {item}")
 
         if resumen_recordatorios["mañana"]:
-
             st.info("🔔 Recordatorios para mañana")
-
             for item in resumen_recordatorios["mañana"]:
                 st.markdown(f"- {item}")
 
     except Exception as e:
         st.warning(f"Error recordatorios: {e}")
 
-    # =====================================================
-    # ALERTAS EMPRESAS / LEGIONELLA
-    # =====================================================
-
     try:
-
         alertas = obtener_alertas_empresas_externas()
-
         toca = alertas["toca"]
         proximo = alertas["proximo"]
 
         if toca:
-
-            st.error(
-                f"🔴 Hay {len(toca)} actuaciones externas vencidas"
-            )
-
+            st.error(f"🔴 Hay {len(toca)} actuaciones externas vencidas")
             for item in toca:
-
                 st.markdown(
-                    f"- {item['tipo']} · "
-                    f"{item['empresa']} · "
-                    f"{item['centro']} · "
-                    f"{item['fecha']}"
+                    f"- {item['tipo']} · {item['empresa']} · "
+                    f"{item['centro']} · {item['fecha']}"
                 )
 
         if proximo:
-
-            st.warning(
-                f"🟠 Hay {len(proximo)} actuaciones próximas"
-            )
-
+            st.warning(f"🟠 Hay {len(proximo)} actuaciones próximas")
             for item in proximo:
-
                 st.markdown(
-                    f"- {item['tipo']} · "
-                    f"{item['empresa']} · "
-                    f"{item['centro']} · "
-                    f"{item['fecha']}"
+                    f"- {item['tipo']} · {item['empresa']} · "
+                    f"{item['centro']} · {item['fecha']}"
                 )
 
     except Exception as e:
-
         st.warning(f"Alertas empresas externas: {e}")
 
-    col1, col2, col3 = st.columns(3)
+    st.markdown("### 🛠️ Trabajo diario")
+    c1, c2, c3 = st.columns(3)
 
-    with col1:
-        if st.button("📊\nPanel general", key="btn_panel", use_container_width=True):
-            st.session_state["seccion_actual"] = "Panel"
-            st.rerun()
-
-        if st.button("📦\nInventario", key="btn_inv", use_container_width=True):
-            st.session_state["seccion_actual"] = "Inventario"
-            st.rerun()
-
-        if st.button("👷\nVista operario", key="btn_op", use_container_width=True):
-            st.session_state["seccion_actual"] = "Operario"
-            st.rerun()
-
-    with col2:
+    with c1:
         if st.button("🛠\nÓrdenes de trabajo", key="btn_ot", use_container_width=True):
             st.session_state["seccion_actual"] = "Órdenes"
             st.rerun()
@@ -639,98 +600,109 @@ def mostrar_menu_admin():
         if st.button("💧\nLegionella", key="btn_leg", use_container_width=True):
             st.session_state["seccion_actual"] = "Legionella"
             st.rerun()
-            
-        if st.button(
-            "🛡️\nCentro Control",
-            key="btn_centro_control",
-            use_container_width=True
-        ):
-            st.session_state["seccion_actual"] = "Panel Legionella"
-            st.rerun()    
+
+    with c2:
+        if st.button("📩\nIncidencias", key="btn_incidencias", use_container_width=True):
+            st.session_state["seccion_actual"] = "Incidencias"
+            st.rerun()
 
         if st.button("🔧\nPreventivo", key="btn_preventivo", use_container_width=True):
             st.session_state["seccion_actual"] = "Preventivo"
             st.rerun()
 
-    with col3:
-        if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Gerencia"
+    with c3:
+        if st.button("📦\nInventario", key="btn_inv", use_container_width=True):
+            st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
 
-        if st.button("⚙️\nOperarios", key="btn_ops", use_container_width=True):
-            st.session_state["seccion_actual"] = "Operarios"
-            st.rerun()
-
-        if st.button("📩\nIncidencias", key="btn_incidencias", use_container_width=True):
-            st.session_state["seccion_actual"] = "Incidencias"
-            st.rerun()
-            
         if st.button("📩\nPedidos material", key="btn_pedidos_admin", use_container_width=True):
             st.session_state["seccion_actual"] = "Pedidos material"
             st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("### 📊 Control y gestión")
+    c4, c5, c6 = st.columns(3)
 
-    col4, col5, col6 = st.columns(3)
-
-    with col4:
-        if st.button("🗺️\nPlanos Legionella", key="btn_planos_legionella", use_container_width=True):
-            st.session_state["seccion_actual"] = "Planos Legionella"
+    with c4:
+        if st.button("📊\nPanel general", key="btn_panel", use_container_width=True):
+            st.session_state["seccion_actual"] = "Panel"
             st.rerun()
-            
-        if st.button("📖\nManual app", key="btn_manual_app", use_container_width=True):
-            st.session_state["seccion_actual"] = "Manual app"
-            st.rerun()   
-            
+
+        if st.button("🏫\nColegio", key="btn_colegio", use_container_width=True):
+            st.session_state["seccion_actual"] = "Colegio"
+            st.rerun()
+
+    with c5:
+        if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Gerencia"
+            st.rerun()
+
         if st.button("🏢\nEmpresas externas", key="btn_empresas_externas", use_container_width=True):
             st.session_state["seccion_actual"] = "Empresas externas"
             st.rerun()
 
-        
-    
-
-    with col5:
-        if st.button("☀️\nPlan verano", key="btn_plan_verano_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Plan verano"
+    with c6:
+        if st.button("👷\nOperarios", key="btn_ops", use_container_width=True):
+            st.session_state["seccion_actual"] = "Operarios"
             st.rerun()
-
-        if st.button("🏫\nEstado aulas", key="btn_estado_aulas", use_container_width=True):
-            st.session_state["seccion_actual"] = "Estado aulas"
-            st.rerun() 
 
         if st.button("🔔\nRecordatorios", key="btn_recordatorios", use_container_width=True):
             st.session_state["seccion_actual"] = "Recordatorios"
             st.rerun()
 
-        if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
-            st.session_state["seccion_actual"] = "Configuración"
-            st.rerun()
-            
-        if st.button("🏫\nColegio", key="btn_colegio", use_container_width=True):
-            st.session_state["seccion_actual"] = "Colegio"
-            st.rerun()   
+    st.markdown("---")
+    st.markdown("### 📅 Planificación")
+    c7, c8 = st.columns(2)
 
-        if st.button("🏫\nGestión espacios", key="btn_gestion_espacios_admin", use_container_width=True):
-            st.session_state["seccion_actual"] = "Gestión espacios"
+    with c7:
+        if st.button("☀️\nPlan verano", key="btn_plan_verano_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Plan verano"
             st.rerun()
 
-        if st.button(
-            "📱\nQR de aulas",
-            key="btn_qr_aulas",
-            use_container_width=True
-        ):
-            st.session_state["seccion_actual"] = "QR aulas"
+    with c8:
+        if st.button("🏫\nEstado aulas", key="btn_estado_aulas", use_container_width=True):
+            st.session_state["seccion_actual"] = "Estado aulas"
             st.rerun()
 
-        if st.button(
-            "📄\nPlacas QR",
-            key="btn_placas_qr",
-            use_container_width=True
-        ):
-            st.session_state["seccion_actual"] = "Placas QR"
-            st.rerun()
+    st.markdown("---")
 
+    with st.expander("⚙️ Herramientas y estructura", expanded=False):
+        h1, h2, h3 = st.columns(3)
 
+        with h1:
+            if st.button("🏫\nGestión espacios", key="btn_gestion_espacios_admin", use_container_width=True):
+                st.session_state["seccion_actual"] = "Gestión espacios"
+                st.rerun()
+
+            if st.button("🗺️\nPlanos Legionella", key="btn_planos_legionella", use_container_width=True):
+                st.session_state["seccion_actual"] = "Planos Legionella"
+                st.rerun()
+
+            if st.button("👷\nVista operario", key="btn_op", use_container_width=True):
+                st.session_state["seccion_actual"] = "Operario"
+                st.rerun()
+
+        with h2:
+            if st.button("📱\nQR de aulas", key="btn_qr_aulas", use_container_width=True):
+                st.session_state["seccion_actual"] = "QR aulas"
+                st.rerun()
+
+            if st.button("📄\nPlacas QR", key="btn_placas_qr", use_container_width=True):
+                st.session_state["seccion_actual"] = "Placas QR"
+                st.rerun()
+
+            if st.button("🛡️\nCentro Control", key="btn_centro_control", use_container_width=True):
+                st.session_state["seccion_actual"] = "Panel Legionella"
+                st.rerun()
+
+        with h3:
+            if st.button("⚙️\nConfiguración", key="btn_config", use_container_width=True):
+                st.session_state["seccion_actual"] = "Configuración"
+                st.rerun()
+
+            if st.button("📖\nManual app", key="btn_manual_app", use_container_width=True):
+                st.session_state["seccion_actual"] = "Manual app"
+                st.rerun()
 
 def mostrar_menu_operario():
     perfil = st.session_state.get("perfil", "")
