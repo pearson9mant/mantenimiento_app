@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from database.db import conectar
+from modules.ubicaciones import CENTROS
 
 
 def _leer_activos_colegio():
@@ -136,12 +137,22 @@ def _aplicar_filtros(df):
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        centros = ["Todos"] + sorted(
-            [
-                x for x in filtrado["centro"].unique().tolist()
-                if x
-            ]
-        )
+        # Usamos la lista maestra de centros del colegio.
+        # Así Pearson 9 aparece aunque todavía no tenga inventario cargado.
+        centros_datos = [
+            x for x in filtrado["centro"].unique().tolist()
+            if x
+        ]
+
+        centros = ["Todos"]
+
+        for centro_base in CENTROS:
+            if centro_base not in centros:
+                centros.append(centro_base)
+
+        for centro_dato in sorted(centros_datos):
+            if centro_dato not in centros:
+                centros.append(centro_dato)
 
         centro = st.selectbox(
             "Centro",
@@ -434,6 +445,27 @@ def _mostrar_por_centro(df):
         fill_value=0
     )
 
+    # Mantener visibles los centros maestros incluso si aún no tienen datos.
+    for centro_base in CENTROS:
+        if centro_base not in tabla.columns:
+            tabla[centro_base] = 0
+
+    columnas_centros = [
+        centro_base
+        for centro_base in CENTROS
+        if centro_base in tabla.columns
+    ]
+
+    otras_columnas = [
+        col
+        for col in tabla.columns
+        if col not in columnas_centros
+    ]
+
+    tabla = tabla[
+        columnas_centros + otras_columnas
+    ]
+
     tabla["Total"] = tabla.sum(
         axis=1
     )
@@ -561,9 +593,20 @@ def pantalla_activos_colegio():
     )
 
     if df.empty:
-        st.info(
-            "No hay resultados con los filtros seleccionados."
+        centro_sel = st.session_state.get(
+            "activos_global_centro",
+            "Todos"
         )
+
+        if centro_sel != "Todos":
+            st.info(
+                f"Todavía no hay inventario de espacios registrado "
+                f"para **{centro_sel}**."
+            )
+        else:
+            st.info(
+                "No hay resultados con los filtros seleccionados."
+            )
         return
 
     _mostrar_metricas(
