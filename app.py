@@ -48,6 +48,7 @@ from ui.ui_operario import (
 from ui.ui_colegio_vivo_operario import pantalla_colegio_vivo_operario
 from ui.ui_historicos import pantalla_historicos
 from ui.ui_evolucion import pantalla_evolucion
+from ui.ui_activos_colegio import pantalla_activos_colegio
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
@@ -635,6 +636,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Colegio"
             st.rerun()
 
+        if st.button(
+            "🏫\nActivos del colegio",
+            key="btn_activos_colegio",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Activos del colegio"
+            st.rerun()
+
     with c5:
         if st.button("📊\nGerencia", key="btn_gerencia_admin", use_container_width=True):
             st.session_state["seccion_actual"] = "Gerencia"
@@ -1067,6 +1076,9 @@ if perfil == "admin":
 
     elif seccion == "Colegio":
         pantalla_colegio()
+
+    elif seccion == "Activos del colegio":
+        pantalla_activos_colegio()
         
     elif seccion == "Gestión espacios":
         pantalla_gestion_aulas()
