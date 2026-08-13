@@ -573,6 +573,115 @@ def _mostrar_detalle_area_correctivas(df, area_objetivo, titulo="Detalle"):
             hide_index=True
         )
 
+
+def _mostrar_espacios_mas_afectados(df):
+    """
+    Identifica los espacios con más correctivas dentro del periodo filtrado
+    y permite desplegar las OT que justifican el dato.
+    """
+    corr = _correctivas(df)
+
+    if corr.empty:
+        return
+
+    corr = corr.copy()
+
+    corr["centro_limpio"] = (
+        corr["centro"]
+        .fillna("Sin centro")
+        .astype(str)
+        .replace("", "Sin centro")
+    )
+
+    corr["edificio_limpio"] = (
+        corr["edificio"]
+        .fillna("Sin edificio")
+        .astype(str)
+        .replace("", "Sin edificio")
+    )
+
+    corr["espacio_limpio"] = (
+        corr["espacio"]
+        .fillna("Sin espacio")
+        .astype(str)
+        .replace("", "Sin espacio")
+    )
+
+    corr["clave_espacio"] = (
+        corr["centro_limpio"]
+        + " · "
+        + corr["edificio_limpio"]
+        + " · "
+        + corr["espacio_limpio"]
+    )
+
+    ranking = (
+        corr.groupby("clave_espacio")
+        .size()
+        .sort_values(ascending=False)
+        .head(10)
+        .to_frame("Correctivas")
+    )
+
+    if ranking.empty:
+        return
+
+    st.markdown("### 🏫 Espacios más afectados")
+
+    st.bar_chart(
+        ranking,
+        use_container_width=True,
+        horizontal=True
+    )
+
+    top_espacios = ranking.index.tolist()
+
+    for posicion, clave in enumerate(top_espacios, start=1):
+        total = int(ranking.loc[clave, "Correctivas"])
+
+        with st.expander(
+            f"{posicion}. {clave} · {total} "
+            f"{'correctiva' if total == 1 else 'correctivas'}",
+            expanded=False
+        ):
+            detalle = corr[
+                corr["clave_espacio"] == clave
+            ].copy()
+
+            columnas = [
+                "fecha",
+                "numero_ot",
+                "area",
+                "prioridad",
+                "operario",
+                "origen",
+                "descripcion",
+            ]
+
+            disponibles = [
+                c for c in columnas
+                if c in detalle.columns
+            ]
+
+            mostrar = detalle[
+                disponibles
+            ].copy()
+
+            if "fecha" in mostrar.columns:
+                mostrar["fecha"] = (
+                    pd.to_datetime(
+                        mostrar["fecha"],
+                        errors="coerce"
+                    )
+                    .dt.strftime("%d/%m/%Y")
+                )
+
+            st.dataframe(
+                mostrar,
+                use_container_width=True,
+                hide_index=True
+            )
+
 def pantalla_evolucion():
     st.subheader("📈 Evolución")
 
@@ -686,6 +795,13 @@ def pantalla_evolucion():
         areas,
         use_container_width=True,
         horizontal=True
+    )
+
+    # =====================================================
+    # ESPACIOS MÁS AFECTADOS
+    # =====================================================
+    _mostrar_espacios_mas_afectados(
+        df
     )
 
     # =====================================================
