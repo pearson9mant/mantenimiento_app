@@ -46,6 +46,8 @@ from ui.ui_operario import (
     pantalla_operario_prueba,
 )
 from ui.ui_colegio_vivo_operario import pantalla_colegio_vivo_operario
+from ui.ui_historicos import pantalla_historicos
+from ui.ui_evolucion import pantalla_evolucion
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
@@ -621,7 +623,8 @@ def mostrar_menu_admin():
 
     st.markdown("---")
     st.markdown("### 📊 Control y gestión")
-    c4, c5, c6 = st.columns(3)
+
+    c4, c5, c6, c7 = st.columns(4)
 
     with c4:
         if st.button("📊\nPanel general", key="btn_panel", use_container_width=True):
@@ -637,13 +640,22 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Gerencia"
             st.rerun()
 
+        if st.button("👷\nOperarios", key="btn_ops", use_container_width=True):
+            st.session_state["seccion_actual"] = "Operarios"
+            st.rerun()
+
+    with c6:
+        if st.button("📚\nHistóricos", key="btn_historicos_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Históricos"
+            st.rerun()
+
         if st.button("🏢\nEmpresas externas", key="btn_empresas_externas", use_container_width=True):
             st.session_state["seccion_actual"] = "Empresas externas"
             st.rerun()
 
-    with c6:
-        if st.button("👷\nOperarios", key="btn_ops", use_container_width=True):
-            st.session_state["seccion_actual"] = "Operarios"
+    with c7:
+        if st.button("📈\nEvolución", key="btn_evolucion_admin", use_container_width=True):
+            st.session_state["seccion_actual"] = "Evolución"
             st.rerun()
 
         if st.button("🔔\nRecordatorios", key="btn_recordatorios", use_container_width=True):
@@ -992,6 +1004,12 @@ if perfil == "admin":
 
     elif seccion == "Gerencia":
         pantalla_gerencia()
+
+    elif seccion == "Históricos":
+        pantalla_historicos()
+
+    elif seccion == "Evolución":
+        pantalla_evolucion()
 
     elif seccion == "Órdenes":
         pantalla_ordenes()
