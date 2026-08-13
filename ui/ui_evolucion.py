@@ -498,6 +498,81 @@ def _mostrar_lectura_evolucion(df):
                 f"+{incremento})."
             )
 
+            _mostrar_detalle_area_correctivas(
+                reciente,
+                area_objetivo=area,
+                titulo="OT que explican el aumento"
+            )
+
+
+def _mostrar_detalle_area_correctivas(df, area_objetivo, titulo="Detalle"):
+    """
+    Muestra las OT correctivas que justifican una alerta de área.
+    No hace nuevas consultas: reutiliza el dataframe ya filtrado.
+    """
+    if df.empty or not area_objetivo:
+        return
+
+    corr = _correctivas(df)
+
+    if corr.empty:
+        return
+
+    detalle = corr[
+        corr["area"]
+        .fillna("Sin área")
+        .astype(str)
+        .replace("", "Sin área")
+        == str(area_objetivo)
+    ].copy()
+
+    if detalle.empty:
+        return
+
+    with st.expander(
+        f"🔎 Ver OT de {area_objetivo} ({len(detalle)})",
+        expanded=False
+    ):
+        columnas = [
+            "fecha",
+            "numero_ot",
+            "centro",
+            "edificio",
+            "espacio",
+            "area",
+            "prioridad",
+            "operario",
+            "origen",
+            "descripcion",
+        ]
+
+        disponibles = [
+            c for c in columnas
+            if c in detalle.columns
+        ]
+
+        mostrar = detalle[
+            disponibles
+        ].copy()
+
+        if "fecha" in mostrar.columns:
+            mostrar["fecha"] = (
+                pd.to_datetime(
+                    mostrar["fecha"],
+                    errors="coerce"
+                )
+                .dt.strftime("%d/%m/%Y")
+            )
+
+        st.dataframe(
+            mostrar.sort_values(
+                by="fecha",
+                ascending=False
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+
 def pantalla_evolucion():
     st.subheader("📈 Evolución")
 
