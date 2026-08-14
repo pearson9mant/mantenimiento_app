@@ -4,6 +4,7 @@ from modules.ordenes import (
     crear_orden,
     obtener_siguiente_numero_ot,
     crear_correctiva_desde_ot,
+    vincular_origen_ot,
 )
 
 
@@ -262,7 +263,15 @@ def existe_ot_preventiva_abierta(
     espacio
 ):
     """
-    Comprueba primero la vinculación tarea_id -> numero_ot.
+    Evita duplicar una OT preventiva.
+
+    Orden de comprobación:
+    1. Vinculación estructural id_preventivo -> OT.
+    2. Registro preventivo -> numero_ot.
+    3. Compatibilidad con OT antiguas por texto y ubicación.
+
+    En las OT antiguas la planta pudo quedar escrita dentro de
+    solicitante u observaciones_estado, por lo que se revisan ambos.
     """
     asegurar_estructura_preventivo()
 
@@ -270,6 +279,39 @@ def existe_ot_preventiva_abierta(
     cursor = conn.cursor()
 
     try:
+        # 1. Vinculación moderna y fiable.
+        try:
+            cursor.execute(_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE id_preventivo = ?
+                  AND LOWER(COALESCE(estado, ''))
+                      NOT IN (
+                          'finalizada',
+                          'finalizado',
+                          'cerrada',
+                          'cerrado',
+                          'cancelada',
+                          'cancelado'
+                      )
+            """), (int(tarea_id),))
+
+            total = int(
+                cursor.fetchone()[0] or 0
+            )
+
+            if total > 0:
+                return True
+
+        except Exception:
+            # Compatibilidad por si una instalación antigua
+            # todavía no tuviera id_preventivo.
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        # 2. Vinculación histórica mediante preventivo_registros.
         cursor.execute(_sql("""
             SELECT COUNT(*)
             FROM preventivo_registros pr
@@ -277,35 +319,90 @@ def existe_ot_preventiva_abierta(
                 ON ot.numero_ot = pr.numero_ot
             WHERE pr.tarea_id = ?
               AND LOWER(COALESCE(ot.estado, ''))
-                  NOT IN ('finalizada', 'finalizado', 'cerrada', 'cerrado', 'cancelada', 'cancelado')
+                  NOT IN (
+                      'finalizada',
+                      'finalizado',
+                      'cerrada',
+                      'cerrado',
+                      'cancelada',
+                      'cancelado'
+                  )
         """), (int(tarea_id),))
 
-        total = int(cursor.fetchone()[0] or 0)
+        total = int(
+            cursor.fetchone()[0] or 0
+        )
 
         if total > 0:
             return True
 
+        # 3. Respaldo para OT antiguas no vinculadas.
         texto_buscar = f"[PREVENTIVO] {tarea}"
+        planta_txt = str(planta or "").strip()
 
-        cursor.execute(_sql("""
-            SELECT COUNT(*)
-            FROM ordenes_trabajo
-            WHERE origen = ?
-              AND descripcion = ?
-              AND centro = ?
-              AND edificio = ?
-              AND espacio = ?
-              AND LOWER(COALESCE(estado, ''))
-                  NOT IN ('finalizada', 'finalizado', 'cerrada', 'cerrado', 'cancelada', 'cancelado')
-        """), (
-            "PREVENTIVO",
-            texto_buscar,
-            centro,
-            edificio,
-            espacio
-        ))
+        if planta_txt:
+            patron_planta = f"%Planta: {planta_txt}%"
 
-        return int(cursor.fetchone()[0] or 0) > 0
+            cursor.execute(_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE origen = ?
+                  AND descripcion = ?
+                  AND centro = ?
+                  AND edificio = ?
+                  AND espacio = ?
+                  AND (
+                        COALESCE(observaciones_estado, '') LIKE ?
+                        OR COALESCE(solicitante, '') LIKE ?
+                  )
+                  AND LOWER(COALESCE(estado, ''))
+                      NOT IN (
+                          'finalizada',
+                          'finalizado',
+                          'cerrada',
+                          'cerrado',
+                          'cancelada',
+                          'cancelado'
+                      )
+            """), (
+                "PREVENTIVO",
+                texto_buscar,
+                centro,
+                edificio,
+                espacio,
+                patron_planta,
+                patron_planta,
+            ))
+
+        else:
+            cursor.execute(_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE origen = ?
+                  AND descripcion = ?
+                  AND centro = ?
+                  AND edificio = ?
+                  AND espacio = ?
+                  AND LOWER(COALESCE(estado, ''))
+                      NOT IN (
+                          'finalizada',
+                          'finalizado',
+                          'cerrada',
+                          'cerrado',
+                          'cancelada',
+                          'cancelado'
+                      )
+            """), (
+                "PREVENTIVO",
+                texto_buscar,
+                centro,
+                edificio,
+                espacio,
+            ))
+
+        return int(
+            cursor.fetchone()[0] or 0
+        ) > 0
 
     finally:
         conn.close()
@@ -569,6 +666,19 @@ def checklist_preventivo_completo(numero_ot):
 
 
 def generar_ots_preventivo_si_toca():
+    """
+    Genera una única OT por tarea preventiva vencida.
+
+    Criterios:
+    - No duplica una OT ya abierta.
+    - Mantiene centro, edificio, planta, espacio y tarea.
+    - Vincula estructuralmente la OT con preventivo_tareas.
+    - Guarda la información preventiva en observaciones_estado,
+      no en solicitante.
+    - Si la planificación lleva retraso, genera una sola OT y
+      avanza la próxima fecha hasta el siguiente vencimiento futuro,
+      manteniendo el calendario anclado.
+    """
     asegurar_estructura_preventivo()
 
     conn = conectar()
@@ -577,68 +687,132 @@ def generar_ots_preventivo_si_toca():
     hoy = hoy_str()
     generadas = 0
 
-    cursor.execute("""
-        SELECT id, centro, edificio, planta, espacio, area, tarea,
-               frecuencia, ultima_fecha, proxima_fecha, operario,
-               tipo, prioridad, duracion_prevista,
-               material_necesario, empresa_externa, fecha_limite
-        FROM preventivo_tareas
-        WHERE activo = 1
-    """)
+    try:
+        cursor.execute("""
+            SELECT id, centro, edificio, planta, espacio, area, tarea,
+                   frecuencia, ultima_fecha, proxima_fecha, operario,
+                   tipo, prioridad, duracion_prevista,
+                   material_necesario, empresa_externa, fecha_limite
+            FROM preventivo_tareas
+            WHERE activo = 1
+        """)
 
-    tareas = cursor.fetchall()
+        tareas = cursor.fetchall()
 
-    for t in tareas:
-        (
-            tarea_id, centro, edificio, planta, espacio, area, tarea,
-            frecuencia, ultima_fecha, proxima_fecha, operario,
-            tipo, prioridad, duracion_prevista,
-            material_necesario, empresa_externa, fecha_limite
-        ) = t
+        for t in tareas:
+            (
+                tarea_id,
+                centro,
+                edificio,
+                planta,
+                espacio,
+                area,
+                tarea,
+                frecuencia,
+                ultima_fecha,
+                proxima_fecha,
+                operario,
+                tipo,
+                prioridad,
+                duracion_prevista,
+                material_necesario,
+                empresa_externa,
+                fecha_limite,
+            ) = t
 
-        operario = operario_por_centro_preventivo(centro, operario)
+            operario = operario_por_centro_preventivo(
+                centro,
+                operario
+            )
 
-        if not proxima_fecha:
-            proxima_fecha = hoy
+            if not proxima_fecha:
+                proxima_fecha = hoy
 
-        if str(proxima_fecha) <= hoy:
-            if existe_ot_preventiva_abierta(tarea_id, tarea, centro, edificio, planta, espacio):
+            fecha_programada = str(
+                proxima_fecha
+            )[:10]
+
+            if fecha_programada > hoy:
                 continue
 
-            numero = obtener_siguiente_numero_ot(centro, "PREV")
+            if existe_ot_preventiva_abierta(
+                tarea_id,
+                tarea,
+                centro,
+                edificio,
+                planta,
+                espacio
+            ):
+                continue
+
+            numero = obtener_siguiente_numero_ot(
+                centro,
+                "PREV"
+            )
 
             descripcion = f"[PREVENTIVO] {tarea}"
 
             observaciones_ot = f"""
 Tipo preventivo: {tipo or 'Preventivo'}
 Planta: {planta or '-'}
-Frecuencia: {frecuencia or '-'}
+Frecuencia: {frecuencia or '-'} días
 Duración prevista: {duracion_prevista or '-'}
 Material necesario: {material_necesario or '-'}
 Empresa externa / mantenedor: {empresa_externa or '-'}
+Fecha planificada: {fecha_programada or '-'}
 Fecha límite: {fecha_limite or '-'}
 """.strip()
 
+            # crear_orden mantiene compatibilidad por posición.
+            # IMPORTANTE:
+            # - solicitante = "Mantenimiento preventivo"
+            # - fecha_programada = fecha_programada
+            # - observaciones_estado = observaciones_ot
             datos_orden = (
-                numero,
-                descripcion,
-                "Abierta",
-                centro,
-                edificio,
-                espacio,
-                area,
-                prioridad or "Media",
-                operario,
-                "PREVENTIVO",
-                observaciones_ot,
-                "",
-                "",
-                "Operarios"
+                numero,                         # 0 numero_ot
+                descripcion,                    # 1 descripcion
+                "Abierta",                      # 2 estado
+                centro,                         # 3 centro
+                edificio,                       # 4 edificio
+                espacio,                        # 5 espacio
+                area,                           # 6 area
+                prioridad or "Media",           # 7 prioridad
+                operario,                       # 8 operario
+                "PREVENTIVO",                   # 9 origen
+                "Mantenimiento preventivo",     # 10 solicitante
+                fecha_programada,               # 11 fecha_origen
+                "",                             # 12 foto
+                "Operarios",                    # 13 tipo_solicitante
+                "Interna",                      # 14 tipo_orden
+                "",                             # 15 empresa_externa
+                "",                             # 16 contacto_empresa
+                "",                             # 17 telefono_empresa
+                "",                             # 18 email_empresa
+                fecha_programada,               # 19 fecha_aviso/programada
+                "",                             # 20 fecha_realizacion
+                0,                              # 21 coste_estimado
+                0,                              # 22 coste_final
+                observaciones_ot,               # 23 observaciones_estado
             )
 
-            crear_orden(datos_orden)
+            crear_orden(
+                datos_orden
+            )
 
-            crear_checklist_preventivo(numero, tarea_id, tarea, operario)
+            # Vinculación estructural: evita depender de textos.
+            vincular_origen_ot(
+                numero_ot=numero,
+                origen_tabla="preventivo_tareas",
+                origen_id=int(tarea_id),
+                id_preventivo=int(tarea_id),
+            )
+
+            crear_checklist_preventivo(
+                numero,
+                tarea_id,
+                tarea,
+                operario
+            )
 
             cursor.execute(_sql("""
                 INSERT INTO preventivo_registros
@@ -668,26 +842,42 @@ Fecha límite: {fecha_limite or '-'}
                 operario
             ))
 
-            # Mantiene el calendario anclado a la fecha programada.
-            # Si la OT se genera con retraso, no desplaza toda la planificación.
-            fecha_base_planificada = str(proxima_fecha or hoy)[:10]
+            # Mantener el calendario anclado, pero sin crear
+            # una cascada de OT atrasadas una detrás de otra.
             nueva_proxima = sumar_frecuencia(
-                fecha_base_planificada,
+                fecha_programada,
                 frecuencia
             )
 
+            while nueva_proxima <= hoy:
+                nueva_proxima = sumar_frecuencia(
+                    nueva_proxima,
+                    frecuencia
+                )
+
             cursor.execute(_sql("""
                 UPDATE preventivo_tareas
-                SET ultima_fecha = ?, proxima_fecha = ?
+                SET ultima_fecha = ?,
+                    proxima_fecha = ?
                 WHERE id = ?
-            """), (hoy, nueva_proxima, tarea_id))
+            """), (
+                hoy,
+                nueva_proxima,
+                tarea_id
+            ))
 
             generadas += 1
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        return generadas
 
-    return generadas
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 def crear_correctivas_checklist_preventivo(numero_ot):
     """
