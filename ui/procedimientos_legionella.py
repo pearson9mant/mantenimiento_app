@@ -258,6 +258,91 @@ def mostrar_control_terminal_completo(id_orden, terminales):
     return _base("Control punto terminal completo", "Control completo", valor, valor_2, valor_3, obs)
 
 
+
+def mostrar_ruta_semanal_purgas_p9(id_orden):
+    """
+    Una sola OT semanal para AFS-04 y AFS-08.
+    Solo es válida cuando ambos puntos han sido purgados.
+    """
+    st.markdown("### 🚰 Ruta semanal · puntos de poco uso")
+    st.caption(
+        "Completa los dos puntos. El resultado quedará registrado "
+        "individualmente en AFS-04 y AFS-08."
+    )
+
+    with st.container(border=True):
+        st.markdown("#### AFS-04 · Grifo comedor alumnos")
+        purga_afs04 = st.checkbox(
+            "Purga AFS-04 realizada",
+            key=f"ruta_p9_afs04_purga_{id_orden}"
+        )
+        agua_afs04 = st.checkbox(
+            "Agua transparente / sin anomalías",
+            value=True,
+            key=f"ruta_p9_afs04_agua_{id_orden}"
+        )
+
+    with st.container(border=True):
+        st.markdown("#### AFS-08 · Grifo taller")
+        purga_afs08 = st.checkbox(
+            "Purga AFS-08 realizada",
+            key=f"ruta_p9_afs08_purga_{id_orden}"
+        )
+        agua_afs08 = st.checkbox(
+            "Agua transparente / sin anomalías",
+            value=True,
+            key=f"ruta_p9_afs08_agua_{id_orden}"
+        )
+
+    observaciones = st.text_area(
+        "Observaciones de la ruta",
+        key=f"ruta_p9_observaciones_{id_orden}"
+    )
+
+    completada = (
+        purga_afs04
+        and agua_afs04
+        and purga_afs08
+        and agua_afs08
+    )
+
+    errores = []
+
+    if not purga_afs04:
+        errores.append("Falta realizar la purga de AFS-04.")
+
+    if not agua_afs04:
+        errores.append("AFS-04 presenta agua no transparente o anomalía.")
+
+    if not purga_afs08:
+        errores.append("Falta realizar la purga de AFS-08.")
+
+    if not agua_afs08:
+        errores.append("AFS-08 presenta agua no transparente o anomalía.")
+
+    observaciones_extra = (
+        "Ruta semanal purgas P9: "
+        f"AFS-04 purga={'Sí' if purga_afs04 else 'No'}, "
+        f"agua correcta={'Sí' if agua_afs04 else 'No'} | "
+        f"AFS-08 purga={'Sí' if purga_afs08 else 'No'}, "
+        f"agua correcta={'Sí' if agua_afs08 else 'No'}"
+    )
+
+    if observaciones:
+        observaciones_extra += f" | {observaciones}"
+
+    return _base(
+        "Ruta semanal purgas P9",
+        "Sí/No",
+        1 if completada else 0,
+        1 if purga_afs04 and agua_afs04 else 0,
+        1 if purga_afs08 and agua_afs08 else 0,
+        observaciones_extra,
+        valido=completada,
+        errores=errores,
+    )
+
+
 def mostrar_revision_visual(id_orden):
     correcto = st.radio(
         "Resultado revisión visual",
