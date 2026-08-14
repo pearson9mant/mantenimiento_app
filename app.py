@@ -866,30 +866,79 @@ def mostrar_menu_comunicacion():
 
 inicializar_db()
 
-try:
-    if "preventivos_auto_revisados" not in st.session_state:
+def _registrar_error_automatismo_inicio(nombre, error):
+    """
+    Registra un fallo de automatismo sin detener la aplicación.
+
+    El error queda:
+    - visible en los logs de Render,
+    - guardado en session_state para poder diagnosticarlo,
+    - sin marcar el automatismo como revisado si realmente falló.
+    """
+    mensaje = f"{nombre}: {type(error).__name__}: {error}"
+
+    print(
+        f"[AUTOMATISMO ERROR] {mensaje}"
+    )
+
+    errores = st.session_state.get(
+        "errores_automatismos_inicio",
+        []
+    )
+
+    if mensaje not in errores:
+        errores.append(
+            mensaje
+        )
+
+    st.session_state[
+        "errores_automatismos_inicio"
+    ] = errores
+
+
+if "preventivos_auto_revisados" not in st.session_state:
+    try:
         generar_ots_preventivo_si_toca()
-        st.session_state["preventivos_auto_revisados"] = True
 
-except Exception:
-    pass
+        st.session_state[
+            "preventivos_auto_revisados"
+        ] = True
+
+    except Exception as e:
+        _registrar_error_automatismo_inicio(
+            "Preventivo",
+            e
+        )
 
 
-try:
-    if "legionella_auto_revisada" not in st.session_state:
+if "legionella_auto_revisada" not in st.session_state:
+    try:
         generar_ots_legionella_si_toca()
-        st.session_state["legionella_auto_revisada"] = True
 
-except Exception:
-    pass
+        st.session_state[
+            "legionella_auto_revisada"
+        ] = True
 
-try:
-    if "externas_auto_revisadas" not in st.session_state:
+    except Exception as e:
+        _registrar_error_automatismo_inicio(
+            "Legionella",
+            e
+        )
+
+
+if "externas_auto_revisadas" not in st.session_state:
+    try:
         crear_ots_empresas_externas_si_toca()
-        st.session_state["externas_auto_revisadas"] = True
 
-except Exception:
-    pass
+        st.session_state[
+            "externas_auto_revisadas"
+        ] = True
+
+    except Exception as e:
+        _registrar_error_automatismo_inicio(
+            "Empresas externas",
+            e
+        )
 
 
 params = st.query_params
