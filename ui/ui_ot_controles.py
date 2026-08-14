@@ -13,6 +13,7 @@ from ui.procedimientos_legionella import (
     mostrar_control_depositos_solares,
     mostrar_revision_visual,
     mostrar_purga,
+    mostrar_ruta_semanal_purgas_p9,
     mostrar_puesta_en_servicio_acumulador_acs,
     mostrar_procedimiento_choque_termico,
     mostrar_limpieza_desinfeccion,
@@ -200,6 +201,11 @@ def mostrar_ejecucion_legionella_operario(
             punto
         )
 
+    elif tarea == "Ruta semanal purgas P9":
+        resultado_procedimiento = mostrar_ruta_semanal_purgas_p9(
+            id_orden
+        )
+
     elif tarea == "Puesta en servicio acumulador ACS":
         resultado_procedimiento = (
             mostrar_puesta_en_servicio_acumulador_acs(
@@ -260,22 +266,103 @@ def mostrar_ejecucion_legionella_operario(
                 + obs_extra
             ).strip()
 
-        estado, resultado = registrar_control(
-            fecha_control.strftime("%Y-%m-%d"),
-            punto,
-            tarea,
-            tipo_control,
-            valor,
-            valor_2,
-            valor_3,
-            unidad,
-            operario,
-            observaciones_finales,
-        )
+        if tarea == "Ruta semanal purgas P9":
+            puntos_ruta_df = leer_df(
+                """
+                SELECT *
+                FROM legionella_puntos
+                WHERE centro = ?
+                  AND activo = 1
+                  AND (
+                        LOWER(COALESCE(nombre_punto, '')) LIKE ?
+                        OR LOWER(COALESCE(nombre_punto, '')) LIKE ?
+                  )
+                ORDER BY id ASC
+                """,
+                (
+                    "Pearson 9",
+                    "%afs-04%",
+                    "%afs-08%",
+                ),
+            )
 
-        if estado == "ERROR":
-            st.error(resultado)
-            return False
+            if puntos_ruta_df.empty or len(puntos_ruta_df) < 2:
+                st.error(
+                    "No se han encontrado AFS-04 y AFS-08 en el catálogo "
+                    "de puntos Legionella."
+                )
+                return False
+
+            estados_ruta = []
+
+            for _, fila_punto in puntos_ruta_df.iterrows():
+                punto_real = fila_punto.to_dict()
+
+                estado_punto, resultado_punto = registrar_control(
+                    fecha_control.strftime("%Y-%m-%d"),
+                    punto_real,
+                    "Purga",
+                    "Purga",
+                    1,
+                    None,
+                    None,
+                    "Sí/No",
+                    operario,
+                    observaciones_finales,
+                )
+
+                estados_ruta.append(
+                    (estado_punto, resultado_punto)
+                )
+
+            errores_ruta = [
+                resultado_punto
+                for estado_punto, resultado_punto in estados_ruta
+                if estado_punto == "ERROR"
+            ]
+
+            if errores_ruta:
+                for error in errores_ruta:
+                    st.error(error)
+                return False
+
+            estado = (
+                "RIESGO"
+                if any(
+                    estado_punto == "RIESGO"
+                    for estado_punto, _ in estados_ruta
+                )
+                else (
+                    "INCIDENCIA"
+                    if any(
+                        estado_punto == "INCIDENCIA"
+                        for estado_punto, _ in estados_ruta
+                    )
+                    else "OK"
+                )
+            )
+
+            resultado = (
+                "Ruta semanal completada y registrada en AFS-04 y AFS-08."
+            )
+
+        else:
+            estado, resultado = registrar_control(
+                fecha_control.strftime("%Y-%m-%d"),
+                punto,
+                tarea,
+                tipo_control,
+                valor,
+                valor_2,
+                valor_3,
+                unidad,
+                operario,
+                observaciones_finales,
+            )
+
+            if estado == "ERROR":
+                st.error(resultado)
+                return False
 
         st.session_state[f"legionella_guardada_{id_orden}"] = True
 
