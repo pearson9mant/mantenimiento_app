@@ -1152,7 +1152,9 @@ def pantalla_colegio_vivo_operario():
         '</div>',
         unsafe_allow_html=True,
     )
-
+    _mostrar_ots_sin_planta(
+        ordenes
+    )
     if not centro_operario:
         st.info(
             "No hay un centro asignado a este operario."
