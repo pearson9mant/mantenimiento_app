@@ -413,16 +413,11 @@ def _planta_respaldo(
     centro,
     edificio,
 ):
-    if centro == "Pearson 22":
-        if edificio == "Llar":
-            return "Planta 0"
-
-        return "Planta 1"
-
-    if centro == "Pearson 9":
-        return "Planta 0"
-
-    return ""
+    """
+    Una OT sin planta real permanece sin ubicar.
+    Nunca se asigna automáticamente a P0 o P1.
+    """
+    return "Sin planta"
 
 
 def _crear_resumen_edificios(colegio):
@@ -1152,9 +1147,11 @@ def pantalla_colegio_vivo_operario():
         '</div>',
         unsafe_allow_html=True,
     )
+
     _mostrar_ots_sin_planta(
         ordenes
     )
+
     if not centro_operario:
         st.info(
             "No hay un centro asignado a este operario."
