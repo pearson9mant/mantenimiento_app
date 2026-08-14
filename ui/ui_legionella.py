@@ -197,7 +197,17 @@ def asegurar_columna_valor3_legionella():
             ADD COLUMN valor_3 REAL
         """)
     except Exception:
-        pass        
+        pass
+
+
+def asegurar_columna_valor4_legionella():
+    try:
+        ejecutar("""
+            ALTER TABLE legionella_registros
+            ADD COLUMN valor_4 REAL
+        """)
+    except Exception:
+        pass
 
 def asegurar_tabla_correctivos_legionella():
     if os.getenv("DATABASE_URL"):
@@ -445,7 +455,15 @@ def sembrar_puntos_si_vacio():
         conn.close()
 
 
-def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_minima=None, controla_consigna=1):
+def evaluar_resultado(
+    tipo_control,
+    valor,
+    valor_2=None,
+    valor_3=None,
+    consigna_minima=None,
+    controla_consigna=1,
+    valor_4=None
+):
     try:
         valor = float(valor)
     except Exception:
@@ -479,6 +497,29 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
             return "RIESGO", "Salida mezclada de válvula fuera de rango 38-50 ºC"
 
         return "OK", "Válvula termostática correcta"
+
+    if tipo_control == "Control circuito duchas mezclado":
+        try:
+            vmt_01 = float(valor)
+            rt_01 = float(valor_2)
+            vmt_02 = float(valor_3)
+            rt_02 = float(valor_4)
+        except Exception:
+            return "INCIDENCIA", "Temperaturas del circuito mezclado no válidas"
+
+        delta_chicas = vmt_01 - rt_01
+        delta_chicos = vmt_02 - rt_02
+
+        if vmt_01 < 38 or vmt_01 > 50:
+            return "RIESGO", f"VMT-01 fuera de rango 38-50 ºC ({vmt_01:.1f} ºC)"
+
+        if vmt_02 < 38 or vmt_02 > 50:
+            return "RIESGO", f"VMT-02 fuera de rango 38-50 ºC ({vmt_02:.1f} ºC)"
+
+        return (
+            "OK",
+            f"Circuito mezclado correcto · ΔT chicas {delta_chicas:.1f} ºC · ΔT chicos {delta_chicos:.1f} ºC"
+        )
 
     try:
         consigna_minima = float(consigna_minima)
@@ -755,6 +796,7 @@ def dias_frecuencia(tarea):
         "Control ACS terminal",
         "Control punto terminal completo",
         "Control depósitos solares",
+        "Control circuito duchas mezclado",
     ]:
         return 30
 
@@ -771,6 +813,9 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
     
     if tipo_control_punto == "Choque térmico":
         return ["Choque térmico"]
+
+    if tipo_control_punto == "Circuito mezclado duchas":
+        return ["Control circuito duchas mezclado"]
 
     
     tareas = []
@@ -854,7 +899,10 @@ def unidad_por_tarea(tarea):
         return "ºC"
         
     if tarea == "Control válvula termostática":
-        return "ºC" 
+        return "ºC"
+
+    if tarea == "Control circuito duchas mezclado":
+        return "ºC"
 
     if tarea == "Control depósitos solares":
         return "ºC"
@@ -942,6 +990,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
                 "Control ACS terminal",
                 "Control sala ACS",
                 "Control válvula termostática",
+                "Control circuito duchas mezclado",
             ]:
                 consigna_minima = 0
                 controla_consigna = 0
@@ -1682,7 +1731,20 @@ def generar_ots_legionella_si_toca():
     return creadas, mensaje
 
 
-def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2, valor_3, unidad, operario, observaciones, ruta_foto=""):
+def registrar_control(
+    fecha_registro,
+    punto,
+    tarea,
+    tipo_control,
+    valor,
+    valor_2,
+    valor_3,
+    unidad,
+    operario,
+    observaciones,
+    ruta_foto="",
+    valor_4=None
+):
     centro = punto.get("centro")
     edificio = punto.get("edificio")
     instalacion = punto.get("instalacion") or ""
@@ -1746,15 +1808,16 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
         valor_2,
         valor_3,
         consigna_minima,
-        controla_consigna
+        controla_consigna,
+        valor_4
     )
 
     ejecutar(
         """
         INSERT INTO legionella_registros
         (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
-         valor, valor_2, valor_3, unidad, estado, resultado, operario, observaciones,foto)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         valor, valor_2, valor_3, valor_4, unidad, estado, resultado, operario, observaciones, foto)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             fecha_registro,
@@ -1769,6 +1832,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
             valor,
             valor_2,
             valor_3,
+            valor_4,
             unidad,
             estado,
             resultado,
@@ -2585,6 +2649,7 @@ def pantalla_legionella():
     asegurar_tabla_correctivos_legionella()
     asegurar_columnas_plano_legionella()
     asegurar_columna_valor3_legionella()
+    asegurar_columna_valor4_legionella()
 
     try:
         asegurar_ruta_semanal_purgas_p9()
@@ -2843,6 +2908,7 @@ def pantalla_legionella():
 
                 tarea = st.selectbox("Tarea", tareas)
 
+                valor_4 = None
                 valor_3 = None
                 valor_2 = None
                 purga_realizada = False
@@ -2893,6 +2959,41 @@ def pantalla_legionella():
                     cabezal_ok = st.checkbox("Cabezal termostático correcto")
                     regulacion_ok = st.checkbox("Regulación estable")
                     accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")
+
+                elif tarea == "Control circuito duchas mezclado":
+                    tipo_control = "Control circuito duchas mezclado"
+                    unidad = "ºC"
+
+                    st.markdown("#### 🚿 Circuito mezclado de duchas")
+                    st.caption(
+                        "RT-01 y RT-02 son retornos posteriores a válvulas mezcladoras. "
+                        "No se aplica automáticamente la consigna general de retorno ACS de 50 ºC."
+                    )
+
+                    valor = st.number_input(
+                        "VMT-01 · Salida mezclada duchas chicas ºC",
+                        min_value=0.0, max_value=100.0, value=45.0, step=0.1,
+                        key="circuito_duchas_vmt01"
+                    )
+                    valor_2 = st.number_input(
+                        "RT-01 · Retorno duchas chicas ºC",
+                        min_value=0.0, max_value=100.0, value=42.0, step=0.1,
+                        key="circuito_duchas_rt01"
+                    )
+                    valor_3 = st.number_input(
+                        "VMT-02 · Salida mezclada duchas chicos ºC",
+                        min_value=0.0, max_value=100.0, value=45.0, step=0.1,
+                        key="circuito_duchas_vmt02"
+                    )
+                    valor_4 = st.number_input(
+                        "RT-02 · Retorno duchas chicos ºC",
+                        min_value=0.0, max_value=100.0, value=42.0, step=0.1,
+                        key="circuito_duchas_rt02"
+                    )
+
+                    c_dt1, c_dt2 = st.columns(2)
+                    c_dt1.metric("ΔT chicas", f"{float(valor) - float(valor_2):.1f} ºC")
+                    c_dt2.metric("ΔT chicos", f"{float(valor_3) - float(valor_4):.1f} ºC")
 
                 elif tarea == "Choque térmico":
                     tipo_control = "Choque térmico"
@@ -3119,6 +3220,26 @@ def pantalla_legionella():
                                 ruta_foto = ""
 
                         observaciones_finales = observaciones or ""
+                        if tarea == "Control circuito duchas mezclado":
+                            delta_chicas = float(valor) - float(valor_2)
+                            delta_chicos = float(valor_3) - float(valor_4)
+
+                            datos_circuito = [
+                                f"VMT-01 salida chicas: {float(valor):.1f} ºC",
+                                f"RT-01 retorno chicas: {float(valor_2):.1f} ºC",
+                                f"ΔT chicas: {delta_chicas:.1f} ºC",
+                                f"VMT-02 salida chicos: {float(valor_3):.1f} ºC",
+                                f"RT-02 retorno chicos: {float(valor_4):.1f} ºC",
+                                f"ΔT chicos: {delta_chicos:.1f} ºC",
+                                "Retornos posteriores a mezcla: sin consigna general de 50 ºC",
+                            ]
+
+                            observaciones_finales = (
+                                observaciones_finales
+                                + "\nCircuito mezclado duchas: "
+                                + " | ".join(datos_circuito)
+                            ).strip()
+
                         if tarea == "Choque térmico":
                             datos_choque = [
                                 f"Temperatura acumulador: {float(valor):.1f} ºC",
@@ -3192,6 +3313,7 @@ def pantalla_legionella():
                             operario,
                             observaciones_finales,
                             ruta_foto,
+                            valor_4=valor_4,
                         )
 
                         if estado == "OK":
@@ -3555,6 +3677,7 @@ def pantalla_legionella():
                         "Solo temperatura",
                         "Sala ACS completa",
                         "Válvula termostática",
+                        "Circuito mezclado duchas",
                     ],
                     key="nuevo_punto_tipo_control"
                 )
@@ -3644,6 +3767,7 @@ def pantalla_legionella():
                         "Temperatura impulsión ACS",
                         "Temperatura retorno",
                         "Control válvula termostática",
+                        "Control circuito duchas mezclado",
                         "Choque térmico",
                         "Purga",
                         "Revisión visual",
@@ -3842,6 +3966,7 @@ def pantalla_legionella():
                             "Válvula termostática",
                             "Solo temperatura",
                             "Choque térmico",
+                            "Circuito mezclado duchas",
                         ]
 
                         valor_tipo_control = row.get("tipo_control_punto") or ""
@@ -4533,7 +4658,7 @@ def pantalla_legionella():
 
         df = leer_df("""
             SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
-                   valor, valor_2, valor_3, unidad, estado, resultado, operario, observaciones, foto
+                   valor, valor_2, valor_3, valor_4, unidad, estado, resultado, operario, observaciones, foto
             FROM legionella_registros
             WHERE centro IS NOT NULL
               AND edificio IS NOT NULL
@@ -4596,6 +4721,20 @@ def pantalla_legionella():
                     
                         st.write(f"🔥 **Entrada ACS válvula:** {row['valor']} ºC")
                         st.write(f"🚿 **Salida mezclada:** {row['valor_2']} ºC")
+
+                    elif row["tarea"] == "Control circuito duchas mezclado":
+
+                        vmt_01 = float(row["valor"])
+                        rt_01 = float(row["valor_2"])
+                        vmt_02 = float(row["valor_3"])
+                        rt_02 = float(row["valor_4"])
+
+                        st.write(f"🚿 **VMT-01 salida chicas:** {vmt_01:.1f} ºC")
+                        st.write(f"🔄 **RT-01 retorno chicas:** {rt_01:.1f} ºC")
+                        st.write(f"📉 **ΔT chicas:** {vmt_01 - rt_01:.1f} ºC")
+                        st.write(f"🚿 **VMT-02 salida chicos:** {vmt_02:.1f} ºC")
+                        st.write(f"🔄 **RT-02 retorno chicos:** {rt_02:.1f} ºC")
+                        st.write(f"📉 **ΔT chicos:** {vmt_02 - rt_02:.1f} ºC")
             
                     else:
             
