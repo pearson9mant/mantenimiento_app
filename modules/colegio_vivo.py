@@ -399,19 +399,12 @@ def _obtener_planta(ot):
 
 def _planta_respaldo(centro, edificio):
     """
-    Evita que las OT antiguas desaparezcan.
+    Las OT antiguas sin planta no se asignan a una planta ficticia.
 
-    Se colocan provisionalmente igual que en Gerencia.
+    Permanecen como "Sin planta" hasta que tengan una ubicación real.
+    De esta forma no aparecen falsamente en P0, P1 ni en ninguna
+    otra planta del Colegio Vivo.
     """
-    if centro == "Pearson 22":
-        if edificio == "Llar":
-            return "Planta 0"
-
-        return "Planta 1"
-
-    if centro == "Pearson 9":
-        return "Planta 0"
-
     return "Sin planta"
 
 
