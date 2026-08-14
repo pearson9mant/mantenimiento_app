@@ -139,7 +139,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         SELECT fecha, centro, edificio, instalacion, punto, tarea, valor, valor_2, valor_3,
                unidad, estado, resultado, operario, observaciones
         FROM legionella_registros
-        WHERE date(fecha) BETWEEN ? AND ?
+        WHERE SUBSTR(fecha, 1, 10) BETWEEN ? AND ?
           AND centro = ?
           AND centro IS NOT NULL
           AND edificio IS NOT NULL
@@ -152,7 +152,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         SELECT fecha_apertura, centro, edificio, punto, tarea, descripcion,
                estado, prioridad, operario, fecha_cierre, observaciones_cierre
         FROM legionella_incidencias
-        WHERE date(fecha_apertura) BETWEEN ? AND ?
+        WHERE SUBSTR(fecha_apertura, 1, 10) BETWEEN ? AND ?
           AND centro = ?
           AND centro IS NOT NULL
           AND edificio IS NOT NULL
@@ -192,8 +192,20 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                    proxima_fecha, observaciones
             FROM legionella_informes
             WHERE centro = ?
-              AND date(fecha_informe) BETWEEN ? AND ?
-            ORDER BY fecha_informe DESC, id DESC
+              AND SUBSTR(
+                    COALESCE(
+                        NULLIF(fecha_actuacion, ''),
+                        fecha_informe
+                    ),
+                    1,
+                    10
+                  ) BETWEEN ? AND ?
+            ORDER BY
+                COALESCE(
+                    NULLIF(fecha_actuacion, ''),
+                    fecha_informe
+                ) DESC,
+                id DESC
         """, (centro_filtro, fecha_inicio_txt, fecha_fin_txt))
     except Exception:
         df_inf = pd.DataFrame()
