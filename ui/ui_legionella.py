@@ -543,6 +543,47 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
             return "OK", "Correcto"
         return "INCIDENCIA", "Purga no realizada"
 
+    if tipo_control == "Control depósitos solares":
+        try:
+            deposito_1 = float(valor)
+            deposito_2 = float(valor_2)
+            diferencia = abs(deposito_1 - deposito_2)
+        except Exception:
+            return "INCIDENCIA", "Temperaturas de depósitos solares no válidas"
+
+        if diferencia > 10:
+            return (
+                "INCIDENCIA",
+                f"Diferencia térmica elevada entre depósitos solares: {diferencia:.1f} ºC"
+            )
+
+        if diferencia > 5:
+            return (
+                "OK",
+                f"Control registrado. Diferencia térmica a vigilar: {diferencia:.1f} ºC"
+            )
+
+        return "OK", f"Depósitos solares equilibrados: diferencia {diferencia:.1f} ºC"
+
+    if tipo_control == "Choque térmico":
+        try:
+            temperatura_acumulador = float(valor)
+            minutos_70 = float(valor_2)
+            temperatura_terminal = float(valor_3)
+        except Exception:
+            return "INCIDENCIA", "Datos del choque térmico no válidos"
+
+        if temperatura_acumulador < 70:
+            return "RIESGO", "Choque térmico: acumulador no alcanzó 70 ºC"
+
+        if minutos_70 < 120:
+            return "RIESGO", "Choque térmico: no se mantuvieron 70 ºC durante 120 minutos"
+
+        if temperatura_terminal < 60:
+            return "RIESGO", "Choque térmico: no se alcanzaron 60 ºC en los puntos terminales"
+
+        return "OK", "Desinfección térmica registrada correctamente"
+
     if tipo_control == "Puesta en servicio acumulador ACS":
         try:
             acumulador = float(valor)
@@ -678,16 +719,28 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=
 
 
 def dias_frecuencia(tarea):
+    """
+    Frecuencias base utilizadas al sembrar nuevas tareas.
+
+    Las tareas ya existentes conservan la frecuencia que tengas
+    configurada en Planificación hasta que tú la cambies.
+    """
+    if tarea == "Control sala ACS":
+        return 1
+
+    if tarea == "Purga":
+        return 7
+
     if tarea == "Control válvula termostática":
         return 30
 
     if tarea in [
-        "Purga",
         "Revisión visual",
         "Temperatura punto terminal",
         "Control AFS",
         "Control ACS terminal",
-        "Control punto terminal completo"
+        "Control punto terminal completo",
+        "Control depósitos solares",
     ]:
         return 30
 
@@ -797,6 +850,9 @@ def unidad_por_tarea(tarea):
 
     if tarea == "Puesta en servicio acumulador ACS":
         return "ºC"
+
+    if tarea == "Choque térmico":
+        return "ºC / min"
 
     return ""
 
@@ -2428,6 +2484,50 @@ def pantalla_legionella():
                     regulacion_ok = st.checkbox("Regulación estable")
                     accesible_ok = st.checkbox("Acceso revisado / falso techo cerrado correctamente")
 
+                elif tarea == "Choque térmico":
+                    tipo_control = "Choque térmico"
+                    unidad = "ºC / min"
+
+                    st.markdown("#### ♨️ Desinfección térmica ACS")
+                    st.caption(
+                        "Registro del tratamiento térmico: temperatura del acumulador, "
+                        "tiempo mantenido y comprobación en puntos terminales."
+                    )
+
+                    valor = st.number_input(
+                        "Temperatura alcanzada en acumulador ºC",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=70.0,
+                        step=0.1,
+                        key="choque_temperatura_acumulador"
+                    )
+
+                    valor_2 = st.number_input(
+                        "Tiempo mantenido a 70 ºC o más (minutos)",
+                        min_value=0,
+                        max_value=600,
+                        value=120,
+                        step=5,
+                        key="choque_minutos_70"
+                    )
+
+                    valor_3 = st.number_input(
+                        "Temperatura mínima comprobada en puntos terminales ºC",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=60.0,
+                        step=0.1,
+                        key="choque_temperatura_terminal"
+                    )
+
+                    choque_terminales_5_min = st.checkbox(
+                        "Puntos terminales mantenidos abiertos al menos 5 minutos "
+                        "después de alcanzar 60 ºC",
+                        value=False,
+                        key="choque_terminales_5_min"
+                    )
+
                 elif tarea == "Control depósitos solares":
                     tipo_control = "Control depósitos solares"
                     unidad = "ºC"
@@ -2568,6 +2668,9 @@ def pantalla_legionella():
                 foto_error = False
                 ruta_foto = ""
 
+                if tarea != "Choque térmico":
+                    choque_terminales_5_min = True
+
                 if foto is not None:
                     if foto.size > 5 * 1024 * 1024:
                         st.warning("La foto supera 5 MB")
@@ -2579,6 +2682,14 @@ def pantalla_legionella():
                 if st.button("Guardar control Legionella", type="primary"):
                     if foto_error:
                         st.error("La foto es demasiado grande.")
+
+                    elif tarea == "Choque térmico" and not choque_terminales_5_min:
+                        st.error(
+                            "No se puede cerrar el choque térmico: confirma primero "
+                            "que los puntos terminales se mantuvieron abiertos al menos "
+                            "5 minutos después de alcanzar 60 ºC."
+                        )
+
                     else:
                         if foto_bytes is not None:
                             try:
@@ -2598,6 +2709,20 @@ def pantalla_legionella():
                                 ruta_foto = ""
 
                         observaciones_finales = observaciones or ""
+                        if tarea == "Choque térmico":
+                            datos_choque = [
+                                f"Temperatura acumulador: {float(valor):.1f} ºC",
+                                f"Tiempo a ≥70 ºC: {int(valor_2)} min",
+                                f"Temperatura mínima terminal: {float(valor_3):.1f} ºC",
+                                "Terminales ≥60 ºC abiertos ≥5 min: Sí",
+                            ]
+
+                            observaciones_finales = (
+                                observaciones_finales
+                                + "\nDesinfección térmica: "
+                                + " | ".join(datos_choque)
+                            ).strip()
+
                         if tarea == "Control depósitos solares":
                             datos_solares = [
                                 f"Temperatura depósito solar 1: {valor:.1f} ºC",
