@@ -73,6 +73,20 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 f"Salida mezclada: {row.get('valor_2', '')} ºC"
             )
 
+        if tarea == "Control depósitos solares":
+            return (
+                f"Solar 1: {row.get('valor', '')} ºC / "
+                f"Solar 2: {row.get('valor_2', '')} ºC / "
+                f"Diferencia: {row.get('valor_3', '')} ºC"
+            )
+
+        if tarea == "Choque térmico":
+            return (
+                f"Acumulador: {row.get('valor', '')} ºC / "
+                f"Tiempo ≥70 ºC: {row.get('valor_2', '')} min / "
+                f"Terminal mínimo: {row.get('valor_3', '')} ºC"
+            )
+
         unidad = "" if pd.isna(row.get("unidad", "")) else str(row.get("unidad", ""))
         valor = "" if pd.isna(row.get("valor", "")) else str(row.get("valor", ""))
         return f"{valor} {unidad}".strip()
