@@ -1130,6 +1130,149 @@ def asegurar_ruta_semanal_purgas_p9():
     return int(df_nueva.iloc[0]["id"])
 
 
+
+def obtener_puntos_ruta_semanal_p9():
+    """
+    Devuelve los dos puntos reales que forman la ruta semanal P9.
+    La ruta solo registra PURGA; no sustituye ni modifica sus controles AFS mensuales.
+    """
+    puntos = []
+
+    for codigo in ("AFS-04", "AFS-08"):
+        df = leer_df("""
+            SELECT *
+            FROM legionella_puntos
+            WHERE centro = ?
+              AND activo = 1
+              AND LOWER(COALESCE(nombre_punto, '')) LIKE ?
+            ORDER BY id DESC
+            LIMIT 1
+        """, (
+            "Pearson 9",
+            f"%{codigo.lower()}%",
+        ))
+
+        if not df.empty:
+            puntos.append(df.iloc[0].to_dict())
+
+    return puntos
+
+
+def registrar_ruta_semanal_purgas_p9(
+    fecha_registro,
+    operario,
+    purga_afs04,
+    purga_afs08,
+    observaciones=""
+):
+    """
+    Registra dos controles individuales de tipo Purga:
+    - AFS-04
+    - AFS-08
+
+    No registra temperatura, cloro, aireador ni revisión visual.
+    Tampoco altera la planificación mensual Control AFS de esos puntos.
+    """
+    if not purga_afs04 or not purga_afs08:
+        return "ERROR", "Debes confirmar la purga de AFS-04 y AFS-08."
+
+    puntos = obtener_puntos_ruta_semanal_p9()
+
+    if len(puntos) != 2:
+        return (
+            "ERROR",
+            "No se han localizado correctamente AFS-04 y AFS-08 en Pearson 9."
+        )
+
+    por_codigo = {}
+    for punto in puntos:
+        nombre = str(punto.get("nombre_punto") or "").upper()
+        if "AFS-04" in nombre:
+            por_codigo["AFS-04"] = punto
+        if "AFS-08" in nombre:
+            por_codigo["AFS-08"] = punto
+
+    if "AFS-04" not in por_codigo or "AFS-08" not in por_codigo:
+        return (
+            "ERROR",
+            "La ruta semanal necesita los puntos AFS-04 y AFS-08 activos."
+        )
+
+    resultados = []
+
+    for codigo in ("AFS-04", "AFS-08"):
+        punto = por_codigo[codigo]
+
+        estado, resultado = registrar_control(
+            fecha_registro,
+            punto,
+            "Purga",
+            "Purga",
+            1,
+            None,
+            None,
+            "Sí/No",
+            operario,
+            (
+                f"Ruta semanal purgas P9 · {codigo}"
+                + (f"\n{observaciones}" if observaciones else "")
+            ),
+            "",
+        )
+
+        if estado != "OK":
+            return estado, resultado
+
+        resultados.append(f"{codigo}: {resultado}")
+
+    # La ruta es una planificación agrupada. Sus registros individuales
+    # son 'Purga', por lo que avanzamos aquí únicamente la fecha de la ruta.
+    df_ruta = leer_df("""
+        SELECT id, frecuencia_dias, proxima_fecha
+        FROM legionella_tareas
+        WHERE centro = ?
+          AND tarea = ?
+          AND activo = 1
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        "Pearson 9",
+        "Ruta semanal purgas P9",
+    ))
+
+    if not df_ruta.empty:
+        id_ruta = int(df_ruta.iloc[0]["id"])
+        frecuencia = int(df_ruta.iloc[0]["frecuencia_dias"] or 7)
+        proxima_actual = str(
+            df_ruta.iloc[0].get("proxima_fecha") or fecha_registro
+        ).strip()
+
+        proxima = ajustar_proxima_fecha_legionella(
+            proxima_actual or fecha_registro,
+            frecuencia
+        )
+
+        fecha_dt = pd.to_datetime(fecha_registro, errors="coerce")
+
+        while pd.notna(fecha_dt) and proxima <= fecha_dt:
+            proxima = ajustar_proxima_fecha_legionella(
+                proxima,
+                frecuencia
+            )
+
+        ejecutar("""
+            UPDATE legionella_tareas
+            SET ultima_fecha = ?,
+                proxima_fecha = ?
+            WHERE id = ?
+        """, (
+            fecha_registro,
+            proxima.strftime("%Y-%m-%d"),
+            id_ruta,
+        ))
+
+    return "OK", "Ruta semanal P9 registrada: purgas AFS-04 y AFS-08 realizadas."
+
 def obtener_planificacion_legionella():
     return leer_df("""
         SELECT id, centro, edificio, instalacion, punto, tarea, tipo_control,
@@ -2570,6 +2713,95 @@ def pantalla_legionella():
 
     with tab1:
         st.markdown("### Nuevo control")
+
+        with st.expander("🚿 Ruta semanal P9 · purgas de puntos de poco uso", expanded=False):
+            st.caption(
+                "Ruta específica semanal. Solo confirma las purgas de AFS-04 y AFS-08. "
+                "Los controles AFS mensuales de ambos puntos siguen independientes."
+            )
+
+            puntos_ruta = obtener_puntos_ruta_semanal_p9()
+
+            if len(puntos_ruta) != 2:
+                st.warning(
+                    "No se han localizado los dos puntos activos AFS-04 y AFS-08 "
+                    "en Pearson 9."
+                )
+            else:
+                nombres_ruta = {
+                    "AFS-04": next(
+                        (
+                            str(p.get("nombre_punto") or "")
+                            for p in puntos_ruta
+                            if "AFS-04" in str(p.get("nombre_punto") or "").upper()
+                        ),
+                        "AFS-04",
+                    ),
+                    "AFS-08": next(
+                        (
+                            str(p.get("nombre_punto") or "")
+                            for p in puntos_ruta
+                            if "AFS-08" in str(p.get("nombre_punto") or "").upper()
+                        ),
+                        "AFS-08",
+                    ),
+                }
+
+                purga_afs04 = st.checkbox(
+                    f"Purga realizada · {nombres_ruta['AFS-04']}",
+                    key="ruta_p9_purga_afs04",
+                )
+
+                purga_afs08 = st.checkbox(
+                    f"Purga realizada · {nombres_ruta['AFS-08']}",
+                    key="ruta_p9_purga_afs08",
+                )
+
+                fecha_ruta = st.date_input(
+                    "Fecha de la ruta",
+                    value=date.today(),
+                    key="ruta_p9_fecha",
+                )
+
+                operario_ruta = st.selectbox(
+                    "Operario ruta",
+                    OPERARIOS,
+                    index=OPERARIOS.index("Luis Lozano"),
+                    key="ruta_p9_operario",
+                )
+
+                if operario_ruta == "Otro":
+                    operario_ruta = st.text_input(
+                        "Nombre operario",
+                        key="ruta_p9_operario_otro",
+                    )
+
+                observaciones_ruta = st.text_area(
+                    "Observaciones de la ruta",
+                    key="ruta_p9_observaciones",
+                )
+
+                if st.button(
+                    "💾 Guardar ruta semanal P9",
+                    type="primary",
+                    use_container_width=True,
+                    key="guardar_ruta_semanal_p9",
+                ):
+                    estado_ruta, resultado_ruta = registrar_ruta_semanal_purgas_p9(
+                        fecha_ruta.strftime("%Y-%m-%d"),
+                        operario_ruta,
+                        purga_afs04,
+                        purga_afs08,
+                        observaciones_ruta,
+                    )
+
+                    if estado_ruta == "OK":
+                        st.success(f"✅ {resultado_ruta}")
+                        st.rerun()
+                    else:
+                        st.error(resultado_ruta)
+
+        st.markdown("---")
 
         centros = list(CENTROS.keys())
         centro = st.selectbox("Centro", centros)
