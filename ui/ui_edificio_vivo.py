@@ -4,6 +4,8 @@ import unicodedata
 
 import streamlit as st
 
+from modules.espacios import obtener_plantas_config
+
 
 # =========================================================
 # ESTRUCTURA DEL COLEGIO
@@ -215,6 +217,85 @@ def etiqueta_planta(planta):
         return "T"
 
     return str(planta).replace("Planta ", "P")
+
+
+
+def _mapa_visibilidad_plantas():
+    """
+    Devuelve un mapa {(centro, edificio, planta): bool} a partir de
+    Configuración > Espacios > Plantas.
+
+    Si una planta no tiene configuración explícita, se considera visible
+    para mantener compatibilidad con estructuras antiguas.
+    """
+    mapa = {}
+
+    try:
+        filas = obtener_plantas_config()
+    except Exception:
+        filas = []
+
+    for fila in filas or []:
+        try:
+            _id, centro, edificio, planta, visible = fila
+        except Exception:
+            continue
+
+        centro_n = normalizar_centro(centro)
+        edificio_n = normalizar_edificio(edificio, centro_n)
+        planta_n = normalizar_planta(planta)
+
+        if not centro_n or not edificio_n or not planta_n:
+            continue
+
+        try:
+            visible_bool = bool(int(visible))
+        except Exception:
+            visible_bool = bool(visible)
+
+        mapa[
+            (
+                centro_n,
+                edificio_n,
+                planta_n,
+            )
+        ] = visible_bool
+
+    return mapa
+
+
+def _plantas_visibles_edificio(
+    centro,
+    edificio,
+    plantas,
+    mapa_visibilidad,
+):
+    """
+    Filtra únicamente las plantas marcadas como visibles.
+    """
+    centro_n = normalizar_centro(centro)
+    edificio_n = normalizar_edificio(edificio, centro_n)
+
+    resultado = []
+
+    for planta in plantas:
+        planta_n = normalizar_planta(planta)
+
+        clave = (
+            centro_n,
+            edificio_n,
+            planta_n,
+        )
+
+        visible = mapa_visibilidad.get(
+            clave,
+            True,
+        )
+
+        if visible:
+            resultado.append(planta)
+
+    return resultado
 
 
 # =========================================================
@@ -662,6 +743,27 @@ def pintar_campus_operario(
         )
         return
 
+    mapa_visibilidad = _mapa_visibilidad_plantas()
+
+    edificios_visibles = {}
+
+    for edificio, plantas in edificios.items():
+        plantas_visibles = _plantas_visibles_edificio(
+            centro=centro,
+            edificio=edificio,
+            plantas=plantas,
+            mapa_visibilidad=mapa_visibilidad,
+        )
+
+        if plantas_visibles:
+            edificios_visibles[edificio] = plantas_visibles
+
+    if not edificios_visibles:
+        st.info(
+            f"No hay plantas visibles configuradas para {centro}."
+        )
+        return
+
     st.markdown(
         (
             '<div class="cv-campus-title">'
@@ -672,7 +774,7 @@ def pintar_campus_operario(
     )
 
     columnas = st.columns(
-        len(edificios),
+        len(edificios_visibles),
         gap="small",
     )
 
@@ -681,7 +783,7 @@ def pintar_campus_operario(
         plantas,
     ) in zip(
         columnas,
-        edificios.items(),
+        edificios_visibles.items(),
     ):
         with columna:
             _pintar_edificio(
