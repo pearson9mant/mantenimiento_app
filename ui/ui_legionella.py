@@ -538,6 +538,17 @@ def evaluar_resultado(tipo_control, valor, valor_2=None, valor_3=None, consigna_
             return "OK", "Correcto"
         return "INCIDENCIA", "Revisión visual desfavorable"
 
+    if tipo_control == "Ruta semanal purgas P9":
+        try:
+            ruta_completa = int(float(valor)) == 1
+        except Exception:
+            ruta_completa = False
+
+        if ruta_completa:
+            return "OK", "Ruta semanal de purgas completada correctamente"
+
+        return "INCIDENCIA", "Ruta semanal de purgas incompleta"
+
     if tipo_control == "Purga":
         if valor == 1:
             return "OK", "Correcto"
@@ -728,7 +739,10 @@ def dias_frecuencia(tarea):
     if tarea == "Control sala ACS":
         return 1
 
-    if tarea == "Purga":
+    if tarea in [
+        "Purga",
+        "Ruta semanal purgas P9",
+    ]:
         return 7
 
     if tarea == "Control válvula termostática":
@@ -830,7 +844,10 @@ def unidad_por_tarea(tarea):
     if tarea == "Revisión visual":
         return "OK/KO"
 
-    if tarea == "Purga":
+    if tarea in [
+        "Purga",
+        "Ruta semanal purgas P9",
+    ]:
         return "Sí/No"
         
     if tarea == "Control sala ACS":
@@ -958,6 +975,159 @@ def sembrar_planificacion_legionella(fecha_inicio):
             creadas += 1
 
     return creadas
+
+
+
+def asegurar_ruta_semanal_purgas_p9():
+    """
+    Crea una única planificación semanal para los puntos de poco uso
+    de Pearson 9 actualmente identificados:
+
+    - AFS-04 · Grifo comedor alumnos (bajo uso)
+    - AFS-08 · Grifo taller (poco uso)
+
+    No modifica ni sustituye los controles AFS mensuales existentes.
+    """
+    nombre_tarea = "Ruta semanal purgas P9"
+    nombre_ruta = "Ruta semanal purgas · AFS-04 + AFS-08"
+
+    # Si ya existe una ruta activa, no se duplica.
+    df_existente = leer_df("""
+        SELECT id
+        FROM legionella_tareas
+        WHERE centro = ?
+          AND tarea = ?
+          AND activo = 1
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        "Pearson 9",
+        nombre_tarea,
+    ))
+
+    if not df_existente.empty:
+        return int(df_existente.iloc[0]["id"])
+
+    # Localizamos los dos puntos reales existentes.
+    df_afs04 = leer_df("""
+        SELECT *
+        FROM legionella_puntos
+        WHERE centro = ?
+          AND activo = 1
+          AND LOWER(COALESCE(nombre_punto, '')) LIKE ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        "Pearson 9",
+        "%afs-04%",
+    ))
+
+    df_afs08 = leer_df("""
+        SELECT *
+        FROM legionella_puntos
+        WHERE centro = ?
+          AND activo = 1
+          AND LOWER(COALESCE(nombre_punto, '')) LIKE ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        "Pearson 9",
+        "%afs-08%",
+    ))
+
+    # No inventamos puntos. Si alguno falta, no creamos la ruta.
+    if df_afs04.empty or df_afs08.empty:
+        return None
+
+    punto_base = df_afs04.iloc[0].to_dict()
+
+    punto_id = int(punto_base["id"])
+    centro = str(
+        punto_base.get("centro")
+        or "Pearson 9"
+    ).strip()
+
+    edificio = str(
+        punto_base.get("edificio")
+        or "Edif. A"
+    ).strip()
+
+    instalacion = str(
+        punto_base.get("instalacion")
+        or "AFCH"
+    ).strip()
+
+    fecha_inicio = "2026-09-01"
+    frecuencia = 7
+    operario = "Luis Lozano"
+
+    ejecutar("""
+        INSERT INTO legionella_tareas
+        (
+            punto_id,
+            centro,
+            edificio,
+            instalacion,
+            punto,
+            tarea,
+            tipo_control,
+            frecuencia,
+            frecuencia_dias,
+            unidad,
+            fecha_inicio,
+            ultima_fecha,
+            proxima_fecha,
+            operario,
+            activo,
+            generar_ot,
+            consigna_minima,
+            controla_consigna,
+            observaciones,
+            tipo_planificacion
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, NULL, ?, ?, 1, 1, 0, 0, ?, ?
+        )
+    """, (
+        punto_id,
+        centro,
+        edificio,
+        instalacion,
+        nombre_ruta,
+        nombre_tarea,
+        nombre_tarea,
+        "7 días",
+        frecuencia,
+        "Sí/No",
+        fecha_inicio,
+        fecha_inicio,
+        operario,
+        (
+            "Ruta semanal Pearson 9. "
+            "Incluye AFS-04 Grifo comedor alumnos (bajo uso) "
+            "y AFS-08 Grifo taller (poco uso)."
+        ),
+        "Automática",
+    ))
+
+    df_nueva = leer_df("""
+        SELECT id
+        FROM legionella_tareas
+        WHERE centro = ?
+          AND tarea = ?
+          AND activo = 1
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        "Pearson 9",
+        nombre_tarea,
+    ))
+
+    if df_nueva.empty:
+        return None
+
+    return int(df_nueva.iloc[0]["id"])
 
 
 def obtener_planificacion_legionella():
@@ -2272,6 +2442,14 @@ def pantalla_legionella():
     asegurar_tabla_correctivos_legionella()
     asegurar_columnas_plano_legionella()
     asegurar_columna_valor3_legionella()
+
+    try:
+        asegurar_ruta_semanal_purgas_p9()
+    except Exception as e:
+        print(
+            f"[LEGIONELLA] No se pudo asegurar la ruta semanal "
+            f"de purgas P9: {type(e).__name__}: {e}"
+        )
 
     # puntos_creados = sembrar_puntos_si_vacio()
 
