@@ -61,10 +61,19 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             )
 
         if tarea == "Control sala ACS":
+            valor_3 = row.get("valor_3", None)
+
+            if pd.notna(valor_3):
+                return (
+                    f"Acum.: {row.get('valor', '')} ºC / "
+                    f"Imp.: {row.get('valor_2', '')} ºC / "
+                    f"Ret.: {valor_3} ºC"
+                )
+
             return (
                 f"Acum.: {row.get('valor', '')} ºC / "
                 f"Imp.: {row.get('valor_2', '')} ºC / "
-                f"Ret.: {row.get('valor_3', '')} ºC"
+                "Sin retorno principal"
             )
 
         if tarea == "Control válvula termostática":
@@ -676,10 +685,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     programa = [
         ["Control", "Frecuencia", "Criterio correcto"],
-        ["Control sala ACS", "Según planificación", "Acumulador ≥ 60 ºC / Impulsión ≥ 50 ºC / Retorno ≥ 50 ºC"],
+        ["Control sala ACS", "Según planificación", "Acumulador ≥ 60 ºC / Impulsión ≥ 50 ºC / retorno ≥ 50 ºC solo cuando exista retorno principal"],
         ["Temperatura acumulador ACS", "Según planificación", "≥ 60 ºC"],
         ["Temperatura impulsión ACS", "Según planificación", "≥ 50 ºC"],
-        ["Temperatura retorno ACS", "Integrado en Control sala ACS", "≥ 50 ºC"],
+        ["Temperatura retorno ACS", "Integrado únicamente cuando exista retorno principal", "≥ 50 ºC"],
         ["Temperatura ACS terminal", "Según planificación", "≥ 50 ºC"],
         ["Temperatura AFCH", "Según planificación", "Preferentemente ≤ 25 ºC"],
         ["Cloro residual libre", "Según planificación", "0,2 - 1,0 mg/L"],
