@@ -470,18 +470,30 @@ def evaluar_resultado(
         return "INCIDENCIA", "Valor no válido o vacío"
 
     if tipo_control == "Control sala ACS":
-        acumulador = float(valor)
-        impulsion = float(valor_2)
-        retorno = float(valor_3)
+        try:
+            acumulador = float(valor)
+            impulsion = float(valor_2)
+        except Exception:
+            return "INCIDENCIA", "Temperaturas de sala ACS no válidas"
 
         if acumulador < 60:
             return "RIESGO", "Acumulador inferior a 60 ºC"
+
         if impulsion < 50:
             return "RIESGO", "Impulsión ACS inferior a 50 ºC"
-        if retorno < 50:
-            return "RIESGO", "Retorno ACS inferior a 50 ºC"
 
-        return "OK", "Sala ACS correcta"
+        if valor_3 is not None:
+            try:
+                retorno = float(valor_3)
+            except Exception:
+                return "INCIDENCIA", "Temperatura de retorno ACS no válida"
+
+            if retorno < 50:
+                return "RIESGO", "Retorno ACS inferior a 50 ºC"
+
+            return "OK", "Sala ACS correcta: acumulador, impulsión y retorno"
+
+        return "OK", "Sala ACS correcta: acumulador e impulsión"
 
     if tipo_control == "Control válvula termostática":
         try:
@@ -2945,9 +2957,39 @@ def pantalla_legionella():
                 elif tarea == "Control sala ACS":
                     tipo_control = "Control sala ACS"
                     unidad = "ºC"
-                    valor = st.number_input("Temperatura acumulador ºC", value=60.0, step=0.1)
-                    valor_2 = st.number_input("Temperatura impulsión ACS ºC", value=50.0, step=0.1)
-                    valor_3 = st.number_input("Temperatura retorno ACS ºC", value=50.0, step=0.1)
+
+                    st.markdown("#### 🔥 Control sala ACS")
+
+                    valor = st.number_input(
+                        "Temperatura acumulador ºC",
+                        value=60.0,
+                        step=0.1,
+                        key=f"sala_acs_acumulador_{centro}_{edificio}"
+                    )
+
+                    valor_2 = st.number_input(
+                        "Temperatura impulsión ACS ºC",
+                        value=50.0,
+                        step=0.1,
+                        key=f"sala_acs_impulsion_{centro}_{edificio}"
+                    )
+
+                    if centro == "Pearson 9":
+                        valor_3 = None
+
+                        st.info(
+                            "Pearson 9: esta instalación no dispone de retorno principal "
+                            "antes de la mezcla. RT-01 y RT-02 pertenecen al circuito "
+                            "mezclado de duchas y se controlan por separado."
+                        )
+
+                    else:
+                        valor_3 = st.number_input(
+                            "Temperatura retorno ACS ºC",
+                            value=50.0,
+                            step=0.1,
+                            key=f"sala_acs_retorno_{centro}_{edificio}"
+                        )
 
                 elif tarea == "Control válvula termostática":
                     tipo_control = "Control válvula termostática"
@@ -3220,6 +3262,27 @@ def pantalla_legionella():
                                 ruta_foto = ""
 
                         observaciones_finales = observaciones or ""
+                        if tarea == "Control sala ACS":
+                            datos_sala = [
+                                f"Temperatura acumulador: {float(valor):.1f} ºC",
+                                f"Temperatura impulsión ACS: {float(valor_2):.1f} ºC",
+                            ]
+
+                            if valor_3 is not None:
+                                datos_sala.append(
+                                    f"Temperatura retorno ACS: {float(valor_3):.1f} ºC"
+                                )
+                            else:
+                                datos_sala.append(
+                                    "Sin retorno principal en esta instalación"
+                                )
+
+                            observaciones_finales = (
+                                observaciones_finales
+                                + "\nControl sala ACS: "
+                                + " | ".join(datos_sala)
+                            ).strip()
+
                         if tarea == "Control circuito duchas mezclado":
                             delta_chicas = float(valor) - float(valor_2)
                             delta_chicos = float(valor_3) - float(valor_4)
