@@ -594,7 +594,14 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
               AND area = 'Legionella'
               AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
               AND descripcion = ?
-              AND LOWER(COALESCE(estado, '')) NOT IN ('finalizada', 'cerrada')
+              AND LOWER(COALESCE(estado, '')) NOT IN (
+                    'finalizada',
+                    'finalizado',
+                    'cerrada',
+                    'cerrado',
+                    'cancelada',
+                    'cancelado'
+              )
             """),
             (centro, edificio, descripcion),
         )
@@ -1163,14 +1170,18 @@ def ajustar_proxima_fecha_legionella(fecha_base, frecuencia_dias):
 
 
 def generar_ots_legionella_planificadas():
+    hoy_txt = date.today().strftime("%Y-%m-%d")
+
     df = leer_df("""
-        SELECT id, punto_id, centro, edificio, punto, tarea, frecuencia_dias, proxima_fecha, operario
+        SELECT id, punto_id, centro, edificio, punto, tarea,
+               frecuencia_dias, proxima_fecha, operario
         FROM legionella_tareas
         WHERE activo = 1
           AND generar_ot = 1
           AND proxima_fecha IS NOT NULL
-          AND date(proxima_fecha) <= date('now')
-    """)
+          AND TRIM(COALESCE(proxima_fecha, '')) <> ''
+          AND SUBSTR(proxima_fecha, 1, 10) <= ?
+    """, (hoy_txt,))
 
     if df.empty:
         return 0, "No hay controles planificados que toquen hoy."
@@ -1197,6 +1208,15 @@ def generar_ots_legionella_planificadas():
                 fila["proxima_fecha"],
                 frecuencia
             )
+
+            # Mantener calendario maestro sin generar una cascada
+            # de OT atrasadas. Si la tarea acumuló varios periodos
+            # vencidos, avanzamos hasta el siguiente vencimiento futuro.
+            while proxima.date() <= date.today():
+                proxima = ajustar_proxima_fecha_legionella(
+                    proxima,
+                    frecuencia
+                )
 
             ejecutar("""
                 UPDATE legionella_tareas
@@ -1391,7 +1411,7 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
 
     try:
         df_plan = leer_df("""
-            SELECT id, frecuencia_dias
+            SELECT id, frecuencia_dias, generar_ot, proxima_fecha
             FROM legionella_tareas
             WHERE centro = ?
               AND edificio = ?
@@ -1422,10 +1442,77 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
                     df_plan.iloc[0]["frecuencia_dias"]
                     or dias_frecuencia(tarea)
                 )
-                proxima = ajustar_proxima_fecha_legionella(
-                    fecha_registro,
-                    frecuencia
+
+                generar_ot_plan = int(
+                    df_plan.iloc[0].get("generar_ot", 1)
+                    or 0
                 )
+
+                proxima_actual = str(
+                    df_plan.iloc[0].get("proxima_fecha")
+                    or ""
+                ).strip()
+
+                if generar_ot_plan == 1:
+                    # La generación de la OT ya avanza la fecha
+                    # desde la fecha MAESTRA planificada.
+                    # Al registrar el control no la desplazamos
+                    # a la fecha real de ejecución.
+                    proxima_txt = proxima_actual
+
+                    # Respaldo: si por cualquier motivo todavía
+                    # no hubiera quedado una fecha futura, la avanzamos
+                    # desde la fecha planificada existente.
+                    if (
+                        not proxima_txt
+                        or pd.to_datetime(
+                            proxima_txt,
+                            errors="coerce"
+                        ) <= pd.to_datetime(
+                            fecha_registro,
+                            errors="coerce"
+                        )
+                    ):
+                        base = (
+                            proxima_txt
+                            if proxima_txt
+                            else fecha_registro
+                        )
+
+                        proxima = ajustar_proxima_fecha_legionella(
+                            base,
+                            frecuencia
+                        )
+
+                        fecha_registro_dt = pd.to_datetime(
+                            fecha_registro,
+                            errors="coerce"
+                        )
+
+                        while (
+                            pd.notna(fecha_registro_dt)
+                            and proxima <= fecha_registro_dt
+                        ):
+                            proxima = ajustar_proxima_fecha_legionella(
+                                proxima,
+                                frecuencia
+                            )
+
+                        proxima_txt = proxima.strftime(
+                            "%Y-%m-%d"
+                        )
+
+                else:
+                    # Controles manuales (por ejemplo Control sala ACS)
+                    # sí avanzan desde la fecha real registrada.
+                    proxima = ajustar_proxima_fecha_legionella(
+                        fecha_registro,
+                        frecuencia
+                    )
+
+                    proxima_txt = proxima.strftime(
+                        "%Y-%m-%d"
+                    )
 
                 ejecutar("""
                     UPDATE legionella_tareas
@@ -1434,11 +1521,14 @@ def registrar_control(fecha_registro, punto, tarea, tipo_control, valor, valor_2
                     WHERE id = ?
                 """, (
                     fecha_registro,
-                    proxima.strftime("%Y-%m-%d"),
+                    proxima_txt,
                     id_plan
                 ))
-    except Exception:
-        pass
+    except Exception as e:
+        print(
+            f"[LEGIONELLA] No se pudo actualizar planificación "
+            f"tras registrar control: {type(e).__name__}: {e}"
+        )
 
     if estado in ["RIESGO", "INCIDENCIA"]:
         if centro and edificio and punto_nombre and tarea:
@@ -3470,7 +3560,7 @@ def pantalla_legionella():
                         "Analítica laboratorio",
                         "Limpieza y desinfección acumulador ACS",
                         "Limpieza y desinfección depósito AFCH",
-                        "Limpieza y desinfección red AFCH"
+                        "Limpieza y desinfección red AFCH",
                         "Desinfección",
                         "Revisión externa",
                         "Certificado",
