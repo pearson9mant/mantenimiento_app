@@ -949,7 +949,85 @@ def _css_pantalla_operario():
         """,
         unsafe_allow_html=True,
     )
+def _mostrar_ots_sin_planta(ordenes):
+    """
+    Muestra las OT antiguas que todavía no tienen planta real.
 
+    No modifica la OT ni inventa una planta.
+    El operario puede seguir trabajándolas normalmente.
+    """
+
+    pendientes = [
+        ot
+        for ot in ordenes or []
+        if ot.get("_sin_ubicar", False)
+    ]
+
+    if not pendientes:
+        return
+
+    pendientes = _ordenar_misiones(
+        pendientes
+    )
+
+    st.warning(
+        f"📍 {len(pendientes)} OT "
+        f"{'pendiente' if len(pendientes) == 1 else 'pendientes'} "
+        "de ubicar en una planta"
+    )
+
+    with st.expander(
+        "Ver OT sin planta",
+        expanded=False
+    ):
+        for ot in pendientes:
+            numero_ot = str(
+                ot.get("numero_ot")
+                or ot.get("id")
+                or "OT"
+            ).strip()
+
+            espacio = _texto_aula(
+                ot
+            )
+
+            descripcion = _texto_averia(
+                ot
+            )
+
+            prioridad = str(
+                ot.get("prioridad")
+                or "Media"
+            ).strip()
+
+            estado = str(
+                ot.get("estado")
+                or "Abierta"
+            ).strip()
+
+            with st.container(
+                border=True
+            ):
+                st.markdown(
+                    f"**{numero_ot} · {espacio}**"
+                )
+
+                st.markdown(
+                    descripcion
+                )
+
+                st.caption(
+                    f"{prioridad} · {estado} · 📍 Sin planta"
+                )
+
+                if ot.get("_ejecutable", False):
+                    st.button(
+                        f"▶ EMPEZAR {numero_ot}",
+                        key=f"cv_sin_planta_{ot.get('id')}",
+                        use_container_width=True,
+                        on_click=_abrir_ot_para_trabajar,
+                        args=(ot, "sin_planta"),
+                    )
 
 def pantalla_colegio_vivo_operario():
     _css_pantalla_operario()
