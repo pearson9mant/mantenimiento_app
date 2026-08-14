@@ -746,9 +746,17 @@ def limpiar_correctivo_inventario(id_elemento):
 
 def cerrar_correctivo_inventario(id_elemento, estado_final="Correcto"):
     """
-    Cierra el correctivo asociado al inventario y actualiza el estado del elemento.
-    Se ejecuta automáticamente al finalizar la OT.
+    Cierra el correctivo asociado al inventario y actualiza
+    completamente el estado del elemento.
+
+    Al finalizar la OT:
+    - elimina la referencia a la OT correctiva
+    - elimina la fecha del correctivo
+    - actualiza el estado final
+    - pone la cantidad afectada a 0
+    - actualiza la fecha de revisión
     """
+
     crear_tabla_inventario_aulas()
 
     conn = conectar()
@@ -760,6 +768,7 @@ def cerrar_correctivo_inventario(id_elemento, estado_final="Correcto"):
             SET numero_ot_correctiva = '',
                 fecha_correctivo = '',
                 estado = ?,
+                cantidad_afectada = 0,
                 fecha_revision = ?
             WHERE id = ?
         """), (
