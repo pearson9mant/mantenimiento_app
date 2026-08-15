@@ -492,7 +492,23 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             (es_acs & es_acumulador & ~es_solar).sum()
         )
 
-        depositos_solares = int(es_solar.sum())
+        # Contar equipos solares físicos, no solo filas lógicas.
+        # Un único punto puede representar varios depósitos que se revisan juntos.
+        df_solar_fisico = df_puntos[es_solar].copy()
+
+        depositos_solares = 0
+
+        for _, solar_row in df_solar_fisico.iterrows():
+            try:
+                unidades_solares = int(
+                    float(solar_row.get("numero_terminales", 0) or 0)
+                )
+            except Exception:
+                unidades_solares = 0
+
+            # Si el punto declara varias unidades físicas, las contamos.
+            # Si no las declara, el propio punto representa al menos un depósito.
+            depositos_solares += unidades_solares if unidades_solares > 0 else 1
 
         es_retorno = (
             tipo.str.contains("retorno", na=False)
@@ -927,14 +943,26 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "INSTALACIÓN SOLAR",
             [
-                ["Depósitos / acumuladores solares", str(depositos_solares)],
+                ["Depósitos / acumuladores solares físicos", str(depositos_solares)],
                 [
-                    "Revisiones trimestrales planificadas",
+                    "Revisión trimestral conjunta planificada",
                     str(revisiones_trimestrales_solares)
                 ],
             ]
         )
     )
+
+    if depositos_solares > 1 and revisiones_trimestrales_solares == 1:
+        contenido.append(
+            Paragraph(
+                "Nota técnica solar: la revisión trimestral se registra como una única "
+                "actuación porque comprende conjuntamente los depósitos solares de la "
+                "instalación. El número de equipos físicos y el número de tareas "
+                "planificadas se muestran por separado.",
+                estilo_texto_portada
+            )
+        )
+        contenido.append(Spacer(1, 8))
 
     contenido.append(
         crear_bloque_estado(
