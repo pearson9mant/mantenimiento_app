@@ -12,6 +12,7 @@ from reportlab.platypus import (
     TableStyle,
     KeepTogether,
     PageBreak,
+    Image,
 )
 
 from reportlab.lib import colors
@@ -1419,50 +1420,135 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     if planos_pdf_unicos:
         contenido.append(
             Paragraph(
-                "Los planos PDF asociados a los puntos de control se incorporan "
-                "como anexo documental del libro. Si el mismo plano está vinculado "
-                "a varios puntos, se incluye una sola vez.",
+                "Los planos asociados a los puntos de control se muestran a continuación. "
+                "Cuando un mismo plano está vinculado a varios puntos, se incluye una sola vez. "
+                "El PDF original también se incorpora al final del libro como anexo documental.",
                 estilo_texto_portada
             )
         )
-        contenido.append(Spacer(1, 8))
+        contenido.append(Spacer(1, 10))
 
-        datos_planos = [["PLANO", "EDIFICIO / ZONA", "PUNTO DE REFERENCIA"]]
+        planos_renderizados = 0
 
-        for plano in planos_pdf_unicos:
-            datos_planos.append([
-                limpiar_pdf(plano["nombre"], 55),
-                limpiar_pdf(plano["edificio"], 40),
-                limpiar_pdf(plano["punto"], 45),
-            ])
+        try:
+            import fitz  # PyMuPDF
 
-        tabla_planos = Table(
-            datos_planos,
-            colWidths=[180, 150, 170],
-            repeatRows=1
-        )
-        tabla_planos.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173A5E")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#B8C4CE")),
-            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE4")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 7),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        contenido.append(tabla_planos)
-        contenido.append(Spacer(1, 8))
-        contenido.append(
-            Paragraph(
-                "Los documentos originales se reproducen íntegramente al final "
-                "del libro en el ANEXO DE PLANOS.",
-                estilo_texto_portada
+            for indice_plano, plano in enumerate(planos_pdf_unicos, start=1):
+                contenido.append(
+                    Paragraph(
+                        f"Plano {indice_plano}: {limpiar_pdf(plano['nombre'])}",
+                        styles["Heading2"]
+                    )
+                )
+
+                datos_identificacion_plano = [
+                    [
+                        Paragraph("<b>Edificio / zona</b>", estilo_texto_portada),
+                        Paragraph(limpiar_pdf(plano["edificio"]), estilo_texto_portada),
+                    ],
+                    [
+                        Paragraph("<b>Punto de referencia</b>", estilo_texto_portada),
+                        Paragraph(limpiar_pdf(plano["punto"]), estilo_texto_portada),
+                    ],
+                ]
+
+                tabla_identificacion_plano = Table(
+                    datos_identificacion_plano,
+                    colWidths=[120, 350]
+                )
+                tabla_identificacion_plano.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E8EEF4")),
+                    ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#B8C4CE")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D1D5DB")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]))
+
+                contenido.append(tabla_identificacion_plano)
+                contenido.append(Spacer(1, 8))
+
+                try:
+                    documento_plano = fitz.open(
+                        stream=plano["data"],
+                        filetype="pdf"
+                    )
+
+                    for numero_pagina in range(len(documento_plano)):
+                        pagina = documento_plano.load_page(numero_pagina)
+
+                        # Render a buena calidad para que el plano sea legible.
+                        pix = pagina.get_pixmap(
+                            matrix=fitz.Matrix(1.7, 1.7),
+                            alpha=False
+                        )
+
+                        png_bytes = pix.tobytes("png")
+                        imagen = Image(BytesIO(png_bytes))
+
+                        # Ajustar manteniendo proporción dentro de una página A4.
+                        max_ancho = 500
+                        max_alto = 680
+
+                        escala = min(
+                            max_ancho / float(imagen.imageWidth),
+                            max_alto / float(imagen.imageHeight),
+                            1.0
+                        )
+
+                        imagen.drawWidth = imagen.imageWidth * escala
+                        imagen.drawHeight = imagen.imageHeight * escala
+
+                        if numero_pagina > 0:
+                            contenido.append(PageBreak())
+
+                        contenido.append(
+                            Paragraph(
+                                f"Página {numero_pagina + 1} de {len(documento_plano)}",
+                                estilo_texto_portada
+                            )
+                        )
+                        contenido.append(Spacer(1, 4))
+                        contenido.append(imagen)
+                        contenido.append(Spacer(1, 10))
+
+                        planos_renderizados += 1
+
+                    documento_plano.close()
+
+                except Exception as e:
+                    contenido.append(
+                        Paragraph(
+                            "No ha sido posible visualizar este plano dentro del libro. "
+                            "El archivo original se mantiene para su incorporación como anexo PDF.",
+                            estilo_texto_portada
+                        )
+                    )
+
+                if indice_plano < len(planos_pdf_unicos):
+                    contenido.append(PageBreak())
+
+        except Exception:
+            contenido.append(
+                Paragraph(
+                    "Los planos están registrados en la base de datos, pero este entorno "
+                    "no dispone del renderizador PDF necesario para mostrarlos dentro del libro. "
+                    "Los originales se intentarán incorporar como anexo al final.",
+                    estilo_texto_portada
+                )
             )
-        )
+
+        if planos_renderizados == 0:
+            contenido.append(Spacer(1, 8))
+            contenido.append(
+                Paragraph(
+                    "Aviso: no se ha generado ninguna previsualización de plano.",
+                    estilo_texto_portada
+                )
+            )
+
     else:
         contenido.append(
             Paragraph(
