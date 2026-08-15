@@ -51,6 +51,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             return f"AFS: {row.get('valor', '')} ºC / Cloro: {row.get('valor_2', '')} mg/L"
 
         if tarea == "Control ACS terminal":
+            if str(row.get("tipo_control", "") or "").strip() == "Control ACS terminal mezclado":
+                return f"ACS terminal mezclado: {row.get('valor', '')} ºC"
             return f"ACS terminal: {row.get('valor', '')} ºC"
 
         if tarea == "Control punto terminal completo":
@@ -76,10 +78,32 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 "Sin retorno principal"
             )
 
+        if tarea == "Revisión trimestral acumulador ACS":
+            try:
+                correcto = int(float(row.get("valor", 0) or 0)) == 1
+            except Exception:
+                correcto = False
+            return "Revisión acumulador: Correcta" if correcto else "Revisión acumulador: Con deficiencias"
+
+        if tarea == "Purga":
+            try:
+                realizada = int(float(row.get("valor", 0) or 0)) == 1
+            except Exception:
+                realizada = False
+            return "Purga: Realizada" if realizada else "Purga: No realizada"
+
         if tarea == "Control válvula termostática":
             return (
                 f"Entrada ACS: {row.get('valor', '')} ºC / "
                 f"Salida mezclada: {row.get('valor_2', '')} ºC"
+            )
+
+        if tarea == "Control circuito duchas mezclado":
+            return (
+                f"VMT-01: {row.get('valor', '')} ºC / "
+                f"RT-01: {row.get('valor_2', '')} ºC / "
+                f"VMT-02: {row.get('valor_3', '')} ºC / "
+                f"RT-02: {row.get('valor_4', '')} ºC"
             )
 
         if tarea == "Control depósitos solares":
@@ -159,7 +183,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         )
 
     df = leer_df("""
-        SELECT fecha, centro, edificio, instalacion, punto, tarea, valor, valor_2, valor_3,
+        SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
+               valor, valor_2, valor_3, valor_4,
                unidad, estado, resultado, operario, observaciones
         FROM legionella_registros
         WHERE SUBSTR(fecha, 1, 10) BETWEEN ? AND ?
@@ -252,6 +277,170 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     no_ok = total - ok
     cumplimiento = round((ok / total) * 100, 2) if total else 0
     fecha_informe = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # ---------------------------------------------------------
+    # MATRIZ NORMATIVA
+    # Base estatal vigente:
+    # - RD 487/2022, de 21 de junio
+    # - RD 614/2024, de 2 de julio (modificación)
+    # - RD 3/2023, de 10 de enero, para calidad de agua de consumo
+    # ---------------------------------------------------------
+
+    NORMATIVA_LEGIONELLA = {
+        "Control sala ACS": (
+            "RD 487/2022 · Anexo IV · B.2 / "
+            "Anexo III · I.A.7.c-f"
+        ),
+        "Temperatura acumulador": (
+            "RD 487/2022 · Anexo IV · B.2 / "
+            "Anexo III · I.A.7.c"
+        ),
+        "Temperatura acumulador ACS": (
+            "RD 487/2022 · Anexo IV · B.2 / "
+            "Anexo III · I.A.7.c"
+        ),
+        "Temperatura impulsión ACS": (
+            "RD 487/2022 · Anexo III · I.A.7.f"
+        ),
+        "Temperatura retorno": (
+            "RD 487/2022 · Anexo IV · B.2 / "
+            "Anexo III · I.A.7.f"
+        ),
+        "Temperatura retorno ACS": (
+            "RD 487/2022 · Anexo IV · B.2 / "
+            "Anexo III · I.A.7.f"
+        ),
+        "Temperatura punto terminal": (
+            "RD 487/2022 · Anexo IV · B.1-B.2"
+        ),
+        "Temperatura ACS terminal": (
+            "RD 487/2022 · Anexo IV · B.1-B.2"
+        ),
+        "Control ACS terminal": (
+            "RD 487/2022 · Anexo IV · B.1-B.2"
+        ),
+        "Control ACS terminal mezclado": (
+            "Control técnico PPCL · terminal posterior a mezcla / "
+            "RD 487/2022 · Anexo III · I.A.7.f"
+        ),
+        "Control AFS": (
+            "RD 487/2022 · Anexo IV · B.1 y B.3 / "
+            "RD 3/2023 · Anexo I.C · Tabla 3"
+        ),
+        "Cloro residual": (
+            "RD 487/2022 · Anexo IV · B.3 / "
+            "RD 3/2023 · Anexo I.C · Tabla 3, nota 8"
+        ),
+        "Control punto terminal completo": (
+            "RD 487/2022 · Anexo IV · B.1-B.3 / "
+            "RD 3/2023 · Anexo I.C"
+        ),
+        "Purga": (
+            "RD 487/2022 · Anexo IV · B.2"
+        ),
+        "Ruta semanal purgas P9": (
+            "RD 487/2022 · Anexo IV · B.1.3"
+        ),
+        "Revisión trimestral acumulador ACS": (
+            "RD 487/2022 · Anexo IV · B.2 · "
+            "redacción RD 614/2024, art. único.10"
+        ),
+        "Revisión visual": (
+            "RD 487/2022 · Anexo IV · B.1"
+        ),
+        "Limpieza y desinfección acumulador": (
+            "RD 487/2022 · Anexo IV · B.4 / Anexo X"
+        ),
+        "Limpieza y desinfección depósito AFCH": (
+            "RD 487/2022 · Anexo IV · B.3-B.4 / Anexo X"
+        ),
+        "Puesta en servicio acumulador ACS": (
+            "RD 487/2022 · Anexo III · I.A.7 / "
+            "Anexo IV · B.2"
+        ),
+        "Choque térmico": (
+            "RD 487/2022 · Anexo III · I.A.7.f / "
+            "Anexo IV · B.4"
+        ),
+        "Control depósitos solares": (
+            "RD 487/2022 · Anexo III · I.A.7.d"
+        ),
+        "Control válvula termostática": (
+            "Control técnico PPCL · relacionado con "
+            "RD 487/2022 · Anexo III · I.A.7.f"
+        ),
+        "Control circuito duchas mezclado": (
+            "Control técnico PPCL · relacionado con "
+            "RD 487/2022 · Anexo III · I.A.7.f"
+        ),
+        "Analítica laboratorio": (
+            "RD 487/2022 · Anexos V, VI, VII y VIII"
+        ),
+        "Revisión externa": (
+            "RD 487/2022 · PPCL/PSL · Anexo IV"
+        ),
+        "Certificado": (
+            "RD 487/2022 · Anexo X, cuando corresponda"
+        ),
+        "Desinfección": (
+            "RD 487/2022 · Anexo IV · B.4 / Anexo X"
+        ),
+    }
+
+    def referencia_normativa(tarea, tipo_control=None):
+        tarea_txt = str(tarea or "").strip()
+        tipo_txt = str(tipo_control or "").strip()
+
+        if tipo_txt in NORMATIVA_LEGIONELLA:
+            return NORMATIVA_LEGIONELLA[tipo_txt]
+
+        if tarea_txt in NORMATIVA_LEGIONELLA:
+            return NORMATIVA_LEGIONELLA[tarea_txt]
+
+        tarea_lower = tarea_txt.lower()
+
+        for nombre, referencia in NORMATIVA_LEGIONELLA.items():
+            if nombre.lower() in tarea_lower:
+                return referencia
+
+        return "Control definido en el PPCL de la instalación"
+
+    def referencia_normativa_punto(row):
+        instalacion = str(row.get("instalacion", "") or "").strip().lower()
+        tipo_punto = str(row.get("tipo_punto", "") or "").strip().lower()
+        tipo_control = str(row.get("tipo_control_punto", "") or "").strip().lower()
+
+        if "solar" in instalacion or "solar" in tipo_punto or "solar" in tipo_control:
+            return "RD 487/2022 · Anexo III · I.A.7.d"
+
+        if "acumulador" in tipo_punto or "acumulador" in tipo_control:
+            return (
+                "RD 487/2022 · Anexo III · I.A.7 / "
+                "Anexo IV · B.2"
+            )
+
+        if "retorno" in tipo_punto or "retorno" in tipo_control:
+            return (
+                "RD 487/2022 · Anexo III · I.A.7.f / "
+                "Anexo IV · B.2"
+            )
+
+        if instalacion in ["afch", "afs"] or "afs" in tipo_control:
+            return (
+                "RD 487/2022 · Anexo III · I.A.6 / "
+                "Anexo IV · B.1 y B.3"
+            )
+
+        if tipo_punto in ["grifo", "ducha", "lavamanos", "fuente"]:
+            return "RD 487/2022 · Anexo IV · B.1-B.3"
+
+        if "válvula" in tipo_control or "valvula" in tipo_control:
+            return (
+                "Control técnico PPCL · relacionado con "
+                "RD 487/2022 · Anexo III · I.A.7.f"
+            )
+
+        return "RD 487/2022 · PPCL/PSL de la instalación"
 
     incidencias_abiertas = 0
     incidencias_cerradas = 0
@@ -684,22 +873,113 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(Paragraph("2. Programa de mantenimiento y criterios de control", styles["Heading2"]))
 
     programa = [
-        ["Control", "Frecuencia", "Criterio correcto"],
-        ["Control sala ACS", "Según planificación", "Acumulador ≥ 60 ºC / Impulsión ≥ 50 ºC / retorno ≥ 50 ºC solo cuando exista retorno principal"],
-        ["Temperatura acumulador ACS", "Según planificación", "≥ 60 ºC"],
-        ["Temperatura impulsión ACS", "Según planificación", "≥ 50 ºC"],
-        ["Temperatura retorno ACS", "Integrado únicamente cuando exista retorno principal", "≥ 50 ºC"],
-        ["Temperatura ACS terminal", "Según planificación", "≥ 50 ºC"],
-        ["Temperatura AFCH", "Según planificación", "Preferentemente ≤ 25 ºC"],
-        ["Cloro residual libre", "Según planificación", "0,2 - 1,0 mg/L"],
-        ["Control punto terminal completo", "Según planificación", "AFCH + cloro + ACS terminal"],
-        ["Depósitos solares", "Según planificación", "Registro de temperatura sin consigna automática"],
-        ["Purga / revisión visual", "Según planificación", "Realizada / correcta"],
-        ["Limpieza y desinfección acumulador", "Anual",
-         "Limpieza, desinfección y revisión interior del acumulador ACS"],
-        ["Limpieza y desinfección depósito AFCH", "Anual",
-         "Según certificado empresa mantenedora"],
-        ["Control válvula termostática", "Según planificación", "Entrada ≥ 60 ºC / salida 38-50 ºC"],
+        ["Control", "Frecuencia normativa", "Criterio correcto", "Referencia normativa"],
+
+        [
+            "Control sala ACS",
+            "Diaria",
+            "Acumulador ≥60 ºC; retorno ≥50 ºC cuando exista. "
+            "La impulsión se controla como parámetro operativo del PPCL.",
+            referencia_normativa("Control sala ACS"),
+        ],
+        [
+            "Temperatura acumulador ACS",
+            "Diaria",
+            "Acumulador final ≥60 ºC",
+            referencia_normativa("Temperatura acumulador ACS"),
+        ],
+        [
+            "Temperatura retorno ACS",
+            "Diaria, cuando exista",
+            "Retorno ≥50 ºC",
+            referencia_normativa("Temperatura retorno ACS"),
+        ],
+        [
+            "Temperatura ACS terminal",
+            "Mensual · muestra rotatoria",
+            "≥50 ºC; alcanzar estabilización antes de 1 minuto",
+            referencia_normativa("Temperatura ACS terminal"),
+        ],
+        [
+            "Revisión puntos terminales",
+            "Mensual · muestra rotatoria",
+            "Todos los terminales revisados al menos una vez al año",
+            "RD 487/2022 · Anexo IV · B.1.2",
+        ],
+        [
+            "Puntos de poco uso",
+            "Semanal",
+            "Abrir grifos/duchas y dejar correr el agua unos minutos",
+            "RD 487/2022 · Anexo IV · B.1.3",
+        ],
+        [
+            "Purga fondo acumulador",
+            "Semanal",
+            "Purga del fondo del acumulador realizada",
+            referencia_normativa("Purga"),
+        ],
+        [
+            "Drenaje de tuberías ACS",
+            "Mensual",
+            "Eliminación de sedimentos mediante válvulas de drenaje",
+            "RD 487/2022 · Anexo IV · B.2",
+        ],
+        [
+            "Revisión trimestral acumulador ACS",
+            "Trimestral",
+            "Estado de mantenimiento correcto; no exige apertura/vaciado obligatorio",
+            referencia_normativa("Revisión trimestral acumulador ACS"),
+        ],
+        [
+            "Control AFS / AFCH",
+            "Temperatura depósito: semanal; desinfectante: diario en muestra representativa",
+            "AFS lo más baja posible; si >25 ºC, evaluación del riesgo. "
+            "Cloro libre según RD 3/2023.",
+            referencia_normativa("Control AFS"),
+        ],
+        [
+            "Cloro residual libre",
+            "Diario en muestra representativa de puntos terminales",
+            "Máx. paramétrico 1,0 mg/L; recomendación general ≥0,2 mg/L",
+            referencia_normativa("Cloro residual"),
+        ],
+        [
+            "Control punto terminal completo",
+            "Según PPCL y periodicidades de cada parámetro",
+            "AFS + desinfectante + ACS terminal",
+            referencia_normativa("Control punto terminal completo"),
+        ],
+        [
+            "Depósitos solares",
+            "Según PPCL",
+            "Si no aseguran >60 ºC de forma continua, debe alcanzarse 60 ºC "
+            "en acumulador final antes de distribución",
+            referencia_normativa("Control depósitos solares"),
+        ],
+        [
+            "Limpieza y desinfección sistema agua sanitaria",
+            "Al menos anual y cuando proceda",
+            "Procedimiento documentado y certificado",
+            "RD 487/2022 · Anexo IV · B.4 / Anexo X",
+        ],
+        [
+            "Choque térmico",
+            "Cuando proceda según PPCL / actuación correctora",
+            "Tratamiento térmico documentado; instalación capaz de alcanzar 70 ºC",
+            referencia_normativa("Choque térmico"),
+        ],
+        [
+            "Control válvula termostática",
+            "Según PPCL",
+            "Control técnico interno de funcionamiento y seguridad",
+            referencia_normativa("Control válvula termostática"),
+        ],
+        [
+            "Circuito mezclado duchas",
+            "Según PPCL",
+            "Control técnico de salida mezclada y retorno posterior a mezcla",
+            referencia_normativa("Control circuito duchas mezclado"),
+        ],
     ]
 
     estilo_tabla_cabecera = styles["Normal"].clone("TablaCabecera")
@@ -720,7 +1000,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     programa_formateado.append([
         Paragraph("CONTROL", estilo_tabla_cabecera),
         Paragraph("FRECUENCIA", estilo_tabla_cabecera),
-        Paragraph("CRITERIO CORRECTO", estilo_tabla_cabecera),
+        Paragraph("CRITERIO", estilo_tabla_cabecera),
+        Paragraph("REFERENCIA NORMATIVA", estilo_tabla_cabecera),
     ])
 
     for fila in programa[1:]:
@@ -728,11 +1009,12 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             Paragraph(limpiar_pdf(fila[0]), estilo_tabla_celda),
             Paragraph(limpiar_pdf(fila[1]), estilo_tabla_celda),
             Paragraph(limpiar_pdf(fila[2]), estilo_tabla_celda),
+            Paragraph(limpiar_pdf(fila[3]), estilo_tabla_celda),
         ])
 
     tabla_programa = Table(
         programa_formateado,
-        colWidths=[155, 120, 225],
+        colWidths=[105, 95, 145, 155],
         repeatRows=1,
     )
 
@@ -758,7 +1040,14 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(
         KeepTogether([
             Paragraph(
-                "Criterios aplicados según la planificación activa de mantenimiento y control.",
+                "Marco normativo de referencia: Real Decreto 487/2022, de 21 de junio, "
+                "en su redacción vigente tras el Real Decreto 614/2024, de 2 de julio. "
+                "Para parámetros de calidad del agua de consumo se incorpora, cuando procede, "
+                "el Real Decreto 3/2023, de 10 de enero. En Cataluña se mantiene además como "
+                "normativa relacionada el Decret 352/2004, de 27 de julio. Las frecuencias y "
+                "criterios técnicos de cada control se trazan a la normativa estatal vigente. "
+                "Los controles identificados como «Control técnico PPCL» son medidas internas "
+                "del plan y no una denominación literal del Real Decreto.",
                 estilo_estado_texto
             ),
             Spacer(1, 7),
@@ -853,6 +1142,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 Paragraph("CONTROL", estilo_inventario_cabecera),
                 Paragraph("TERM.", estilo_inventario_cabecera),
                 Paragraph("UBICACIÓN", estilo_inventario_cabecera),
+                Paragraph("REF. NORMATIVA", estilo_inventario_cabecera),
             ]]
 
             for _, row in df_edificio.iterrows():
@@ -887,11 +1177,15 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                         limpiar_pdf(ubicacion, 45),
                         estilo_inventario_celda
                     ),
+                    Paragraph(
+                        limpiar_pdf(referencia_normativa_punto(row), 120),
+                        estilo_inventario_celda
+                    ),
                 ])
 
             tabla_p = Table(
                 tabla_puntos,
-                colWidths=[45, 120, 75, 95, 35, 130],
+                colWidths=[38, 92, 58, 72, 30, 92, 118],
                 repeatRows=1,
             )
 
@@ -1073,12 +1367,19 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 limpiar_pdf(row.get("proxima_fecha", ""), 16),
                 limpiar_pdf(row.get("operario", ""), 24),
                 limpiar_pdf(consigna, 12),
+                limpiar_pdf(
+                    referencia_normativa(row.get("tarea", "")),
+                    120
+                ),
             ])
 
         contenido.append(construir_tabla_operativa(
-            ["EDIFICIO", "PUNTO", "TAREA", "FRECUENCIA", "PRÓXIMA", "OPERARIO", "CONSIGNA"],
+            [
+                "EDIFICIO", "PUNTO", "TAREA", "FRECUENCIA",
+                "PRÓXIMA", "OPERARIO", "CONSIGNA", "REF. NORMATIVA"
+            ],
             filas_plan,
-            [65, 90, 105, 62, 55, 78, 45],
+            [50, 68, 78, 48, 48, 58, 35, 115],
             centrar_columnas={3, 4, 6}
         ))
 
@@ -1106,12 +1407,22 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 limpiar_pdf(texto_valores(row), 62),
                 limpiar_pdf(row.get("estado", ""), 14),
                 limpiar_pdf(row.get("operario", ""), 22),
+                limpiar_pdf(
+                    referencia_normativa(
+                        row.get("tarea", ""),
+                        row.get("tipo_control", "")
+                    ),
+                    125
+                ),
             ])
 
         tabla_controles = construir_tabla_operativa(
-            ["FECHA", "EDIFICIO", "PUNTO", "TAREA", "VALORES REGISTRADOS", "ESTADO", "OPERARIO"],
+            [
+                "FECHA", "EDIFICIO", "PUNTO", "TAREA",
+                "VALORES", "ESTADO", "OPERARIO", "REF. NORMATIVA"
+            ],
             filas_controles,
-            [48, 64, 85, 92, 125, 42, 44],
+            [40, 48, 60, 67, 90, 36, 44, 115],
             centrar_columnas={0, 5}
         )
 
@@ -1155,6 +1466,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 "Temperatura acumulador",
                 "Temperatura retorno",
                 "Temperatura impulsión ACS",
+                "Revisión trimestral acumulador ACS",
+                "Control circuito duchas mezclado",
             ])
         ].copy()
 
@@ -1170,12 +1483,22 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                     limpiar_pdf(texto_valores(row), 60),
                     limpiar_pdf(row.get("estado", ""), 14),
                     limpiar_pdf(row.get("resultado", ""), 65),
+                    limpiar_pdf(
+                        referencia_normativa(
+                            row.get("tarea", ""),
+                            row.get("tipo_control", "")
+                        ),
+                        120
+                    ),
                 ])
 
             tabla_criticos = construir_tabla_operativa(
-                ["FECHA", "PUNTO", "CONTROL", "VALORES", "ESTADO", "RESULTADO"],
+                [
+                    "FECHA", "PUNTO", "CONTROL", "VALORES",
+                    "ESTADO", "RESULTADO", "REF. NORMATIVA"
+                ],
                 filas_criticos,
-                [50, 90, 100, 125, 45, 90],
+                [40, 65, 70, 82, 38, 85, 120],
                 centrar_columnas={0, 4}
             )
 
@@ -1224,12 +1547,19 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 limpiar_pdf(row.get("tarea", ""), 34),
                 limpiar_pdf(row.get("estado", ""), 18),
                 limpiar_pdf(descripcion, 100),
+                limpiar_pdf(
+                    referencia_normativa(row.get("tarea", "")),
+                    120
+                ),
             ])
 
         tabla_incidencias = construir_tabla_operativa(
-            ["FECHA", "EDIFICIO", "PUNTO", "TAREA", "ESTADO", "DESCRIPCIÓN / CIERRE"],
+            [
+                "FECHA", "EDIFICIO", "PUNTO", "TAREA",
+                "ESTADO", "DESCRIPCIÓN / CIERRE", "REF. NORMATIVA"
+            ],
             filas_incidencias,
-            [48, 65, 82, 85, 55, 165],
+            [40, 48, 58, 60, 42, 140, 112],
             centrar_columnas={0, 4}
         )
 
@@ -1275,12 +1605,19 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 limpiar_pdf(row.get("punto", ""), 34),
                 limpiar_pdf(row.get("resultado", ""), 24),
                 limpiar_pdf(row.get("numero_informe", ""), 24),
+                limpiar_pdf(
+                    referencia_normativa(row.get("tipo_informe", "")),
+                    120
+                ),
             ])
 
         contenido.append(construir_tabla_operativa(
-            ["FECHA", "TIPO", "EMPRESA", "INST.", "PUNTO", "RESULTADO", "N.º INFORME"],
+            [
+                "FECHA", "TIPO", "EMPRESA", "INST.", "PUNTO",
+                "RESULTADO", "N.º INFORME", "REF. NORMATIVA"
+            ],
             filas_informes,
-            [48, 90, 75, 45, 95, 72, 75],
+            [40, 68, 55, 35, 65, 52, 55, 130],
             centrar_columnas={0, 3, 5}
         ))
 
@@ -1333,9 +1670,14 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(Paragraph(
         "El presente libro se genera con los datos registrados en la aplicación de mantenimiento: "
         "puntos físicos de control, planificación activa, controles de temperatura, cloro residual, "
-        "purgas, revisiones visuales, incidencias, acciones correctoras e informes externos. "
-        "El retorno ACS se considera integrado dentro del control de sala ACS cuando así esté configurado "
-        "en la planificación. La documentación original adjunta permanece archivada en el sistema.",
+        "purgas, revisiones, incidencias, acciones correctoras e informes externos. Cada actuación se "
+        "acompaña de su referencia normativa o, cuando se trata de un control técnico específico creado "
+        "por el centro, de su identificación como medida interna del PPCL. El marco estatal de referencia "
+        "es el RD 487/2022 en su redacción vigente tras el RD 614/2024; para parámetros de calidad del agua "
+        "de consumo se incorpora el RD 3/2023 cuando procede y, en Cataluña, se identifica también el "
+        "Decret 352/2004 como normativa relacionada. El retorno ACS se considera únicamente cuando "
+        "existe como circuito principal de retorno; los retornos posteriores a mezcla se documentan como "
+        "controles técnicos independientes. La documentación original adjunta permanece archivada en el sistema.",
         estilo_estado_texto
     ))
 
