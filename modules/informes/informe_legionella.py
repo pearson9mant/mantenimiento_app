@@ -495,7 +495,40 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             terminales_ducha = 0
 
     controles_sala_acs = contar_tareas("Control sala ACS")
-    revisiones_trimestrales_acs = contar_tareas("Revisión trimestral acumulador ACS")
+
+    # En nuestra estructura, el retorno principal puede estar integrado
+    # dentro del propio Control sala ACS y no existir como tarea independiente.
+    # Para el resumen técnico mostramos los retornos principales efectivamente
+    # cubiertos por esos controles, evitando que aparezca un 0 engañoso.
+    retornos_principales_controlados = max(
+        retornos_principales_acs,
+        controles_sala_acs,
+    )
+
+    # Separar las revisiones trimestrales de acumuladores ACS de las
+    # revisiones de depósitos solares para que el resumen sea comprensible.
+    revisiones_trimestrales_acs = 0
+    revisiones_trimestrales_solares = 0
+
+    if not df_plan.empty:
+        tarea_plan_tmp = df_plan["tarea"].astype(str).str.strip().str.lower()
+        punto_plan_tmp = df_plan["punto"].astype(str).str.lower()
+        instalacion_plan_tmp = df_plan["instalacion"].astype(str).str.lower()
+
+        es_revision_trimestral = (
+            tarea_plan_tmp == "revisión trimestral acumulador acs"
+        )
+        es_solar_plan = (
+            instalacion_plan_tmp.str.contains("solar", na=False)
+            | punto_plan_tmp.str.contains("solar", na=False)
+        )
+
+        revisiones_trimestrales_solares = int(
+            (es_revision_trimestral & es_solar_plan).sum()
+        )
+        revisiones_trimestrales_acs = int(
+            (es_revision_trimestral & ~es_solar_plan).sum()
+        )
 
     purgas_acumulador = 0
     if not df_plan.empty:
@@ -765,10 +798,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             "SISTEMA ACS",
             [
                 ["Acumuladores ACS", str(acumuladores_acs)],
-                ["Retornos principales ACS", str(retornos_principales_acs)],
+                ["Retornos principales integrados en Control sala ACS", str(retornos_principales_controlados)],
                 ["Controles sala ACS planificados", str(controles_sala_acs)],
-                ["Revisiones trimestrales acumuladores", str(revisiones_trimestrales_acs)],
-                ["Purgas de acumulador planificadas", str(purgas_acumulador)],
+                ["Revisiones trimestrales acumuladores ACS", str(revisiones_trimestrales_acs)],
+                ["Purgas semanales de acumulador", str(purgas_acumulador)],
             ]
         )
     )
@@ -788,6 +821,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             "INSTALACIÓN SOLAR",
             [
                 ["Depósitos solares", str(depositos_solares)],
+                ["Revisiones trimestrales depósitos solares", str(revisiones_trimestrales_solares)],
             ]
         )
     )
