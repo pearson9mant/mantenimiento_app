@@ -563,6 +563,16 @@ def evaluar_resultado(
 
         return "OK", "Control AFS correcto"
 
+    if tipo_control == "Control ACS terminal mezclado":
+        return (
+            "OK",
+            (
+                f"Temperatura terminal mezclado registrada: {valor:.1f} ºC. "
+                "No se aplica automáticamente la consigna general de 50 ºC "
+                "porque el punto está aguas abajo de una válvula mezcladora."
+            )
+        )
+
     if tipo_control == "Control ACS terminal":
         if valor >= 50:
             return "OK", "Temperatura ACS terminal correcta"
@@ -843,6 +853,9 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
         tareas.insert(0, "Control AFS")
 
     elif tipo_control_punto == "Solo ACS":
+        tareas.insert(0, "Control ACS terminal")
+
+    elif tipo_control_punto == "ACS terminal mezclada":
         tareas.insert(0, "Control ACS terminal")
 
     elif tipo_control_punto == "ACS + AFS":
@@ -2895,39 +2908,41 @@ def pantalla_legionella():
             """,
             (centro,),
         )
-        
+
         if zonas_df.empty:
             st.warning(
                 "No hay zonas con puntos de Legionella activos para este centro."
             )
-            st.stop()
-        
-        edificios = (
-            zonas_df["edificio"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
-        
-        edificio = st.selectbox(
-            "Edificio / zona",
-            edificios,
-            key="leg_registro_edificio"
-        )
-        
-        puntos_df = leer_df(
-            """
-            SELECT *
-            FROM legionella_puntos
-            WHERE centro = ?
-              AND edificio = ?
-              AND activo = 1
-            ORDER BY instalacion, nombre_punto
-            """,
-            (centro, edificio),
-        )
+            edificio = None
+            puntos_df = pd.DataFrame()
+
+        else:
+            edificios = (
+                zonas_df["edificio"]
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .drop_duplicates()
+                .tolist()
+            )
+
+            edificio = st.selectbox(
+                "Edificio / zona",
+                edificios,
+                key="leg_registro_edificio"
+            )
+
+            puntos_df = leer_df(
+                """
+                SELECT *
+                FROM legionella_puntos
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND activo = 1
+                ORDER BY instalacion, nombre_punto
+                """,
+                (centro, edificio),
+            )
 
         if puntos_df.empty:
             st.warning("No hay puntos de control dados de alta. Ve a la pestaña ⚙️ Puntos y crea el primero.")
@@ -3204,13 +3219,56 @@ def pantalla_legionella():
                     valor_3 = temperatura_acs
 
                 elif tarea == "Control ACS terminal":
-                    tipo_control = "Control ACS terminal"
-                    unidad = "ºC"
-                    valor = st.number_input("Temperatura ACS terminal ºC", min_value=0.0, max_value=100.0, value=50.0, step=0.1)
+                    es_terminal_mezclado = (
+                        str(tipo_control_punto or "").strip()
+                        == "ACS terminal mezclada"
+                    )
 
-                    purga_realizada = st.checkbox("Purga realizada")
-                    aireador_limpio = st.checkbox("Aireador limpio/desinfectado")
-                    revision_visual_ok = st.checkbox("Revisión visual correcta")
+                    tipo_control = (
+                        "Control ACS terminal mezclado"
+                        if es_terminal_mezclado
+                        else "Control ACS terminal"
+                    )
+
+                    unidad = "ºC"
+
+                    if es_terminal_mezclado:
+                        st.markdown("#### 🚿 Terminal ACS después de mezcla")
+                        st.caption(
+                            "Este punto está aguas abajo de una válvula mezcladora. "
+                            "La temperatura se registra como dato del terminal, "
+                            "sin aplicar automáticamente la consigna general de 50 ºC."
+                        )
+
+                    valor = st.number_input(
+                        "Temperatura ACS terminal ºC",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=45.0 if es_terminal_mezclado else 50.0,
+                        step=0.1,
+                        key=f"acs_terminal_{centro}_{edificio}_{punto_nombre}"
+                    )
+
+                    purga_realizada = st.checkbox(
+                        "Purga realizada",
+                        key=f"purga_acs_terminal_{centro}_{edificio}_{punto_nombre}"
+                    )
+
+                    if str(tipo_punto or "").strip().lower() == "ducha":
+                        aireador_limpio = st.checkbox(
+                            "Cabezal de ducha limpio/desinfectado",
+                            key=f"cabezal_acs_terminal_{centro}_{edificio}_{punto_nombre}"
+                        )
+                    else:
+                        aireador_limpio = st.checkbox(
+                            "Aireador limpio/desinfectado",
+                            key=f"aireador_acs_terminal_{centro}_{edificio}_{punto_nombre}"
+                        )
+
+                    revision_visual_ok = st.checkbox(
+                        "Revisión visual correcta",
+                        key=f"revision_acs_terminal_{centro}_{edificio}_{punto_nombre}"
+                    )
 
                 elif tarea == "Cloro residual":
                     tipo_control = "Cloro residual"
@@ -3371,17 +3429,42 @@ def pantalla_legionella():
                             ).strip()
 
                         if tarea in ["Control AFS", "Control ACS terminal", "Control punto terminal completo"]:
+                            etiqueta_limpieza = (
+                                "Cabezal de ducha limpio/desinfectado"
+                                if str(tipo_punto or "").strip().lower() == "ducha"
+                                else "Aireador limpio/desinfectado"
+                            )
+
                             checklist = [
                                 "Purga realizada: Sí" if purga_realizada else "Purga realizada: No",
-                                "Aireador limpio/desinfectado: Sí" if aireador_limpio else "Aireador limpio/desinfectado: No",
+                                (
+                                    f"{etiqueta_limpieza}: Sí"
+                                    if aireador_limpio
+                                    else f"{etiqueta_limpieza}: No"
+                                ),
                                 "Revisión visual correcta: Sí" if revision_visual_ok else "Revisión visual correcta: No",
                             ]
 
                             if tarea == "Control punto terminal completo":
-                                checklist.append(f"Temperatura ACS terminal: {temperatura_acs} ºC")
+                                checklist.append(
+                                    f"Temperatura ACS terminal: {temperatura_acs} ºC"
+                                )
+
+                            if (
+                                tarea == "Control ACS terminal"
+                                and tipo_control == "Control ACS terminal mezclado"
+                            ):
+                                checklist.append(
+                                    "Terminal alimentado por circuito mezclado: Sí"
+                                )
+                                checklist.append(
+                                    "Sin aplicación automática de consigna general 50 ºC"
+                                )
 
                             observaciones_finales = (
-                                observaciones_finales + "\nChecklist: " + " | ".join(checklist)
+                                observaciones_finales
+                                + "\nChecklist: "
+                                + " | ".join(checklist)
                             ).strip()
 
                         if tarea == "Control válvula termostática":
@@ -3765,6 +3848,7 @@ def pantalla_legionella():
                     [
                         "Solo AFS",
                         "Solo ACS",
+                        "ACS terminal mezclada",
                         "ACS + AFS",
                         "Acumulador",
                         "Retorno",
@@ -4054,6 +4138,7 @@ def pantalla_legionella():
                         opciones_tipo_control = [
                             "Solo AFS",
                             "Solo ACS",
+                            "ACS terminal mezclada",
                             "ACS + AFS",
                             "Acumulador",
                             "Retorno",
@@ -4805,14 +4890,33 @@ def pantalla_legionella():
                         st.write(f"🧪 **Cloro residual:** {row['valor_2']} mg/L")
             
                     elif row["tarea"] == "Control ACS terminal":
-            
-                        st.write(f"🔥 **Temperatura ACS terminal:** {row['valor']} ºC")
+
+                        if str(row.get("tipo_control") or "") == "Control ACS terminal mezclado":
+                            st.write(
+                                f"🚿 **Temperatura terminal ACS mezclado:** "
+                                f"{row['valor']} ºC"
+                            )
+                            st.caption(
+                                "Punto aguas abajo de válvula mezcladora. "
+                                "Sin consigna automática general de 50 ºC."
+                            )
+                        else:
+                            st.write(
+                                f"🔥 **Temperatura ACS terminal:** "
+                                f"{row['valor']} ºC"
+                            )
 
                     elif row["tarea"] == "Control sala ACS":
-                    
+
                         st.write(f"🔥 **Acumulador:** {row['valor']} ºC")
                         st.write(f"➡️ **Impulsión ACS:** {row['valor_2']} ºC")
-                        st.write(f"🔄 **Retorno ACS:** {row['valor_3']} ºC")
+
+                        if pd.notna(row.get("valor_3")):
+                            st.write(f"🔄 **Retorno ACS:** {row['valor_3']} ºC")
+                        else:
+                            st.caption(
+                                "Sin retorno principal en esta instalación."
+                            )
 
                     elif row["tarea"] == "Control válvula termostática":
                     
