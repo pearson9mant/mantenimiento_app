@@ -2883,13 +2883,47 @@ def pantalla_legionella():
         centros = list(CENTROS.keys())
         centro = st.selectbox("Centro", centros)
 
-        edificios = list(CENTROS[centro].keys())
-        edificio = st.selectbox("Edificio", edificios)
-
+        zonas_df = leer_df(
+            """
+            SELECT DISTINCT edificio
+            FROM legionella_puntos
+            WHERE centro = ?
+              AND activo = 1
+              AND edificio IS NOT NULL
+              AND TRIM(edificio) <> ''
+            ORDER BY edificio
+            """,
+            (centro,),
+        )
+        
+        if zonas_df.empty:
+            st.warning(
+                "No hay zonas con puntos de Legionella activos para este centro."
+            )
+            st.stop()
+        
+        edificios = (
+            zonas_df["edificio"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .drop_duplicates()
+            .tolist()
+        )
+        
+        edificio = st.selectbox(
+            "Edificio / zona",
+            edificios,
+            key="leg_registro_edificio"
+        )
+        
         puntos_df = leer_df(
             """
-            SELECT * FROM legionella_puntos
-            WHERE centro = ? AND edificio = ? AND activo = 1
+            SELECT *
+            FROM legionella_puntos
+            WHERE centro = ?
+              AND edificio = ?
+              AND activo = 1
             ORDER BY instalacion, nombre_punto
             """,
             (centro, edificio),
