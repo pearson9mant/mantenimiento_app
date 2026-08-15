@@ -1,5 +1,6 @@
 from io import BytesIO
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -222,13 +223,62 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ORDER BY centro, edificio, instalacion, nombre_punto
     """, (centro_filtro,))
 
-    # Planos PDF asociados a puntos: se deduplican por contenido.
+    # ---------------------------------------------------------
+    # PLANOS DEL CENTRO
+    # ---------------------------------------------------------
+    # La aplicación ya dispone de un plano general por centro en
+    # assets/planos_legionella. Esos son los planos principales del libro.
+    # Después añadimos, si existen, planos específicos guardados en puntos.
     planos_pdf_unicos = []
     huellas_planos = set()
 
-    if not df_puntos.empty and "plano_data" in df_puntos.columns:
-        import hashlib
+    import hashlib
 
+    planos_generales_legionella = {
+        "Pearson 22": {
+            "ruta": Path("assets/planos_legionella/Puntos_control_legionela.pdf"),
+            "nombre": "Puntos_control_legionela.pdf",
+            "edificio": "Plano general Pearson 22",
+            "punto": "Puntos AFS, ACS, acumuladores, duchas y muestras",
+        },
+        "Pearson 9": {
+            "ruta": Path(
+                "assets/planos_legionella/"
+                "Puntos_control_legionela_Pearson_9_v2.pdf"
+            ),
+            "nombre": "Puntos_control_legionela_Pearson_9_v2.pdf",
+            "edificio": "Plano general Pearson 9",
+            "punto": "Puntos AFS, ACS, acumuladores, duchas y muestras",
+        },
+    }
+
+    plano_general = planos_generales_legionella.get(str(centro_filtro).strip())
+
+    if plano_general:
+        ruta_plano_general = plano_general["ruta"]
+
+        if ruta_plano_general.exists():
+            try:
+                plano_bytes = ruta_plano_general.read_bytes()
+                huella = hashlib.sha256(plano_bytes).hexdigest()
+
+                huellas_planos.add(huella)
+
+                planos_pdf_unicos.append({
+                    "nombre": plano_general["nombre"],
+                    "edificio": plano_general["edificio"],
+                    "punto": plano_general["punto"],
+                    "data": plano_bytes,
+                    "origen": "Plano general del centro",
+                })
+            except Exception as e:
+                print(
+                    f"[INFORME LEGIONELLA] No se pudo leer el plano general "
+                    f"de {centro_filtro}: {type(e).__name__}: {e}"
+                )
+
+    # Planos específicos almacenados en legionella_puntos.
+    if not df_puntos.empty and "plano_data" in df_puntos.columns:
         for _, row_plano in df_puntos.iterrows():
             plano_data = row_plano.get("plano_data")
 
@@ -246,6 +296,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 continue
 
             huellas_planos.add(huella)
+
             planos_pdf_unicos.append({
                 "nombre": str(
                     row_plano.get("plano_nombre")
@@ -254,6 +305,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 "edificio": str(row_plano.get("edificio") or "").strip(),
                 "punto": str(row_plano.get("nombre_punto") or "").strip(),
                 "data": plano_bytes,
+                "origen": "Plano específico asociado a punto",
             })
 
     df_plan = leer_df("""
@@ -1420,9 +1472,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     if planos_pdf_unicos:
         contenido.append(
             Paragraph(
-                "Los planos asociados a los puntos de control se muestran a continuación. "
-                "Cuando un mismo plano está vinculado a varios puntos, se incluye una sola vez. "
-                "El PDF original también se incorpora al final del libro como anexo documental.",
+                "Se muestra primero el plano general de puntos de control del centro. "
+                "A continuación se incorporan, si existen, planos específicos asociados "
+                "a puntos concretos. Los documentos duplicados se incluyen una sola vez. "
+                "Los PDF originales se incorporan también al final del libro como anexo documental.",
                 estilo_texto_portada
             )
         )
@@ -1449,6 +1502,13 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                     [
                         Paragraph("<b>Punto de referencia</b>", estilo_texto_portada),
                         Paragraph(limpiar_pdf(plano["punto"]), estilo_texto_portada),
+                    ],
+                    [
+                        Paragraph("<b>Origen</b>", estilo_texto_portada),
+                        Paragraph(
+                            limpiar_pdf(plano.get("origen", "")),
+                            estilo_texto_portada
+                        ),
                     ],
                 ]
 
