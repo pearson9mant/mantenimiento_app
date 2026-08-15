@@ -455,94 +455,167 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         )
         incidencias_cerradas = len(df_inc) - incidencias_abiertas
 
-    # Resumen por familias reales. Evitamos comparar todos los puntos ACS
-    # con una sola clase de tarea, porque producía lecturas engañosas (p. ej. 19 / 2).
-    puntos_acs = contar_puntos(instalacion="ACS")
+    # Resumen técnico por familias reales de la instalación.
+    # El objetivo es que los números sean comprensibles para mantenimiento,
+    # gerencia e inspección, evitando mezclar puntos físicos con tareas.
+
     puntos_afs = contar_puntos(instalacion="AFCH") + contar_puntos(instalacion="AFS")
-    depositos_solares = contar_puntos(instalacion="Solar")
     puntos_ducha = contar_puntos(tipo_punto="ducha")
     puntos_vtm = contar_puntos(tipo_control="válvula")
 
     acumuladores_acs = 0
-    retornos_principales_acs = 0
-    if not df_puntos.empty:
-        inst = df_puntos["instalacion"].astype(str).str.lower()
-        tipo = df_puntos["tipo_punto"].astype(str).str.lower()
-        nombre = df_puntos["nombre_punto"].astype(str).str.lower()
-        control = df_puntos["tipo_control_punto"].astype(str).str.lower()
-
-        es_acs = inst.str.contains("acs", na=False)
-        es_solar = inst.str.contains("solar", na=False) | tipo.str.contains("solar", na=False) | control.str.contains("solar", na=False)
-        es_acumulador = tipo.str.contains("acumulador", na=False) | nombre.str.contains("acumulador", na=False)
-        es_retorno = tipo.str.contains("retorno", na=False) | nombre.str.contains("retorno", na=False)
-        es_mezclado = nombre.str.contains("mezcl", na=False) | control.str.contains("mezcl", na=False)
-
-        acumuladores_acs = int((es_acs & es_acumulador & ~es_solar).sum())
-        # Solo retornos principales de ACS; los retornos posteriores a mezcla
-        # se muestran/controlan en su bloque específico y no se duplican aquí.
-        retornos_principales_acs = int((es_acs & es_retorno & ~es_mezclado).sum())
-
+    depositos_solares = 0
+    retornos_principales_acs_fisicos = 0
     terminales_ducha = 0
 
-    if not df_puntos.empty and "numero_terminales" in df_puntos.columns:
+    if not df_puntos.empty:
+        inst = df_puntos["instalacion"].astype(str).str.strip().str.lower()
+        tipo = df_puntos["tipo_punto"].astype(str).str.strip().str.lower()
+        nombre = df_puntos["nombre_punto"].astype(str).str.strip().str.lower()
+        control = df_puntos["tipo_control_punto"].astype(str).str.strip().str.lower()
+
+        es_solar = (
+            inst.str.contains("solar", na=False)
+            | tipo.str.contains("solar", na=False)
+            | control.str.contains("solar", na=False)
+        )
+
+        es_acs = inst.str.contains("acs", na=False)
+        es_acumulador = (
+            tipo.str.contains("acumulador", na=False)
+            | nombre.str.contains("acumulador", na=False)
+            | nombre.str.contains("depósito acs", na=False)
+            | nombre.str.contains("deposito acs", na=False)
+        )
+
+        acumuladores_acs = int(
+            (es_acs & es_acumulador & ~es_solar).sum()
+        )
+
+        depositos_solares = int(es_solar.sum())
+
+        es_retorno = (
+            tipo.str.contains("retorno", na=False)
+            | nombre.str.contains("retorno", na=False)
+        )
+
+        es_retorno_mezclado = (
+            nombre.str.contains("mezcl", na=False)
+            | control.str.contains("mezcl", na=False)
+        )
+
+        retornos_principales_acs_fisicos = int(
+            (es_acs & es_retorno & ~es_retorno_mezclado).sum()
+        )
+
         try:
             terminales_ducha = int(
                 df_puntos[
-                    df_puntos["tipo_punto"].astype(str).str.lower().str.contains("ducha", na=False)
-                ]["numero_terminales"].fillna(0).astype(int).sum()
+                    df_puntos["tipo_punto"]
+                    .astype(str)
+                    .str.lower()
+                    .str.contains("ducha", na=False)
+                ]["numero_terminales"]
+                .fillna(0)
+                .astype(int)
+                .sum()
             )
         except Exception:
             terminales_ducha = 0
 
     controles_sala_acs = contar_tareas("Control sala ACS")
+    controles_afs = contar_tareas("Control AFS")
+    controles_terminales_completos = contar_tareas("Control punto terminal completo")
+    controles_terminales_acs = contar_tareas("Control ACS terminal")
+    controles_vtm = contar_tareas("Control válvula termostática")
+    controles_circuito_mezclado = contar_tareas("Control circuito duchas mezclado")
 
-    # En nuestra estructura, el retorno principal puede estar integrado
-    # dentro del propio Control sala ACS y no existir como tarea independiente.
-    # Para el resumen técnico mostramos los retornos principales efectivamente
-    # cubiertos por esos controles, evitando que aparezca un 0 engañoso.
-    retornos_principales_controlados = max(
-        retornos_principales_acs,
+    # En la app, el retorno principal puede quedar integrado en Control sala ACS.
+    # Para evitar el "0" engañoso, el resumen informa de cuántos circuitos de sala
+    # ACS incluyen retorno principal.
+    retornos_principales_integrados = min(
         controles_sala_acs,
+        acumuladores_acs
     )
 
-    # Separar las revisiones trimestrales de acumuladores ACS de las
-    # revisiones de depósitos solares para que el resumen sea comprensible.
+    if retornos_principales_acs_fisicos > 0:
+        retornos_principales_mostrados = retornos_principales_acs_fisicos
+    else:
+        retornos_principales_mostrados = retornos_principales_integrados
+
     revisiones_trimestrales_acs = 0
     revisiones_trimestrales_solares = 0
+    purgas_acumulador = 0
 
     if not df_plan.empty:
-        tarea_plan_tmp = df_plan["tarea"].astype(str).str.strip().str.lower()
-        punto_plan_tmp = df_plan["punto"].astype(str).str.lower()
-        instalacion_plan_tmp = df_plan["instalacion"].astype(str).str.lower()
+        tarea_plan = df_plan["tarea"].astype(str).str.strip().str.lower()
+        punto_plan = df_plan["punto"].astype(str).str.strip().str.lower()
+        instalacion_plan = df_plan["instalacion"].astype(str).str.strip().str.lower()
 
         es_revision_trimestral = (
-            tarea_plan_tmp == "revisión trimestral acumulador acs"
+            tarea_plan == "revisión trimestral acumulador acs"
         )
+
         es_solar_plan = (
-            instalacion_plan_tmp.str.contains("solar", na=False)
-            | punto_plan_tmp.str.contains("solar", na=False)
+            instalacion_plan.str.contains("solar", na=False)
+            | punto_plan.str.contains("solar", na=False)
         )
 
         revisiones_trimestrales_solares = int(
             (es_revision_trimestral & es_solar_plan).sum()
         )
+
         revisiones_trimestrales_acs = int(
             (es_revision_trimestral & ~es_solar_plan).sum()
         )
 
-    purgas_acumulador = 0
-    if not df_plan.empty:
-        tarea_plan = df_plan["tarea"].astype(str).str.strip().str.lower()
-        punto_plan = df_plan["punto"].astype(str).str.lower()
-        # Cuenta la tarea especial Purga vinculada al acumulador, sin incluir
-        # las rutas semanales de purga de puntos terminales de poco uso.
         purgas_acumulador = int(
-            ((tarea_plan == "purga") & punto_plan.str.contains("acumulador", na=False)).sum()
+            (
+                (tarea_plan == "purga")
+                & (
+                    punto_plan.str.contains("acumulador", na=False)
+                    | punto_plan.str.contains("depósito acs", na=False)
+                    | punto_plan.str.contains("deposito acs", na=False)
+                )
+            ).sum()
         )
 
-    controles_afs = contar_tareas("Control AFS")
-    controles_terminales = contar_tareas("Control punto terminal completo")
-    controles_vtm = contar_tareas("Control válvula termostática")
+    # Cobertura documental real del periodo.
+    tareas_previstas_periodo = 0
+    tareas_con_registro_periodo = 0
+    cobertura_periodo = 0.0
+
+    if not df_plan.empty:
+        tareas_previstas_periodo = len(df_plan)
+
+        if not df.empty:
+            claves_plan = set(
+                (
+                    str(r["edificio"]).strip(),
+                    str(r["punto"]).strip(),
+                    str(r["tarea"]).strip(),
+                )
+                for _, r in df_plan.iterrows()
+            )
+
+            claves_reg = set(
+                (
+                    str(r["edificio"]).strip(),
+                    str(r["punto"]).strip(),
+                    str(r["tarea"]).strip(),
+                )
+                for _, r in df.iterrows()
+            )
+
+            tareas_con_registro_periodo = len(
+                claves_plan.intersection(claves_reg)
+            )
+
+        if tareas_previstas_periodo > 0:
+            cobertura_periodo = round(
+                (tareas_con_registro_periodo / tareas_previstas_periodo) * 100,
+                1
+            )
 
     # ---------------------------------------------------------
     # PORTADA PROFESIONAL
@@ -797,21 +870,55 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "SISTEMA ACS",
             [
-                ["Acumuladores ACS", str(acumuladores_acs)],
-                ["Retornos principales integrados en Control sala ACS", str(retornos_principales_controlados)],
-                ["Controles sala ACS planificados", str(controles_sala_acs)],
-                ["Revisiones trimestrales acumuladores ACS", str(revisiones_trimestrales_acs)],
-                ["Purgas semanales de acumulador", str(purgas_acumulador)],
+                ["Acumuladores ACS finales", str(acumuladores_acs)],
+                [
+                    "Retornos principales ACS controlados",
+                    str(retornos_principales_mostrados)
+                ],
+                [
+                    "Controles sala ACS planificados",
+                    f"{controles_sala_acs} · frecuencia diaria"
+                    if controles_sala_acs
+                    else "0"
+                ],
+                [
+                    "Revisiones de acumuladores",
+                    f"{revisiones_trimestrales_acs} · frecuencia trimestral"
+                    if revisiones_trimestrales_acs
+                    else "0"
+                ],
+                [
+                    "Purgas de fondo de acumulador",
+                    f"{purgas_acumulador} · frecuencia semanal"
+                    if purgas_acumulador
+                    else "0"
+                ],
             ]
         )
     )
 
     contenido.append(
+        Paragraph(
+            "Nota técnica ACS: el retorno principal se registra dentro del "
+            "Control sala ACS cuando la instalación dispone de él. Los circuitos "
+            "posteriores a válvulas mezcladoras no se contabilizan como retornos "
+            "principales ACS.",
+            estilo_texto_portada
+        )
+    )
+    contenido.append(Spacer(1, 8))
+
+    contenido.append(
         crear_bloque_estado(
             "AGUA FRÍA (AFCH / AFS)",
             [
-                ["Puntos de control", str(puntos_afs)],
-                ["Controles planificados", str(controles_afs)],
+                ["Puntos de control AFS/AFCH", str(puntos_afs)],
+                [
+                    "Controles AFS planificados",
+                    f"{controles_afs} · temperatura + desinfectante"
+                    if controles_afs
+                    else "0"
+                ],
             ]
         )
     )
@@ -820,8 +927,11 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "INSTALACIÓN SOLAR",
             [
-                ["Depósitos solares", str(depositos_solares)],
-                ["Revisiones trimestrales depósitos solares", str(revisiones_trimestrales_solares)],
+                ["Depósitos / acumuladores solares", str(depositos_solares)],
+                [
+                    "Revisiones trimestrales planificadas",
+                    str(revisiones_trimestrales_solares)
+                ],
             ]
         )
     )
@@ -830,19 +940,35 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "PUNTOS TERMINALES",
             [
-                ["Duchas", str(puntos_ducha)],
-                ["Terminales", str(terminales_ducha)],
-                ["Controles completos", str(controles_terminales)],
+                ["Puntos tipo ducha", str(puntos_ducha)],
+                ["Duchas / terminales asociados", str(terminales_ducha)],
+                [
+                    "Controles ACS terminal planificados",
+                    str(controles_terminales_acs)
+                ],
+                [
+                    "Controles completos AFS + ACS",
+                    str(controles_terminales_completos)
+                ],
             ]
         )
     )
 
     contenido.append(
         crear_bloque_estado(
-            "VÁLVULAS TERMOSTÁTICAS",
+            "VÁLVULAS TERMOSTÁTICAS / MEZCLA",
             [
-                ["Instaladas", str(puntos_vtm)],
-                ["Controles planificados", str(controles_vtm)],
+                ["Válvulas termostáticas registradas", str(puntos_vtm)],
+                [
+                    "Controles de válvula planificados",
+                    f"{controles_vtm} · frecuencia mensual"
+                    if controles_vtm
+                    else "0"
+                ],
+                [
+                    "Controles de circuito mezclado",
+                    str(controles_circuito_mezclado)
+                ],
             ]
         )
     )
@@ -851,29 +977,89 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "RESULTADO DEL PERIODO",
             [
-                ["Controles realizados", str(total)],
+                ["Registros realizados", str(total)],
+                ["Registros correctos", str(ok)],
+                ["Registros con riesgo / incidencia", str(no_ok)],
                 ["Incidencias abiertas", str(incidencias_abiertas)],
                 ["Incidencias cerradas", str(incidencias_cerradas)],
-                ["Cumplimiento", f"{cumplimiento}%"],
+                ["Resultado de registros ejecutados", f"{cumplimiento}%"],
+                [
+                    "Cobertura de tareas activas en el periodo",
+                    f"{tareas_con_registro_periodo}/{tareas_previstas_periodo} · {cobertura_periodo}%"
+                    if tareas_previstas_periodo
+                    else "Sin planificación activa"
+                ],
             ]
         )
     )
 
     contenido.append(Spacer(1, 8))
 
-    if incidencias_abiertas == 0:
-        estado_operativo = "FAVORABLE"
-        texto_estado = (
-            "La instalación dispone de puntos físicos identificados y planificación preventiva activa. "
-            "No constan incidencias abiertas en el periodo seleccionado. "
-            "El estado operativo general se considera FAVORABLE según los registros disponibles."
+    contenido.append(
+        Paragraph(
+            "1.1.1 Lectura técnica de la instalación",
+            styles["Heading3"]
         )
-    else:
+    )
+    contenido.append(Spacer(1, 4))
+
+    arquitectura_txt = (
+        f"El centro dispone de {acumuladores_acs} acumulador(es) ACS final(es), "
+        f"{retornos_principales_mostrados} retorno(s) principal(es) controlado(s), "
+        f"{terminales_ducha} terminal(es) de ducha asociados y "
+        f"{puntos_vtm} válvula(s) termostática(s) registradas. "
+        "El retorno principal se integra en el control de sala ACS cuando existe. "
+        "Las válvulas termostáticas y los circuitos posteriores a mezcla se controlan "
+        "como elementos técnicos específicos y no se contabilizan como retornos "
+        "principales ACS."
+    )
+
+    contenido.append(
+        Table(
+            [[Paragraph(arquitectura_txt, estilo_texto_portada)]],
+            colWidths=[470],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F3F6F8")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#B8C4CE")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ])
+        )
+    )
+    contenido.append(Spacer(1, 12))
+
+    if total == 0:
+        estado_operativo = "SIN DATOS SUFICIENTES"
+        texto_estado = (
+            "Existe planificación preventiva, pero no constan registros ejecutados "
+            "en el periodo seleccionado. No procede calificar el estado operativo "
+            "como favorable hasta disponer de evidencias de ejecución."
+        )
+    elif incidencias_abiertas > 0 or no_ok > 0:
         estado_operativo = "EN SEGUIMIENTO"
         texto_estado = (
-            f"La instalación dispone de puntos físicos identificados y planificación preventiva activa. "
-            f"Constan {incidencias_abiertas} incidencia(s) abierta(s) en el periodo seleccionado. "
-            "El estado operativo general queda EN SEGUIMIENTO hasta el cierre de las acciones correctoras."
+            f"Se han registrado {total} controles en el periodo. "
+            f"Constan {no_ok} resultado(s) con riesgo/incidencia y "
+            f"{incidencias_abiertas} incidencia(s) abierta(s). "
+            "Debe mantenerse el seguimiento hasta verificar el cierre efectivo "
+            "de las acciones correctoras."
+        )
+    elif tareas_previstas_periodo and cobertura_periodo < 100:
+        estado_operativo = "CONTROL PARCIAL"
+        texto_estado = (
+            f"Los {total} registros ejecutados son correctos, pero la cobertura "
+            f"documental de tareas activas en el periodo es del {cobertura_periodo}%. "
+            "El estado se considera controlado parcialmente hasta completar la "
+            "evidencia de ejecución prevista."
+        )
+    else:
+        estado_operativo = "FAVORABLE"
+        texto_estado = (
+            f"Durante el periodo se han registrado {total} controles y todos "
+            "los resultados disponibles son correctos. No constan incidencias "
+            "abiertas y la cobertura documental de las tareas activas es completa."
         )
 
     contenido.append(
@@ -888,6 +1074,10 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         color_estado_fondo = colors.HexColor("#E8F5E9")
         color_estado_borde = colors.HexColor("#2E7D32")
         color_estado_texto = colors.HexColor("#1B5E20")
+    elif estado_operativo == "EN SEGUIMIENTO":
+        color_estado_fondo = colors.HexColor("#FDECEC")
+        color_estado_borde = colors.HexColor("#B91C1C")
+        color_estado_texto = colors.HexColor("#991B1B")
     else:
         color_estado_fondo = colors.HexColor("#FFF4E5")
         color_estado_borde = colors.HexColor("#D97706")
@@ -968,7 +1158,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         [
             "Temperatura ACS terminal",
             "Mensual · muestra rotatoria",
-            "≥50 ºC; alcanzar estabilización antes de 1 minuto",
+            "≥50 ºC en los puntos representativos de ACS",
             referencia_normativa("Temperatura ACS terminal"),
         ],
         [
@@ -1003,14 +1193,14 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         ],
         [
             "Control AFS / AFCH",
-            "Temperatura depósito: semanal; desinfectante: diario en muestra representativa",
-            "AFS lo más baja posible; si >25 ºC, evaluación del riesgo. "
-            "Cloro libre según RD 3/2023.",
+            "Según programa PPCL; controles representativos de temperatura y desinfectante",
+            "Temperatura preferentemente ≤25 ºC. Cloro libre residual: "
+            "valor paramétrico 1,0 mg/L; recomendación general ≥0,2 mg/L.",
             referencia_normativa("Control AFS"),
         ],
         [
             "Cloro residual libre",
-            "Diario en muestra representativa de puntos terminales",
+            "Según programa de control del agua y PPCL",
             "Máx. paramétrico 1,0 mg/L; recomendación general ≥0,2 mg/L",
             referencia_normativa("Cloro residual"),
         ],
@@ -1114,8 +1304,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 "Marco normativo de referencia: Real Decreto 487/2022, de 21 de junio, "
                 "en su redacción vigente tras el Real Decreto 614/2024, de 2 de julio. "
                 "Para parámetros de calidad del agua de consumo se incorpora, cuando procede, "
-                "el Real Decreto 3/2023, de 10 de enero. En Cataluña se mantiene además como "
-                "normativa relacionada el Decret 352/2004, de 27 de julio. Las frecuencias y "
+                "el Real Decreto 3/2023, de 10 de enero. En Cataluña, ASPCAT identifica además "
+                "el Decret 352/2004, de 27 de julio, como normativa relacionada. Las frecuencias y "
                 "criterios técnicos de cada control se trazan a la normativa estatal vigente. "
                 "Los controles identificados como «Control técnico PPCL» son medidas internas "
                 "del plan y no una denominación literal del Real Decreto.",
@@ -1300,8 +1490,9 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     if total == 0:
         diagnostico_periodo = (
             "No constan controles registrados durante el periodo seleccionado. "
-            "Por tanto, no es posible emitir una valoración basada en resultados operacionales. "
-            "Se recomienda comprobar la planificación activa y confirmar la ejecución de los controles pendientes."
+            "La ausencia de incidencias no puede interpretarse como conformidad: "
+            "sin registros no existe evidencia suficiente de ejecución. "
+            "Debe verificarse la planificación activa y completar los controles previstos."
         )
         color_diagnostico_fondo = colors.HexColor("#FFF4E5")
         color_diagnostico_borde = colors.HexColor("#D97706")
@@ -1703,21 +1894,29 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     if total == 0:
         conclusion_tecnica = (
-            "No existen registros suficientes en el periodo para emitir una conclusión operacional completa. "
-            "La planificación preventiva permanece como referencia de trabajo y debe verificarse la ejecución "
-            "de los controles correspondientes."
+            "No existen registros suficientes en el periodo para emitir una conclusión "
+            "operacional. La planificación preventiva permanece activa, pero debe "
+            "documentarse la ejecución de los controles previstos."
         )
-    elif incidencias_abiertas == 0 and no_ok == 0:
+    elif incidencias_abiertas > 0 or no_ok > 0:
         conclusion_tecnica = (
-            "Los registros disponibles reflejan una situación operativa favorable. Los controles ejecutados "
-            "se encuentran dentro de los criterios establecidos y no constan incidencias abiertas al cierre "
-            "del periodo revisado."
+            "Los registros disponibles muestran controles que requieren seguimiento y/o "
+            "incidencias pendientes. La valoración definitiva queda condicionada al cierre "
+            "documentado de las acciones correctoras y a la verificación posterior de los "
+            "parámetros afectados."
+        )
+    elif tareas_previstas_periodo and cobertura_periodo < 100:
+        conclusion_tecnica = (
+            f"Los controles registrados son correctos, pero la cobertura documental de "
+            f"las tareas activas en el periodo es del {cobertura_periodo}%. "
+            "La instalación se considera controlada parcialmente hasta completar la "
+            "evidencia prevista."
         )
     else:
         conclusion_tecnica = (
-            "Los registros disponibles muestran controles que requieren seguimiento y/o incidencias pendientes. "
-            "La valoración definitiva queda condicionada al cierre documentado de las acciones correctoras y "
-            "a la verificación posterior de los parámetros afectados."
+            "Los registros disponibles reflejan una situación operativa favorable: "
+            "los controles ejecutados cumplen los criterios establecidos, no constan "
+            "incidencias abiertas y la cobertura documental del periodo es completa."
         )
 
     tabla_conclusion = Table(
@@ -1747,8 +1946,9 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         "es el RD 487/2022 en su redacción vigente tras el RD 614/2024; para parámetros de calidad del agua "
         "de consumo se incorpora el RD 3/2023 cuando procede y, en Cataluña, se identifica también el "
         "Decret 352/2004 como normativa relacionada. El retorno ACS se considera únicamente cuando "
-        "existe como circuito principal de retorno; los retornos posteriores a mezcla se documentan como "
-        "controles técnicos independientes. La documentación original adjunta permanece archivada en el sistema.",
+        "existe como circuito principal de retorno. Los circuitos posteriores a válvulas mezcladoras "
+        "se documentan dentro del control técnico correspondiente y no se contabilizan como retornos "
+        "principales ACS. La documentación original adjunta permanece archivada en el sistema.",
         estilo_estado_texto
     ))
 
