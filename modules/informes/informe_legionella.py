@@ -40,10 +40,25 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     fecha_fin_txt = fecha_fin.strftime("%Y-%m-%d")
 
     def limpiar_pdf(texto, max_len=None):
-        texto = "" if pd.isna(texto) else str(texto)
-        texto = texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if texto is None:
+            texto = ""
+        else:
+            try:
+                if pd.isna(texto):
+                    texto = ""
+                else:
+                    texto = str(texto)
+            except Exception:
+                texto = str(texto)
+
+        if str(texto).strip().lower() in ["nan", "none", "nat", "<na>"]:
+            texto = ""
+
+        texto = str(texto).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
         if max_len:
             texto = texto[:max_len]
+
         return texto
 
     def texto_valores(row):
@@ -1430,14 +1445,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(tabla_programa)
     contenido.append(Spacer(1, 18))
 
-    contenido.append(
-        Paragraph(
-            "3. Inventario de puntos físicos de control",
-            styles["Heading2"]
-        )
-    )
-    contenido.append(Spacer(1, 6))
-
     estilo_inventario_cabecera = styles["Normal"].clone("InventarioCabecera")
     estilo_inventario_cabecera.fontName = "Helvetica-Bold"
     estilo_inventario_cabecera.fontSize = 6.5
@@ -1463,7 +1470,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     contenido.append(PageBreak())
     contenido.append(
         Paragraph(
-            "2. PLANOS Y LOCALIZACIÓN DE LA INSTALACIÓN",
+            "3. PLANOS Y LOCALIZACIÓN DE LA INSTALACIÓN",
             styles["Heading1"]
         )
     )
@@ -1619,6 +1626,15 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     contenido.append(Spacer(1, 14))
 
+    contenido.append(PageBreak())
+    contenido.append(
+        Paragraph(
+            "4. Inventario de puntos físicos de control",
+            styles["Heading2"]
+        )
+    )
+    contenido.append(Spacer(1, 6))
+
     if df_puntos.empty:
         contenido.append(
             Table(
@@ -1758,7 +1774,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 4. ANÁLISIS TÉCNICO DEL PERIODO
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("4. Análisis técnico del periodo", styles["Heading2"]))
+    contenido.append(Paragraph("5. Análisis técnico del periodo", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if total == 0:
@@ -1883,17 +1899,48 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 5. PLANIFICACIÓN ACTIVA
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("5. Planificación preventiva activa", styles["Heading2"]))
+    contenido.append(Paragraph("6. Planificación preventiva activa", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if df_plan.empty:
         contenido.append(bloque_sin_datos("No consta planificación activa registrada."))
     else:
+        def consigna_informe(row):
+            tarea_txt = str(row.get("tarea", "") or "").strip()
+
+            if tarea_txt == "Control sala ACS":
+                return "Acum. ≥60 / Ret. ≥50"
+
+            if tarea_txt in [
+                "Control ACS terminal",
+                "Control punto terminal completo",
+                "Temperatura ACS terminal",
+                "Temperatura punto terminal",
+            ]:
+                return "ACS ≥50"
+
+            if tarea_txt == "Control AFS":
+                return ""
+
+            try:
+                controla = int(row.get("controla_consigna") or 0) == 1
+            except Exception:
+                controla = False
+
+            if controla:
+                try:
+                    valor_consigna = float(row.get("consigna_minima") or 0)
+                except Exception:
+                    valor_consigna = 0
+
+                if valor_consigna > 0:
+                    return f"≥ {valor_consigna:g}"
+
+            return ""
+
         filas_plan = []
         for _, row in df_plan.head(120).iterrows():
-            consigna = ""
-            if int(row.get("controla_consigna") or 0) == 1:
-                consigna = f"≥ {row.get('consigna_minima', '')}"
+            consigna = consigna_informe(row)
 
             filas_plan.append([
                 limpiar_pdf(row.get("edificio", ""), 28),
@@ -1915,7 +1962,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                 "PRÓXIMA", "OPERARIO", "CONSIGNA", "REF. NORMATIVA"
             ],
             filas_plan,
-            [50, 68, 78, 48, 48, 58, 35, 115],
+            [48, 64, 74, 45, 46, 55, 58, 110],
             centrar_columnas={3, 4, 6}
         ))
 
@@ -1925,7 +1972,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 6. CONTROLES REALIZADOS
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("6. Registro de controles realizados", styles["Heading2"]))
+    contenido.append(Paragraph("7. Registro de controles realizados", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if df.empty:
@@ -1986,7 +2033,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 6.1 CONTROLES CRÍTICOS
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("6.1 Controles críticos del periodo", styles["Heading2"]))
+    contenido.append(Paragraph("7.1 Controles críticos del periodo", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if df.empty:
@@ -2061,7 +2108,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 7. INCIDENCIAS Y ACCIONES CORRECTORAS
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("7. Incidencias y acciones correctoras", styles["Heading2"]))
+    contenido.append(Paragraph("8. Incidencias y acciones correctoras", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if df_inc.empty:
@@ -2123,7 +2170,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 8. INFORMES EXTERNOS
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("8. Informes externos, analíticas y certificados", styles["Heading2"]))
+    contenido.append(Paragraph("9. Informes externos, analíticas y certificados", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if df_inf.empty:
@@ -2163,7 +2210,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     # 9. CONCLUSIÓN Y TRAZABILIDAD
     # ---------------------------------------------------------
 
-    contenido.append(Paragraph("9. Conclusión técnica y trazabilidad", styles["Heading2"]))
+    contenido.append(Paragraph("10. Conclusión técnica y trazabilidad", styles["Heading2"]))
     contenido.append(Spacer(1, 6))
 
     if total == 0:
