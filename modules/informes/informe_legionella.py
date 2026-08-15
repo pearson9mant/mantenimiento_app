@@ -455,11 +455,33 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         )
         incidencias_cerradas = len(df_inc) - incidencias_abiertas
 
+    # Resumen por familias reales. Evitamos comparar todos los puntos ACS
+    # con una sola clase de tarea, porque producía lecturas engañosas (p. ej. 19 / 2).
     puntos_acs = contar_puntos(instalacion="ACS")
     puntos_afs = contar_puntos(instalacion="AFCH") + contar_puntos(instalacion="AFS")
     depositos_solares = contar_puntos(instalacion="Solar")
     puntos_ducha = contar_puntos(tipo_punto="ducha")
     puntos_vtm = contar_puntos(tipo_control="válvula")
+
+    acumuladores_acs = 0
+    retornos_principales_acs = 0
+    if not df_puntos.empty:
+        inst = df_puntos["instalacion"].astype(str).str.lower()
+        tipo = df_puntos["tipo_punto"].astype(str).str.lower()
+        nombre = df_puntos["nombre_punto"].astype(str).str.lower()
+        control = df_puntos["tipo_control_punto"].astype(str).str.lower()
+
+        es_acs = inst.str.contains("acs", na=False)
+        es_solar = inst.str.contains("solar", na=False) | tipo.str.contains("solar", na=False) | control.str.contains("solar", na=False)
+        es_acumulador = tipo.str.contains("acumulador", na=False) | nombre.str.contains("acumulador", na=False)
+        es_retorno = tipo.str.contains("retorno", na=False) | nombre.str.contains("retorno", na=False)
+        es_mezclado = nombre.str.contains("mezcl", na=False) | control.str.contains("mezcl", na=False)
+
+        acumuladores_acs = int((es_acs & es_acumulador & ~es_solar).sum())
+        # Solo retornos principales de ACS; los retornos posteriores a mezcla
+        # se muestran/controlan en su bloque específico y no se duplican aquí.
+        retornos_principales_acs = int((es_acs & es_retorno & ~es_mezclado).sum())
+
     terminales_ducha = 0
 
     if not df_puntos.empty and "numero_terminales" in df_puntos.columns:
@@ -473,6 +495,18 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             terminales_ducha = 0
 
     controles_sala_acs = contar_tareas("Control sala ACS")
+    revisiones_trimestrales_acs = contar_tareas("Revisión trimestral acumulador ACS")
+
+    purgas_acumulador = 0
+    if not df_plan.empty:
+        tarea_plan = df_plan["tarea"].astype(str).str.strip().str.lower()
+        punto_plan = df_plan["punto"].astype(str).str.lower()
+        # Cuenta la tarea especial Purga vinculada al acumulador, sin incluir
+        # las rutas semanales de purga de puntos terminales de poco uso.
+        purgas_acumulador = int(
+            ((tarea_plan == "purga") & punto_plan.str.contains("acumulador", na=False)).sum()
+        )
+
     controles_afs = contar_tareas("Control AFS")
     controles_terminales = contar_tareas("Control punto terminal completo")
     controles_vtm = contar_tareas("Control válvula termostática")
@@ -730,8 +764,11 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         crear_bloque_estado(
             "SISTEMA ACS",
             [
-                ["Puntos de control", str(puntos_acs)],
-                ["Controles planificados", str(controles_sala_acs)],
+                ["Acumuladores ACS", str(acumuladores_acs)],
+                ["Retornos principales ACS", str(retornos_principales_acs)],
+                ["Controles sala ACS planificados", str(controles_sala_acs)],
+                ["Revisiones trimestrales acumuladores", str(revisiones_trimestrales_acs)],
+                ["Purgas de acumulador planificadas", str(purgas_acumulador)],
             ]
         )
     )
