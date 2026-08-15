@@ -211,7 +211,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     df_puntos = leer_df("""
         SELECT centro, edificio, instalacion, tipo_punto, tipo_control_punto,
-               nombre_punto, ubicacion, ubicacion_exacta, numero_terminales, activo
+               nombre_punto, ubicacion, ubicacion_exacta, numero_terminales, activo,
+               plano_nombre, plano_data
         FROM legionella_puntos
         WHERE centro = ?
           AND centro IS NOT NULL
@@ -219,6 +220,40 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
           AND nombre_punto IS NOT NULL
         ORDER BY centro, edificio, instalacion, nombre_punto
     """, (centro_filtro,))
+
+    # Planos PDF asociados a puntos: se deduplican por contenido.
+    planos_pdf_unicos = []
+    huellas_planos = set()
+
+    if not df_puntos.empty and "plano_data" in df_puntos.columns:
+        import hashlib
+
+        for _, row_plano in df_puntos.iterrows():
+            plano_data = row_plano.get("plano_data")
+
+            if plano_data is None or plano_data == b"":
+                continue
+
+            try:
+                plano_bytes = bytes(plano_data)
+            except Exception:
+                continue
+
+            huella = hashlib.sha256(plano_bytes).hexdigest()
+
+            if huella in huellas_planos:
+                continue
+
+            huellas_planos.add(huella)
+            planos_pdf_unicos.append({
+                "nombre": str(
+                    row_plano.get("plano_nombre")
+                    or f"Plano {row_plano.get('edificio', '')}"
+                ).strip(),
+                "edificio": str(row_plano.get("edificio") or "").strip(),
+                "punto": str(row_plano.get("nombre_punto") or "").strip(),
+                "data": plano_bytes,
+            })
 
     df_plan = leer_df("""
         SELECT centro, edificio, instalacion, punto, tarea, frecuencia, frecuencia_dias,
@@ -993,10 +1028,6 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
                     if controles_vtm
                     else "0"
                 ],
-                [
-                    "Controles de circuito mezclado",
-                    str(controles_circuito_mezclado)
-                ],
             ]
         )
     )
@@ -1372,6 +1403,75 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     estilo_inventario_edificio.fontSize = 7.5
     estilo_inventario_edificio.leading = 9
     estilo_inventario_edificio.textColor = colors.HexColor("#17324D")
+
+    # ---------------------------------------------------------
+    # PLANOS Y LOCALIZACIÓN
+    # ---------------------------------------------------------
+    contenido.append(PageBreak())
+    contenido.append(
+        Paragraph(
+            "2. PLANOS Y LOCALIZACIÓN DE LA INSTALACIÓN",
+            styles["Heading1"]
+        )
+    )
+    contenido.append(Spacer(1, 8))
+
+    if planos_pdf_unicos:
+        contenido.append(
+            Paragraph(
+                "Los planos PDF asociados a los puntos de control se incorporan "
+                "como anexo documental del libro. Si el mismo plano está vinculado "
+                "a varios puntos, se incluye una sola vez.",
+                estilo_texto_portada
+            )
+        )
+        contenido.append(Spacer(1, 8))
+
+        datos_planos = [["PLANO", "EDIFICIO / ZONA", "PUNTO DE REFERENCIA"]]
+
+        for plano in planos_pdf_unicos:
+            datos_planos.append([
+                limpiar_pdf(plano["nombre"], 55),
+                limpiar_pdf(plano["edificio"], 40),
+                limpiar_pdf(plano["punto"], 45),
+            ])
+
+        tabla_planos = Table(
+            datos_planos,
+            colWidths=[180, 150, 170],
+            repeatRows=1
+        )
+        tabla_planos.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173A5E")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#B8C4CE")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE4")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        contenido.append(tabla_planos)
+        contenido.append(Spacer(1, 8))
+        contenido.append(
+            Paragraph(
+                "Los documentos originales se reproducen íntegramente al final "
+                "del libro en el ANEXO DE PLANOS.",
+                estilo_texto_portada
+            )
+        )
+    else:
+        contenido.append(
+            Paragraph(
+                "No constan planos PDF asociados a los puntos de control de este centro.",
+                estilo_texto_portada
+            )
+        )
+
+    contenido.append(Spacer(1, 14))
 
     if df_puntos.empty:
         contenido.append(
@@ -2005,9 +2105,45 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     doc.build(contenido)
 
+    pdf_final = buffer.getvalue()
+
+    # Incorporar físicamente los planos PDF al final del libro.
+    # Se usa import opcional para no romper la generación si la librería
+    # no estuviera disponible en algún entorno.
+    if planos_pdf_unicos:
+        try:
+            from pypdf import PdfReader, PdfWriter
+
+            writer = PdfWriter()
+
+            informe_reader = PdfReader(BytesIO(pdf_final))
+            for pagina in informe_reader.pages:
+                writer.add_page(pagina)
+
+            planos_añadidos = 0
+
+            for plano in planos_pdf_unicos:
+                try:
+                    plano_reader = PdfReader(BytesIO(plano["data"]))
+
+                    for pagina in plano_reader.pages:
+                        writer.add_page(pagina)
+
+                    planos_añadidos += 1
+                except Exception:
+                    continue
+
+            if planos_añadidos > 0:
+                buffer_final = BytesIO()
+                writer.write(buffer_final)
+                pdf_final = buffer_final.getvalue()
+
+        except Exception:
+            pass
+
     st.download_button(
         f"📘 Descargar libro inspección {centro_filtro}",
-        data=buffer.getvalue(),
+        data=pdf_final,
         file_name=f"libro_inspeccion_legionella_{centro_filtro.replace(' ', '_')}_{fecha_inicio_txt}_a_{fecha_fin_txt}.pdf",
         mime="application/pdf",
         use_container_width=True
