@@ -596,6 +596,20 @@ def evaluar_resultado(
             return "OK", "Correcto"
         return "RIESGO", "Cloro fuera de rango 0,2 - 1,0 mg/L"
 
+    if tipo_control == "Revisión trimestral acumulador ACS":
+        try:
+            revision_ok = int(float(valor)) == 1
+        except Exception:
+            revision_ok = False
+
+        if revision_ok:
+            return "OK", "Revisión trimestral del acumulador ACS correcta"
+
+        return (
+            "INCIDENCIA",
+            "Revisión trimestral del acumulador ACS con deficiencias"
+        )
+
     if tipo_control == "Revisión visual":
         if valor == 1:
             return "OK", "Correcto"
@@ -808,6 +822,9 @@ def dias_frecuencia(tarea):
     ]:
         return 7
 
+    if tarea == "Revisión trimestral acumulador ACS":
+        return 90
+
     if tarea == "Control válvula termostática":
         return 30
 
@@ -910,6 +927,9 @@ def unidad_por_tarea(tarea):
         
     if tarea == "Control punto terminal completo":
         return "ºC / mg/L" 
+
+    if tarea == "Revisión trimestral acumulador ACS":
+        return "OK/KO"
 
     if tarea == "Revisión visual":
         return "OK/KO"
@@ -2983,6 +3003,13 @@ def pantalla_legionella():
                 accesible_ok = False
                 temperatura_acs = None
 
+                acumulador_estado_general_ok = False
+                acumulador_sin_fugas = False
+                acumulador_sin_corrosion = False
+                acumulador_sin_incrustaciones = False
+                acumulador_aislamiento_ok = False
+                acumulador_conexiones_ok = False
+
                 if tarea == "Temperatura acumulador":
                     tipo_control = "Temperatura acumulador"
                     unidad = "ºC"
@@ -3275,6 +3302,58 @@ def pantalla_legionella():
                     unidad = "mg/L"
                     valor = st.number_input("Cloro residual libre mg/L", min_value=0.0, max_value=5.0, value=0.5, step=0.01)
 
+                elif tarea == "Revisión trimestral acumulador ACS":
+                    tipo_control = "Revisión trimestral acumulador ACS"
+                    unidad = "OK/KO"
+
+                    st.markdown("#### 🔧 Revisión trimestral acumulador ACS")
+                    st.caption(
+                        "Revisión del estado físico y de conservación del acumulador. "
+                        "La purga semanal se controla en una tarea independiente."
+                    )
+
+                    acumulador_estado_general_ok = st.checkbox(
+                        "Estado exterior general correcto",
+                        key=f"rev_trim_estado_{centro}_{edificio}_{punto_nombre}"
+                    )
+                    acumulador_sin_fugas = st.checkbox(
+                        "Sin fugas visibles",
+                        key=f"rev_trim_fugas_{centro}_{edificio}_{punto_nombre}"
+                    )
+                    acumulador_sin_corrosion = st.checkbox(
+                        "Sin corrosión visible",
+                        key=f"rev_trim_corrosion_{centro}_{edificio}_{punto_nombre}"
+                    )
+                    acumulador_sin_incrustaciones = st.checkbox(
+                        "Sin incrustaciones o deterioro visible",
+                        key=f"rev_trim_incrustaciones_{centro}_{edificio}_{punto_nombre}"
+                    )
+                    acumulador_aislamiento_ok = st.checkbox(
+                        "Aislamiento exterior en buen estado",
+                        key=f"rev_trim_aislamiento_{centro}_{edificio}_{punto_nombre}"
+                    )
+                    acumulador_conexiones_ok = st.checkbox(
+                        "Conexiones, válvulas y elementos accesibles en buen estado",
+                        key=f"rev_trim_conexiones_{centro}_{edificio}_{punto_nombre}"
+                    )
+
+                    valor = 1 if all([
+                        acumulador_estado_general_ok,
+                        acumulador_sin_fugas,
+                        acumulador_sin_corrosion,
+                        acumulador_sin_incrustaciones,
+                        acumulador_aislamiento_ok,
+                        acumulador_conexiones_ok,
+                    ]) else 0
+
+                    if valor == 1:
+                        st.success("✅ Revisión visual del acumulador correcta")
+                    else:
+                        st.warning(
+                            "⚠️ La revisión quedará con incidencia mientras exista "
+                            "algún punto sin confirmar."
+                        )
+
                 elif tarea == "Revisión visual":
                     tipo_control = "Revisión visual"
                     unidad = "OK/KO"
@@ -3465,6 +3544,41 @@ def pantalla_legionella():
                                 observaciones_finales
                                 + "\nChecklist: "
                                 + " | ".join(checklist)
+                            ).strip()
+
+                        if tarea == "Revisión trimestral acumulador ACS":
+                            checklist_acumulador = [
+                                "Estado exterior general: Correcto"
+                                if acumulador_estado_general_ok
+                                else "Estado exterior general: Deficiencia",
+
+                                "Fugas visibles: No"
+                                if acumulador_sin_fugas
+                                else "Fugas visibles: Sí / revisar",
+
+                                "Corrosión visible: No"
+                                if acumulador_sin_corrosion
+                                else "Corrosión visible: Sí / revisar",
+
+                                "Incrustaciones/deterioro visible: No"
+                                if acumulador_sin_incrustaciones
+                                else "Incrustaciones/deterioro visible: Sí / revisar",
+
+                                "Aislamiento exterior: Correcto"
+                                if acumulador_aislamiento_ok
+                                else "Aislamiento exterior: Revisar",
+
+                                "Conexiones/válvulas accesibles: Correctas"
+                                if acumulador_conexiones_ok
+                                else "Conexiones/válvulas accesibles: Revisar",
+
+                                "Purga semanal: controlada en tarea independiente",
+                            ]
+
+                            observaciones_finales = (
+                                observaciones_finales
+                                + "\nRevisión trimestral acumulador ACS: "
+                                + " | ".join(checklist_acumulador)
                             ).strip()
 
                         if tarea == "Control válvula termostática":
@@ -3951,6 +4065,7 @@ def pantalla_legionella():
                         "Control circuito duchas mezclado",
                         "Choque térmico",
                         "Purga",
+                        "Revisión trimestral acumulador ACS",
                         "Revisión visual",
                         "Limpieza y desinfección acumulador",
                         "Limpieza y desinfección depósito AFCH",
@@ -3984,7 +4099,15 @@ def pantalla_legionella():
                     "Frecuencia en días",
                     min_value=1,
                     max_value=730,
-                    value=1 if es_puesta_servicio_manual else 30,
+                    value=(
+                        1
+                        if es_puesta_servicio_manual
+                        else (
+                            90
+                            if tarea_manual == "Revisión trimestral acumulador ACS"
+                            else 30
+                        )
+                    ),
                     step=1,
                     key="tarea_manual_frecuencia",
                     disabled=es_puesta_servicio_manual,
@@ -4918,9 +5041,36 @@ def pantalla_legionella():
                                 "Sin retorno principal en esta instalación."
                             )
 
+                    elif row["tarea"] == "Revisión trimestral acumulador ACS":
+
+
+
+                        if float(row["valor"] or 0) == 1:
+
+
+                            st.success("✅ Revisión trimestral acumulador ACS correcta")
+
+
+                        else:
+
+
+                            st.warning(
+
+
+                                "⚠️ Revisión trimestral acumulador ACS con deficiencias"
+
+
+                            )
+
+
+
                     elif row["tarea"] == "Control válvula termostática":
-                    
+
+
+
                         st.write(f"🔥 **Entrada ACS válvula:** {row['valor']} ºC")
+
+
                         st.write(f"🚿 **Salida mezclada:** {row['valor_2']} ºC")
 
                     elif row["tarea"] == "Control circuito duchas mezclado":
