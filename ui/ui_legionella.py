@@ -2987,6 +2987,45 @@ def pantalla_legionella():
 
                 tareas = tareas_por_tipo_punto(tipo_punto, tipo_control_punto)
 
+                # Añadir también las tareas especiales activas que estén
+                # realmente planificadas para este punto.
+                try:
+                    df_tareas_planificadas_punto = leer_df(
+                        """
+                        SELECT DISTINCT tarea
+                        FROM legionella_tareas
+                        WHERE centro = ?
+                          AND edificio = ?
+                          AND punto = ?
+                          AND activo = 1
+                          AND tarea IS NOT NULL
+                          AND TRIM(COALESCE(tarea, '')) <> ''
+                        ORDER BY tarea
+                        """,
+                        (
+                            centro,
+                            edificio,
+                            punto_nombre,
+                        ),
+                    )
+
+                    if not df_tareas_planificadas_punto.empty:
+                        for tarea_planificada in (
+                            df_tareas_planificadas_punto["tarea"]
+                            .dropna()
+                            .astype(str)
+                            .str.strip()
+                            .tolist()
+                        ):
+                            if tarea_planificada not in tareas:
+                                tareas.append(tarea_planificada)
+
+                except Exception as e:
+                    print(
+                        f"[LEGIONELLA] No se pudieron cargar tareas planificadas "
+                        f"del punto {punto_nombre}: {type(e).__name__}: {e}"
+                    )
+
                 tarea = st.selectbox("Tarea", tareas)
 
                 valor_4 = None
