@@ -709,6 +709,7 @@ def calcular_tipo_prioridad(row):
     origen = str(row.get("origen", "") or "").lower()
     descripcion = str(row.get("descripcion", "") or "").lower()
     prioridad = str(row.get("prioridad", "") or "").lower()
+    numero_ot = str(row.get("numero_ot", "") or "").strip().upper()
 
     if "legionella" in area or "legionella" in origen or "legionella" in descripcion:
         return "Sanitaria"
@@ -719,7 +720,10 @@ def calcular_tipo_prioridad(row):
     if "alta" in prioridad:
         return "Alta"
 
-    if str(row.get("origen", "") or "").upper() == "PREVENTIVO":
+    # Una preventiva real se identifica por su numeración PREV.
+    # Una INC nacida desde preventivo conserva el origen para trazabilidad,
+    # pero sigue siendo una incidencia correctiva.
+    if numero_ot.startswith("PREV-"):
         return "Preventiva"
 
     return "Incidencia"
@@ -810,6 +814,13 @@ def puntuar_orden(row):
     origen = normalizar(row.get("origen"))
     prioridad = normalizar(row.get("prioridad"))
     descripcion = normalizar(row.get("descripcion"))
+    numero_ot = normalizar(row.get("numero_ot"))
+
+    es_preventiva_real = numero_ot.startswith("prev-")
+    es_correctiva_desde_preventivo = (
+        numero_ot.startswith("inc-")
+        and origen == "preventivo"
+    )
 
     # -------------------------------------------------
     # 1. PRIORIDAD PRINCIPAL
@@ -826,9 +837,15 @@ def puntuar_orden(row):
         score += 75
         motivos.append("Prioridad alta.")
 
-    elif origen == "preventivo":
+    elif es_preventiva_real:
         score += 60
         motivos.append("Actuación preventiva pendiente.")
+
+    elif es_correctiva_desde_preventivo:
+        score += 55
+        motivos.append(
+            "Avería detectada durante mantenimiento preventivo."
+        )
 
     elif origen in ["app", "outlook", "profesores", "externa"]:
         score += 55
