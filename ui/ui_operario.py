@@ -125,10 +125,21 @@ def obtener_operario_fila(fila):
         return ""
 
 
-def es_ot_preventiva(origen, descripcion):
+def es_ot_preventiva(origen, descripcion, numero_ot=""):
     origen_txt = str(origen or "").strip().upper()
     desc_txt = str(descripcion or "").strip().upper()
-    return origen_txt == "PREVENTIVO" or desc_txt.startswith("[PREVENTIVO]")
+    numero_txt = str(numero_ot or "").strip().upper()
+
+    if numero_txt.startswith("PREV-"):
+        return True
+
+    if numero_txt.startswith("INC-"):
+        return False
+
+    return (
+        origen_txt == "PREVENTIVO"
+        or desc_txt.startswith("[PREVENTIVO]")
+    )
 
 
 def es_ot_legionella(area, origen, descripcion):
