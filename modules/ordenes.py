@@ -1393,7 +1393,178 @@ def actualizar_tipo_solicitante_por_numero(numero_ot, tipo_solicitante):
     conn.close()
     return True
 
+def _texto_normalizado_correctiva(texto):
+    texto = str(texto or "").strip().lower()
 
+    cambios = {
+        "á": "a",
+        "é": "e",
+        "í": "i",
+        "ó": "o",
+        "ú": "u",
+        "ñ": "n",
+    }
+
+    for origen, destino in cambios.items():
+        texto = texto.replace(origen, destino)
+
+    return texto
+
+
+def clasificar_correctiva_desde_revision(
+    descripcion_defecto,
+    area_origen="",
+    prioridad_origen="Media",
+):
+    """
+    Clasifica una avería encontrada durante una revisión/preventivo.
+
+    Filosofía:
+    - La correctiva no hereda ciegamente 'Preventivo' como área.
+    - Agua, electricidad y climatización tienen peso operativo.
+    - Urgente solo cuando el texto indica riesgo/afectación activa.
+    """
+    texto = _texto_normalizado_correctiva(
+        descripcion_defecto
+    )
+
+    area_final = str(area_origen or "").strip()
+    prioridad_final = str(
+        prioridad_origen or "Media"
+    ).strip()
+
+    # -------------------------------------------------
+    # FONTANERÍA / AGUA
+    # -------------------------------------------------
+    palabras_agua = [
+        "fluxor",
+        "cisterna",
+        "grifo",
+        "lavabo",
+        "lavamanos",
+        "inodoro",
+        "wc",
+        "tuberia",
+        "desague",
+        "sifon",
+        "valvula",
+        "agua",
+        "fuga",
+    ]
+
+    if any(palabra in texto for palabra in palabras_agua):
+        area_final = "Fontanería"
+
+        # Elemento de agua averiado = prioridad alta.
+        prioridad_final = "Alta"
+
+        # Riesgo activo = urgente.
+        riesgo_activo = [
+            "fuga",
+            "pierde agua",
+            "perdiendo agua",
+            "sale agua",
+            "chorro",
+            "inund",
+            "revent",
+            "no corta",
+            "no cierra",
+        ]
+
+        if any(palabra in texto for palabra in riesgo_activo):
+            prioridad_final = "Urgente"
+
+        return area_final, prioridad_final
+
+    # -------------------------------------------------
+    # ELECTRICIDAD
+    # -------------------------------------------------
+    palabras_electricidad = [
+        "electrico",
+        "electricidad",
+        "enchufe",
+        "magnetotermico",
+        "diferencial",
+        "cuadro electrico",
+        "cortocircuito",
+        "chisp",
+        "cable",
+    ]
+
+    if any(
+        palabra in texto
+        for palabra in palabras_electricidad
+    ):
+        area_final = "Electricidad"
+        prioridad_final = "Alta"
+
+        if any(
+            palabra in texto
+            for palabra in [
+                "chisp",
+                "quem",
+                "humo",
+                "cortocircuito",
+                "descarga",
+            ]
+        ):
+            prioridad_final = "Urgente"
+
+        return area_final, prioridad_final
+
+    # -------------------------------------------------
+    # CLIMATIZACIÓN
+    # -------------------------------------------------
+    palabras_clima = [
+        "climatizacion",
+        "aire acondicionado",
+        "split",
+        "calefaccion",
+        "radiador",
+        "caldera",
+    ]
+
+    if any(
+        palabra in texto
+        for palabra in palabras_clima
+    ):
+        area_final = "Climatización"
+
+        if prioridad_final.lower() in [
+            "",
+            "baja",
+            "media",
+        ]:
+            prioridad_final = "Alta"
+
+        return area_final, prioridad_final
+
+    # -------------------------------------------------
+    # RESTO
+    # -------------------------------------------------
+    if not area_final or area_final.lower() in [
+        "preventivo",
+        "preventiva",
+        "mantenimiento",
+    ]:
+        try:
+            area_detectada = sugerir_area_ot(
+                descripcion=descripcion_defecto,
+                area_actual="",
+                origen="",
+                tipo_orden="Interna",
+            )
+
+            if area_detectada:
+                area_final = area_detectada
+
+        except Exception:
+            pass
+
+    if not area_final:
+        area_final = "Otros"
+
+    return area_final, prioridad_final
 def crear_correctiva_desde_ot(
     centro,
     edificio,
