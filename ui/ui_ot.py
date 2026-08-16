@@ -152,7 +152,7 @@ def descomponer_orden_operario(fila):
 
 
 def puede_finalizar_preventivo(num_ot, origen, desc):
-    if es_ot_preventiva(origen, desc):
+    if es_ot_preventiva(origen, desc, num_ot):
         return checklist_preventivo_completo(num_ot)
     return True
 
