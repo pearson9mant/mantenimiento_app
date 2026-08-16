@@ -513,6 +513,16 @@ def actualizar_item_checklist_preventivo(
     if estado_revision not in estados_validos:
         return False
 
+    observaciones_revision = str(
+        observaciones_revision or ""
+    ).strip()
+
+    if (
+        estado_revision in ["Ajustado", "Revisar", "Avería"]
+        and not observaciones_revision
+    ):
+        return False
+
     hecho = 1 if estado_revision else 0
     fecha_hecho = hoy_str() if hecho else ""
 
@@ -533,7 +543,7 @@ def actualizar_item_checklist_preventivo(
         WHERE id = ?
     """), (
         estado_revision,
-        str(observaciones_revision or "").strip(),
+        observaciones_revision,
         1 if crear_correctivo else 0,
         hecho,
         fecha_hecho,
@@ -595,6 +605,15 @@ def guardar_checklist_preventivo_completo(items, operario=""):
                     f"Estado preventivo no válido: {estado_revision}"
                 )
 
+            if (
+                estado_revision in ["Ajustado", "Revisar", "Avería"]
+                and not observaciones_revision
+            ):
+                raise ValueError(
+                    "Los puntos marcados como Ajustado, Revisar o Avería "
+                    "deben incluir una observación técnica."
+                )
+
             hecho = 1 if estado_revision else 0
             fecha_hecho = hoy_str() if hecho else ""
 
@@ -653,16 +672,122 @@ def actualizar_checklist_preventivo(id_check, hecho, operario=""):
     return True
 
 
-def checklist_preventivo_completo(numero_ot):
-    checks = obtener_checklist_preventivo(numero_ot)
+def resumen_checklist_preventivo(numero_ot):
+    """
+    Resume el estado técnico del checklist preventivo.
+
+    Reglas:
+    - Correcto: no requiere observación.
+    - Ajustado / Revisar / Avería: requieren observación técnica.
+    - Avería con "crear_correctivo" marcado: debe tener OT correctiva
+      vinculada antes de considerar el preventivo listo para cerrar.
+    """
+    checks = obtener_checklist_preventivo_detallado(numero_ot)
+
+    resumen = {
+        "total": 0,
+        "completados": 0,
+        "pendientes": 0,
+        "correctos": 0,
+        "ajustados": 0,
+        "revisar": 0,
+        "averias": 0,
+        "observaciones_faltantes": 0,
+        "correctivas_pendientes": 0,
+        "correctivas_creadas": 0,
+        "listo_para_cerrar": False,
+    }
 
     if not checks:
-        return False
+        return resumen
 
-    total = len(checks)
-    hechos = len([c for c in checks if int(c[4] or 0) == 1])
+    resumen["total"] = len(checks)
 
-    return total == hechos
+    for check in checks:
+        (
+            id_check,
+            check_numero_ot,
+            tarea_id,
+            item,
+            hecho,
+            fecha_hecho,
+            operario,
+            observaciones_antiguas,
+            estado_revision,
+            observaciones_revision,
+            crear_correctivo,
+            numero_ot_correctiva,
+        ) = check
+
+        estado = str(estado_revision or "").strip()
+
+        # Compatibilidad con checklists antiguos.
+        if not estado and bool(hecho):
+            estado = "Correcto"
+
+        observacion = str(
+            observaciones_revision
+            or observaciones_antiguas
+            or ""
+        ).strip()
+
+        if not estado:
+            resumen["pendientes"] += 1
+            continue
+
+        resumen["completados"] += 1
+
+        if estado == "Correcto":
+            resumen["correctos"] += 1
+
+        elif estado == "Ajustado":
+            resumen["ajustados"] += 1
+
+        elif estado == "Revisar":
+            resumen["revisar"] += 1
+
+        elif estado == "Avería":
+            resumen["averias"] += 1
+
+        if (
+            estado in ["Ajustado", "Revisar", "Avería"]
+            and not observacion
+        ):
+            resumen["observaciones_faltantes"] += 1
+
+        if estado == "Avería" and bool(crear_correctivo):
+            if str(numero_ot_correctiva or "").strip():
+                resumen["correctivas_creadas"] += 1
+            else:
+                resumen["correctivas_pendientes"] += 1
+
+    resumen["listo_para_cerrar"] = (
+        resumen["total"] > 0
+        and resumen["completados"] == resumen["total"]
+        and resumen["observaciones_faltantes"] == 0
+        and resumen["correctivas_pendientes"] == 0
+    )
+
+    return resumen
+
+
+def checklist_preventivo_completo(numero_ot):
+    """
+    Indica si la inspección preventiva puede cerrarse.
+
+    Se permite cerrar con puntos Ajustado, Revisar o Avería porque
+    la revisión preventiva ya se ha ejecutado, pero:
+    - todos los puntos deben tener resultado,
+    - Ajustado/Revisar/Avería deben tener observación,
+    - si una Avería está marcada para crear correctiva, esa OT debe
+      estar ya creada y vinculada.
+    """
+    return bool(
+        resumen_checklist_preventivo(numero_ot).get(
+            "listo_para_cerrar",
+            False
+        )
+    )
 
 
 def generar_ots_preventivo_si_toca():
@@ -973,10 +1098,31 @@ def crear_correctivas_checklist_preventivo(numero_ot):
 
         numero_correctiva = ""
 
-        texto_mensaje = str(mensaje or "")
+        texto_mensaje = str(mensaje or "").strip()
 
+        # La función histórica devuelve normalmente un texto con el número
+        # de OT al final. Conservamos compatibilidad sin depender de una
+        # redacción exacta.
         if ":" in texto_mensaje:
             numero_correctiva = texto_mensaje.split(":")[-1].strip()
+
+        if not numero_correctiva:
+            partes = texto_mensaje.split()
+
+            for parte in reversed(partes):
+                candidata = parte.strip(".,;()[]{}")
+
+                if (
+                    candidata
+                    and any(ch.isdigit() for ch in candidata)
+                    and (
+                        "OT" in candidata.upper()
+                        or "COR" in candidata.upper()
+                        or "INC" in candidata.upper()
+                    )
+                ):
+                    numero_correctiva = candidata
+                    break
 
         conn = conectar()
         cursor = conn.cursor()
