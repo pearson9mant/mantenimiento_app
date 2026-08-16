@@ -27,6 +27,7 @@ from modules.preventivo import (
     guardar_checklist_preventivo_completo,
     crear_checklist_preventivo,
     crear_correctivas_checklist_preventivo,
+    resumen_checklist_preventivo,
 )
 
 from ui.ui_legionella import (
@@ -400,8 +401,12 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
 
     total = len(checks)
     completados = 0
+    correctos = 0
+    ajustados = 0
     averias = 0
     pendientes_revision = 0
+    observaciones_faltantes = 0
+    correctivas_pendientes_interfaz = 0
 
     datos_para_guardar = []
 
@@ -412,6 +417,11 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         "Revisar",
         "Avería",
     ]
+
+    st.caption(
+        "✅ Correcto · 🛠 Ajustado · 🟡 Revisar · 🔴 Avería. "
+        "Ajustado, Revisar y Avería requieren una observación técnica."
+    )
 
     for check in checks:
         (
@@ -461,18 +471,51 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
                 key=f"prev_estado_{num_ot}_{id_check}",
             )
 
+            requiere_observacion = nuevo_estado in [
+                "Ajustado",
+                "Revisar",
+                "Avería",
+            ]
+
+            etiqueta_observacion = (
+                "Observaciones técnicas *"
+                if requiere_observacion
+                else "Observaciones"
+            )
+
+            placeholder_observacion = {
+                "Ajustado": (
+                    "Indica qué desviación encontraste y qué ajuste realizaste."
+                ),
+                "Revisar": (
+                    "Indica qué debe volver a comprobarse y por qué."
+                ),
+                "Avería": (
+                    "Describe la avería detectada y el estado del elemento."
+                ),
+            }.get(
+                nuevo_estado,
+                "Describe lo revisado si necesitas dejar constancia."
+            )
+
             nueva_observacion = st.text_area(
-                "Observaciones",
+                etiqueta_observacion,
                 value=str(
                     observaciones_revision
                     or observaciones_antiguas
                     or ""
                 ),
                 key=f"prev_obs_{num_ot}_{id_check}",
-                placeholder=(
-                    "Describe lo revisado o la avería detectada."
-                ),
+                placeholder=placeholder_observacion,
             )
+
+            if requiere_observacion and not str(
+                nueva_observacion or ""
+            ).strip():
+                st.warning(
+                    "Este resultado requiere una observación técnica."
+                )
+                observaciones_faltantes += 1
 
             crear_correctiva_nueva = False
 
@@ -485,8 +528,14 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
 
                 if numero_ot_correctiva:
                     st.success(
-                        f"Correctiva creada: {numero_ot_correctiva}"
+                        f"🔧 Correctiva vinculada: {numero_ot_correctiva}"
                     )
+                elif crear_correctiva_nueva:
+                    st.info(
+                        "La preventiva podrá cerrarse cuando generes "
+                        "la correctiva marcada."
+                    )
+                    correctivas_pendientes_interfaz += 1
 
             datos_para_guardar.append({
                 "id_check": id_check,
@@ -498,106 +547,205 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         if nuevo_estado:
             completados += 1
 
-        if nuevo_estado == "Avería":
+        if nuevo_estado == "Correcto":
+            correctos += 1
+        elif nuevo_estado == "Ajustado":
+            ajustados += 1
+        elif nuevo_estado == "Revisar":
+            pendientes_revision += 1
+        elif nuevo_estado == "Avería":
             averias += 1
 
-        if nuevo_estado == "Revisar":
-            pendientes_revision += 1
+    # ------------------------------------------------------
+    # RESUMEN VISIBLE DEL TRABAJO PREVENTIVO
+    # ------------------------------------------------------
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("✅ Correctos", correctos)
+    c2.metric("🛠 Ajustados", ajustados)
+    c3.metric("🟡 Revisar", pendientes_revision)
+    c4.metric("🔴 Averías", averias)
 
     st.caption(
-        f"Checklist: {completados}/{total} completado · "
-        f"🟡 Revisar: {pendientes_revision} · "
-        f"🔴 Averías: {averias}"
+        f"Checklist: {completados}/{total} completado"
     )
 
+    if pendientes_revision > 0:
+        st.warning(
+            f"🟡 {pendientes_revision} punto(s) quedan señalados para "
+            "seguimiento técnico. La preventiva puede cerrarse una vez "
+            "guardada correctamente."
+        )
+
+    if ajustados > 0:
+        st.info(
+            f"🛠 {ajustados} punto(s) se han ajustado durante la revisión "
+            "y quedarán registrados en el histórico."
+        )
+
+    if averias > 0:
+        st.error(
+            f"🔴 Se han detectado {averias} avería(s). "
+            "Las marcadas para correctiva deben tener su OT vinculada "
+            "antes de cerrar esta preventiva."
+        )
+
+    # ------------------------------------------------------
+    # GUARDAR
+    # ------------------------------------------------------
     if st.button(
         "💾 Guardar checklist preventivo",
         key=f"guardar_checklist_completo_{num_ot}",
         use_container_width=True,
         type="primary",
     ):
-        try:
-            guardado = guardar_checklist_preventivo_completo(
-                items=datos_para_guardar,
-                operario=nombre_operario_actual() or operario,
-            )
-
-            if guardado:
-                st.success(
-                    "Checklist preventivo guardado correctamente."
-                )
-                st.rerun()
-            else:
-                st.error(
-                    "No se ha podido guardar el checklist."
-                )
-
-        except Exception as e:
+        if observaciones_faltantes > 0:
             st.error(
-                f"Error guardando el checklist: {e}"
+                "Completa las observaciones obligatorias de los puntos "
+                "Ajustado, Revisar o Avería antes de guardar."
             )
+        else:
+            try:
+                guardado = guardar_checklist_preventivo_completo(
+                    items=datos_para_guardar,
+                    operario=nombre_operario_actual() or operario,
+                )
 
-    if completados == total:
-        if averias > 0:
-            st.warning(
-                "Checklist completado con averías detectadas."
-            )
+                if guardado:
+                    st.success(
+                        "Checklist preventivo guardado correctamente."
+                    )
+                    st.rerun()
+                else:
+                    st.error(
+                        "No se ha podido guardar el checklist."
+                    )
 
-            st.info(
-                "Guarda primero el checklist. Después crea las "
-                "correctivas marcadas."
-            )
+            except Exception as e:
+                st.error(
+                    f"Error guardando el checklist: {e}"
+                )
 
+    # ------------------------------------------------------
+    # CREAR CORRECTIVAS
+    # ------------------------------------------------------
+    hay_correctivas_marcadas = any(
+        item.get("estado_revision") == "Avería"
+        and bool(item.get("crear_correctivo"))
+        for item in datos_para_guardar
+    )
+
+    if completados == total and averias > 0:
+        if hay_correctivas_marcadas:
             if st.button(
                 "🔧 Crear correctivas marcadas",
                 key=f"prev_generar_correctivas_{num_ot}",
                 use_container_width=True,
             ):
-                try:
-                    # Asegura que las selecciones actuales estén guardadas
-                    guardar_checklist_preventivo_completo(
-                        items=datos_para_guardar,
-                        operario=nombre_operario_actual() or operario,
-                    )
-
-                    creadas, mensajes = (
-                        crear_correctivas_checklist_preventivo(num_ot)
-                    )
-
-                    if creadas > 0:
-                        st.success(
-                            f"Se han creado {creadas} OT correctiva(s)."
-                        )
-
-                        for mensaje in mensajes:
-                            if mensaje:
-                                st.caption(str(mensaje))
-
-                        st.rerun()
-
-                    else:
-                        st.info(
-                            "No hay correctivas nuevas pendientes. "
-                            "Puede que ya estén creadas o no se haya "
-                            "marcado la casilla."
-                        )
-
-                except Exception as e:
+                if observaciones_faltantes > 0:
                     st.error(
-                        f"No se han podido crear las correctivas: {e}"
+                        "Antes de crear correctivas, completa las observaciones "
+                        "técnicas obligatorias."
                     )
+                else:
+                    try:
+                        guardar_checklist_preventivo_completo(
+                            items=datos_para_guardar,
+                            operario=nombre_operario_actual() or operario,
+                        )
+
+                        creadas, mensajes = (
+                            crear_correctivas_checklist_preventivo(num_ot)
+                        )
+
+                        if creadas > 0:
+                            st.success(
+                                f"Se han creado {creadas} OT correctiva(s)."
+                            )
+
+                            for mensaje in mensajes:
+                                if mensaje:
+                                    st.caption(str(mensaje))
+
+                            st.rerun()
+
+                        else:
+                            st.info(
+                                "No hay correctivas nuevas pendientes. "
+                                "Puede que ya estén creadas."
+                            )
+
+                    except Exception as e:
+                        st.error(
+                            f"No se han podido crear las correctivas: {e}"
+                        )
 
         else:
-            st.success(
-                "Checklist completado. Guarda los cambios antes "
-                "de finalizar la OT."
+            st.warning(
+                "Hay averías registradas, pero ninguna está marcada "
+                "para crear una OT correctiva."
             )
 
-        return True
+    # ------------------------------------------------------
+    # ESTADO REAL GUARDADO EN BASE DE DATOS
+    # ------------------------------------------------------
+    resumen_guardado = resumen_checklist_preventivo(num_ot)
 
-    st.warning(
-        "Todos los puntos deben tener un resultado antes de finalizar."
-    )
+    if resumen_guardado["total"] > 0:
+        if resumen_guardado["correctivas_creadas"] > 0:
+            st.success(
+                f"🔧 Correctivas vinculadas: "
+                f"{resumen_guardado['correctivas_creadas']}"
+            )
+
+        if resumen_guardado["correctivas_pendientes"] > 0:
+            st.warning(
+                f"Faltan por crear "
+                f"{resumen_guardado['correctivas_pendientes']} "
+                "correctiva(s) marcada(s)."
+            )
+
+        if resumen_guardado["observaciones_faltantes"] > 0:
+            st.warning(
+                "Hay resultados guardados que todavía necesitan "
+                "observación técnica."
+            )
+
+        if resumen_guardado["listo_para_cerrar"]:
+            if resumen_guardado["revisar"] > 0:
+                st.success(
+                    "✅ Preventiva lista para cerrar. "
+                    "Los puntos marcados como Revisar quedan registrados "
+                    "para seguimiento."
+                )
+            elif resumen_guardado["averias"] > 0:
+                st.success(
+                    "✅ Preventiva lista para cerrar. "
+                    "Las averías y sus correctivas quedan trazadas."
+                )
+            else:
+                st.success(
+                    "✅ Preventiva lista para cerrar."
+                )
+
+            return True
+
+    if completados < total:
+        st.warning(
+            "Todos los puntos deben tener un resultado antes de finalizar."
+        )
+    elif observaciones_faltantes > 0:
+        st.warning(
+            "Faltan observaciones técnicas obligatorias."
+        )
+    elif correctivas_pendientes_interfaz > 0:
+        st.warning(
+            "Genera las correctivas marcadas antes de finalizar."
+        )
+    else:
+        st.info(
+            "Guarda el checklist para validar el cierre de la preventiva."
+        )
+
     return False
 
 def mostrar_checklist_correctivo_legionella_operario(num_ot, centro, edificio, espacio, desc):
