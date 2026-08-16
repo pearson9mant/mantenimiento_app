@@ -851,7 +851,7 @@ def mostrar_tarjeta_ot(
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
-        if es_ot_preventiva(origen, desc):
+        if es_ot_preventiva(origen, desc, num_ot):
             mostrar_checklist_preventivo_operario(
                 num_ot=num_ot,
                 desc=desc,
