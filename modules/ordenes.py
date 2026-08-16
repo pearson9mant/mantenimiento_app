@@ -1577,15 +1577,30 @@ def crear_correctiva_desde_ot(
     origen="Preventivo",
     solicitante="Operarios",
 ):
-    descripcion_defecto = str(descripcion_defecto or "").strip()
+    descripcion_defecto = str(
+        descripcion_defecto or ""
+    ).strip()
 
     if not descripcion_defecto:
         return False, "No hay defecto indicado."
 
-    numero_ot = obtener_siguiente_numero_ot(centro, "INC")
+    numero_ot = obtener_siguiente_numero_ot(
+        centro,
+        "INC"
+    )
+
+    # La correctiva analiza el defecto encontrado.
+    # No hereda ciegamente área/prioridad del preventivo.
+    area_correctiva, prioridad_correctiva = (
+        clasificar_correctiva_desde_revision(
+            descripcion_defecto=descripcion_defecto,
+            area_origen=area,
+            prioridad_origen=prioridad,
+        )
+    )
 
     descripcion = (
-        f"[CORRECTIVA DESDE {origen.upper()}]\n"
+        f"[CORRECTIVA DESDE {str(origen or '').upper()}]\n"
         f"OT origen: {numero_ot_origen}\n\n"
         f"{descripcion_defecto}"
     )
@@ -1597,10 +1612,10 @@ def crear_correctiva_desde_ot(
         centro,
         edificio,
         espacio,
-        area or "Otros",
-        prioridad or "Media",
+        area_correctiva,
+        prioridad_correctiva,
         operario,
-        origen,
+        origen,                 # Conservamos trazabilidad
         solicitante,
         "",
         "",
@@ -1621,7 +1636,11 @@ def crear_correctiva_desde_ot(
         ""
     ))
 
-    return True, f"Correctiva creada correctamente: {numero_creado or numero_ot}"
+    return (
+        True,
+        f"Correctiva creada correctamente: "
+        f"{numero_creado or numero_ot}"
+    )
 
 
 # =====================================================
