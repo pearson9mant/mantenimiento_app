@@ -71,10 +71,26 @@ def nombre_operario_actual():
     ).strip()
 
 
-def es_ot_preventiva(origen, descripcion):
+def es_ot_preventiva(origen, descripcion, numero_ot=""):
     origen_txt = str(origen or "").strip().upper()
     desc_txt = str(descripcion or "").strip().upper()
-    return origen_txt == "PREVENTIVO" or desc_txt.startswith("[PREVENTIVO]")
+    numero_txt = str(numero_ot or "").strip().upper()
+
+    # Regla principal:
+    # una OT preventiva real lleva numeración PREV.
+    if numero_txt.startswith("PREV-"):
+        return True
+
+    # Una INC creada desde un preventivo conserva origen PREVENTIVO
+    # para trazabilidad, pero sigue siendo una correctiva.
+    if numero_txt.startswith("INC-"):
+        return False
+
+    # Compatibilidad con OT antiguas.
+    return (
+        origen_txt == "PREVENTIVO"
+        or desc_txt.startswith("[PREVENTIVO]")
+    )
 
 
 def es_ot_legionella(area, origen, descripcion):
