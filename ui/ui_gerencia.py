@@ -4,7 +4,6 @@ from datetime import datetime, date
 import unicodedata
 
 from database.db import conectar
-from ui.ui_arbol_colegio import mostrar_arbol_gerencia
 
 
 CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
@@ -1020,9 +1019,6 @@ def mostrar_menu_centro(df, centro):
         with c6:
             boton_tarjeta("Preventivas este mes", contar(df, centro, "preventivas_mes"), centro, "preventivas_mes", "🛠️")
 
-    with st.expander("🌳 Ver incidencias por centro", expanded=False):
-        st.caption("Vista solo lectura para gerencia.")
-        mostrar_arbol_gerencia()
 
     with st.expander("💶 Recursos e inventario", expanded=False):
         total_inv = total_inventario_centro(centro)
