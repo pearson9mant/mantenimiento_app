@@ -1190,9 +1190,16 @@ EDIFICIOS_GERENCIA = {
         "Llar": ["Terrado", "Planta 2", "Planta 1", "Planta 0"],
     },
     "Pearson 9": {
-        "Edificio A": ["Terrado", "Planta 2", "Planta 1", "Planta 0"],
-        "Edificio B": ["Terrado", "Planta 2", "Planta 1", "Planta 0"],
-        "Edificio C": ["Terrado", "Planta 2", "Planta 1", "Planta 0"],
+        "Edificio A": ["Planta 2", "Planta 1"],
+        "Edificio B": ["Planta 2", "Planta 1"],
+        "Edificio C": ["Planta 2", "Planta 1"],
+        # El anexo no pertenece a A/B/C y físicamente es una sola planta.
+        "Anexo Servicios": [
+            "Taller",
+            "Vestuarios chicas",
+            "Sala calderas",
+            "Vestuarios chicos",
+        ],
     },
 }
 
@@ -1203,6 +1210,19 @@ ALIAS_EDIFICIOS_GERENCIA = {
     "Edificio A": ["edificio a", "edif a", "bloque a"],
     "Edificio B": ["edificio b", "edif b", "bloque b"],
     "Edificio C": ["edificio c", "edif c", "bloque c"],
+    "Anexo Servicios": [
+        "anexo servicios",
+        "anexo",
+        "taller",
+        "vestuarios chicas",
+        "vestuario chicas",
+        "vestuarios chicos",
+        "vestuario chicos",
+        "sala calderas",
+        "sala de calderas",
+        "sala tecnica",
+        "sala técnica",
+    ],
 }
 
 
@@ -1283,26 +1303,134 @@ def _coincide_edificio(valor, edificio):
     return any(normalizar_busqueda(a) in texto or texto in normalizar_busqueda(a) for a in alias)
 
 
+ZONAS_ANEXO_GERENCIA = {
+    "Taller": [
+        "taller",
+    ],
+    "Vestuarios chicas": [
+        "vestuarios chicas",
+        "vestuario chicas",
+        "duchas femeninas",
+        "duchas femenina",
+        "duchas chicas",
+    ],
+    "Sala calderas": [
+        "sala calderas",
+        "sala de calderas",
+        "sala tecnica",
+        "sala técnica",
+    ],
+    "Vestuarios chicos": [
+        "vestuarios chicos",
+        "vestuario chicos",
+        "duchas masculinas",
+        "duchas masculina",
+        "duchas chicos",
+    ],
+}
+
+
+def _coincide_zona_anexo_gerencia(espacio, zona):
+    texto = normalizar_busqueda(espacio)
+    if not texto:
+        return False
+
+    aliases = ZONAS_ANEXO_GERENCIA.get(zona, [zona])
+
+    for alias in aliases:
+        alias_n = normalizar_busqueda(alias)
+        if texto == alias_n or alias_n in texto:
+            return True
+
+    return False
+
+
 def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     if df.empty:
         return df.copy()
-    datos = df[df["centro"].fillna("").astype(str).str.strip() == centro].copy()
+
+    datos = df[
+        df["centro"].fillna("").astype(str).str.strip() == centro
+    ].copy()
+
     if datos.empty:
         return datos
-    datos = datos[datos["edificio"].fillna("").astype(str).apply(lambda x: _coincide_edificio(x, edificio))].copy()
+
+    # -------------------------------------------------
+    # ANEXO SERVICIOS · PEARSON 9
+    # -------------------------------------------------
+    # Taller, Vestuarios chicas, Sala calderas y Vestuarios chicos
+    # son espacios de una única planta y no pertenecen a A/B/C.
+    if centro == "Pearson 9" and edificio == "Anexo Servicios":
+        espacio_texto = datos["espacio"].fillna("").astype(str)
+
+        mascara = espacio_texto.apply(
+            lambda valor: _coincide_zona_anexo_gerencia(
+                valor,
+                planta,
+            )
+        )
+
+        # Compatibilidad con órdenes antiguas donde la ubicación
+        # pudiera haber quedado en descripción o edificio.
+        if not mascara.any():
+            apoyo = (
+                datos["espacio"].fillna("").astype(str)
+                + " "
+                + datos["edificio"].fillna("").astype(str)
+                + " "
+                + datos["descripcion"].fillna("").astype(str)
+            )
+
+            mascara = apoyo.apply(
+                lambda valor: _coincide_zona_anexo_gerencia(
+                    valor,
+                    planta,
+                )
+            )
+
+        return datos[mascara].copy()
+
+    # -------------------------------------------------
+    # EDIFICIOS NORMALES
+    # -------------------------------------------------
+    datos = datos[
+        datos["edificio"].fillna("").astype(str).apply(
+            lambda x: _coincide_edificio(
+                x,
+                edificio,
+            )
+        )
+    ].copy()
+
     if datos.empty:
         return datos
+
     planta_obj = _normalizar_planta(planta)
-    datos["_planta_norm"] = datos["planta"].fillna("").astype(str).apply(_normalizar_planta)
-    # Compatibilidad con órdenes antiguas sin planta: intentar localizarla en espacio/descripcion.
+
+    datos["_planta_norm"] = (
+        datos["planta"]
+        .fillna("")
+        .astype(str)
+        .apply(_normalizar_planta)
+    )
+
+    # Compatibilidad con órdenes antiguas sin planta:
+    # intentar localizarla en espacio/descripcion.
     vacias = datos["_planta_norm"].eq("")
+
     if vacias.any():
         apoyo = (
-            datos.loc[vacias, "espacio"].fillna("").astype(str) + " " +
-            datos.loc[vacias, "descripcion"].fillna("").astype(str)
+            datos.loc[vacias, "espacio"].fillna("").astype(str)
+            + " "
+            + datos.loc[vacias, "descripcion"].fillna("").astype(str)
         ).apply(_normalizar_planta)
+
         datos.loc[vacias, "_planta_norm"] = apoyo
-    return datos[datos["_planta_norm"] == planta_obj].copy()
+
+    return datos[
+        datos["_planta_norm"] == planta_obj
+    ].copy()
 
 
 def _activas_gerencia(datos):
@@ -1398,7 +1526,11 @@ def mostrar_edificio_cv(df, centro, edificio, plantas):
     seleccionado_centro = st.session_state.get("gerencia_cv_centro")
     for col, planta in zip(columnas, plantas):
         icono, cantidad, _ = _estado_planta(df, centro, edificio, planta)
-        etiqueta_planta = planta.replace("Planta ", "P")
+        if edificio == "Anexo Servicios":
+            etiqueta_planta = planta
+        else:
+            etiqueta_planta = planta.replace("Planta ", "P")
+
         sufijo = f"\n{cantidad}" if cantidad else "\nOK"
         seleccionada = centro == seleccionado_centro and edificio == seleccionado_edificio and planta == seleccionado_planta
         prefijo = "▸ " if seleccionada else ""
@@ -1454,9 +1586,15 @@ def mostrar_panel_planta_cv(df):
     en_curso = activas[activas["estado"].isin(["En curso", "En ejecución"])] if not activas.empty else activas
     cerradas_mes = _cerradas_mes_planta(datos)
 
+    texto_contexto = (
+        "Situación operativa de la zona seleccionada"
+        if edificio == "Anexo Servicios"
+        else "Situación operativa de la planta seleccionada"
+    )
+
     st.markdown(
         f"<div class='cv-panel-title'>📍 {centro} · {edificio} · {planta}</div>"
-        f"<div class='cv-panel-subtitle'>Situación operativa de la planta seleccionada</div>",
+        f"<div class='cv-panel-subtitle'>{texto_contexto}</div>",
         unsafe_allow_html=True,
     )
 
@@ -1568,7 +1706,7 @@ def mostrar_colegio_vivo_gerencia(df):
     izquierda, derecha = st.columns([1.08, 1.35], gap="large")
     with izquierda:
         st.markdown("<div class='cv-section'>Mapa operativo del colegio</div>", unsafe_allow_html=True)
-        st.caption("Pulsa una planta para ver sus datos. El color refleja el riesgo, no solo la cantidad.")
+        st.caption("Pulsa una planta o zona para ver sus datos. El color refleja el riesgo, no solo la cantidad.")
         for centro, edificios in EDIFICIOS_GERENCIA.items():
             st.markdown(f"**{centro}**")
             for edificio, plantas in edificios.items():
