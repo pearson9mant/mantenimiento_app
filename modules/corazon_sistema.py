@@ -792,67 +792,6 @@ def _es_solicitud_direccion_corazon(row):
 
 
 
-
-def _dias_retraso_preventivo_corazon(row):
-    """Calcula el retraso de una PREV- sin modificar planificación."""
-    numero_ot = normalizar(row.get("numero_ot"))
-    if not numero_ot.startswith("prev-"):
-        return 0
-
-    fecha_objetivo = (
-        row.get("fecha_prevista")
-        or row.get("fecha_programada")
-        or row.get("proxima_fecha")
-        or row.get("fecha")
-        or row.get("fecha_creacion")
-        or row.get("fecha_alta")
-        or ""
-    )
-    fecha_dt = pd.to_datetime(fecha_objetivo, errors="coerce", dayfirst=True)
-    if pd.isna(fecha_dt):
-        return 0
-    hoy = pd.Timestamp(date.today()).normalize()
-    fecha_dt = pd.Timestamp(fecha_dt).normalize()
-    return max(0, int((hoy - fecha_dt).days))
-
-
-def _bonus_preventivo_corazon(row):
-    """Refuerzo moderado para preventivos críticos o retrasados."""
-    numero_ot = normalizar(row.get("numero_ot"))
-    if not numero_ot.startswith("prev-"):
-        return 0, []
-
-    area = normalizar(row.get("area"))
-    descripcion = normalizar(row.get("descripcion"))
-    texto = f"{area} {descripcion}"
-    bonus = 0
-    motivos = []
-
-    if any(p in texto for p in [
-        "acs", "agua", "fontan", "electr", "cuadro",
-        "clima", "calefaccion", "calefacción", "aire acondicionado",
-    ]):
-        bonus += 5
-        motivos.append("Preventivo de un sistema con impacto operativo.")
-
-    dias_retraso = _dias_retraso_preventivo_corazon(row)
-    if dias_retraso >= 30:
-        bonus_retraso = 15
-    elif dias_retraso >= 15:
-        bonus_retraso = 10
-    elif dias_retraso >= 7:
-        bonus_retraso = 6
-    elif dias_retraso >= 3:
-        bonus_retraso = 3
-    else:
-        bonus_retraso = 0
-
-    if bonus_retraso:
-        bonus += bonus_retraso
-        motivos.append(f"Preventivo pendiente desde hace {dias_retraso} días.")
-
-    return bonus, motivos
-
 def puntuar_orden(row):
     """
     Puntuación base del Corazón.
@@ -925,18 +864,6 @@ def puntuar_orden(row):
         score += peso_impacto
         if motivo_impacto and motivo_impacto not in motivos:
             motivos.append(motivo_impacto)
-
-    # -------------------------------------------------
-    # 2B. INTELIGENCIA ESPECÍFICA DE PREVENTIVOS
-    # Solo afecta a PREV-. Legionella conserva su tratamiento sanitario.
-    # -------------------------------------------------
-    if es_preventiva_real:
-        bonus_preventivo, motivos_preventivo = _bonus_preventivo_corazon(row)
-        if bonus_preventivo:
-            score += bonus_preventivo
-        for motivo_preventivo in motivos_preventivo:
-            if motivo_preventivo not in motivos:
-                motivos.append(motivo_preventivo)
 
     # -------------------------------------------------
     # 3. SOLICITUD DIRECTA DE DIRECCIÓN
@@ -1037,6 +964,107 @@ def _bonus_continuidad_ubicacion_corazon(
         return 3, "Aprovecha que ya estás en este edificio."
 
     return 0, ""
+
+
+
+def evaluar_ejecutabilidad_corazon(item):
+    """
+    Determina si una OT puede ejecutarse ahora.
+    No cambia estados ni toma decisiones por el operario.
+    """
+    estado = normalizar(item.get("estado"))
+
+    if estado in ESTADOS_BLOQUEADOS_CORAZON:
+        motivos = {
+            "pendiente material": "Está pendiente de material.",
+            "pendiente proveedor": "Está pendiente de proveedor.",
+            "pendiente presupuesto": "Está pendiente de presupuesto.",
+            "avisado": "Está avisada y pendiente de siguiente actuación.",
+        }
+
+        return {
+            "ejecutable": False,
+            "bloqueada": True,
+            "motivo_bloqueo": motivos.get(
+                estado,
+                "La OT está temporalmente bloqueada.",
+            ),
+        }
+
+    if estado in ESTADOS_CIERRE:
+        return {
+            "ejecutable": False,
+            "bloqueada": True,
+            "motivo_bloqueo": "La OT ya está cerrada.",
+        }
+
+    return {
+        "ejecutable": True,
+        "bloqueada": False,
+        "motivo_bloqueo": "",
+    }
+
+
+def clasificar_capa_decision_corazon(item):
+    """
+    Traduce la prioridad técnica a una capa operativa.
+
+    CRITICO / HAZLO_AHORA / SIGUIENTE / APROVECHA /
+    PUEDE_ESPERAR / EN_ESPERA.
+    """
+    ejecucion = evaluar_ejecutabilidad_corazon(item)
+
+    if not ejecucion["ejecutable"]:
+        return {
+            "codigo": "EN_ESPERA",
+            "etiqueta": "⏳ EN ESPERA",
+            "mensaje": ejecucion["motivo_bloqueo"],
+            **ejecucion,
+        }
+
+    score = int(item.get("score", 0) or 0)
+    tipo = str(item.get("tipo_prioridad") or "").strip()
+    prioridad = normalizar(item.get("prioridad"))
+    bonus_ubicacion = int(item.get("bonus_ubicacion", 0) or 0)
+
+    if tipo == "Sanitaria" or prioridad == "urgente" or score >= 90:
+        return {
+            "codigo": "CRITICO",
+            "etiqueta": "🚨 CRÍTICO",
+            "mensaje": "Puede interrumpir la ruta normal por riesgo o prioridad.",
+            **ejecucion,
+        }
+
+    if score >= 70 or prioridad == "alta":
+        return {
+            "codigo": "HAZLO_AHORA",
+            "etiqueta": "❤️ HAZLO AHORA",
+            "mensaje": "Es una de las actuaciones ejecutables más importantes.",
+            **ejecucion,
+        }
+
+    if bonus_ubicacion > 0:
+        return {
+            "codigo": "APROVECHA",
+            "etiqueta": "📍 APROVECHA",
+            "mensaje": "No es crítica, pero conviene resolverla por proximidad.",
+            **ejecucion,
+        }
+
+    if score >= 55:
+        return {
+            "codigo": "SIGUIENTE",
+            "etiqueta": "➡️ SIGUIENTE",
+            "mensaje": "Conviene mantenerla entre las próximas actuaciones.",
+            **ejecucion,
+        }
+
+    return {
+        "codigo": "PUEDE_ESPERAR",
+        "etiqueta": "🟢 PUEDE ESPERAR",
+        "mensaje": "Puede permanecer en cola mientras haya actuaciones de mayor impacto.",
+        **ejecucion,
+    }
 
 
 def construir_prioridades_globales(
@@ -1275,6 +1303,26 @@ def construir_prioridades_globales(
         ),
         reverse=True,
     )
+
+    # FASE 1 · CAPA OPERATIVA
+    for indice, prioridad_item in enumerate(prioridades):
+        capa = clasificar_capa_decision_corazon(prioridad_item)
+
+        if (
+            indice == 0
+            and capa.get("ejecutable")
+            and capa.get("codigo") not in ["CRITICO", "EN_ESPERA"]
+        ):
+            capa["codigo"] = "HAZLO_AHORA"
+            capa["etiqueta"] = "❤️ HAZLO AHORA"
+            capa["mensaje"] = "Es la mejor actuación ejecutable según el Corazón."
+
+        prioridad_item["capa_decision_corazon"] = capa
+        prioridad_item["ejecutable_corazon"] = bool(capa.get("ejecutable"))
+        prioridad_item["bloqueada_corazon"] = bool(capa.get("bloqueada"))
+        prioridad_item["motivo_bloqueo_corazon"] = str(
+            capa.get("motivo_bloqueo") or ""
+        )
 
     return prioridades[:limite]
 
@@ -1859,6 +1907,28 @@ def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     mision["motivos_corazon"] = prioridad.get("motivos", [])
     mision["recurrencia_corazon"] = prioridad.get("recurrencia")
     mision["planta_resuelta_corazon"] = prioridad.get("planta")
+
+    # FASE 1: información interna adicional.
+    # La interfaz actual puede seguir ignorándola sin cambiar de aspecto.
+    mision["capa_decision_corazon"] = prioridad.get(
+        "capa_decision_corazon",
+        clasificar_capa_decision_corazon(prioridad),
+    )
+    mision["ejecutable_corazon"] = prioridad.get(
+        "ejecutable_corazon",
+        True,
+    )
+    mision["bloqueada_corazon"] = prioridad.get(
+        "bloqueada_corazon",
+        False,
+    )
+    mision["motivo_bloqueo_corazon"] = prioridad.get(
+        "motivo_bloqueo_corazon",
+        "",
+    )
+
+    # Se conserva la lectura humana existente para no alterar
+    # la página del operario.
     mision["decision_humana_corazon"] = clasificar_decision_corazon(
         mision
     )
