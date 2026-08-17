@@ -1462,27 +1462,96 @@ def _estado_planta(df, centro, edificio, planta):
     return "🟢", 0, 0
 
 
-def _seleccion_mas_relevante(df):
-    mejor = ("Pearson 22", "Infantil / Primaria", "Planta 2")
+def _seleccion_mas_relevante(df, centro_objetivo=None):
+    if centro_objetivo in EDIFICIOS_GERENCIA:
+        centros = {
+            centro_objetivo: EDIFICIOS_GERENCIA[centro_objetivo]
+        }
+    else:
+        centros = EDIFICIOS_GERENCIA
+
+    mejor = None
     mejor_peso = -1
-    for centro, edificios in EDIFICIOS_GERENCIA.items():
+
+    for centro, edificios in centros.items():
         for edificio, plantas in edificios.items():
             for planta in plantas:
-                _, cantidad, nivel = _estado_planta(df, centro, edificio, planta)
+                _, cantidad, nivel = _estado_planta(
+                    df,
+                    centro,
+                    edificio,
+                    planta,
+                )
+
                 peso = nivel * 1000 + cantidad
+
                 if peso > mejor_peso:
-                    mejor = (centro, edificio, planta)
+                    mejor = (
+                        centro,
+                        edificio,
+                        planta,
+                    )
                     mejor_peso = peso
+
+    if mejor is None:
+        if centro_objetivo == "Pearson 9":
+            return (
+                "Pearson 9",
+                "Edificio A",
+                "Planta 2",
+            )
+
+        return (
+            "Pearson 22",
+            "Infantil / Primaria",
+            "Planta 2",
+        )
+
     return mejor
 
 
-def _iniciar_seleccion_colegio_vivo(df):
-    claves = ["gerencia_cv_centro", "gerencia_cv_edificio", "gerencia_cv_planta"]
-    if not all(st.session_state.get(k) for k in claves):
-        centro, edificio, planta = _seleccion_mas_relevante(df)
-        st.session_state["gerencia_cv_centro"] = centro
-        st.session_state["gerencia_cv_edificio"] = edificio
-        st.session_state["gerencia_cv_planta"] = planta
+def _iniciar_seleccion_colegio_vivo(
+    df,
+    centro_objetivo=None,
+):
+    centro_actual = st.session_state.get(
+        "gerencia_cv_centro"
+    )
+    edificio_actual = st.session_state.get(
+        "gerencia_cv_edificio"
+    )
+    planta_actual = st.session_state.get(
+        "gerencia_cv_planta"
+    )
+
+    necesita_inicializar = (
+        not edificio_actual
+        or not planta_actual
+    )
+
+    if (
+        centro_objetivo in EDIFICIOS_GERENCIA
+        and centro_actual != centro_objetivo
+    ):
+        necesita_inicializar = True
+
+    if necesita_inicializar:
+        centro, edificio, planta = _seleccion_mas_relevante(
+            df,
+            centro_objetivo=centro_objetivo,
+        )
+
+        st.session_state[
+            "gerencia_cv_centro"
+        ] = centro
+
+        st.session_state[
+            "gerencia_cv_edificio"
+        ] = edificio
+
+        st.session_state[
+            "gerencia_cv_planta"
+        ] = planta
 
 
 def _seleccionar_planta_cv(centro, edificio, planta):
@@ -1672,41 +1741,199 @@ def mostrar_resumen_inferior_cv(df):
             )
 
 
-def mostrar_colegio_vivo_gerencia(df):
-    _iniciar_seleccion_colegio_vivo(df)
+def mostrar_colegio_vivo_gerencia(
+    df,
+    centro_objetivo=None,
+):
+    centro_objetivo = str(
+        centro_objetivo or ""
+    ).strip()
 
-    e22, estado22, total22 = _estado_centro_cv(df, "Pearson 22")
-    e9, estado9, total9 = _estado_centro_cv(df, "Pearson 9")
+    if centro_objetivo not in EDIFICIOS_GERENCIA:
+        centro_objetivo = None
+
+    _iniciar_seleccion_colegio_vivo(
+        df,
+        centro_objetivo=centro_objetivo,
+    )
+
+    # =================================================
+    # PERFIL GERENCIA · UN SOLO CENTRO
+    # =================================================
+    if centro_objetivo:
+        icono_centro, estado_centro, total_centro = (
+            _estado_centro_cv(
+                df,
+                centro_objetivo,
+            )
+        )
+
+        st.markdown(
+            f"<div class='cv-hero'><div>"
+            f"<div class='cv-title'>🏫 {centro_objetivo}</div>"
+            f"<div class='cv-subtitle'>"
+            f"Gerencia · Colegio vivo · Estado operativo del centro"
+            f"</div></div>"
+            f"<div class='cv-status'>"
+            f"{icono_centro} {estado_centro}"
+            f"</div></div>",
+            unsafe_allow_html=True,
+        )
+
+        st.info(
+            f"{icono_centro} **{centro_objetivo} · "
+            f"{estado_centro}** · "
+            f"{total_centro} actuaciones activas"
+        )
+
+        izquierda, derecha = st.columns(
+            [1.08, 1.35],
+            gap="large",
+        )
+
+        with izquierda:
+            st.markdown(
+                "<div class='cv-section'>"
+                "Mapa operativo del centro"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.caption(
+                "Pulsa una planta o zona para ver sus datos. "
+                "El color refleja el riesgo, no solo la cantidad."
+            )
+
+            edificios = EDIFICIOS_GERENCIA[
+                centro_objetivo
+            ]
+
+            for edificio, plantas in edificios.items():
+                mostrar_edificio_cv(
+                    df,
+                    centro_objetivo,
+                    edificio,
+                    plantas,
+                )
+
+        with derecha:
+            with st.container(border=True):
+                mostrar_panel_planta_cv(df)
+
+        mostrar_resumen_inferior_cv(df)
+
+        with st.expander(
+            "📈 Evolución, inventario y detalle ejecutivo",
+            expanded=False,
+        ):
+            mostrar_evolucion_mantenimiento(
+                df,
+                centro_objetivo,
+            )
+
+            total_inv = total_inventario_centro(
+                centro_objetivo
+            )
+            total_usado = total_utilizado_centro(
+                centro_objetivo,
+                df,
+            )
+
+            c1, c2 = st.columns(2)
+            c1.metric(
+                "Valor de inventario",
+                euros(total_inv),
+            )
+            c2.metric(
+                "Material utilizado",
+                euros(total_usado),
+            )
+
+        return
+
+    # =================================================
+    # ADMINISTRACIÓN · VISTA GLOBAL DE LOS DOS CENTROS
+    # =================================================
+    e22, estado22, total22 = _estado_centro_cv(
+        df,
+        "Pearson 22",
+    )
+    e9, estado9, total9 = _estado_centro_cv(
+        df,
+        "Pearson 9",
+    )
+
     estado_global = "El colegio está bajo control"
     icono_global = "🟢"
+
     if "🔴" in [e22, e9]:
-        estado_global = "Hay una zona que requiere atención prioritaria"
+        estado_global = (
+            "Hay una zona que requiere atención prioritaria"
+        )
         icono_global = "🔴"
+
     elif "🟡" in [e22, e9]:
-        estado_global = "El colegio requiere seguimiento operativo"
+        estado_global = (
+            "El colegio requiere seguimiento operativo"
+        )
         icono_global = "🟡"
 
     st.markdown(
-        f"<div class='cv-hero'><div><div class='cv-title'>🏫 Colegio vivo</div>"
-        f"<div class='cv-subtitle'>Gerencia · Estado real de Pearson 22 y Pearson 9</div></div>"
-        f"<div class='cv-status'>{icono_global} {estado_global}</div></div>",
+        f"<div class='cv-hero'><div>"
+        f"<div class='cv-title'>🏫 Colegio vivo</div>"
+        f"<div class='cv-subtitle'>"
+        f"Gerencia · Estado real de Pearson 22 y Pearson 9"
+        f"</div></div>"
+        f"<div class='cv-status'>"
+        f"{icono_global} {estado_global}"
+        f"</div></div>",
         unsafe_allow_html=True,
     )
 
     s1, s2 = st.columns(2)
-    with s1:
-        st.info(f"{e22} **Pearson 22 · {estado22}** · {total22} actuaciones activas")
-    with s2:
-        st.info(f"{e9} **Pearson 9 · {estado9}** · {total9} actuaciones activas")
 
-    izquierda, derecha = st.columns([1.08, 1.35], gap="large")
+    with s1:
+        st.info(
+            f"{e22} **Pearson 22 · {estado22}** · "
+            f"{total22} actuaciones activas"
+        )
+
+    with s2:
+        st.info(
+            f"{e9} **Pearson 9 · {estado9}** · "
+            f"{total9} actuaciones activas"
+        )
+
+    izquierda, derecha = st.columns(
+        [1.08, 1.35],
+        gap="large",
+    )
+
     with izquierda:
-        st.markdown("<div class='cv-section'>Mapa operativo del colegio</div>", unsafe_allow_html=True)
-        st.caption("Pulsa una planta o zona para ver sus datos. El color refleja el riesgo, no solo la cantidad.")
+        st.markdown(
+            "<div class='cv-section'>"
+            "Mapa operativo del colegio"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            "Pulsa una planta o zona para ver sus datos. "
+            "El color refleja el riesgo, no solo la cantidad."
+        )
+
         for centro, edificios in EDIFICIOS_GERENCIA.items():
-            st.markdown(f"**{centro}**")
+            st.markdown(
+                f"**{centro}**"
+            )
+
             for edificio, plantas in edificios.items():
-                mostrar_edificio_cv(df, centro, edificio, plantas)
+                mostrar_edificio_cv(
+                    df,
+                    centro,
+                    edificio,
+                    plantas,
+                )
 
     with derecha:
         with st.container(border=True):
@@ -1714,14 +1941,36 @@ def mostrar_colegio_vivo_gerencia(df):
 
     mostrar_resumen_inferior_cv(df)
 
-    with st.expander("📈 Evolución, inventario y detalle ejecutivo", expanded=False):
-        centro = st.session_state["gerencia_cv_centro"]
-        mostrar_evolucion_mantenimiento(df, centro)
-        total_inv = total_inventario_centro(centro)
-        total_usado = total_utilizado_centro(centro, df)
+    with st.expander(
+        "📈 Evolución, inventario y detalle ejecutivo",
+        expanded=False,
+    ):
+        centro = st.session_state[
+            "gerencia_cv_centro"
+        ]
+
+        mostrar_evolucion_mantenimiento(
+            df,
+            centro,
+        )
+
+        total_inv = total_inventario_centro(
+            centro
+        )
+        total_usado = total_utilizado_centro(
+            centro,
+            df,
+        )
+
         c1, c2 = st.columns(2)
-        c1.metric("Valor de inventario", euros(total_inv))
-        c2.metric("Material utilizado", euros(total_usado))
+        c1.metric(
+            "Valor de inventario",
+            euros(total_inv),
+        )
+        c2.metric(
+            "Material utilizado",
+            euros(total_usado),
+        )
 
 
 def pantalla_gerencia():
@@ -1730,17 +1979,55 @@ def pantalla_gerencia():
     iniciar_estado_gerencia()
 
     df = preparar_ordenes()
-    if df.empty:
-        st.warning("No hay órdenes para mostrar todavía.")
-        df = pd.DataFrame(columns=[
-            "numero_ot", "fecha_creacion", "fecha_cierre", "centro", "edificio",
-            "planta", "espacio", "descripcion", "estado", "operario", "solicitante",
-            "origen", "area", "prioridad", "origen_tabla", "fecha_dt", "fecha_cierre_dt"
-        ])
 
-    detalle_actual = st.session_state.get("gerencia_detalle")
+    if df.empty:
+        st.warning(
+            "No hay órdenes para mostrar todavía."
+        )
+
+        df = pd.DataFrame(
+            columns=[
+                "numero_ot",
+                "fecha_creacion",
+                "fecha_cierre",
+                "centro",
+                "edificio",
+                "planta",
+                "espacio",
+                "descripcion",
+                "estado",
+                "operario",
+                "solicitante",
+                "origen",
+                "area",
+                "prioridad",
+                "origen_tabla",
+                "fecha_dt",
+                "fecha_cierre_dt",
+            ]
+        )
+
+    detalle_actual = st.session_state.get(
+        "gerencia_detalle"
+    )
+
     if detalle_actual:
         mostrar_detalle(df)
         return
 
-    mostrar_colegio_vivo_gerencia(df)
+    perfil_actual = str(
+        st.session_state.get("perfil")
+        or ""
+    ).strip().lower()
+
+    centro_objetivo = None
+
+    if perfil_actual == "gerencia":
+        centro_objetivo = st.session_state.get(
+            "gerencia_cv_centro"
+        )
+
+    mostrar_colegio_vivo_gerencia(
+        df,
+        centro_objetivo=centro_objetivo,
+    )
