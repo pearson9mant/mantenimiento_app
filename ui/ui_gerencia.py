@@ -1241,6 +1241,30 @@ def aplicar_estilo_colegio_vivo():
         background:#fff;box-shadow:0 5px 16px rgba(15,23,42,.06);margin-bottom:8px;
     }
     .cv-building-title {font-size:14px;font-weight:900;color:#1e3a8a;margin-bottom:6px}
+
+    .cv-annex {
+        border:1px solid #dbe3ef;
+        border-radius:16px;
+        padding:10px 10px 8px;
+        background:#fff;
+        box-shadow:0 5px 16px rgba(15,23,42,.06);
+        margin-top:10px;
+        margin-bottom:8px;
+    }
+
+    .cv-annex-title {
+        background:linear-gradient(180deg,#173a6e,#0e284d);
+        color:#fff;
+        border:3px solid #d9caa7;
+        border-radius:10px 10px 0 0;
+        text-align:center;
+        padding:8px 10px;
+        font-size:13px;
+        font-weight:950;
+        letter-spacing:.25px;
+        margin-bottom:6px;
+    }
+
     .cv-panel {
         border:1px solid #dbe3ef;border-radius:18px;padding:14px 16px;background:#fff;
         box-shadow:0 8px 22px rgba(15,23,42,.07);
@@ -1272,6 +1296,28 @@ def aplicar_estilo_colegio_vivo():
     .block-container {padding-top:1rem;padding-bottom:1rem;max-width:1700px}
     @media (max-width: 900px) {
         .cv-hero {display:block}.cv-status{margin-top:10px}.cv-title{font-size:23px}
+        .cv-annex-title{font-size:12px;padding:7px 8px}
+    }
+
+    @media (max-width: 760px) {
+        .st-key-gerencia_anexo_p9 div[data-testid="stHorizontalBlock"]{
+            flex-wrap:wrap !important;
+            gap:4px !important;
+        }
+
+        .st-key-gerencia_anexo_p9 div[data-testid="stHorizontalBlock"] > div{
+            flex:1 1 calc(50% - 4px) !important;
+            min-width:calc(50% - 4px) !important;
+            max-width:calc(50% - 4px) !important;
+        }
+
+        .st-key-gerencia_anexo_p9 div[data-testid="stButton"] > button{
+            min-height:52px !important;
+            white-space:normal !important;
+            text-align:center !important;
+            justify-content:center !important;
+            line-height:1.15 !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1611,6 +1657,116 @@ def mostrar_edificio_cv(df, centro, edificio, plantas):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def mostrar_anexo_servicios_cv(df, centro="Pearson 9"):
+    """
+    Dibuja el Anexo Servicios de Pearson 9 como una franja independiente,
+    no como un cuarto edificio.
+
+    Mantiene la misma selección y el mismo panel de detalle que el resto
+    del Colegio Vivo.
+    """
+    zonas = EDIFICIOS_GERENCIA["Pearson 9"]["Anexo Servicios"]
+
+    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
+    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
+    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
+
+    st.markdown(
+        "<div class='cv-annex'>"
+        "<div class='cv-annex-title'>"
+        "ANEXO SERVICIOS · PLANTA ÚNICA"
+        "</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="gerencia_anexo_p9"):
+        columnas = st.columns(
+            len(zonas),
+            gap="small",
+        )
+
+        iconos_zona = {
+            "Taller": "🔧",
+            "Vestuarios chicas": "🚿",
+            "Sala calderas": "🔥",
+            "Vestuarios chicos": "🚿",
+        }
+
+        for columna, zona in zip(columnas, zonas):
+            icono_estado, cantidad, _ = _estado_planta(
+                df,
+                centro,
+                "Anexo Servicios",
+                zona,
+            )
+
+            sufijo = f"\n{cantidad}" if cantidad else "\nOK"
+
+            seleccionada = (
+                centro == seleccionado_centro
+                and seleccionado_edificio == "Anexo Servicios"
+                and seleccionado_planta == zona
+            )
+
+            prefijo = "▸ " if seleccionada else ""
+            icono_zona = iconos_zona.get(zona, "📍")
+
+            with columna:
+                st.button(
+                    f"{prefijo}{icono_estado} {icono_zona} {zona}{sufijo}",
+                    key=f"cv_{centro}_anexo_{zona}",
+                    use_container_width=True,
+                    on_click=_seleccionar_planta_cv,
+                    args=(
+                        centro,
+                        "Anexo Servicios",
+                        zona,
+                    ),
+                    type="primary" if seleccionada else "secondary",
+                )
+
+
+def mostrar_mapa_centro_cv(df, centro):
+    """
+    Renderiza la estructura física del centro.
+
+    Pearson 9:
+    - A/B/C como edificios.
+    - Anexo Servicios como franja independiente.
+
+    Pearson 22 mantiene exactamente su representación actual.
+    """
+    edificios = EDIFICIOS_GERENCIA[centro]
+
+    if centro == "Pearson 9":
+        for edificio in [
+            "Edificio A",
+            "Edificio B",
+            "Edificio C",
+        ]:
+            mostrar_edificio_cv(
+                df,
+                centro,
+                edificio,
+                edificios[edificio],
+            )
+
+        mostrar_anexo_servicios_cv(
+            df,
+            centro="Pearson 9",
+        )
+        return
+
+    for edificio, plantas in edificios.items():
+        mostrar_edificio_cv(
+            df,
+            centro,
+            edificio,
+            plantas,
+        )
+
+
 def _cerradas_mes_planta(datos):
     if datos.empty:
         return datos
@@ -1690,9 +1846,16 @@ def mostrar_panel_planta_cv(df):
                 unsafe_allow_html=True,
             )
 
-    st.markdown("#### Incidencias de esta planta")
+    if edificio == "Anexo Servicios":
+        st.markdown("#### Incidencias de esta zona")
+    else:
+        st.markdown("#### Incidencias de esta planta")
+
     if activas.empty:
-        st.success("Planta sin incidencias activas.")
+        if edificio == "Anexo Servicios":
+            st.success("Zona sin incidencias activas.")
+        else:
+            st.success("Planta sin incidencias activas.")
     else:
         columnas = ["numero_ot", "descripcion", "area", "prioridad", "estado"]
         vista = activas.sort_values("fecha_dt", ascending=True, na_position="last").head(6)[columnas].copy()
@@ -1804,17 +1967,10 @@ def mostrar_colegio_vivo_gerencia(
                 "El color refleja el riesgo, no solo la cantidad."
             )
 
-            edificios = EDIFICIOS_GERENCIA[
-                centro_objetivo
-            ]
-
-            for edificio, plantas in edificios.items():
-                mostrar_edificio_cv(
-                    df,
-                    centro_objetivo,
-                    edificio,
-                    plantas,
-                )
+            mostrar_mapa_centro_cv(
+                df,
+                centro_objetivo,
+            )
 
         with derecha:
             with st.container(border=True):
@@ -1922,18 +2078,15 @@ def mostrar_colegio_vivo_gerencia(
             "El color refleja el riesgo, no solo la cantidad."
         )
 
-        for centro, edificios in EDIFICIOS_GERENCIA.items():
+        for centro in EDIFICIOS_GERENCIA:
             st.markdown(
                 f"**{centro}**"
             )
 
-            for edificio, plantas in edificios.items():
-                mostrar_edificio_cv(
-                    df,
-                    centro,
-                    edificio,
-                    plantas,
-                )
+            mostrar_mapa_centro_cv(
+                df,
+                centro,
+            )
 
     with derecha:
         with st.container(border=True):
