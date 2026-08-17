@@ -14,6 +14,9 @@ from modules.espacios import (
 )
 from ui.preventivo_aulas import pantalla_preventivo_aulas
 from modules.inteligencia_preventivos import construir_panel_preventivo
+from ui.ui_inteligencia_preventiva import (
+    pantalla_inteligencia_preventiva,
+)
 
 
 TAREAS_PREVENTIVAS_POR_AREA = {
