@@ -39,6 +39,297 @@ ESTADOS_CERRADOS = {
 
 
 # =========================================================
+# PATRONES DE AVERÍA
+# =========================================================
+#
+# La inteligencia no considera suficiente que dos incidencias
+# pertenezcan al mismo área. Intenta identificar qué elemento
+# o tipo de fallo se repite dentro de cada espacio.
+#
+# El sistema es deliberadamente conservador:
+# si no encuentra un patrón repetido con suficiente evidencia,
+# no recomienda crear un preventivo nuevo.
+
+PATRONES_POR_AREA = {
+    "fontaneria": {
+        "cisterna / fluxor": [
+            "cisterna", "fluxor", "presto", "descarga", "pulsador wc",
+        ],
+        "grifo": [
+            "grifo", "monomando", "aireador", "caño",
+        ],
+        "fuga de agua": [
+            "fuga", "pierde agua", "pérdida de agua", "gotea", "goteo",
+            "escape de agua",
+        ],
+        "desagüe / atasco": [
+            "desague", "desagüe", "atasco", "atascado", "embozado",
+            "sumidero", "sifon", "sifón",
+        ],
+        "tubería / racor": [
+            "tuberia", "tubería", "racor", "latiguillo", "manguito",
+            "llave de paso", "valvula", "válvula",
+        ],
+    },
+
+    "electricidad": {
+        "enchufe / toma": [
+            "enchufe", "toma", "base electrica", "base eléctrica",
+        ],
+        "interruptor / pulsador": [
+            "interruptor", "pulsador",
+        ],
+        "cuadro / protección": [
+            "magnetotermico", "magnetotérmico", "diferencial",
+            "cuadro electrico", "cuadro eléctrico", "salta el automatico",
+            "salta el automático",
+        ],
+        "cableado": [
+            "cable", "cableado", "conexion", "conexión",
+        ],
+    },
+
+    "climatizacion": {
+        "filtros": [
+            "filtro", "filtros",
+        ],
+        "condensados / desagüe": [
+            "condensado", "condensados", "desague", "desagüe",
+            "gotea", "goteo",
+        ],
+        "temperatura / rendimiento": [
+            "no enfria", "no enfría", "no calienta", "temperatura",
+            "frio", "frío", "calor",
+        ],
+        "unidad interior": [
+            "split", "unidad interior", "ventilador",
+        ],
+        "unidad exterior": [
+            "unidad exterior", "compresor", "condensadora",
+        ],
+    },
+
+    "iluminacion": {
+        "luminaria / lámpara": [
+            "luminaria", "lampara", "lámpara", "fluorescente",
+            "bombilla", "led", "tubo",
+        ],
+        "emergencia": [
+            "emergencia", "luz emergencia", "luz de emergencia",
+        ],
+        "interruptor / pulsador": [
+            "interruptor", "pulsador",
+        ],
+    },
+
+    "equipamiento": {
+        "puerta / maneta": [
+            "puerta", "maneta", "cerradura", "bisagra", "pomo",
+        ],
+        "ventana / persiana": [
+            "ventana", "persiana", "estor",
+        ],
+        "mesa / silla": [
+            "mesa", "silla", "pata", "tablero",
+        ],
+        "pizarra": [
+            "pizarra",
+        ],
+    },
+
+    "informatica": {
+        "pantalla / proyector": [
+            "pantalla", "proyector", "proyector", "hdmi",
+        ],
+        "ordenador": [
+            "ordenador", "pc", "equipo informatico", "equipo informático",
+        ],
+        "red / conectividad": [
+            "red", "wifi", "internet", "conexion", "conexión",
+        ],
+        "audio": [
+            "altavoz", "altavoces", "audio", "sonido",
+        ],
+    },
+
+    "acs": {
+        "acumulador": [
+            "acumulador", "deposito", "depósito",
+        ],
+        "retorno / recirculación": [
+            "retorno", "recirculacion", "recirculación", "bomba retorno",
+            "bomba de retorno",
+        ],
+        "temperatura": [
+            "temperatura", "no llega", "agua fria", "agua fría",
+        ],
+        "válvula": [
+            "valvula", "válvula",
+        ],
+    },
+
+    "seguridad": {
+        "puerta de emergencia": [
+            "puerta emergencia", "puerta de emergencia", "antipanico",
+            "antipánico",
+        ],
+        "cierre / acceso": [
+            "cerradura", "cierre", "acceso", "llave",
+        ],
+        "señalización": [
+            "senalizacion", "señalización", "senal", "señal",
+        ],
+    },
+
+    "jardineria": {
+        "riego": [
+            "riego", "aspersor", "gotero", "programador",
+        ],
+        "árbol / rama": [
+            "arbol", "árbol", "rama", "ramas",
+        ],
+    },
+}
+
+
+def _sin_acentos(texto):
+    return (
+        str(texto or "")
+        .lower()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ü", "u")
+    )
+
+
+def _texto_incidencia(fila):
+    """
+    Une los campos textuales disponibles de una OT sin depender
+    de que todas las tablas tengan exactamente las mismas columnas.
+    """
+    campos = [
+        "descripcion",
+        "titulo",
+        "incidencia",
+        "observaciones",
+        "observaciones_cierre",
+        "detalle",
+        "comentarios",
+    ]
+
+    partes = []
+
+    for campo in campos:
+        if campo in fila.index:
+            valor = str(fila.get(campo, "") or "").strip()
+            if valor:
+                partes.append(valor)
+
+    return " ".join(partes)
+
+
+def _detectar_patron_individual(area, texto):
+    """
+    Devuelve el patrón técnico más probable de una incidencia.
+    Si no hay evidencia suficiente devuelve cadena vacía.
+    """
+    area_clave = _normalizar_clave(area)
+    texto_norm = _sin_acentos(texto)
+
+    catalogo = PATRONES_POR_AREA.get(area_clave, {})
+
+    mejor_patron = ""
+    mejor_puntuacion = 0
+
+    for patron, palabras in catalogo.items():
+        puntuacion = 0
+
+        for palabra in palabras:
+            palabra_norm = _sin_acentos(palabra)
+
+            if palabra_norm and palabra_norm in texto_norm:
+                # Las expresiones compuestas pesan algo más.
+                puntuacion += 2 if " " in palabra_norm else 1
+
+        if puntuacion > mejor_puntuacion:
+            mejor_patron = patron
+            mejor_puntuacion = puntuacion
+
+    if mejor_puntuacion <= 0:
+        return ""
+
+    return mejor_patron
+
+
+def _analizar_patron_grupo(grupo, area):
+    """
+    Busca si dentro del grupo existe un tipo de avería realmente repetido.
+
+    Criterio conservador:
+    - al menos 2 incidencias del mismo patrón;
+    - y ese patrón debe representar al menos el 50% del grupo.
+    """
+    patrones = []
+
+    for _, fila in grupo.iterrows():
+        texto = _texto_incidencia(fila)
+        patron = _detectar_patron_individual(area, texto)
+
+        if patron:
+            patrones.append(patron)
+
+    if not patrones:
+        return {
+            "patron": "",
+            "repeticiones": 0,
+            "confianza": "Sin patrón claro",
+            "porcentaje": 0,
+        }
+
+    conteo = {}
+
+    for patron in patrones:
+        conteo[patron] = conteo.get(patron, 0) + 1
+
+    patron_dominante = max(
+        conteo,
+        key=lambda p: conteo[p],
+    )
+
+    repeticiones = conteo[patron_dominante]
+    total_grupo = len(grupo)
+
+    porcentaje = round(
+        (repeticiones / total_grupo) * 100
+    ) if total_grupo else 0
+
+    if repeticiones < 2 or porcentaje < 50:
+        return {
+            "patron": "",
+            "repeticiones": repeticiones,
+            "confianza": "Baja",
+            "porcentaje": porcentaje,
+        }
+
+    if porcentaje >= 80 and repeticiones >= 3:
+        confianza = "Alta"
+    elif porcentaje >= 60:
+        confianza = "Media"
+    else:
+        confianza = "Moderada"
+
+    return {
+        "patron": patron_dominante,
+        "repeticiones": repeticiones,
+        "confianza": confianza,
+        "porcentaje": porcentaje,
+    }
+
+
+# =========================================================
 # UTILIDADES
 # =========================================================
 
@@ -714,6 +1005,31 @@ def analizar_inteligencia_preventiva(
 
         area_norm = _normalizar(area)
 
+        patron_info = _analizar_patron_grupo(
+            grupo,
+            area,
+        )
+
+        patron_detectado = patron_info.get(
+            "patron",
+            "",
+        )
+
+        repeticiones_patron = patron_info.get(
+            "repeticiones",
+            0,
+        )
+
+        confianza_patron = patron_info.get(
+            "confianza",
+            "Sin patrón claro",
+        )
+
+        porcentaje_patron = patron_info.get(
+            "porcentaje",
+            0,
+        )
+
         # ---------------------------------------------
         # Umbral diferente según riesgo
         # ---------------------------------------------
@@ -785,19 +1101,36 @@ def analizar_inteligencia_preventiva(
         tarea_preventiva = ""
 
         # =============================================
-        # NO EXISTE PREVENTIVO
+        # NO HAY PATRÓN TÉCNICO REPETIDO CLARO
         # =============================================
-        if preventivo is None:
+        if not patron_detectado:
+
+            accion = "Seguir observando"
+
+            motivo = (
+                f"Hay {cantidad} incidencias en {dias} días en el mismo "
+                f"espacio y área, pero sus descripciones no muestran todavía "
+                f"un mismo tipo de avería repetido con suficiente claridad. "
+                f"No conviene crear un preventivo solo por coincidencia de área."
+            )
+
+        # =============================================
+        # HAY PATRÓN Y NO EXISTE PREVENTIVO
+        # =============================================
+        elif preventivo is None:
 
             accion = "Crear preventivo"
 
             motivo = (
-                f"Se han registrado {cantidad} incidencias "
-                f"en {dias} días en el mismo espacio y área."
+                f"Patrón detectado: {patron_detectado}. "
+                f"Se repite en {repeticiones_patron} de {cantidad} incidencias "
+                f"({porcentaje_patron}% del grupo). "
+                f"Confianza del patrón: {confianza_patron}. "
+                f"Conviene valorar un preventivo específico sobre este elemento."
             )
 
         # =============================================
-        # YA EXISTE PREVENTIVO
+        # HAY PATRÓN Y YA EXISTE PREVENTIVO
         # =============================================
         else:
 
@@ -837,30 +1170,31 @@ def analizar_inteligencia_preventiva(
                 intervalo_medio is not None
                 and dias_actuales > 0
                 and dias_sugeridos > 0
-                and dias_actuales
-                > dias_sugeridos
+                and dias_actuales > dias_sugeridos
             ):
 
-                accion = (
-                    "Revisar frecuencia"
-                )
+                accion = "Revisar frecuencia"
 
                 motivo = (
-                    f"Ya existe preventivo, pero las averías "
-                    f"se repiten aproximadamente cada "
-                    f"{intervalo_medio} días."
+                    f"Patrón detectado: {patron_detectado}. "
+                    f"Se repite en {repeticiones_patron} de {cantidad} incidencias "
+                    f"({porcentaje_patron}%). "
+                    f"Ya existe preventivo, pero las averías se repiten "
+                    f"aproximadamente cada {intervalo_medio} días. "
+                    f"Conviene revisar si la frecuencia actual se adelanta "
+                    f"lo suficiente al fallo."
                 )
 
             else:
 
-                accion = (
-                    "Vigilar preventivo existente"
-                )
+                accion = "Vigilar preventivo existente"
 
                 motivo = (
-                    f"Existe preventivo activo, pero se han "
-                    f"registrado {cantidad} correctivos en "
-                    f"{dias} días."
+                    f"Patrón detectado: {patron_detectado}. "
+                    f"Se repite en {repeticiones_patron} de {cantidad} incidencias "
+                    f"({porcentaje_patron}%). "
+                    f"Existe preventivo activo; antes de crear otro conviene "
+                    f"comprobar si su checklist cubre específicamente este elemento."
                 )
 
         planta = mapa_plantas.get(
@@ -910,6 +1244,18 @@ def analizar_inteligencia_preventiva(
             ),
             "prioridad_alta": (
                 prioridad_alta
+            ),
+            "patron_detectado": (
+                patron_detectado
+            ),
+            "repeticiones_patron": (
+                repeticiones_patron
+            ),
+            "confianza_patron": (
+                confianza_patron
+            ),
+            "porcentaje_patron": (
+                porcentaje_patron
             ),
             "descripcion": (
                 _descripcion_representativa(
