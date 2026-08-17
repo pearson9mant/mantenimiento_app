@@ -434,8 +434,11 @@ def obtener_historico_preventivos():
         FROM historico_ordenes h
         LEFT JOIN preventivo_registros pr
             ON pr.numero_ot = h.numero_ot
-        WHERE UPPER(COALESCE(h.origen, '')) = 'PREVENTIVO'
-           OR UPPER(COALESCE(h.descripcion, '')) LIKE '[PREVENTIVO]%'
+        WHERE (
+                UPPER(COALESCE(h.numero_ot, '')) LIKE 'PREV-%'
+                OR UPPER(COALESCE(h.descripcion, '')) LIKE '[PREVENTIVO]%'
+              )
+          AND UPPER(COALESCE(h.numero_ot, '')) NOT LIKE 'INC-%'
         ORDER BY h.id DESC
     """))
 
