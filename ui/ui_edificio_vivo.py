@@ -29,25 +29,56 @@ EDIFICIOS = {
         ],
     },
     "Pearson 9": {
+        # Estructura física real de los tres edificios principales.
+        # El Anexo Servicios se pinta aparte porque no pertenece a A/B/C.
         "Edificio A": [
-            "Terrado",
             "Planta 2",
             "Planta 1",
-            "Planta 0",
         ],
         "Edificio B": [
-            "Terrado",
             "Planta 2",
             "Planta 1",
-            "Planta 0",
         ],
         "Edificio C": [
-            "Terrado",
             "Planta 2",
             "Planta 1",
-            "Planta 0",
         ],
     },
+}
+
+
+# Zonas físicas del anexo de Pearson 9, en el orden real del plano.
+ZONAS_ANEXO_P9 = [
+    "Taller",
+    "Vestuarios chicas",
+    "Sala calderas",
+    "Vestuarios chicos",
+]
+
+ALIASES_ZONAS_ANEXO_P9 = {
+    "Taller": [
+        "taller",
+    ],
+    "Vestuarios chicas": [
+        "vestuarios chicas",
+        "vestuario chicas",
+        "duchas femeninas",
+        "duchas femenina",
+        "duchas chicas",
+    ],
+    "Sala calderas": [
+        "sala calderas",
+        "sala de calderas",
+        "sala tecnica",
+        "sala técnica",
+    ],
+    "Vestuarios chicos": [
+        "vestuarios chicos",
+        "vestuario chicos",
+        "duchas masculinas",
+        "duchas masculina",
+        "duchas chicos",
+    ],
 }
 
 
@@ -109,6 +140,24 @@ def normalizar_centro(valor):
 
 def normalizar_edificio(valor, centro=""):
     texto = _norm(valor)
+
+    # Pearson 9 tiene un anexo de servicios independiente de A/B/C.
+    # Nunca debe confundirse con la Llar de Pearson 22.
+    if centro == "Pearson 9":
+        if any(
+            alias in texto
+            for alias in [
+                "anexo",
+                "anexo servicios",
+                "taller",
+                "vestuario",
+                "vestuarios",
+                "sala calderas",
+                "sala de calderas",
+                "sala tecnica",
+            ]
+        ):
+            return "Anexo Servicios"
 
     if any(
         alias in texto
@@ -407,6 +456,234 @@ def volver_colegio_vivo():
 
 
 # =========================================================
+# ANEXO SERVICIOS · PEARSON 9
+# =========================================================
+
+def _zona_anexo_desde_espacio(espacio):
+    """
+    Relaciona el espacio real de una OT con una de las cuatro zonas
+    del Anexo Servicios de P9. No modifica la base de datos.
+    """
+    texto = _norm(espacio)
+
+    if not texto:
+        return ""
+
+    for zona, aliases in ALIASES_ZONAS_ANEXO_P9.items():
+        for alias in aliases:
+            alias_n = _norm(alias)
+
+            if texto == alias_n or alias_n in texto:
+                return zona
+
+    return ""
+
+
+def _clave_ot_visual(ot):
+    if not isinstance(ot, dict):
+        try:
+            ot = dict(ot)
+        except Exception:
+            return str(ot)
+
+    return str(
+        ot.get("id")
+        or ot.get("numero_ot")
+        or ot.get("numero")
+        or repr(ot)
+    )
+
+
+def _ordenes_unicas_anexo(lista):
+    resultado = []
+    vistas = set()
+
+    for ot in lista or []:
+        try:
+            ot_dict = dict(ot)
+        except Exception:
+            continue
+
+        clave = _clave_ot_visual(ot_dict)
+
+        if clave in vistas:
+            continue
+
+        vistas.add(clave)
+        resultado.append(ot_dict)
+
+    return resultado
+
+
+def _datos_zona_anexo_p9(resumen, zona):
+    """
+    Reconstruye el estado de cada zona del anexo a partir de las OT
+    que ya llegan al Colegio Vivo. Esto permite aprovechar órdenes
+    antiguas sin reescribirlas ni moverlas en la base de datos.
+    """
+    ordenes = []
+    ejecutables = []
+    bloqueadas = []
+
+    for clave, datos in (resumen or {}).items():
+        try:
+            centro_clave = normalizar_centro(clave[0])
+        except Exception:
+            continue
+
+        if centro_clave != "Pearson 9":
+            continue
+
+        for nombre_lista, destino in [
+            ("ordenes", ordenes),
+            ("ordenes_ejecutables", ejecutables),
+            ("ordenes_bloqueadas", bloqueadas),
+        ]:
+            for ot in datos.get(nombre_lista, []) or []:
+                try:
+                    ot_dict = dict(ot)
+                except Exception:
+                    continue
+
+                espacio_ot = (
+                    ot_dict.get("espacio")
+                    or ot_dict.get("aula")
+                    or ot_dict.get("ubicacion")
+                    or ""
+                )
+
+                if _zona_anexo_desde_espacio(espacio_ot) == zona:
+                    destino.append(ot_dict)
+
+    ordenes = _ordenes_unicas_anexo(ordenes)
+    ejecutables = _ordenes_unicas_anexo(ejecutables)
+    bloqueadas = _ordenes_unicas_anexo(bloqueadas)
+
+    # Compatibilidad con resúmenes antiguos que no separaban
+    # ejecutables y bloqueadas.
+    if ordenes and not ejecutables and not bloqueadas:
+        estados_bloqueados = {
+            "pendiente material",
+            "pendiente proveedor",
+            "pendiente presupuesto",
+            "avisado",
+        }
+        estados_cierre = {
+            "finalizada",
+            "finalizado",
+            "cerrada",
+            "cerrado",
+            "cancelada",
+            "cancelado",
+        }
+
+        for ot in ordenes:
+            estado = _norm(ot.get("estado"))
+
+            if estado in estados_cierre:
+                continue
+
+            if estado in estados_bloqueados:
+                bloqueadas.append(ot)
+            else:
+                ejecutables.append(ot)
+
+        ejecutables = _ordenes_unicas_anexo(ejecutables)
+        bloqueadas = _ordenes_unicas_anexo(bloqueadas)
+
+    urgentes = sum(
+        1
+        for ot in ordenes
+        if "urgente" in _norm(ot.get("prioridad"))
+    )
+
+    altas = sum(
+        1
+        for ot in ordenes
+        if "alta" in _norm(ot.get("prioridad"))
+    )
+
+    en_curso = sum(
+        1
+        for ot in ordenes
+        if _norm(ot.get("estado")) == "en curso"
+    )
+
+    return {
+        "total": len(ordenes),
+        "ejecutables": len(ejecutables),
+        "bloqueadas": len(bloqueadas),
+        "en_curso": en_curso,
+        "urgentes": urgentes,
+        "altas": altas,
+        "ordenes": ordenes,
+        "ordenes_ejecutables": ejecutables,
+        "ordenes_bloqueadas": bloqueadas,
+    }
+
+
+def _pintar_anexo_servicios_p9(resumen):
+    """
+    Dibuja el anexo en el orden físico real:
+    Taller → Vestuarios chicas → Sala calderas → Vestuarios chicos.
+    """
+    st.markdown(
+        '<div class="cv-annex-wrap">'
+        '<div class="cv-annex-title">ANEXO SERVICIOS · PLANTA ÚNICA</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    columnas = st.columns(
+        len(ZONAS_ANEXO_P9),
+        gap="small",
+    )
+
+    iconos_zona = {
+        "Taller": "🔧",
+        "Vestuarios chicas": "🚿",
+        "Sala calderas": "🔥",
+        "Vestuarios chicos": "🚿",
+    }
+
+    for columna, zona in zip(
+        columnas,
+        ZONAS_ANEXO_P9,
+    ):
+        datos = _datos_zona_anexo_p9(
+            resumen,
+            zona,
+        )
+
+        estado = _estado_planta(datos)
+        icono_estado = _icono_estado(estado)
+        contador = _texto_contador(datos)
+        icono_zona = iconos_zona.get(zona, "📍")
+
+        zona_activa = (
+            st.session_state.get("colegio_vivo_ultima_centro") == "Pearson 9"
+            and st.session_state.get("colegio_vivo_ultimo_edificio") == "Anexo Servicios"
+            and st.session_state.get("colegio_vivo_ultima_planta") == zona
+        )
+
+        with columna:
+            st.button(
+                f"{icono_estado} {icono_zona} {zona} {contador}",
+                key=f"cv_anexo_p9_{zona}",
+                type="primary" if zona_activa else "secondary",
+                use_container_width=True,
+                on_click=_abrir_planta,
+                args=(
+                    "Pearson 9",
+                    "Anexo Servicios",
+                    zona,
+                    datos.get("ordenes", []),
+                    datos.get("ordenes_ejecutables", []),
+                ),
+            )
+
+
+# =========================================================
 # CSS
 # =========================================================
 
@@ -510,6 +787,26 @@ def css_edificio_vivo():
             background:#354154;
             border-bottom:2px solid #1f2937;
             border-radius:0 0 3px 3px;
+        }
+
+        .cv-annex-wrap{
+            width:min(100%,1180px);
+            margin:12px auto 4px;
+        }
+
+        .cv-annex-title{
+            background:linear-gradient(
+                180deg,
+                #173a6e,
+                #0e284d
+            );
+            color:#fff;
+            border:3px solid #d9caa7;
+            padding:8px 12px;
+            text-align:center;
+            font-size:14px;
+            font-weight:950;
+            letter-spacing:.3px;
         }
 
         /*
@@ -792,3 +1089,10 @@ def pintar_campus_operario(
                 plantas,
                 resumen,
             )
+
+    # Pearson 9 tiene además un anexo real, independiente de A/B/C,
+    # formado por cuatro espacios consecutivos en una sola planta.
+    if centro == "Pearson 9":
+        _pintar_anexo_servicios_p9(
+            resumen,
+        )
