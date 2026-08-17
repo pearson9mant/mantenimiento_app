@@ -792,6 +792,67 @@ def _es_solicitud_direccion_corazon(row):
 
 
 
+
+def _dias_retraso_preventivo_corazon(row):
+    """Calcula el retraso de una PREV- sin modificar planificación."""
+    numero_ot = normalizar(row.get("numero_ot"))
+    if not numero_ot.startswith("prev-"):
+        return 0
+
+    fecha_objetivo = (
+        row.get("fecha_prevista")
+        or row.get("fecha_programada")
+        or row.get("proxima_fecha")
+        or row.get("fecha")
+        or row.get("fecha_creacion")
+        or row.get("fecha_alta")
+        or ""
+    )
+    fecha_dt = pd.to_datetime(fecha_objetivo, errors="coerce", dayfirst=True)
+    if pd.isna(fecha_dt):
+        return 0
+    hoy = pd.Timestamp(date.today()).normalize()
+    fecha_dt = pd.Timestamp(fecha_dt).normalize()
+    return max(0, int((hoy - fecha_dt).days))
+
+
+def _bonus_preventivo_corazon(row):
+    """Refuerzo moderado para preventivos críticos o retrasados."""
+    numero_ot = normalizar(row.get("numero_ot"))
+    if not numero_ot.startswith("prev-"):
+        return 0, []
+
+    area = normalizar(row.get("area"))
+    descripcion = normalizar(row.get("descripcion"))
+    texto = f"{area} {descripcion}"
+    bonus = 0
+    motivos = []
+
+    if any(p in texto for p in [
+        "acs", "agua", "fontan", "electr", "cuadro",
+        "clima", "calefaccion", "calefacción", "aire acondicionado",
+    ]):
+        bonus += 5
+        motivos.append("Preventivo de un sistema con impacto operativo.")
+
+    dias_retraso = _dias_retraso_preventivo_corazon(row)
+    if dias_retraso >= 30:
+        bonus_retraso = 15
+    elif dias_retraso >= 15:
+        bonus_retraso = 10
+    elif dias_retraso >= 7:
+        bonus_retraso = 6
+    elif dias_retraso >= 3:
+        bonus_retraso = 3
+    else:
+        bonus_retraso = 0
+
+    if bonus_retraso:
+        bonus += bonus_retraso
+        motivos.append(f"Preventivo pendiente desde hace {dias_retraso} días.")
+
+    return bonus, motivos
+
 def puntuar_orden(row):
     """
     Puntuación base del Corazón.
@@ -864,6 +925,18 @@ def puntuar_orden(row):
         score += peso_impacto
         if motivo_impacto and motivo_impacto not in motivos:
             motivos.append(motivo_impacto)
+
+    # -------------------------------------------------
+    # 2B. INTELIGENCIA ESPECÍFICA DE PREVENTIVOS
+    # Solo afecta a PREV-. Legionella conserva su tratamiento sanitario.
+    # -------------------------------------------------
+    if es_preventiva_real:
+        bonus_preventivo, motivos_preventivo = _bonus_preventivo_corazon(row)
+        if bonus_preventivo:
+            score += bonus_preventivo
+        for motivo_preventivo in motivos_preventivo:
+            if motivo_preventivo not in motivos:
+                motivos.append(motivo_preventivo)
 
     # -------------------------------------------------
     # 3. SOLICITUD DIRECTA DE DIRECCIÓN
