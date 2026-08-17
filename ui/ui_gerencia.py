@@ -1242,27 +1242,143 @@ def aplicar_estilo_colegio_vivo():
     }
     .cv-building-title {font-size:14px;font-weight:900;color:#1e3a8a;margin-bottom:6px}
 
-    .cv-annex {
-        border:1px solid #dbe3ef;
-        border-radius:16px;
-        padding:10px 10px 8px;
-        background:#fff;
-        box-shadow:0 5px 16px rgba(15,23,42,.06);
-        margin-top:10px;
-        margin-bottom:8px;
+    /* =====================================================
+       MAPA VISUAL · MISMO LENGUAJE QUE OPERARIO
+       ===================================================== */
+    .cv-map-campus-title{
+        width:100%;
+        margin:2px auto 7px;
+        text-align:center;
+        color:#0f172a;
+        font-size:18px;
+        line-height:1;
+        font-weight:950;
+        letter-spacing:.35px;
+        text-transform:uppercase;
     }
 
-    .cv-annex-title {
+    .cv-map-roof{
+        height:37px;
+        position:relative;
+        margin:0 4px -1px;
+        background:#172b47;
+        clip-path:polygon(50% 0,100% 78%,100% 100%,0 100%,0 78%);
+    }
+
+    .cv-map-roof:after{
+        content:"";
+        position:absolute;
+        left:50%;
+        top:11px;
+        transform:translateX(-50%);
+        width:11px;
+        height:11px;
+        border:3px solid #f4e6bd;
+        border-radius:50%;
+        background:#27496f;
+    }
+
+    .cv-map-building-name{
+        height:39px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        overflow:hidden;
+        padding:0 2px;
+        background:linear-gradient(180deg,#173a6e,#0e284d);
+        color:#fff;
+        font-size:12px;
+        line-height:1;
+        font-weight:950;
+        white-space:nowrap;
+        text-align:center;
+        border-left:4px solid #d9caa7;
+        border-right:4px solid #d9caa7;
+        border-top:3px solid #e8dab5;
+        border-bottom:3px solid #caba93;
+    }
+
+    .cv-map-ground{
+        height:33px;
+        position:relative;
+        background:linear-gradient(#d4c29b,#bd9f72);
+        border:4px solid #ded1ad;
+        border-top:3px solid #b89e72;
+    }
+
+    .cv-map-door{
+        position:absolute;
+        left:50%;
+        bottom:0;
+        transform:translateX(-50%);
+        width:19px;
+        height:26px;
+        background:linear-gradient(90deg,#16345b 48%,#0c2442 50%);
+        border:2px solid #10233c;
+        border-bottom:0;
+        border-radius:2px 2px 0 0;
+    }
+
+    .cv-map-base{
+        height:6px;
+        background:#354154;
+        border-bottom:2px solid #1f2937;
+        border-radius:0 0 3px 3px;
+    }
+
+    .cv-map-annex-wrap{
+        width:100%;
+        margin:8px auto 4px;
+    }
+
+    .cv-map-annex-title{
         background:linear-gradient(180deg,#173a6e,#0e284d);
         color:#fff;
         border:3px solid #d9caa7;
-        border-radius:10px 10px 0 0;
+        padding:7px 9px;
         text-align:center;
-        padding:8px 10px;
-        font-size:13px;
+        font-size:12px;
         font-weight:950;
         letter-spacing:.25px;
-        margin-bottom:6px;
+    }
+
+    /* Solo los botones de los edificios del mapa */
+    .st-key-gerencia_mapa_edificios
+    div[data-testid="stButton"] > button{
+        min-height:43px !important;
+        height:43px !important;
+        padding:0 6px !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        border:1px solid rgba(80,70,50,.24) !important;
+        color:#102033 !important;
+        font-size:11px !important;
+        line-height:1 !important;
+        font-weight:900 !important;
+        text-align:center !important;
+        justify-content:center !important;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.30) !important;
+    }
+
+    .st-key-gerencia_mapa_edificios
+    div[data-testid="stButton"] > button[kind="primary"]{
+        background:linear-gradient(135deg,#173a6e,#2459a7) !important;
+        color:#fff !important;
+        border:2px solid #f0d58a !important;
+    }
+
+    .st-key-gerencia_anexo_p9
+    div[data-testid="stButton"] > button{
+        min-height:47px !important;
+        height:47px !important;
+        padding:4px 5px !important;
+        border-radius:0 !important;
+        font-size:10px !important;
+        line-height:1.12 !important;
+        font-weight:900 !important;
+        white-space:normal !important;
+        text-align:center !important;
+        justify-content:center !important;
     }
 
     .cv-panel {
@@ -1296,27 +1412,91 @@ def aplicar_estilo_colegio_vivo():
     .block-container {padding-top:1rem;padding-bottom:1rem;max-width:1700px}
     @media (max-width: 900px) {
         .cv-hero {display:block}.cv-status{margin-top:10px}.cv-title{font-size:23px}
-        .cv-annex-title{font-size:12px;padding:7px 8px}
     }
 
     @media (max-width: 760px) {
-        .st-key-gerencia_anexo_p9 div[data-testid="stHorizontalBlock"]{
+        .cv-map-campus-title{font-size:15px;margin-bottom:5px}
+
+        .cv-map-roof{
+            height:27px;
+            margin:0 2px -1px;
+        }
+
+        .cv-map-roof:after{
+            top:8px;
+            width:8px;
+            height:8px;
+            border-width:2px;
+        }
+
+        .cv-map-building-name{
+            height:30px;
+            font-size:9px;
+            border-left-width:2px;
+            border-right-width:2px;
+            border-top-width:2px;
+            border-bottom-width:2px;
+        }
+
+        .st-key-gerencia_mapa_edificios
+        div[data-testid="stHorizontalBlock"]{
+            flex-wrap:nowrap !important;
+            gap:4px !important;
+        }
+
+        .st-key-gerencia_mapa_edificios
+        div[data-testid="stHorizontalBlock"] > div{
+            min-width:0 !important;
+            flex:1 1 0 !important;
+        }
+
+        .st-key-gerencia_mapa_edificios
+        div[data-testid="stButton"] > button{
+            min-height:39px !important;
+            height:39px !important;
+            padding:0 3px !important;
+            font-size:9px !important;
+        }
+
+        .cv-map-ground{
+            height:23px;
+            border-width:2px;
+            border-top-width:2px;
+        }
+
+        .cv-map-door{
+            width:13px;
+            height:18px;
+            border-width:1px;
+        }
+
+        .cv-map-base{
+            height:4px;
+        }
+
+        .cv-map-annex-title{
+            font-size:11px;
+            padding:6px 5px;
+        }
+
+        .st-key-gerencia_anexo_p9
+        div[data-testid="stHorizontalBlock"]{
             flex-wrap:wrap !important;
             gap:4px !important;
         }
 
-        .st-key-gerencia_anexo_p9 div[data-testid="stHorizontalBlock"] > div{
+        .st-key-gerencia_anexo_p9
+        div[data-testid="stHorizontalBlock"] > div{
             flex:1 1 calc(50% - 4px) !important;
             min-width:calc(50% - 4px) !important;
             max-width:calc(50% - 4px) !important;
         }
 
-        .st-key-gerencia_anexo_p9 div[data-testid="stButton"] > button{
-            min-height:52px !important;
-            white-space:normal !important;
-            text-align:center !important;
-            justify-content:center !important;
-            line-height:1.15 !important;
+        .st-key-gerencia_anexo_p9
+        div[data-testid="stButton"] > button{
+            min-height:50px !important;
+            height:50px !important;
+            font-size:10px !important;
         }
     }
     </style>
@@ -1657,28 +1837,99 @@ def mostrar_edificio_cv(df, centro, edificio, plantas):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def mostrar_anexo_servicios_cv(df, centro="Pearson 9"):
+def _pintar_edificio_visual_gerencia(
+    df,
+    centro,
+    edificio,
+    plantas,
+):
     """
-    Dibuja el Anexo Servicios de Pearson 9 como una franja independiente,
-    no como un cuarto edificio.
-
-    Mantiene la misma selección y el mismo panel de detalle que el resto
-    del Colegio Vivo.
+    Representación visual tipo Colegio Vivo de Operario.
+    Solo cambia el dibujo; datos y selección siguen usando
+    la lógica actual de Gerencia.
     """
-    zonas = EDIFICIOS_GERENCIA["Pearson 9"]["Anexo Servicios"]
-
-    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
-    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
-    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
-
     st.markdown(
-        "<div class='cv-annex'>"
-        "<div class='cv-annex-title'>"
-        "ANEXO SERVICIOS · PLANTA ÚNICA"
-        "</div>"
-        "</div>",
+        (
+            '<div class="cv-map-roof"></div>'
+            '<div class="cv-map-building-name">'
+            f'{edificio.upper()}'
+            '</div>'
+        ),
         unsafe_allow_html=True,
     )
+
+    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
+    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
+    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
+
+    for planta in plantas:
+        icono, cantidad, _ = _estado_planta(
+            df,
+            centro,
+            edificio,
+            planta,
+        )
+
+        etiqueta = (
+            "T"
+            if planta == "Terrado"
+            else planta.replace("Planta ", "P")
+        )
+
+        contador = "✓" if cantidad == 0 else f"({cantidad})"
+
+        seleccionada = (
+            centro == seleccionado_centro
+            and edificio == seleccionado_edificio
+            and planta == seleccionado_planta
+        )
+
+        st.button(
+            f"{icono} {etiqueta} {contador}",
+            key=f"cv_visual_{centro}_{edificio}_{planta}",
+            use_container_width=True,
+            on_click=_seleccionar_planta_cv,
+            args=(centro, edificio, planta),
+            type="primary" if seleccionada else "secondary",
+        )
+
+    st.markdown(
+        (
+            '<div class="cv-map-ground">'
+            '<div class="cv-map-door"></div>'
+            '</div>'
+            '<div class="cv-map-base"></div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def _pintar_anexo_visual_gerencia(df):
+    zonas = EDIFICIOS_GERENCIA[
+        "Pearson 9"
+    ]["Anexo Servicios"]
+
+    st.markdown(
+        (
+            '<div class="cv-map-annex-wrap">'
+            '<div class="cv-map-annex-title">'
+            'ANEXO SERVICIOS · PLANTA ÚNICA'
+            '</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    iconos_zona = {
+        "Taller": "🔧",
+        "Vestuarios chicas": "🚿",
+        "Sala calderas": "🔥",
+        "Vestuarios chicos": "🚿",
+    }
+
+    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
+    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
+    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
 
     with st.container(key="gerencia_anexo_p9"):
         columnas = st.columns(
@@ -1686,40 +1937,34 @@ def mostrar_anexo_servicios_cv(df, centro="Pearson 9"):
             gap="small",
         )
 
-        iconos_zona = {
-            "Taller": "🔧",
-            "Vestuarios chicas": "🚿",
-            "Sala calderas": "🔥",
-            "Vestuarios chicos": "🚿",
-        }
-
-        for columna, zona in zip(columnas, zonas):
+        for columna, zona in zip(
+            columnas,
+            zonas,
+        ):
             icono_estado, cantidad, _ = _estado_planta(
                 df,
-                centro,
+                "Pearson 9",
                 "Anexo Servicios",
                 zona,
             )
 
-            sufijo = f"\n{cantidad}" if cantidad else "\nOK"
+            contador = "✓" if cantidad == 0 else f"({cantidad})"
+            icono_zona = iconos_zona.get(zona, "📍")
 
             seleccionada = (
-                centro == seleccionado_centro
+                seleccionado_centro == "Pearson 9"
                 and seleccionado_edificio == "Anexo Servicios"
                 and seleccionado_planta == zona
             )
 
-            prefijo = "▸ " if seleccionada else ""
-            icono_zona = iconos_zona.get(zona, "📍")
-
             with columna:
                 st.button(
-                    f"{prefijo}{icono_estado} {icono_zona} {zona}{sufijo}",
-                    key=f"cv_{centro}_anexo_{zona}",
+                    f"{icono_estado} {icono_zona} {zona} {contador}",
+                    key=f"cv_visual_p9_anexo_{zona}",
                     use_container_width=True,
                     on_click=_seleccionar_planta_cv,
                     args=(
-                        centro,
+                        "Pearson 9",
                         "Anexo Servicios",
                         zona,
                     ),
@@ -1727,44 +1972,77 @@ def mostrar_anexo_servicios_cv(df, centro="Pearson 9"):
                 )
 
 
-def mostrar_mapa_centro_cv(df, centro):
+def mostrar_mapa_visual_centro_gerencia(
+    df,
+    centro,
+):
     """
-    Renderiza la estructura física del centro.
+    Mapa visual compacto para Gerencia.
+
+    Pearson 22:
+      Infantil/Primaria + Llar, como edificios reales.
 
     Pearson 9:
-    - A/B/C como edificios.
-    - Anexo Servicios como franja independiente.
-
-    Pearson 22 mantiene exactamente su representación actual.
+      A + B + C en una fila y Anexo Servicios debajo.
     """
-    edificios = EDIFICIOS_GERENCIA[centro]
+    st.markdown(
+        f'<div class="cv-map-campus-title">{centro}</div>',
+        unsafe_allow_html=True,
+    )
 
-    if centro == "Pearson 9":
-        for edificio in [
-            "Edificio A",
-            "Edificio B",
-            "Edificio C",
-        ]:
-            mostrar_edificio_cv(
-                df,
-                centro,
-                edificio,
-                edificios[edificio],
+    with st.container(key="gerencia_mapa_edificios"):
+        if centro == "Pearson 9":
+            columnas = st.columns(
+                3,
+                gap="small",
             )
 
-        mostrar_anexo_servicios_cv(
-            df,
-            centro="Pearson 9",
-        )
-        return
+            for columna, edificio in zip(
+                columnas,
+                [
+                    "Edificio A",
+                    "Edificio B",
+                    "Edificio C",
+                ],
+            ):
+                with columna:
+                    _pintar_edificio_visual_gerencia(
+                        df,
+                        centro,
+                        edificio,
+                        EDIFICIOS_GERENCIA[
+                            centro
+                        ][edificio],
+                    )
 
-    for edificio, plantas in edificios.items():
-        mostrar_edificio_cv(
-            df,
-            centro,
-            edificio,
-            plantas,
+            _pintar_anexo_visual_gerencia(df)
+            return
+
+        # Pearson 22
+        columnas = st.columns(
+            [1.15, 1],
+            gap="small",
         )
+
+        with columnas[0]:
+            _pintar_edificio_visual_gerencia(
+                df,
+                "Pearson 22",
+                "Infantil / Primaria",
+                EDIFICIOS_GERENCIA[
+                    "Pearson 22"
+                ]["Infantil / Primaria"],
+            )
+
+        with columnas[1]:
+            _pintar_edificio_visual_gerencia(
+                df,
+                "Pearson 22",
+                "Llar",
+                EDIFICIOS_GERENCIA[
+                    "Pearson 22"
+                ]["Llar"],
+            )
 
 
 def _cerradas_mes_planta(datos):
@@ -1967,7 +2245,7 @@ def mostrar_colegio_vivo_gerencia(
                 "El color refleja el riesgo, no solo la cantidad."
             )
 
-            mostrar_mapa_centro_cv(
+            mostrar_mapa_visual_centro_gerencia(
                 df,
                 centro_objetivo,
             )
@@ -2079,11 +2357,7 @@ def mostrar_colegio_vivo_gerencia(
         )
 
         for centro in EDIFICIOS_GERENCIA:
-            st.markdown(
-                f"**{centro}**"
-            )
-
-            mostrar_mapa_centro_cv(
+            mostrar_mapa_visual_centro_gerencia(
                 df,
                 centro,
             )
