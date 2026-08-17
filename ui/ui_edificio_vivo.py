@@ -634,53 +634,56 @@ def _pintar_anexo_servicios_p9(resumen):
         unsafe_allow_html=True,
     )
 
-    columnas = st.columns(
-        len(ZONAS_ANEXO_P9),
-        gap="small",
-    )
-
-    iconos_zona = {
-        "Taller": "🔧",
-        "Vestuarios chicas": "🚿",
-        "Sala calderas": "🔥",
-        "Vestuarios chicos": "🚿",
-    }
-
-    for columna, zona in zip(
-        columnas,
-        ZONAS_ANEXO_P9,
-    ):
-        datos = _datos_zona_anexo_p9(
-            resumen,
-            zona,
+    # Contenedor con key propia para poder hacer el anexo responsive
+    # sin alterar los tres edificios principales.
+    with st.container(key="cv_anexo_p9_mobile"):
+        columnas = st.columns(
+            len(ZONAS_ANEXO_P9),
+            gap="small",
         )
 
-        estado = _estado_planta(datos)
-        icono_estado = _icono_estado(estado)
-        contador = _texto_contador(datos)
-        icono_zona = iconos_zona.get(zona, "📍")
+        iconos_zona = {
+            "Taller": "🔧",
+            "Vestuarios chicas": "🚿",
+            "Sala calderas": "🔥",
+            "Vestuarios chicos": "🚿",
+        }
 
-        zona_activa = (
-            st.session_state.get("colegio_vivo_ultima_centro") == "Pearson 9"
-            and st.session_state.get("colegio_vivo_ultimo_edificio") == "Anexo Servicios"
-            and st.session_state.get("colegio_vivo_ultima_planta") == zona
-        )
-
-        with columna:
-            st.button(
-                f"{icono_estado} {icono_zona} {zona} {contador}",
-                key=f"cv_anexo_p9_{zona}",
-                type="primary" if zona_activa else "secondary",
-                use_container_width=True,
-                on_click=_abrir_planta,
-                args=(
-                    "Pearson 9",
-                    "Anexo Servicios",
-                    zona,
-                    datos.get("ordenes", []),
-                    datos.get("ordenes_ejecutables", []),
-                ),
+        for columna, zona in zip(
+            columnas,
+            ZONAS_ANEXO_P9,
+        ):
+            datos = _datos_zona_anexo_p9(
+                resumen,
+                zona,
             )
+
+            estado = _estado_planta(datos)
+            icono_estado = _icono_estado(estado)
+            contador = _texto_contador(datos)
+            icono_zona = iconos_zona.get(zona, "📍")
+
+            zona_activa = (
+                st.session_state.get("colegio_vivo_ultima_centro") == "Pearson 9"
+                and st.session_state.get("colegio_vivo_ultimo_edificio") == "Anexo Servicios"
+                and st.session_state.get("colegio_vivo_ultima_planta") == zona
+            )
+
+            with columna:
+                st.button(
+                    f"{icono_estado} {icono_zona} {zona} {contador}",
+                    key=f"cv_anexo_p9_{zona}",
+                    type="primary" if zona_activa else "secondary",
+                    use_container_width=True,
+                    on_click=_abrir_planta,
+                    args=(
+                        "Pearson 9",
+                        "Anexo Servicios",
+                        zona,
+                        datos.get("ordenes", []),
+                        datos.get("ordenes_ejecutables", []),
+                    ),
+                )
 
 
 # =========================================================
@@ -876,6 +879,10 @@ def css_edificio_vivo():
         }
 
         @media(max-width:760px){
+            /*
+            Los edificios A/B/C continúan en una sola fila.
+            Solo el Anexo Servicios pasa a 2 x 2 en móvil.
+            */
             div[data-testid="stHorizontalBlock"]{
                 flex-wrap:nowrap !important;
                 gap:4px !important;
@@ -884,6 +891,42 @@ def css_edificio_vivo():
             div[data-testid="stHorizontalBlock"] > div{
                 min-width:0 !important;
                 flex:1 1 0 !important;
+            }
+
+            .st-key-cv_anexo_p9_mobile
+            div[data-testid="stHorizontalBlock"]{
+                flex-wrap:wrap !important;
+                gap:4px !important;
+                width:100% !important;
+            }
+
+            .st-key-cv_anexo_p9_mobile
+            div[data-testid="stHorizontalBlock"] > div{
+                flex:1 1 calc(50% - 4px) !important;
+                min-width:calc(50% - 4px) !important;
+                max-width:calc(50% - 4px) !important;
+            }
+
+            .st-key-cv_anexo_p9_mobile
+            div[data-testid="stButton"] > button{
+                min-height:54px !important;
+                height:54px !important;
+                padding:4px 7px !important;
+                font-size:11px !important;
+                line-height:1.15 !important;
+                white-space:normal !important;
+                justify-content:center !important;
+                text-align:center !important;
+                overflow:hidden !important;
+            }
+
+            .cv-annex-wrap{
+                margin-top:8px;
+            }
+
+            .cv-annex-title{
+                font-size:12px;
+                padding:7px 8px;
             }
 
             .cv-campus-title{
