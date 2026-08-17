@@ -1004,13 +1004,27 @@ if perfil == "gerencia":
         col1, col2 = st.columns(2)
 
         with col1:
-            if st.button("📊\nPanel gerencia", key="btn_gerencia_panel", use_container_width=True):
-                st.session_state["seccion_actual"] = "Gerencia"
+            if st.button(
+                "🏫\nPearson 22",
+                key="btn_gerencia_p22",
+                use_container_width=True
+            ):
+                st.session_state["gerencia_cv_centro"] = "Pearson 22"
+                st.session_state["gerencia_cv_edificio"] = None
+                st.session_state["gerencia_cv_planta"] = None
+                st.session_state["seccion_actual"] = "Gerencia Pearson 22"
                 st.rerun()
 
         with col2:
-            if st.button("☀️\nPlan verano", key="btn_plan_verano_gerencia", use_container_width=True):
-                st.session_state["seccion_actual"] = "Plan verano"
+            if st.button(
+                "🏫\nPearson 9",
+                key="btn_gerencia_p9",
+                use_container_width=True
+            ):
+                st.session_state["gerencia_cv_centro"] = "Pearson 9"
+                st.session_state["gerencia_cv_edificio"] = None
+                st.session_state["gerencia_cv_planta"] = None
+                st.session_state["seccion_actual"] = "Gerencia Pearson 9"
                 st.rerun()
 
         pintar_footer()
@@ -1147,11 +1161,13 @@ if perfil == "admin":
 
 elif perfil == "gerencia":
 
-    if seccion == "Gerencia":
+    if seccion == "Gerencia Pearson 22":
+        st.session_state["gerencia_cv_centro"] = "Pearson 22"
         pantalla_gerencia()
 
-    elif seccion == "Plan verano":
-        pantalla_plan_verano()
+    elif seccion == "Gerencia Pearson 9":
+        st.session_state["gerencia_cv_centro"] = "Pearson 9"
+        pantalla_gerencia()
 
 elif perfil == "comunicacion":
 
