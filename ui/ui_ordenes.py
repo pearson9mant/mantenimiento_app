@@ -18,7 +18,7 @@ from modules.ordenes import (
     obtener_siguiente_numero_ot,
     actualizar_estado,
     actualizar_observaciones_estado,
-    obtener_historico,
+    obtener_historico_reciente,
     borrar_orden,
     borrar_orden_historico,
     finalizar_trabajo_externo,
