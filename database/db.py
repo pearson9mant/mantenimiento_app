@@ -19,6 +19,20 @@ def _sql(query):
     return query
 
 
+def _log_db_warning(contexto, error):
+    """
+    Registra avisos internos de base de datos en los logs.
+    No interrumpe el funcionamiento de la aplicación.
+    """
+    try:
+        print(
+            f"[DB WARNING] {contexto}: "
+            f"{type(error).__name__}: {error}"
+        )
+    except Exception:
+        pass
+
+
 def conectar():
     database_url = os.getenv("DATABASE_URL")
 
@@ -37,8 +51,11 @@ def conectar():
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout=30000")
-    except Exception:
-        pass
+    except Exception as e:
+        _log_db_warning(
+            "Configurando PRAGMA de SQLite",
+            e
+        )
 
     return conn
 
@@ -59,7 +76,11 @@ def _column_exists(cursor, tabla, columna):
 
         return columna in [fila[1] for fila in cursor.fetchall()]
 
-    except Exception:
+    except Exception as e:
+        _log_db_warning(
+            f"Comprobando columna {tabla}.{columna}",
+            e
+        )
         return False
 
 
@@ -72,8 +93,12 @@ def _add_column(cursor, tabla, columna, tipo):
             f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"
         )
 
-    except Exception:
-        pass
+    except Exception as e:
+        _log_db_warning(
+            f"Añadiendo columna {tabla}.{columna}",
+            e
+        )
+
 
 def crear_indices_rendimiento():
     conn = conectar()
@@ -131,8 +156,11 @@ def crear_indices_rendimiento():
     for sql in indices:
         try:
             cursor.execute(sql)
-        except Exception:
-            pass
+        except Exception as e:
+            _log_db_warning(
+                f"Creando índice: {sql}",
+                e
+            )
 
     conn.commit()
     conn.close()
