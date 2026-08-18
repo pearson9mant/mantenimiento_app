@@ -593,6 +593,8 @@ def crear_orden(datos):
     contacto_empresa = datos[16] if len(datos) > 16 else ""
     telefono_empresa = datos[17] if len(datos) > 17 else ""
     email_empresa = datos[18] if len(datos) > 18 else ""
+
+    planta = datos[28] if len(datos) > 28 else ""
     # Dato opcional añadido al final para no romper llamadas antiguas
     
 
@@ -679,9 +681,10 @@ def crear_orden(datos):
             fecha_firma_operario,
             coste_estimado,
             coste_final,
-            observaciones_estado
+            observaciones_estado,
+            planta
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """), (
         numero_ot,
         descripcion,
@@ -711,7 +714,8 @@ def crear_orden(datos):
         fecha_firma_operario,
         coste_estimado,
         coste_final,
-        observaciones_estado
+        observaciones_estado,
+        planta
     ))
 
     conn.commit()
@@ -910,6 +914,38 @@ def obtener_ordenes_operario(operario):
     datos = cursor.fetchall()
     conn.close()
     return datos
+
+
+
+def actualizar_planta_ot(numero_ot, planta):
+    """Actualiza únicamente la planta de una OT activa."""
+    asegurar_columnas_observaciones_estado()
+
+    numero_ot = str(numero_ot or "").strip()
+    planta = str(planta or "").strip()
+
+    if not numero_ot:
+        return False
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET planta = ?
+            WHERE numero_ot = ?
+        """), (planta, numero_ot))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 def obtener_detalle_orden_externa(id_orden):
@@ -1170,7 +1206,8 @@ def finalizar_orden(id_orden, observaciones=""):
                trabajo_a_realizar, trabajo_realizado, firma_operario,
                fecha_firma_operario, coste_estimado, coste_final,
                observaciones_estado,
-               origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia
+               origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
+               planta
         FROM ordenes_trabajo
         WHERE id = ?
     """), (id_orden,))
@@ -1187,7 +1224,8 @@ def finalizar_orden(id_orden, observaciones=""):
             trabajo_a_realizar, trabajo_realizado, firma_operario,
             fecha_firma_operario, coste_estimado, coste_final,
             observaciones_estado,
-            origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia
+            origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
+            planta
         ) = orden
 
         if tipo_orden == "Externa":
@@ -1238,9 +1276,10 @@ def finalizar_orden(id_orden, observaciones=""):
                 origen_id,
                 id_punto_legionella,
                 id_preventivo,
-                id_incidencia
+                id_incidencia,
+                planta
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot,
             descripcion,
@@ -1276,7 +1315,8 @@ def finalizar_orden(id_orden, observaciones=""):
             origen_id,
             id_punto_legionella,
             id_preventivo,
-            id_incidencia
+            id_incidencia,
+            planta
         ))
 
         if registrar_historial_espacio is not None:
