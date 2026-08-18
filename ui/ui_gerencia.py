@@ -171,6 +171,7 @@ def leer_primera_tabla_existente(posibles_tablas):
     return pd.DataFrame(), ""
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def preparar_ordenes():
     ordenes = leer_tabla("ordenes_trabajo")
     historico = leer_tabla("historico_ordenes")
@@ -222,6 +223,7 @@ def preparar_ordenes():
     return df
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def preparar_inventario():
     df = leer_tabla("inventario")
 
@@ -272,6 +274,7 @@ def preparar_inventario():
     return df
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def preparar_movimientos_inventario():
     movimientos, tabla = leer_primera_tabla_existente([
         "movimientos_inventario",
@@ -667,8 +670,6 @@ def mostrar_selector_centros():
 def evaluar_estado_centro(df, centro):
     abiertas = contar(df, centro, "abiertas")
     material = contar(df, centro, "material")
-    legionella = contar(df, centro, "legionella_mes")
-    preventivas = contar(df, centro, "preventivas_mes")
 
     if abiertas >= 20 or material >= 5:
         return "rojo", 55, "Existen incidencias que requieren atención prioritaria."
@@ -731,18 +732,23 @@ def mostrar_resumen_ejecutivo(df, centro):
             )
             st.caption(row.get("descripcion", "") or "")
 
-    st.markdown("### 🎯 Actuaciones recomendadas hoy")
+    st.markdown("### 📌 Actuaciones abiertas a seguir")
 
     abiertas = obtener_df_tarjeta(df, centro, "abiertas").head(5)
 
     if abiertas.empty:
-        st.success("No hay actuaciones pendientes prioritarias.")
+        st.success("No hay actuaciones pendientes.")
     else:
         for i, (_, row) in enumerate(abiertas.iterrows(), start=1):
             st.markdown(
                 f"{i}. **{row.get('espacio', '-') or '-'}** · "
                 f"{row.get('descripcion', '-') or '-'}"
             )
+
+        st.caption(
+            "Gerencia muestra actuaciones abiertas para seguimiento. "
+            "La prioridad diaria de trabajo la determina el ❤️ Corazón."
+        )
 
 
 def _serie_mensual_base():
@@ -1075,7 +1081,10 @@ def mostrar_detalle_inventario_total(centro):
         st.info("No hay inventario registrado para mostrar.")
         return
 
-    st.metric("💰 Total inventario", euros(datos["valor_total"].sum()))
+    st.metric(
+        "💰 Total inventario",
+        euros(datos["valor_total"].sum())
+    )
 
     datos = buscador_dataframe(
         datos,
@@ -1095,30 +1104,107 @@ def mostrar_detalle_inventario_total(centro):
         fecha_compra = row.get("fecha_compra", "")
         foto = row.get("foto", "")
 
-        foto_data = obtener_foto_inventario_por_id(id_material)
+        with st.expander(
+            f"📦 {codigo} · {material} · Stock: {stock}",
+            expanded=False
+        ):
+            st.markdown(
+                f"### {material}"
+            )
 
-        with st.expander(f"📦 {codigo} · {material} · Stock: {stock}", expanded=False):
-            st.markdown(f"### {material}")
+            st.caption(
+                f"🏷️ {categoria or '-'} · "
+                f"📍 {ubicacion or '-'}"
+            )
 
-            st.caption(f"🏷️ {categoria or '-'} · 📍 {ubicacion or '-'}")
-            st.markdown(f"**Precio unitario:** {euros(precio)}")
-            st.markdown(f"**Valor inventario:** {euros(valor)}")
+            st.markdown(
+                f"**Precio unitario:** {euros(precio)}"
+            )
+
+            st.markdown(
+                f"**Valor inventario:** {euros(valor)}"
+            )
 
             if fecha_compra:
-                st.caption(f"📅 {fecha_compra}")
+                st.caption(
+                    f"📅 {fecha_compra}"
+                )
 
-            if foto_data:
+            # =====================================================
+            # FOTO INVENTARIO BAJO DEMANDA
+            # =====================================================
+            clave_foto_inv = (
+                "gerencia_foto_inventario_abierta"
+            )
+
+            foto_abierta = st.session_state.get(
+                clave_foto_inv
+            )
+
+            if foto_abierta == id_material:
+
+                if st.button(
+                    "🙈 Ocultar foto",
+                    key=f"cerrar_foto_gerencia_{id_material}",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop(
+                        clave_foto_inv,
+                        None,
+                    )
+                    st.rerun()
+
                 try:
-                    st.image(bytes(foto_data), width=220)
-                except Exception:
-                    st.caption("Foto no disponible.")
+                    foto_data = (
+                        obtener_foto_inventario_por_id(
+                            id_material
+                        )
+                    )
 
-            elif foto:
-                try:
-                    st.image(foto, width=220)
-                except Exception:
-                    st.caption("Foto no disponible.")
+                    if foto_data:
+                        try:
+                            st.image(
+                                bytes(foto_data),
+                                width=220
+                            )
+                        except Exception:
+                            st.caption(
+                                "Foto no disponible."
+                            )
 
+                    elif foto:
+                        try:
+                            st.image(
+                                foto,
+                                width=220
+                            )
+                        except Exception:
+                            st.caption(
+                                "Foto no disponible."
+                            )
+
+                    else:
+                        st.info(
+                            "Este material no tiene foto."
+                        )
+
+                except Exception as e:
+                    st.caption(
+                        f"No se pudo cargar la foto: {e}"
+                    )
+
+            else:
+
+                if st.button(
+                    "📷 Ver foto",
+                    key=f"abrir_foto_gerencia_{id_material}",
+                    use_container_width=True,
+                ):
+                    st.session_state[
+                        clave_foto_inv
+                    ] = id_material
+
+                    st.rerun()
 
 def mostrar_detalle_inventario_utilizado(centro, ordenes):
     movimientos = preparar_movimientos_inventario()
@@ -2108,7 +2194,7 @@ def mostrar_panel_planta_cv(df):
         st.markdown("#### Por áreas")
         _mostrar_areas_cv(activas)
     with c_prioridad:
-        st.markdown("#### Actuación prioritaria")
+        st.markdown("#### Actuación que requiere más atención")
         if activas.empty:
             st.success("No hay actuaciones pendientes.")
         else:
@@ -2122,6 +2208,11 @@ def mostrar_panel_planta_cv(df):
                 f"{fila.get('prioridad','') or 'Prioridad pendiente de valorar'} · "
                 f"{fila.get('numero_ot','') or ''}</div></div>",
                 unsafe_allow_html=True,
+            )
+
+            st.caption(
+                "Esta referencia es para seguimiento de Gerencia. "
+                "La prioridad operativa la determina el ❤️ Corazón."
             )
 
     if edificio == "Anexo Servicios":
