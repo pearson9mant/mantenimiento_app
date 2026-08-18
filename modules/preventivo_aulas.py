@@ -138,6 +138,15 @@ def crear_tablas_preventivo_aulas():
         )
     """))
 
+    try:
+        cur.execute(_sql("""
+            ALTER TABLE preventivo_aulas
+            ADD COLUMN planta TEXT
+        """))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     conn.commit()
     conn.close()
 
@@ -148,7 +157,8 @@ def crear_revision_aula(
     espacio,
     operario,
     observaciones="",
-    numero_ot_preventiva=""
+    numero_ot_preventiva="",
+    planta="",
 ):
     crear_tablas_preventivo_aulas()
 
@@ -165,9 +175,10 @@ def crear_revision_aula(
             operario,
             estado,
             observaciones,
-            numero_ot_preventiva
+            numero_ot_preventiva,
+            planta
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
     """), (
         hoy_str(),
@@ -177,7 +188,8 @@ def crear_revision_aula(
         operario,
         "Abierta",
         observaciones,
-        numero_ot_preventiva
+        numero_ot_preventiva,
+        planta
     ))
 
     revision_id = cur.fetchone()[0]
@@ -221,7 +233,8 @@ def obtener_revisiones_aulas(limite=100):
 
     cur.execute(_sql("""
         SELECT id, fecha, centro, edificio, espacio, operario,
-               estado, observaciones, numero_ot_preventiva
+               estado, observaciones, numero_ot_preventiva,
+               COALESCE(planta, '')
         FROM preventivo_aulas
         ORDER BY id DESC
         LIMIT ?
@@ -241,7 +254,8 @@ def obtener_revision_aula(revision_id):
 
     cur.execute(_sql("""
         SELECT id, fecha, centro, edificio, espacio, operario,
-               estado, observaciones, numero_ot_preventiva
+               estado, observaciones, numero_ot_preventiva,
+               COALESCE(planta, '')
         FROM preventivo_aulas
         WHERE id = ?
     """), (revision_id,))
@@ -394,7 +408,8 @@ def crear_correctivos_desde_revision(revision_id):
         operario,
         estado_revision,
         observaciones_revision,
-        numero_ot_preventiva
+        numero_ot_preventiva,
+        planta,
     ) = revision
 
     conn = conectar()
@@ -431,6 +446,7 @@ def crear_correctivos_desde_revision(revision_id):
 Correctivo generado desde revisión preventiva de aula.
 
 Aula/Espacio: {espacio}
+Planta: {planta or "-"}
 Elemento: {elemento}
 Área asignada automáticamente: {area}
 Observación: {observaciones_item or "-"}
@@ -439,20 +455,35 @@ OT preventiva origen: {numero_ot_preventiva or "-"}
 """.strip()
 
         datos_orden = (
-            numero,
-            descripcion,
-            "Abierta",
-            centro,
-            edificio,
-            espacio,
-            area,
-            "Media",
-            operario,
-            "PREVENTIVO_AULA",
-            observaciones_ot,
-            foto or "",
-            "",
-            "Operarios"
+            numero,                         # 0 numero_ot
+            descripcion,                    # 1 descripcion
+            "Abierta",                      # 2 estado
+            centro,                         # 3 centro
+            edificio,                       # 4 edificio
+            espacio,                        # 5 espacio
+            area,                           # 6 area
+            "Media",                        # 7 prioridad
+            operario,                       # 8 operario
+            "PREVENTIVO_AULA",              # 9 origen
+            "Mantenimiento preventivo",     # 10 solicitante
+            hoy_str(),                      # 11 fecha_origen
+            foto or "",                     # 12 foto
+            "Operarios",                    # 13 tipo_solicitante
+            "Interna",                      # 14 tipo_orden
+            "",                             # 15 empresa_externa
+            "",                             # 16 contacto_empresa
+            "",                             # 17 telefono_empresa
+            "",                             # 18 email_empresa
+            "",                             # 19 fecha_aviso_empresa
+            "",                             # 20 fecha_realizacion
+            "",                             # 21 trabajo_a_realizar
+            "",                             # 22 trabajo_realizado
+            "",                             # 23 firma_operario
+            "",                             # 24 fecha_firma_operario
+            0,                              # 25 coste_estimado
+            0,                              # 26 coste_final
+            observaciones_ot,               # 27 observaciones_estado
+            planta or "",                   # 28 planta
         )
 
         crear_orden(datos_orden)
