@@ -1866,16 +1866,6 @@ def pantalla_operario(modo="ordenes"):
         st.caption(str(e))
         return
 
-    operario_normalizado = normalizar_operario_nombre(
-        operario_sel
-    )
-
-    historico_operario = [
-        h for h in historico
-        if len(h) > 10
-        and normalizar_operario_nombre(h[10])
-        == operario_normalizado
-    ]
 
     if not historico_operario:
         st.info("No hay trabajos finalizados todavía.")
