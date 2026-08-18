@@ -10,7 +10,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from modules.espacios import obtener_aulas_para_qr
+from modules.espacios import obtener_espacios_para_qr
 from modules.espacios import (
     obtener_centros_espacios,
     obtener_edificios_espacios,
@@ -102,6 +102,53 @@ def obtener_configuracion_placas():
                 "placas_marcas_corte",
                 True,
             )
+        ),
+
+        "mostrar_aula": bool(
+            st.session_state.get(
+                "placas_mostrar_aula",
+                True,
+            )
+        ),
+
+        "tamano_texto_aula": int(
+            st.session_state.get(
+                "placas_tamano_aula",
+                9,
+            )
+            or 9
+        ),
+
+        "tamano_nombre_espacio": int(
+            st.session_state.get(
+                "placas_tamano_nombre",
+                20,
+            )
+            or 20
+        ),
+
+        "tamano_qr": int(
+            st.session_state.get(
+                "placas_tamano_qr",
+                32,
+            )
+            or 32
+        ),
+
+        "separacion_superior": float(
+            st.session_state.get(
+                "placas_posicion_aula",
+                22.0,
+            )
+            or 22.0
+        ),
+
+        "separacion_nombre": float(
+            st.session_state.get(
+                "placas_posicion_nombre",
+                27.5,
+            )
+            or 27.5
         ),
     }
 
@@ -576,7 +623,15 @@ def generar_pdf_pegatinas(aulas, configuracion):
             edificio,
             planta,
             espacio,
+            tipo_espacio,
         ) = fila
+
+        configuracion_espacio = dict(
+            configuracion
+        )
+        configuracion_espacio[
+            "tipo_espacio"
+        ] = tipo_espacio
 
         dibujar_pegatina_espacio(
             pdf,
@@ -589,7 +644,7 @@ def generar_pdf_pegatinas(aulas, configuracion):
             edificio,
             planta,
             espacio,
-            configuracion,
+            configuracion_espacio,
         )
         if configuracion.get("marcas_corte", True):
             dibujar_marcas_corte(
@@ -861,12 +916,30 @@ def dibujar_pegatina_espacio(
         espacio or ""
     ).strip().upper()
 
-    # Etiqueta superior: AULA para aulas,
-    # ESPACIO para el resto.
-    etiqueta_espacio = "AULA"
+    # Etiqueta superior según el tipo real del espacio.
+    tipo_normalizado = str(tipo_espacio or "").strip()
+    tipo_lower = tipo_normalizado.lower()
 
-    if tipo_espacio and "aula" not in tipo_espacio.lower():
-        etiqueta_espacio = "ESPACIO"
+    if "aula" in tipo_lower:
+        etiqueta_espacio = "AULA"
+    elif "patio" in tipo_lower:
+        etiqueta_espacio = "PATIO"
+    elif tipo_lower in ["wc", "aseo", "baño", "lavabo"]:
+        etiqueta_espacio = "WC"
+    elif "comedor" in tipo_lower:
+        etiqueta_espacio = "COMEDOR"
+    elif "cocina" in tipo_lower:
+        etiqueta_espacio = "COCINA"
+    elif "almac" in tipo_lower:
+        etiqueta_espacio = "ALMACÉN"
+    elif "laboratorio" in tipo_lower:
+        etiqueta_espacio = "LABORATORIO"
+    elif "gimnasio" in tipo_lower:
+        etiqueta_espacio = "GIMNASIO"
+    elif "sala" in tipo_lower:
+        etiqueta_espacio = "SALA"
+    else:
+        etiqueta_espacio = tipo_normalizado.upper() or "ESPACIO"
 
     if mostrar_aula:
         dibujar_texto_centrado(
@@ -1053,35 +1126,38 @@ def dibujar_pegatina_espacio(
 
 
 def pantalla_qr_aulas():
-    st.markdown("## 📱 QR de aulas")
+    st.markdown("## 📱 QR de espacios")
 
     st.info(
-        "Aquí aparecen las aulas registradas en el catálogo central. "
-        "Puedes probar cada formulario, descargar un QR individual "
-        "o generar un PDF listo para imprimir."
+        "Aquí aparecen únicamente los espacios del catálogo que tienen "
+        "activado 📱 QR habilitado. Puedes probar el formulario, "
+        "descargar un QR individual o generar el PDF de placas."
     )
 
-    aulas = obtener_aulas_para_qr()
+    espacios_qr = obtener_espacios_para_qr()
 
-    if not aulas:
-        st.warning("No hay aulas registradas.")
+    if not espacios_qr:
+        st.warning(
+            "No hay espacios con QR habilitado. "
+            "Actívalos desde Configuración → Espacios."
+        )
         return
 
     centros = sorted({
         str(fila[1])
-        for fila in aulas
-        if len(fila) >= 5 and fila[1]
+        for fila in espacios_qr
+        if len(fila) >= 6 and fila[1]
     })
 
     centro_filtro = st.selectbox(
         "Centro",
         ["Todos"] + centros,
-        key="qr_aulas_filtro_centro",
+        key="qr_espacios_filtro_centro",
     )
 
-    aulas_centro = [
+    espacios_centro = [
         fila
-        for fila in aulas
+        for fila in espacios_qr
         if (
             centro_filtro == "Todos"
             or str(fila[1]) == centro_filtro
@@ -1090,26 +1166,26 @@ def pantalla_qr_aulas():
 
     edificios = sorted({
         str(fila[2])
-        for fila in aulas_centro
-        if len(fila) >= 5 and fila[2]
+        for fila in espacios_centro
+        if len(fila) >= 6 and fila[2]
     })
 
     edificio_filtro = st.selectbox(
         "Edificio",
         ["Todos"] + edificios,
-        key="qr_aulas_filtro_edificio",
+        key="qr_espacios_filtro_edificio",
     )
 
     buscar = st.text_input(
-        "Buscar aula",
-        placeholder="Ejemplo: I4A, 3A, ESO 1A...",
-        key="qr_aulas_buscar",
+        "Buscar espacio",
+        placeholder="Ejemplo: Patio, Sala polivalente, I4A, WC...",
+        key="qr_espacios_buscar",
     ).strip().lower()
 
     resultados = []
 
-    for fila in aulas:
-        if len(fila) < 5:
+    for fila in espacios_qr:
+        if len(fila) < 6:
             continue
 
         (
@@ -1118,6 +1194,7 @@ def pantalla_qr_aulas():
             edificio,
             planta,
             espacio,
+            tipo_espacio,
         ) = fila
 
         if (
@@ -1134,47 +1211,49 @@ def pantalla_qr_aulas():
 
         texto_busqueda = (
             f"{codigo} {centro} {edificio} "
-            f"{planta} {espacio}"
+            f"{planta} {espacio} {tipo_espacio}"
         ).lower()
 
-        if buscar:
-            espacio_normalizado = str(espacio or "").strip().lower()
-            codigo_normalizado = str(codigo or "").strip().lower()
-        
-            if (
-                buscar != espacio_normalizado
-                and buscar != codigo_normalizado
-            ):
-                continue
+        if buscar and buscar not in texto_busqueda:
+            continue
 
         resultados.append(fila)
 
-    st.caption(f"Aulas encontradas: {len(resultados)}")
+    st.caption(
+        f"Espacios con QR encontrados: {len(resultados)}"
+    )
 
     if not resultados:
-        st.info("No hay aulas que coincidan con los filtros.")
+        st.info(
+            "No hay espacios que coincidan con los filtros."
+        )
         return
 
     configuracion = obtener_configuracion_placas()
 
-    st.markdown("### 📄 Pegatinas para imprimir")
+    st.markdown("### 📄 Placas para imprimir")
 
     st.caption(
         f"El PDF incluye {configuracion['por_pagina']} placas "
-        "por página A4, listas para imprimir, recortar "
-        "y plastificar."
+        "por página A4."
     )
 
-    nombre_partes = ["QR_Aulas"]
+    nombre_partes = ["QR_Espacios"]
 
     if centro_filtro != "Todos":
-        nombre_partes.append(centro_filtro)
+        nombre_partes.append(
+            centro_filtro
+        )
 
     if edificio_filtro != "Todos":
-        nombre_partes.append(edificio_filtro)
+        nombre_partes.append(
+            edificio_filtro
+        )
 
     nombre_pdf = (
-        limpiar_nombre_archivo("_".join(nombre_partes))
+        limpiar_nombre_archivo(
+            "_".join(nombre_partes)
+        )
         + ".pdf"
     )
 
@@ -1184,12 +1263,12 @@ def pantalla_qr_aulas():
     )
 
     st.download_button(
-        "📄 Descargar PDF de pegatinas",
+        "📄 Descargar PDF de placas",
         data=pdf_bytes,
         file_name=nombre_pdf,
         mime="application/pdf",
         use_container_width=True,
-        key="descargar_pdf_qr_aulas",
+        key="descargar_pdf_qr_espacios",
     )
 
     st.markdown("---")
@@ -1198,11 +1277,6 @@ def pantalla_qr_aulas():
         "🔎 Ver y comprobar placas individuales",
         expanded=False,
     ):
-        st.caption(
-            "Desde aquí puedes probar el formulario de cada aula "
-            "o descargar un QR individual."
-        )
-
         for fila in resultados:
             (
                 codigo,
@@ -1210,14 +1284,19 @@ def pantalla_qr_aulas():
                 edificio,
                 planta,
                 espacio,
+                tipo_espacio,
             ) = fila
 
-            codigo = str(codigo or "").strip()
+            codigo = str(
+                codigo or ""
+            ).strip()
 
             if not codigo:
                 continue
 
-            enlace = construir_enlace_qr(codigo)
+            enlace = construir_enlace_qr(
+                codigo
+            )
 
             qr_bytes = generar_qr_png(
                 enlace,
@@ -1225,14 +1304,21 @@ def pantalla_qr_aulas():
                 border=2,
             )
 
-            with st.container(border=True):
-                st.markdown(f"### 🏫 {espacio}")
-
-                st.caption(
-                    f"📍 {centro} · {edificio} · {planta}"
+            with st.container(
+                border=True
+            ):
+                st.markdown(
+                    f"### 📍 {espacio}"
                 )
 
-                col1, col2 = st.columns([1, 2])
+                st.caption(
+                    f"{tipo_espacio or 'Espacio'} · "
+                    f"{centro} · {edificio} · {planta}"
+                )
+
+                col1, col2 = st.columns(
+                    [1, 2]
+                )
 
                 with col1:
                     st.image(
@@ -1241,7 +1327,9 @@ def pantalla_qr_aulas():
                     )
 
                 with col2:
-                    st.code(codigo)
+                    st.code(
+                        codigo
+                    )
 
                     st.link_button(
                         "🔎 Probar formulario",
