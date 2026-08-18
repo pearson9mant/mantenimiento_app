@@ -1855,7 +1855,10 @@ def pantalla_operario(modo="ordenes"):
     # No consulta ni renderiza órdenes activas
     # =====================================================
     try:
-        historico = obtener_historico()
+        historico_operario = obtener_historico_operario(
+            operario_sel,
+            limite=500,
+        )
     except Exception as e:
         st.error(
             "No se ha podido cargar el histórico."
