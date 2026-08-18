@@ -10,6 +10,7 @@ from modules.inventario import (
     desactivar_material,
     activar_material,
     comprobar_material_antes_crear,
+    actualizar_material_abel,
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -246,8 +247,12 @@ def pantalla_inventario():
                     f"{item['fecha']}"
                 )
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(
+            f"[INVENTARIO WARNING] "
+            f"No se pudieron cargar alertas externas: "
+            f"{type(e).__name__}: {e}"
+        )
 
     operario = st.session_state.get("operario_activo", "")
 
@@ -692,21 +697,41 @@ def pantalla_inventario():
             if observaciones_coste:
                 st.info(f"💶 {observaciones_coste}")
 
-            if foto_data:
-                try:
-                    st.image(bytes(foto_data), width=220)
-                    if foto_nombre:
-                        st.caption(f"📷 {foto_nombre}")
-                except Exception as e:
-                    st.caption(f"Foto no disponible: {e}")
+            # La foto ya viene en el registro actual, pero no se procesa
+            # ni se renderiza hasta que el usuario la solicita.
+            clave_foto_inv = "inventario_foto_abierta"
+            foto_abierta = st.session_state.get(clave_foto_inv)
 
-            elif foto:
-                try:
-                    st.image(foto, width=220)
-                    if foto_nombre:
-                        st.caption(f"📷 {foto_nombre}")
-                except Exception:
-                    st.caption("Foto no disponible.")
+            if foto_data or foto:
+                if foto_abierta == codigo:
+                    if st.button(
+                        "🙈 Ocultar foto",
+                        key=f"ocultar_foto_inv_{codigo}",
+                    ):
+                        st.session_state.pop(clave_foto_inv, None)
+                        st.rerun()
+
+                    if foto_data:
+                        try:
+                            st.image(bytes(foto_data), width=220)
+                            if foto_nombre:
+                                st.caption(f"📷 {foto_nombre}")
+                        except Exception as e:
+                            st.caption(f"Foto no disponible: {e}")
+                    elif foto:
+                        try:
+                            st.image(foto, width=220)
+                            if foto_nombre:
+                                st.caption(f"📷 {foto_nombre}")
+                        except Exception:
+                            st.caption("Foto no disponible.")
+                else:
+                    if st.button(
+                        "📷 Ver foto",
+                        key=f"ver_foto_inv_{codigo}",
+                    ):
+                        st.session_state[clave_foto_inv] = codigo
+                        st.rerun()
 
             with st.expander("✏️ Editar material"):
 
@@ -770,25 +795,38 @@ def pantalla_inventario():
                         foto_nombre_nueva = None
                         foto_data_nueva = None
 
-                        if nueva_foto is not None:
-                            foto_nombre_nueva = nueva_foto.name
-                            foto_data_nueva = nueva_foto.getvalue()
+                        if (
+                            nueva_foto is not None
+                            and nueva_foto.size > 5 * 1024 * 1024
+                        ):
+                            st.error(
+                                "No se puede guardar. "
+                                "La foto supera 5 MB."
+                            )
+                        else:
+                            if nueva_foto is not None:
+                                foto_nombre_nueva = limpiar_nombre_archivo(
+                                    nueva_foto.name
+                                )
+                                foto_data_nueva = nueva_foto.getvalue()
 
-                        actualizar_material_abel(
-                            codigo=codigo,
-                            material=nuevo_material,
-                            categoria=nueva_categoria,
-                            ubicacion=nueva_ubicacion,
-                            proveedor=nuevo_proveedor,
-                            stock_minimo=nuevo_stock_minimo,
-                            precio_unitario=nuevo_precio_unitario,
-                            observaciones=nuevas_observaciones,
-                            foto_nombre=foto_nombre_nueva,
-                            foto_data=foto_data_nueva
-                        )
+                            actualizar_material_abel(
+                                codigo=codigo,
+                                material=nuevo_material,
+                                categoria=nueva_categoria,
+                                ubicacion=nueva_ubicacion,
+                                proveedor=nuevo_proveedor,
+                                stock_minimo=nuevo_stock_minimo,
+                                precio_unitario=nuevo_precio_unitario,
+                                observaciones=nuevas_observaciones,
+                                foto_nombre=foto_nombre_nueva,
+                                foto_data=foto_data_nueva
+                            )
 
-                        st.success("Material actualizado correctamente.")
-                        st.rerun()
+                            st.success(
+                                "Material actualizado correctamente."
+                            )
+                            st.rerun()
 
             if puede_borrar_inventario():
                 if activo == 1:
