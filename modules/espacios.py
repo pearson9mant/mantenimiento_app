@@ -1078,7 +1078,16 @@ def obtener_espacio_por_codigo(codigo):
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT id, codigo, centro, edificio, planta, espacio, tipo, activo
+        SELECT
+            id,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo,
+            qr_habilitado
         FROM espacios
         WHERE codigo = ?
         LIMIT 1
