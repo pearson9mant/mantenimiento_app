@@ -1680,6 +1680,14 @@ def asegurar_tabla_ordenes_fotos():
             )
         """)
 
+    try:
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ordenes_fotos_numero_ot
+            ON ordenes_fotos(numero_ot)
+        """)
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
