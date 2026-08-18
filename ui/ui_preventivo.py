@@ -463,7 +463,11 @@ def obtener_historico_preventivos():
             h.fecha_cierre,
             h.centro,
             h.edificio,
-            COALESCE(pr.planta, ''),
+            COALESCE(
+                NULLIF(h.planta, ''),
+                pr.planta,
+                ''
+            ),
             h.espacio,
             h.area,
             h.operario,
@@ -1165,10 +1169,42 @@ def pantalla_preventivo():
                         st.write(material_necesario)
 
                     if foto:
-                        try:
-                            st.image(foto, caption="Foto preventiva", width=260)
-                        except Exception:
-                            st.caption("Foto preventiva no disponible.")
+                        clave_foto = "preventivo_foto_tarea_abierta"
+
+                        foto_abierta = st.session_state.get(
+                            clave_foto
+                        )
+
+                        if foto_abierta == id_tarea:
+                            if st.button(
+                                "🙈 Ocultar foto",
+                                key=f"ocultar_foto_prev_{id_tarea}",
+                            ):
+                                st.session_state.pop(
+                                    clave_foto,
+                                    None,
+                                )
+                                st.rerun()
+
+                            try:
+                                st.image(
+                                    foto,
+                                    caption="Foto preventiva",
+                                    width=260,
+                                )
+                            except Exception:
+                                st.caption(
+                                    "Foto preventiva no disponible."
+                                )
+                        else:
+                            if st.button(
+                                "📷 Ver foto",
+                                key=f"ver_foto_prev_{id_tarea}",
+                            ):
+                                st.session_state[
+                                    clave_foto
+                                ] = id_tarea
+                                st.rerun()
 
                     c1, c2 = st.columns(2)
 
