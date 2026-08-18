@@ -1181,7 +1181,8 @@ def mostrar_tarjeta_ot(
                     centro=centro,
                     edificio=edificio,
                     espacio=espacio,
-                    desc=desc
+                    desc=desc,
+                    planta=planta_mostrar,
                 )
             else:
                 mostrar_ejecucion_legionella_operario(
@@ -1192,6 +1193,7 @@ def mostrar_tarjeta_ot(
                     edificio=edificio,
                     espacio=espacio,
                     operario=operario,
+                    planta=planta_mostrar,
                 )
 
         st.markdown("### 📝 Estado y observaciones")
