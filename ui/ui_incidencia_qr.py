@@ -141,26 +141,45 @@ def pantalla_incidencia_qr():
         )
         return
 
-    (
-        id_espacio_db,
-        codigo_espacio,
-        centro,
-        edificio,
-        planta,
-        espacio,
-        tipo,
-        activo,
-    ) = espacio_db
+    if len(espacio_db) >= 9:
+        (
+            id_espacio_db,
+            codigo_espacio,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo,
+            qr_habilitado,
+        ) = espacio_db
+    else:
+        (
+            id_espacio_db,
+            codigo_espacio,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo,
+        ) = espacio_db
+
+        # Compatibilidad temporal con estructuras anteriores:
+        # las aulas que ya tenían QR siguen funcionando.
+        qr_habilitado = (
+            1
+            if "aula" in str(tipo or "").strip().lower()
+            else 0
+        )
 
     if int(activo or 0) != 1:
         st.error("Este espacio está desactivado.")
         return
 
-    tipo_normalizado = str(tipo or "").strip().lower()
-
-    if "aula" not in tipo_normalizado:
+    if int(qr_habilitado or 0) != 1:
         st.warning(
-            "Este formulario QR está habilitado actualmente solo para aulas."
+            "Este espacio no tiene habilitado el formulario QR."
         )
         return
 
@@ -253,7 +272,7 @@ def pantalla_incidencia_qr():
         st.markdown(
             "<div style='text-align:center; color:#2563eb; "
             "font-size:13px; font-weight:900; letter-spacing:1px;'>"
-            "AULA SELECCIONADA</div>",
+            f"{str(tipo or 'ESPACIO').upper()} SELECCIONADO</div>",
             unsafe_allow_html=True,
         )
     
