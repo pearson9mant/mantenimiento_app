@@ -2,13 +2,15 @@ import streamlit as st
 from datetime import date, timedelta
 from pathlib import Path
 
-from config import CENTROS, EDIFICIOS, AREAS, OPERARIOS, ESPACIOS
+from config import CENTROS, AREAS, OPERARIOS
 from database.db import conectar, _sql
 from modules.preventivo import (
     generar_ots_preventivo_si_toca,
     frecuencia_a_dias,
 )
 from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
     obtener_plantas_espacios,
     obtener_espacios_por_planta,
 )
@@ -840,54 +842,80 @@ def pantalla_preventivo():
     )
 
     with tab1:
-        centro = st.selectbox("Centro", CENTROS, key="prev_centro")
+        # =====================================================
+        # UBICACIÓN · CATÁLOGO CENTRAL
+        # =====================================================
 
-        edificios_disponibles = EDIFICIOS.get(centro, [])
+        centros_catalogo = obtener_centros_espacios()
+
+        if not centros_catalogo:
+            centros_catalogo = list(CENTROS)
+
+        centro = st.selectbox(
+            "Centro",
+            centros_catalogo,
+            key="prev_centro",
+        )
+
+        edificios_disponibles = obtener_edificios_espacios(
+            centro
+        )
+
+        if not edificios_disponibles:
+            st.warning(
+                "Este centro todavía no tiene edificios "
+                "registrados en Configuración → Espacios."
+            )
+            return
+
         edificio = st.selectbox(
             "Edificio",
             edificios_disponibles,
-            key=f"prev_edificio_{centro}"
+            key=f"prev_edificio_{centro}",
         )
 
         plantas_disponibles = obtener_plantas_espacios(
             centro,
-            edificio
+            edificio,
         )
-        
+
         if not plantas_disponibles:
-            plantas_disponibles = ["Sin planta"]
-        
+            st.warning(
+                "Este edificio todavía no tiene plantas "
+                "registradas en el catálogo."
+            )
+            return
+
         planta = st.selectbox(
             "Planta",
             plantas_disponibles,
-            key=f"prev_planta_{centro}_{edificio}"
+            key=f"prev_planta_{centro}_{edificio}",
         )
-        
+
         espacios_encontrados = obtener_espacios_por_planta(
             centro,
             edificio,
-            planta
+            planta,
         )
-        
+
         espacios_disponibles = [
             fila[0]
             for fila in espacios_encontrados
             if fila and fila[0]
         ]
-        
+
         if not espacios_disponibles:
-            espacios_disponibles = ["Otro"]
-        
-        espacio_sel = st.selectbox(
+            st.warning(
+                "No hay espacios registrados en esta planta. "
+                "Añádelos desde Configuración → Espacios."
+            )
+            return
+
+        espacio = st.selectbox(
             "Espacio",
             espacios_disponibles,
-            key=f"prev_espacio_{centro}_{edificio}_{planta}"
+            key=f"prev_espacio_{centro}_{edificio}_{planta}",
         )
-
-        if espacio_sel == "Otro":
-            espacio = st.text_input("Especificar espacio", key="prev_espacio_otro")
-        else:
-            espacio = espacio_sel
 
         frecuencia_dias = st.number_input(
             "Frecuencia en días",
