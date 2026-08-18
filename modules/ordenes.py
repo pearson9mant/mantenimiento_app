@@ -756,6 +756,53 @@ def obtener_ordenes():
     conn.close()
     return datos
 
+def obtener_historico_operario(operario, limite=500):
+    """
+    Devuelve únicamente el histórico del operario solicitado.
+
+    No sustituye obtener_historico(), para mantener compatibilidad
+    con las pantallas existentes.
+
+    El límite protege la pantalla del operario cuando el histórico
+    crezca con los años.
+    """
+    asegurar_columnas_observaciones_estado()
+
+    operario = str(operario or "").strip()
+
+    if not operario:
+        return []
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT id, numero_ot, descripcion, estado, fecha_creacion,
+                   centro, edificio, espacio, area, prioridad, operario, origen,
+                   solicitante, fecha_origen, fecha_cierre,
+                   observaciones_cierre, foto,
+                   tipo_solicitante,
+                   tipo_orden, empresa_externa, contacto_empresa,
+                   telefono_empresa, email_empresa,
+                   fecha_programada, fecha_realizacion,
+                   coste_estimado, coste_final,
+                   observaciones_estado
+            FROM historico_ordenes
+            WHERE LOWER(TRIM(COALESCE(operario, ''))) =
+                  LOWER(TRIM(?))
+            ORDER BY id DESC
+            LIMIT ?
+        """), (
+            operario,
+            int(limite),
+        ))
+
+        return cursor.fetchall()
+
+    finally:
+        conn.close()
+
 
 def obtener_historico():
     asegurar_columnas_observaciones_estado()
