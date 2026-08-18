@@ -10,14 +10,42 @@ def _ph(conn):
     return "?" if "sqlite" in modulo else "%s"
 
 
+def _log_inventario_warning(contexto, error):
+    """
+    Registra avisos internos del inventario en los logs.
+    No interrumpe el funcionamiento de la aplicación.
+    """
+    try:
+        print(
+            f"[INVENTARIO WARNING] {contexto}: "
+            f"{type(error).__name__}: {error}"
+        )
+    except Exception:
+        pass
+
+
 def _add_columna_segura(cursor, tabla, columna, tipo):
     try:
-        cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN IF NOT EXISTS {columna} {tipo}")
+        cursor.execute(
+            f"ALTER TABLE {tabla} "
+            f"ADD COLUMN IF NOT EXISTS {columna} {tipo}"
+        )
+        return True
+
     except Exception:
         try:
-            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
-        except Exception:
-            pass
+            cursor.execute(
+                f"ALTER TABLE {tabla} "
+                f"ADD COLUMN {columna} {tipo}"
+            )
+            return True
+
+        except Exception as e:
+            _log_inventario_warning(
+                f"Añadiendo columna {tabla}.{columna}",
+                e
+            )
+            return False
 
 
 # =====================================================
@@ -213,10 +241,36 @@ def asegurar_columnas_inventario():
         cursor.execute("UPDATE inventario SET precio_unitario = 0 WHERE precio_unitario IS NULL")
         cursor.execute("UPDATE inventario SET coste_total = 0 WHERE coste_total IS NULL")
 
+        # Índices de uso frecuente del módulo.
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_inv_material_norm "
+            "ON inventario(material_normalizado)",
+            "CREATE INDEX IF NOT EXISTS idx_inv_centro_categoria "
+            "ON inventario(centro, categoria)",
+            "CREATE INDEX IF NOT EXISTS idx_mov_inv_codigo_material "
+            "ON movimientos_inventario(codigo_material)",
+            "CREATE INDEX IF NOT EXISTS idx_mov_inv_numero_ot "
+            "ON movimientos_inventario(numero_ot)",
+        ]
+
+        for sql_indice in indices:
+            try:
+                cursor.execute(sql_indice)
+            except Exception as e:
+                _log_inventario_warning(
+                    f"Creando índice: {sql_indice}",
+                    e
+                )
+
         conn.commit()
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        _log_inventario_warning(
+            "Asegurando estructura de inventario",
+            e
+        )
+        return
 
     finally:
         conn.close()
@@ -470,6 +524,142 @@ def obtener_materiales_inventario(
     return datos
 
 
+
+def obtener_materiales_inventario_ligero(
+    filtro_texto="",
+    filtro_categoria="Todas",
+    filtro_centro="Todos",
+    filtro_edificio="Todos",
+    incluir_inactivos=False
+):
+    """
+    Versión ligera para listados de pantalla.
+
+    Mantiene exactamente el mismo orden de columnas que
+    obtener_materiales_inventario(), pero no descarga foto_data.
+    En su posición devuelve NULL para conservar compatibilidad
+    con el desempaquetado existente.
+    """
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    sql = """
+        SELECT id, codigo, material, categoria, unidad,
+               stock_actual, stock_minimo,
+               centro, edificio, ubicacion, proveedor,
+               observaciones, fecha_alta,
+               foto, foto_nombre,
+               NULL AS foto_data,
+               activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
+        FROM inventario
+        WHERE 1=1
+    """
+
+    params = []
+
+    if not incluir_inactivos:
+        sql += " AND COALESCE(activo, 1) = 1"
+
+    if filtro_texto.strip():
+        sql += (
+            f" AND (codigo LIKE {p} "
+            f"OR material LIKE {p} "
+            f"OR ubicacion LIKE {p} "
+            f"OR proveedor LIKE {p})"
+        )
+        txt = f"%{filtro_texto.strip()}%"
+        params.extend([txt, txt, txt, txt])
+
+    if filtro_categoria != "Todas":
+        sql += f" AND categoria = {p}"
+        params.append(filtro_categoria)
+
+    if filtro_centro != "Todos":
+        sql += f" AND centro = {p}"
+        params.append(filtro_centro)
+
+    if filtro_edificio != "Todos":
+        sql += f" AND edificio = {p}"
+        params.append(filtro_edificio)
+
+    sql += " ORDER BY material ASC"
+
+    try:
+        cursor.execute(sql, params)
+        return cursor.fetchall()
+
+    finally:
+        conn.close()
+
+
+def obtener_foto_material(codigo):
+    """
+    Recupera la foto de un único material bajo demanda.
+
+    Devuelve:
+        {
+            "foto": str,
+            "foto_nombre": str,
+            "foto_data": bytes | None
+        }
+    """
+    asegurar_columnas_inventario()
+
+    codigo = str(codigo or "").strip()
+
+    if not codigo:
+        return {
+            "foto": "",
+            "foto_nombre": "",
+            "foto_data": None,
+        }
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute(f"""
+            SELECT foto, foto_nombre, foto_data
+            FROM inventario
+            WHERE codigo = {p}
+        """, (codigo,))
+
+        fila = cursor.fetchone()
+
+        if not fila:
+            return {
+                "foto": "",
+                "foto_nombre": "",
+                "foto_data": None,
+            }
+
+        return {
+            "foto": fila[0] or "",
+            "foto_nombre": fila[1] or "",
+            "foto_data": fila[2],
+        }
+
+    except Exception as e:
+        _log_inventario_warning(
+            f"Cargando foto del material {codigo}",
+            e
+        )
+
+        return {
+            "foto": "",
+            "foto_nombre": "",
+            "foto_data": None,
+        }
+
+    finally:
+        conn.close()
+
 def obtener_codigos_materiales():
     asegurar_columnas_inventario()
 
@@ -542,8 +732,11 @@ def obtener_datos_ot_para_inventario(cursor, conn, numero_ot):
                 datos_ot["fecha_creacion_ot"] = str(fila[7] or "")
                 datos_ot["origen_ot"] = fila[8] or ""
                 return datos_ot
-        except Exception:
-            pass
+        except Exception as e:
+            _log_inventario_warning(
+                f"Consultando datos de OT {numero_ot}",
+                e
+            )
 
     return datos_ot
 
