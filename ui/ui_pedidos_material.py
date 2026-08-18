@@ -374,12 +374,19 @@ def _mapa_catalogo(
 
 def mostrar_fotos_pedido(
     id_pedido,
+    contexto="general",
 ):
     numero_pedido = referencia_pedido(
         id_pedido
     )
 
-    clave = "pedido_fotos_abierto"
+    contexto = str(
+        contexto or "general"
+    ).strip().lower()
+
+    clave = (
+        f"pedido_fotos_abierto_{contexto}"
+    )
 
     abierto = st.session_state.get(
         clave
@@ -389,7 +396,10 @@ def mostrar_fotos_pedido(
 
         if st.button(
             "🙈 Ocultar fotos",
-            key=f"ocultar_fotos_pedido_{id_pedido}",
+            key=(
+                f"ocultar_fotos_pedido_"
+                f"{contexto}_{id_pedido}"
+            ),
         ):
             st.session_state.pop(
                 clave,
@@ -445,7 +455,10 @@ def mostrar_fotos_pedido(
 
         if st.button(
             "📷 Ver fotos",
-            key=f"ver_fotos_pedido_{id_pedido}",
+            key=(
+                f"ver_fotos_pedido_"
+                f"{contexto}_{id_pedido}"
+            ),
         ):
             st.session_state[
                 clave
@@ -1302,7 +1315,8 @@ def ui_pedidos_operario(
             )
 
             mostrar_fotos_pedido(
-                id_pedido
+                id_pedido,
+                contexto="operario",
             )
 
 
@@ -1405,7 +1419,8 @@ def ui_pedidos_abel():
             )
 
             mostrar_fotos_pedido(
-                id_pedido
+                id_pedido,
+                contexto="abel",
             )
 
             st.divider()
