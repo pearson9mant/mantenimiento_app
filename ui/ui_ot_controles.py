@@ -81,7 +81,8 @@ def mostrar_ejecucion_legionella_operario(
     centro,
     edificio,
     espacio,
-    operario
+    operario,
+    planta="",
 ):
     st.markdown("### 💧 Ejecutar control Legionella")
 
@@ -121,6 +122,12 @@ def mostrar_ejecucion_legionella_operario(
             if not puntos_df.empty:
                 punto = puntos_df.iloc[0].to_dict()
 
+                if not str(planta or "").strip():
+                    planta = str(
+                        punto.get("planta")
+                        or ""
+                    ).strip()
+
     except Exception:
         punto = None
 
@@ -154,7 +161,16 @@ def mostrar_ejecucion_legionella_operario(
 
         punto = puntos_df.iloc[0].to_dict()
 
-    st.caption(f"📍 {centro} · {edificio} · {punto_nombre}")
+        if not str(planta or "").strip():
+            planta = str(
+                punto.get("planta")
+                or ""
+            ).strip()
+
+    st.caption(
+        f"📍 {centro} · {edificio} · "
+        f"{planta or '-'} · {punto_nombre}"
+    )
     st.caption(f"🧪 Tarea: {tarea}")
 
     terminales = int(punto.get("numero_terminales", 1) or 1)
@@ -748,7 +764,14 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
 
     return False
 
-def mostrar_checklist_correctivo_legionella_operario(num_ot, centro, edificio, espacio, desc):
+def mostrar_checklist_correctivo_legionella_operario(
+    num_ot,
+    centro,
+    edificio,
+    espacio,
+    desc,
+    planta="",
+):
     if "CORRECTIVO LEGIONELLA" not in str(desc or "").upper():
         return False
 
@@ -880,7 +903,8 @@ def mostrar_checklist_correctivo_legionella_operario(num_ot, centro, edificio, e
                     "temperatura_final": temperatura_final,
                     "empresa_externa": empresa_externa_leg,
                     "observaciones": observaciones_leg,
-                }
+                },
+                planta=planta,
             )
             st.success("Checklist Legionella guardado.")
             st.rerun()
