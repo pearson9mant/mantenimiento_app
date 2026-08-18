@@ -88,6 +88,9 @@ def crear_indices_rendimiento():
         "CREATE INDEX IF NOT EXISTS idx_ot_origen ON ordenes_trabajo(origen)",
         "CREATE INDEX IF NOT EXISTS idx_ot_centro_fecha ON ordenes_trabajo(centro, fecha_creacion)",
         "CREATE INDEX IF NOT EXISTS idx_ot_operario_estado ON ordenes_trabajo(operario, estado)",
+        # NUEVOS
+        "CREATE INDEX IF NOT EXISTS idx_ot_numero ON ordenes_trabajo(numero_ot)",
+        "CREATE INDEX IF NOT EXISTS idx_ot_centro_estado ON ordenes_trabajo(centro, estado)",
 
         # HISTÓRICO
         "CREATE INDEX IF NOT EXISTS idx_hist_estado ON historico_ordenes(estado)",
@@ -97,6 +100,8 @@ def crear_indices_rendimiento():
         "CREATE INDEX IF NOT EXISTS idx_hist_origen ON historico_ordenes(origen)",
         "CREATE INDEX IF NOT EXISTS idx_hist_centro_fecha ON historico_ordenes(centro, fecha_creacion)",
         "CREATE INDEX IF NOT EXISTS idx_hist_operario_fecha ON historico_ordenes(operario, fecha_creacion)",
+        # NUEVO
+        "CREATE INDEX IF NOT EXISTS idx_hist_numero ON historico_ordenes(numero_ot)",
         
         # PREVENTIVO
         "CREATE INDEX IF NOT EXISTS idx_prev_activo ON preventivo_tareas(activo)",
