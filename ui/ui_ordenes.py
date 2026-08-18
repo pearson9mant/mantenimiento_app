@@ -1740,37 +1740,108 @@ def pantalla_ordenes():
                             st.info(f"📝 Observación durante el estado: {observaciones_estado}")
 
                         
-                        try:
+                        # =====================================================
+                        # FOTOS HISTÓRICO BAJO DEMANDA
+                        # =====================================================
 
-                            fotos_db = obtener_fotos_ot(numero_ot)
-                        
-                            if fotos_db:
-                        
-                                with st.expander("📷 Ver fotos"):
-                        
+                        clave_fotos_hist = (
+                            "historico_fotos_ot_abierta"
+                        )
+
+                        fotos_abiertas = (
+                            st.session_state.get(
+                                clave_fotos_hist
+                            )
+                        )
+
+                        if fotos_abiertas == numero_ot:
+
+                            if st.button(
+                                "🙈 Ocultar fotos",
+                                key=f"cerrar_fotos_hist_{id_orden}",
+                            ):
+                                st.session_state.pop(
+                                    clave_fotos_hist,
+                                    None,
+                                )
+                                st.rerun()
+
+                            try:
+                                fotos_db = obtener_fotos_ot(
+                                    numero_ot
+                                )
+
+                                if fotos_db:
+
+                                    st.markdown(
+                                        "#### 📷 Fotos"
+                                    )
+
                                     cols_fotos = st.columns(3)
-                        
-                                    for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-                        
-                                        with cols_fotos[i % 3]:
-                        
+
+                                    for i, (
+                                        nombre_foto,
+                                        foto_data,
+                                    ) in enumerate(
+                                        fotos_db
+                                    ):
+
+                                        with cols_fotos[
+                                            i % 3
+                                        ]:
+
                                             try:
                                                 st.image(
-                                                    bytes(foto_data),
-                                                    caption=f"Foto {i + 1}",
-                                                    use_container_width=True
+                                                    bytes(
+                                                        foto_data
+                                                    ),
+                                                    caption=(
+                                                        nombre_foto
+                                                        or f"Foto {i + 1}"
+                                                    ),
+                                                    use_container_width=True,
                                                 )
-                        
+
                                             except Exception:
-                                                st.caption("📷 Foto no disponible")
-                        
-                            elif foto:
-                        
-                                with st.expander("📷 Ver foto"):
-                                    st.image(foto, use_container_width=True)
-                        
-                        except Exception as e:
-                            st.caption(f"📷 Error fotos histórico: {e}")
+                                                st.caption(
+                                                    "📷 Foto no disponible"
+                                                )
+
+                                elif foto:
+
+                                    try:
+                                        st.image(
+                                            foto,
+                                            caption="Foto",
+                                            use_container_width=True,
+                                        )
+
+                                    except Exception:
+                                        st.caption(
+                                            "📷 Foto no disponible"
+                                        )
+
+                                else:
+                                    st.info(
+                                        "Esta OT no tiene fotos."
+                                    )
+
+                            except Exception as e:
+                                st.caption(
+                                    f"📷 Error cargando fotos: {e}"
+                                )
+
+                        else:
+
+                            if st.button(
+                                "📷 Ver fotos",
+                                key=f"abrir_fotos_hist_{id_orden}",
+                            ):
+                                st.session_state[
+                                    clave_fotos_hist
+                                ] = numero_ot
+
+                                st.rerun()
 
                     with c2:
                         if es_admin() or es_gerencia():
