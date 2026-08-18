@@ -187,6 +187,7 @@ def crear_tabla_espacios():
         ("tipo", "TEXT"),
         ("activo", "INTEGER DEFAULT 1"),
         ("codigo", "TEXT"),
+        ("qr_habilitado", "INTEGER DEFAULT 0"),
     ]:
         try:
             cur.execute(_sql(f"""
@@ -296,7 +297,14 @@ def obtener_espacios(activos=True):
     return datos
 
 
-def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
+def crear_espacio(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    tipo="Espacio",
+    qr_habilitado=0,
+):
     crear_tabla_espacios()
 
     centro = normalizar_texto(centro)
@@ -304,6 +312,7 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
     planta = normalizar_texto(planta)
     espacio = normalizar_texto(espacio)
     tipo = normalizar_texto(tipo) or "Espacio"
+    qr_habilitado = 1 if qr_habilitado else 0
 
     if not centro or not edificio or not planta or not espacio:
         return False
@@ -339,16 +348,18 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
                 planta,
                 espacio,
                 tipo,
-                activo
+                activo,
+                qr_habilitado
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """), (
             centro,
             edificio,
             planta,
             espacio,
             tipo,
-            1
+            1,
+            qr_habilitado
         ))
 
         try:
@@ -370,10 +381,12 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
         cur.execute(_sql("""
             UPDATE espacios
             SET tipo = ?,
-                activo = 1
+                activo = 1,
+                qr_habilitado = ?
             WHERE id = ?
         """), (
             tipo,
+            qr_habilitado,
             id_espacio
         ))
 
@@ -384,7 +397,15 @@ def crear_espacio(centro, edificio, planta, espacio, tipo="Espacio"):
     return True
 
 
-def actualizar_espacio(id_espacio, centro, edificio, planta, espacio, tipo):
+def actualizar_espacio(
+    id_espacio,
+    centro,
+    edificio,
+    planta,
+    espacio,
+    tipo,
+    qr_habilitado=None,
+):
     crear_tabla_espacios()
 
     centro = normalizar_texto(centro)
@@ -403,22 +424,44 @@ def actualizar_espacio(id_espacio, centro, edificio, planta, espacio, tipo):
     cur = conn.cursor()
 
     try:
-        cur.execute(_sql("""
-            UPDATE espacios
-            SET centro = ?,
-                edificio = ?,
-                planta = ?,
-                espacio = ?,
-                tipo = ?
-            WHERE id = ?
-        """), (
-            centro,
-            edificio,
-            planta,
-            espacio,
-            tipo,
-            id_espacio
-        ))
+        if qr_habilitado is None:
+            cur.execute(_sql("""
+                UPDATE espacios
+                SET centro = ?,
+                    edificio = ?,
+                    planta = ?,
+                    espacio = ?,
+                    tipo = ?
+                WHERE id = ?
+            """), (
+                centro,
+                edificio,
+                planta,
+                espacio,
+                tipo,
+                id_espacio
+            ))
+        else:
+            qr_habilitado = 1 if qr_habilitado else 0
+
+            cur.execute(_sql("""
+                UPDATE espacios
+                SET centro = ?,
+                    edificio = ?,
+                    planta = ?,
+                    espacio = ?,
+                    tipo = ?,
+                    qr_habilitado = ?
+                WHERE id = ?
+            """), (
+                centro,
+                edificio,
+                planta,
+                espacio,
+                tipo,
+                qr_habilitado,
+                id_espacio
+            ))
 
         conn.commit()
         return True
@@ -690,6 +733,81 @@ def obtener_tipos_espacios():
 
 
 # =====================================================
+# QR DE ESPACIOS
+# =====================================================
+
+def actualizar_qr_habilitado_espacio(id_espacio, habilitado):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE espacios
+            SET qr_habilitado = ?
+            WHERE id = ?
+        """), (
+            1 if habilitado else 0,
+            id_espacio,
+        ))
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def qr_habilitado_espacio(id_espacio):
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT qr_habilitado
+        FROM espacios
+        WHERE id = ?
+        LIMIT 1
+    """), (id_espacio,))
+
+    fila = cur.fetchone()
+    conn.close()
+
+    return bool(fila and int(fila[0] or 0) == 1)
+
+
+def obtener_espacios_para_qr():
+    crear_tabla_espacios()
+    asegurar_codigos_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(_sql("""
+        SELECT
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo
+        FROM espacios
+        WHERE activo = 1
+          AND qr_habilitado = 1
+          AND codigo IS NOT NULL
+          AND codigo <> ''
+        ORDER BY centro, edificio, planta, espacio
+    """))
+
+    datos = cur.fetchall()
+    conn.close()
+    return datos
+
+
+# =====================================================
 # BÚSQUEDAS
 # =====================================================
 
@@ -944,58 +1062,13 @@ def ordenar_items_espacios(items):
     )
 
 def obtener_aulas_para_qr():
-    crear_tabla_espacios()
-    asegurar_codigos_espacios()
+    """
+    Alias de compatibilidad.
+    Ahora devuelve todos los espacios con QR habilitado,
+    no solo los de tipo Aula.
+    """
+    return obtener_espacios_para_qr()
 
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        SELECT
-            codigo,
-            centro,
-            edificio,
-            planta,
-            espacio,
-            tipo
-        FROM espacios
-        WHERE activo = 1
-        ORDER BY centro, edificio, planta, espacio
-    """))
-
-    filas = cur.fetchall()
-    conn.close()
-
-    aulas = []
-
-    for fila in filas:
-        codigo, centro, edificio, planta, espacio, tipo = fila
-
-        tipo_txt = str(tipo or "").strip().lower()
-        espacio_txt = str(espacio or "").strip().lower()
-
-        es_aula = (
-            "aula" in tipo_txt
-            or espacio_txt.startswith("i1")
-            or espacio_txt.startswith("i2")
-            or espacio_txt.startswith("i3")
-            or espacio_txt.startswith("i4")
-            or espacio_txt.startswith("i5")
-            or espacio_txt.startswith("eso")
-            or espacio_txt.startswith("bach")
-            or espacio_txt[:1].isdigit()
-        )
-
-        if es_aula:
-            aulas.append((
-                codigo,
-                centro,
-                edificio,
-                planta,
-                espacio,
-            ))
-
-    return aulas
 
 def obtener_espacio_por_codigo(codigo):
     crear_tabla_espacios()
@@ -1016,24 +1089,6 @@ def obtener_espacio_por_codigo(codigo):
     conn.close()
     return fila
 
-def obtener_aulas_para_qr():
-    crear_tabla_espacios()
-
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        SELECT codigo, centro, edificio, planta, espacio
-        FROM espacios
-        WHERE activo = 1
-        AND LOWER(tipo) = 'aula'
-        ORDER BY codigo
-    """))
-
-    datos = cur.fetchall()
-
-    conn.close()
-    return datos
 
 def buscar_espacios_texto(texto, limite=30):
     crear_tabla_espacios()
