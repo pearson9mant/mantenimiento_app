@@ -1,10 +1,10 @@
 import streamlit as st
-from pathlib import Path
-
 from modules.inventario import (
     generar_codigo_material,
     crear_material_inventario,
     obtener_materiales_inventario,
+    obtener_materiales_inventario_ligero,
+    obtener_foto_material,
     registrar_movimiento_inventario,
     obtener_movimientos_por_material,
     desactivar_material,
@@ -567,7 +567,7 @@ def pantalla_inventario():
             key="ver_inactivos_inventario"
         )
 
-    materiales = obtener_materiales_inventario(
+    materiales = obtener_materiales_inventario_ligero(
         filtro_texto=filtro_texto,
         filtro_categoria=filtro_categoria,
         filtro_centro=filtro_centro,
@@ -697,41 +697,92 @@ def pantalla_inventario():
             if observaciones_coste:
                 st.info(f"💶 {observaciones_coste}")
 
-            # La foto ya viene en el registro actual, pero no se procesa
-            # ni se renderiza hasta que el usuario la solicita.
+            # =====================================================
+            # FOTO MATERIAL · CARGA REAL BAJO DEMANDA
+            # =====================================================
             clave_foto_inv = "inventario_foto_abierta"
-            foto_abierta = st.session_state.get(clave_foto_inv)
+            foto_abierta = st.session_state.get(
+                clave_foto_inv
+            )
 
-            if foto_data or foto:
-                if foto_abierta == codigo:
-                    if st.button(
-                        "🙈 Ocultar foto",
-                        key=f"ocultar_foto_inv_{codigo}",
-                    ):
-                        st.session_state.pop(clave_foto_inv, None)
-                        st.rerun()
+            if foto_abierta == codigo:
 
-                    if foto_data:
-                        try:
-                            st.image(bytes(foto_data), width=220)
-                            if foto_nombre:
-                                st.caption(f"📷 {foto_nombre}")
-                        except Exception as e:
-                            st.caption(f"Foto no disponible: {e}")
-                    elif foto:
-                        try:
-                            st.image(foto, width=220)
-                            if foto_nombre:
-                                st.caption(f"📷 {foto_nombre}")
-                        except Exception:
-                            st.caption("Foto no disponible.")
+                if st.button(
+                    "🙈 Ocultar foto",
+                    key=f"ocultar_foto_inv_{codigo}",
+                ):
+                    st.session_state.pop(
+                        clave_foto_inv,
+                        None,
+                    )
+                    st.rerun()
+
+                foto_material = obtener_foto_material(
+                    codigo
+                )
+
+                foto_data_real = foto_material.get(
+                    "foto_data"
+                )
+                foto_real = foto_material.get(
+                    "foto",
+                    ""
+                )
+                foto_nombre_real = foto_material.get(
+                    "foto_nombre",
+                    ""
+                )
+
+                if foto_data_real:
+                    try:
+                        st.image(
+                            bytes(foto_data_real),
+                            width=220
+                        )
+
+                        if foto_nombre_real:
+                            st.caption(
+                                f"📷 {foto_nombre_real}"
+                            )
+
+                    except Exception as e:
+                        st.caption(
+                            f"Foto no disponible: {e}"
+                        )
+
+                elif foto_real:
+                    try:
+                        st.image(
+                            foto_real,
+                            width=220
+                        )
+
+                        if foto_nombre_real:
+                            st.caption(
+                                f"📷 {foto_nombre_real}"
+                            )
+
+                    except Exception:
+                        st.caption(
+                            "Foto no disponible."
+                        )
+
                 else:
-                    if st.button(
-                        "📷 Ver foto",
-                        key=f"ver_foto_inv_{codigo}",
-                    ):
-                        st.session_state[clave_foto_inv] = codigo
-                        st.rerun()
+                    st.info(
+                        "Este material no tiene foto."
+                    )
+
+            else:
+
+                if st.button(
+                    "📷 Ver foto",
+                    key=f"ver_foto_inv_{codigo}",
+                ):
+                    st.session_state[
+                        clave_foto_inv
+                    ] = codigo
+
+                    st.rerun()
 
             with st.expander("✏️ Editar material"):
 
