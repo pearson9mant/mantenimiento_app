@@ -1,6 +1,11 @@
 from datetime import datetime
+
 from database.db import conectar, _sql
 from modules.ordenes import guardar_foto_ot
+from modules.inventario import (
+    obtener_material_por_codigo,
+    registrar_movimiento_inventario,
+)
 
 
 ESTADOS_PEDIDO = [
@@ -8,8 +13,20 @@ ESTADOS_PEDIDO = [
     "Preparado",
     "Entregado",
     "Sin stock",
-    "Cancelado"
+    "Cancelado",
 ]
+
+_ESTRUCTURA_PEDIDOS_ASEGURADA = False
+
+
+def _log_pedidos_warning(contexto, error):
+    try:
+        print(
+            f"[PEDIDOS MATERIAL WARNING] {contexto}: "
+            f"{type(error).__name__}: {error}"
+        )
+    except Exception:
+        pass
 
 
 def _es_postgres_conn(conn):
@@ -18,124 +35,228 @@ def _es_postgres_conn(conn):
 
 
 def _id_sql(conn):
-    return "SERIAL PRIMARY KEY" if _es_postgres_conn(conn) else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    if _es_postgres_conn(conn):
+        return "SERIAL PRIMARY KEY"
+    return "INTEGER PRIMARY KEY AUTOINCREMENT"
 
 
 def _column_exists(cur, tabla, columna):
     try:
-        if "psycopg2" in cur.connection.__class__.__module__.lower():
-            cur.execute("""
+        if _es_postgres_conn(cur.connection):
+            cur.execute(
+                """
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_name = %s
-                AND column_name = %s
-            """, (tabla, columna))
+                  AND column_name = %s
+                """,
+                (tabla, columna),
+            )
             return cur.fetchone() is not None
 
         cur.execute(f"PRAGMA table_info({tabla})")
-        return columna in [fila[1] for fila in cur.fetchall()]
+        return columna in [
+            fila[1]
+            for fila in cur.fetchall()
+        ]
 
-    except Exception:
+    except Exception as e:
+        _log_pedidos_warning(
+            f"Comprobando columna {tabla}.{columna}",
+            e,
+        )
         return False
 
 
 def _add_column(cur, tabla, columna, tipo):
-    try:
-        if _column_exists(cur, tabla, columna):
-            return
+    if _column_exists(
+        cur,
+        tabla,
+        columna,
+    ):
+        return True
 
-        cur.execute(f"""
+    try:
+        cur.execute(
+            f"""
             ALTER TABLE {tabla}
             ADD COLUMN {columna} {tipo}
-        """)
+            """
+        )
+        return True
 
-    except Exception:
+    except Exception as e:
+        _log_pedidos_warning(
+            f"Añadiendo columna {tabla}.{columna}",
+            e,
+        )
+
         try:
             cur.connection.rollback()
         except Exception:
             pass
 
+        return False
+
 
 def crear_tabla_pedidos_material():
+    """
+    Asegura la estructura una sola vez por proceso.
+
+    Mantiene:
+    - cabecera histórica pedidos_material;
+    - líneas múltiples pedidos_material_lineas;
+    - compatibilidad con pedidos antiguos.
+    """
+    global _ESTRUCTURA_PEDIDOS_ASEGURADA
+
+    if _ESTRUCTURA_PEDIDOS_ASEGURADA:
+        return
+
     conn = conectar()
     cur = conn.cursor()
-
     id_sql = _id_sql(conn)
 
-    # CABECERA DEL PEDIDO
-    cur.execute(_sql(f"""
-        CREATE TABLE IF NOT EXISTS pedidos_material (
-            id {id_sql},
-            numero_pedido TEXT,
-            fecha TEXT,
-            operario TEXT,
-            centro TEXT,
-            edificio TEXT,
-            prioridad TEXT,
-            estado TEXT,
-            observaciones TEXT,
-            link_material TEXT,
-            foto TEXT,
-            fecha_preparado TEXT,
-            fecha_entrega TEXT
-        )
-    """))
-    conn.commit()
+    try:
+        cur.execute(_sql(f"""
+            CREATE TABLE IF NOT EXISTS pedidos_material (
+                id {id_sql},
+                numero_pedido TEXT,
+                fecha TEXT,
+                operario TEXT,
+                centro TEXT,
+                edificio TEXT,
+                prioridad TEXT,
+                estado TEXT,
+                observaciones TEXT,
+                link_material TEXT,
+                foto TEXT,
+                fecha_preparado TEXT,
+                fecha_entrega TEXT
+            )
+        """))
 
-    # Por compatibilidad con pedidos antiguos
-    columnas_cabecera = [
-        ("numero_pedido", "TEXT"),
-        ("fecha", "TEXT"),
-        ("operario", "TEXT"),
-        ("centro", "TEXT"),
-        ("edificio", "TEXT"),
-        ("material", "TEXT"),
-        ("cantidad", "REAL"),
-        ("prioridad", "TEXT"),
-        ("estado", "TEXT"),
-        ("observaciones", "TEXT"),
-        ("link_material", "TEXT"),
-        ("foto", "TEXT"),
-        ("fecha_preparado", "TEXT"),
-        ("fecha_entrega", "TEXT"),
-    ]
+        conn.commit()
 
-    for columna, tipo in columnas_cabecera:
-        _add_column(cur, "pedidos_material", columna, tipo)
+        columnas_cabecera = [
+            ("numero_pedido", "TEXT"),
+            ("fecha", "TEXT"),
+            ("operario", "TEXT"),
+            ("centro", "TEXT"),
+            ("edificio", "TEXT"),
+            ("material", "TEXT"),
+            ("cantidad", "REAL"),
+            ("prioridad", "TEXT"),
+            ("estado", "TEXT"),
+            ("observaciones", "TEXT"),
+            ("link_material", "TEXT"),
+            ("foto", "TEXT"),
+            ("fecha_preparado", "TEXT"),
+            ("fecha_entrega", "TEXT"),
+        ]
 
-    # LÍNEAS DEL PEDIDO
-    cur.execute(_sql(f"""
-        CREATE TABLE IF NOT EXISTS pedidos_material_lineas (
-            id {id_sql},
-            pedido_id INTEGER,
-            codigo_material TEXT,
-            material TEXT,
-            cantidad REAL,
-            estado TEXT,
-            observaciones TEXT,
-            link_material TEXT,
-            fecha_preparado TEXT,
-            fecha_entrega TEXT
-        )
-    """))
+        for columna, tipo in columnas_cabecera:
+            _add_column(
+                cur,
+                "pedidos_material",
+                columna,
+                tipo,
+            )
 
-    columnas_lineas = [
-        ("pedido_id", "INTEGER"),
-        ("codigo_material", "TEXT"),
-        ("material", "TEXT"),
-        ("cantidad", "REAL"),
-        ("estado", "TEXT"),
-        ("observaciones", "TEXT"),
-        ("link_material", "TEXT"),
-        ("fecha_preparado", "TEXT"),
-        ("fecha_entrega", "TEXT"),
-    ]
+        cur.execute(_sql(f"""
+            CREATE TABLE IF NOT EXISTS pedidos_material_lineas (
+                id {id_sql},
+                pedido_id INTEGER,
+                codigo_material TEXT,
+                material TEXT,
+                cantidad REAL,
+                estado TEXT,
+                observaciones TEXT,
+                link_material TEXT,
+                fecha_preparado TEXT,
+                fecha_entrega TEXT,
+                inventario_descontado INTEGER DEFAULT 0
+            )
+        """))
 
-    for columna, tipo in columnas_lineas:
-        _add_column(cur, "pedidos_material_lineas", columna, tipo)
+        conn.commit()
 
-    conn.commit()
-    conn.close()
+        columnas_lineas = [
+            ("pedido_id", "INTEGER"),
+            ("codigo_material", "TEXT"),
+            ("material", "TEXT"),
+            ("cantidad", "REAL"),
+            ("estado", "TEXT"),
+            ("observaciones", "TEXT"),
+            ("link_material", "TEXT"),
+            ("fecha_preparado", "TEXT"),
+            ("fecha_entrega", "TEXT"),
+            (
+                "inventario_descontado",
+                "INTEGER DEFAULT 0",
+            ),
+        ]
+
+        for columna, tipo in columnas_lineas:
+            _add_column(
+                cur,
+                "pedidos_material_lineas",
+                columna,
+                tipo,
+            )
+
+        # Índices del flujo diario.
+        indices = [
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_pedidos_operario "
+                "ON pedidos_material(operario)"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_pedidos_estado "
+                "ON pedidos_material(estado)"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_pedidos_fecha "
+                "ON pedidos_material(fecha)"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_ped_lineas_pedido "
+                "ON pedidos_material_lineas(pedido_id)"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_ped_lineas_codigo "
+                "ON pedidos_material_lineas(codigo_material)"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS "
+                "idx_ped_lineas_estado "
+                "ON pedidos_material_lineas(estado)"
+            ),
+        ]
+
+        for sql_indice in indices:
+            try:
+                cur.execute(sql_indice)
+            except Exception as e:
+                _log_pedidos_warning(
+                    f"Creando índice: {sql_indice}",
+                    e,
+                )
+
+        conn.commit()
+        _ESTRUCTURA_PEDIDOS_ASEGURADA = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
     migrar_pedidos_antiguos_a_lineas()
 
@@ -146,19 +267,23 @@ def formatear_numero_pedido(id_pedido):
 
 def migrar_pedidos_antiguos_a_lineas():
     """
-    Si ya tenías pedidos antiguos con un solo material,
-    los pasa automáticamente a pedidos_material_lineas.
-    No borra nada.
+    Migra pedidos antiguos de una sola línea sin borrar datos.
     """
     conn = conectar()
     cur = conn.cursor()
 
     try:
         cur.execute(_sql("""
-            SELECT id, material, cantidad, estado, observaciones, link_material
+            SELECT
+                id,
+                material,
+                cantidad,
+                estado,
+                observaciones,
+                link_material
             FROM pedidos_material
             WHERE material IS NOT NULL
-            AND material <> ''
+              AND material <> ''
         """))
 
         pedidos = cur.fetchall()
@@ -175,14 +300,25 @@ def migrar_pedidos_antiguos_a_lineas():
                 SELECT COUNT(*)
                 FROM pedidos_material_lineas
                 WHERE pedido_id = ?
-            """), (pedido_id,))
+            """), (
+                pedido_id,
+            ))
 
-            existe = cur.fetchone()[0]
+            existe = int(
+                cur.fetchone()[0] or 0
+            )
 
             if existe == 0:
                 cur.execute(_sql("""
                     INSERT INTO pedidos_material_lineas
-                    (pedido_id, material, cantidad, estado, observaciones, link_material)
+                    (
+                        pedido_id,
+                        material,
+                        cantidad,
+                        estado,
+                        observaciones,
+                        link_material
+                    )
                     VALUES (?, ?, ?, ?, ?, ?)
                 """), (
                     pedido_id,
@@ -190,15 +326,20 @@ def migrar_pedidos_antiguos_a_lineas():
                     cantidad,
                     estado,
                     observaciones,
-                    link_material
+                    link_material,
                 ))
 
         conn.commit()
 
-    except Exception:
-        pass
+    except Exception as e:
+        conn.rollback()
+        _log_pedidos_warning(
+            "Migrando pedidos antiguos",
+            e,
+        )
 
-    conn.close()
+    finally:
+        conn.close()
 
 
 def crear_pedido_material_multiple(
@@ -208,113 +349,193 @@ def crear_pedido_material_multiple(
     prioridad="Media",
     observaciones="",
     lineas=None,
-    foto="postgres_fotos"
+    foto="postgres_fotos",
 ):
     """
-    lineas debe ser una lista de diccionarios:
-    [
-        {
-            "codigo_material": "",
-            "material": "Tubo PVC 32",
-            "cantidad": 2,
-            "observaciones": "",
-            "link_material": ""
-        }
-    ]
-    """
+    Crea una cabecera con varias líneas.
 
+    Cada línea puede ser:
+    - material catalogado: codigo_material con valor;
+    - material de compra: codigo_material vacío.
+    """
     crear_tabla_pedidos_material()
 
-    if not lineas:
-        return None
+    lineas = lineas or []
 
-    conn = conectar()
-    cur = conn.cursor()
-
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    if _es_postgres_conn(conn):
-        cur.execute(_sql("""
-            INSERT INTO pedidos_material
-            (fecha, operario, centro, edificio, prioridad, estado, observaciones, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id
-        """), (
-            fecha,
-            operario,
-            centro,
-            edificio,
-            prioridad,
-            "Pendiente",
-            observaciones,
-            foto
-        ))
-
-        fila = cur.fetchone()
-        id_pedido = fila[0] if fila else None
-
-    else:
-        cur.execute(_sql("""
-            INSERT INTO pedidos_material
-            (fecha, operario, centro, edificio, prioridad, estado, observaciones, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """), (
-            fecha,
-            operario,
-            centro,
-            edificio,
-            prioridad,
-            "Pendiente",
-            observaciones,
-            foto
-        ))
-
-        id_pedido = cur.lastrowid
-
-    if not id_pedido:
-        conn.close()
-        return None
-
-    numero_pedido = formatear_numero_pedido(id_pedido)
-
-    cur.execute(_sql("""
-        UPDATE pedidos_material
-        SET numero_pedido = ?
-        WHERE id = ?
-    """), (
-        numero_pedido,
-        id_pedido
-    ))
+    lineas_validas = []
 
     for linea in lineas:
-        material = str(linea.get("material", "")).strip()
+        material = str(
+            linea.get(
+                "material",
+                "",
+            )
+            or ""
+        ).strip()
 
         if not material:
             continue
 
-        cantidad = linea.get("cantidad", 1)
-        codigo_material = linea.get("codigo_material", "")
-        obs_linea = linea.get("observaciones", "")
-        link_material = linea.get("link_material", "")
+        try:
+            cantidad = float(
+                linea.get(
+                    "cantidad",
+                    1,
+                )
+                or 1
+            )
+        except Exception:
+            cantidad = 1.0
+
+        if cantidad <= 0:
+            continue
+
+        lineas_validas.append({
+            "codigo_material": str(
+                linea.get(
+                    "codigo_material",
+                    "",
+                )
+                or ""
+            ).strip(),
+            "material": material,
+            "cantidad": cantidad,
+            "observaciones": str(
+                linea.get(
+                    "observaciones",
+                    "",
+                )
+                or ""
+            ).strip(),
+            "link_material": str(
+                linea.get(
+                    "link_material",
+                    "",
+                )
+                or ""
+            ).strip(),
+        })
+
+    if not lineas_validas:
+        return None
+
+    conn = conectar()
+    cur = conn.cursor()
+    fecha = datetime.now().strftime(
+        "%Y-%m-%d %H:%M"
+    )
+
+    try:
+        if _es_postgres_conn(conn):
+            cur.execute(_sql("""
+                INSERT INTO pedidos_material
+                (
+                    fecha,
+                    operario,
+                    centro,
+                    edificio,
+                    prioridad,
+                    estado,
+                    observaciones,
+                    foto
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+            """), (
+                fecha,
+                operario,
+                centro,
+                edificio,
+                prioridad,
+                "Pendiente",
+                observaciones,
+                foto,
+            ))
+
+            fila = cur.fetchone()
+            id_pedido = (
+                fila[0]
+                if fila
+                else None
+            )
+
+        else:
+            cur.execute(_sql("""
+                INSERT INTO pedidos_material
+                (
+                    fecha,
+                    operario,
+                    centro,
+                    edificio,
+                    prioridad,
+                    estado,
+                    observaciones,
+                    foto
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """), (
+                fecha,
+                operario,
+                centro,
+                edificio,
+                prioridad,
+                "Pendiente",
+                observaciones,
+                foto,
+            ))
+
+            id_pedido = cur.lastrowid
+
+        if not id_pedido:
+            conn.rollback()
+            return None
+
+        numero_pedido = formatear_numero_pedido(
+            id_pedido
+        )
 
         cur.execute(_sql("""
-            INSERT INTO pedidos_material_lineas
-            (pedido_id, codigo_material, material, cantidad, estado, observaciones, link_material)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            UPDATE pedidos_material
+            SET numero_pedido = ?
+            WHERE id = ?
         """), (
+            numero_pedido,
             id_pedido,
-            codigo_material,
-            material,
-            cantidad,
-            "Pendiente",
-            obs_linea,
-            link_material
         ))
 
-    conn.commit()
-    conn.close()
+        for linea in lineas_validas:
+            cur.execute(_sql("""
+                INSERT INTO pedidos_material_lineas
+                (
+                    pedido_id,
+                    codigo_material,
+                    material,
+                    cantidad,
+                    estado,
+                    observaciones,
+                    link_material,
+                    inventario_descontado
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            """), (
+                id_pedido,
+                linea["codigo_material"],
+                linea["material"],
+                linea["cantidad"],
+                "Pendiente",
+                linea["observaciones"],
+                linea["link_material"],
+            ))
 
-    return id_pedido
+        conn.commit()
+        return id_pedido
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 def crear_pedido_material(
@@ -325,20 +546,40 @@ def crear_pedido_material(
     prioridad,
     observaciones="",
     link_material="",
-    foto="postgres_fotos"
+    foto="postgres_fotos",
+    estado=None,
+    creado_por=None,
 ):
     """
-    Función antigua.
-    Se mantiene para que no se rompa nada.
-    Ahora crea un pedido con una sola línea.
+    Compatibilidad con llamadas antiguas.
+
+    Los parámetros estado y creado_por se aceptan para no romper
+    interfaces históricas. El flujo nuevo siempre nace Pendiente.
     """
+    observaciones_finales = str(
+        observaciones or ""
+    ).strip()
+
+    if creado_por:
+        texto_creado = (
+            f"Creado por: {creado_por}"
+        )
+
+        if observaciones_finales:
+            observaciones_finales += (
+                f" | {texto_creado}"
+            )
+        else:
+            observaciones_finales = (
+                texto_creado
+            )
 
     return crear_pedido_material_multiple(
         operario=operario,
         centro=centro,
         edificio="",
         prioridad=prioridad,
-        observaciones=observaciones,
+        observaciones=observaciones_finales,
         foto=foto,
         lineas=[
             {
@@ -346,9 +587,9 @@ def crear_pedido_material(
                 "material": material,
                 "cantidad": cantidad,
                 "observaciones": observaciones,
-                "link_material": link_material
+                "link_material": link_material,
             }
-        ]
+        ],
     )
 
 
@@ -361,43 +602,93 @@ def obtener_numero_pedido(id_pedido):
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        SELECT numero_pedido
-        FROM pedidos_material
-        WHERE id = ?
-    """), (id_pedido,))
+    try:
+        cur.execute(_sql("""
+            SELECT numero_pedido
+            FROM pedidos_material
+            WHERE id = ?
+        """), (
+            id_pedido,
+        ))
 
-    fila = cur.fetchone()
-    conn.close()
+        fila = cur.fetchone()
 
-    if fila and fila[0]:
-        return fila[0]
+        if fila and fila[0]:
+            return fila[0]
 
-    return formatear_numero_pedido(id_pedido)
+        return formatear_numero_pedido(
+            id_pedido
+        )
+
+    finally:
+        conn.close()
 
 
-def guardar_fotos_pedido_material(id_pedido, fotos):
+def guardar_fotos_pedido_material(
+    id_pedido,
+    fotos,
+):
     if not id_pedido or not fotos:
-        return
+        return 0
 
-    numero_pedido = obtener_numero_pedido(id_pedido)
+    numero_pedido = obtener_numero_pedido(
+        id_pedido
+    )
 
     if not numero_pedido:
-        return
+        return 0
 
-    for i, foto in enumerate(fotos, start=1):
+    guardadas = 0
+
+    for i, foto in enumerate(
+        list(fotos)[:5],
+        start=1,
+    ):
         try:
+            tamaño = getattr(
+                foto,
+                "size",
+                0,
+            )
+
+            if tamaño and tamaño > 5 * 1024 * 1024:
+                continue
+
             foto_bytes = foto.read()
-            nombre_foto = f"{numero_pedido}_{i}_{foto.name}"
+
+            if len(foto_bytes) > 5 * 1024 * 1024:
+                continue
+
+            nombre_original = str(
+                getattr(
+                    foto,
+                    "name",
+                    f"foto_{i}.jpg",
+                )
+                or f"foto_{i}.jpg"
+            )
+
+            nombre_foto = (
+                f"{numero_pedido}_"
+                f"{i}_"
+                f"{nombre_original}"
+            )
 
             guardar_foto_ot(
                 numero_ot=numero_pedido,
                 nombre_foto=nombre_foto,
-                foto_data=foto_bytes
+                foto_data=foto_bytes,
             )
 
-        except Exception:
-            pass
+            guardadas += 1
+
+        except Exception as e:
+            _log_pedidos_warning(
+                f"Guardando foto de {numero_pedido}",
+                e,
+            )
+
+    return guardadas
 
 
 def obtener_lineas_pedido(id_pedido):
@@ -406,44 +697,125 @@ def obtener_lineas_pedido(id_pedido):
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        SELECT
-            id,
-            pedido_id,
-            codigo_material,
-            material,
-            cantidad,
-            estado,
-            observaciones,
-            link_material,
-            fecha_preparado,
-            fecha_entrega
-        FROM pedidos_material_lineas
-        WHERE pedido_id = ?
-        ORDER BY id ASC
-    """), (id_pedido,))
+    try:
+        cur.execute(_sql("""
+            SELECT
+                id,
+                pedido_id,
+                codigo_material,
+                material,
+                cantidad,
+                estado,
+                observaciones,
+                link_material,
+                fecha_preparado,
+                fecha_entrega,
+                inventario_descontado
+            FROM pedidos_material_lineas
+            WHERE pedido_id = ?
+            ORDER BY id ASC
+        """), (
+            id_pedido,
+        ))
 
-    datos = cur.fetchall()
-    conn.close()
+        return cur.fetchall()
 
-    return datos
+    finally:
+        conn.close()
 
 
-def obtener_resumen_materiales_pedido(id_pedido):
-    lineas = obtener_lineas_pedido(id_pedido)
+def _resumen_lineas_por_pedido(ids_pedido):
+    """
+    Carga todas las líneas de los pedidos visibles en una sola consulta.
+    Evita una consulta adicional por cada pedido.
+    """
+    ids = [
+        int(x)
+        for x in ids_pedido
+        if x is not None
+    ]
+
+    if not ids:
+        return {}
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        marcadores = ",".join(
+            ["?"] * len(ids)
+        )
+
+        cur.execute(
+            _sql(f"""
+                SELECT
+                    pedido_id,
+                    material,
+                    cantidad
+                FROM pedidos_material_lineas
+                WHERE pedido_id IN ({marcadores})
+                ORDER BY pedido_id, id ASC
+            """),
+            tuple(ids),
+        )
+
+        mapa = {}
+
+        for pedido_id, material, cantidad in cur.fetchall():
+            mapa.setdefault(
+                pedido_id,
+                [],
+            ).append(
+                f"{material} x {cantidad}"
+            )
+
+        return {
+            pedido_id: " | ".join(items)
+            for pedido_id, items in mapa.items()
+        }
+
+    finally:
+        conn.close()
+
+
+def obtener_resumen_materiales_pedido(
+    id_pedido,
+):
+    lineas = obtener_lineas_pedido(
+        id_pedido
+    )
 
     materiales = []
 
-    for l in lineas:
-        material = l[3]
-        cantidad = l[4]
-        materiales.append(f"{material} x {cantidad}")
+    for linea in lineas:
+        materiales.append(
+            f"{linea[3]} x {linea[4]}"
+        )
 
-    return " | ".join(materiales)
+    return " | ".join(
+        materiales
+    )
 
 
-def obtener_pedidos_material(operario=None, solo_pendientes=False):
+def obtener_pedidos_material(
+    operario=None,
+    solo_pendientes=False,
+    limite=300,
+):
     crear_tabla_pedidos_material()
+
+    try:
+        limite = int(limite)
+    except Exception:
+        limite = 300
+
+    limite = max(
+        1,
+        min(
+            limite,
+            1000,
+        ),
+    )
 
     conn = conectar()
     cur = conn.cursor()
@@ -471,254 +843,654 @@ def obtener_pedidos_material(operario=None, solo_pendientes=False):
 
     if operario:
         query += " AND operario = ?"
-        params.append(operario)
+        params.append(
+            operario
+        )
 
     if solo_pendientes:
-        query += " AND estado IN ('Pendiente', 'Preparado', 'Sin stock')"
+        query += (
+            " AND estado IN "
+            "('Pendiente', 'Preparado', 'Sin stock')"
+        )
 
-    query += " ORDER BY id DESC"
+    query += " ORDER BY id DESC LIMIT ?"
+    params.append(
+        limite
+    )
 
-    cur.execute(_sql(query), params)
-    pedidos = cur.fetchall()
-    conn.close()
+    try:
+        cur.execute(
+            _sql(query),
+            tuple(params),
+        )
+
+        pedidos = cur.fetchall()
+
+    finally:
+        conn.close()
+
+    resumenes = _resumen_lineas_por_pedido(
+        [
+            p[0]
+            for p in pedidos
+        ]
+    )
 
     resultado = []
 
     for p in pedidos:
-        id_pedido = p[0]
-        resumen_materiales = obtener_resumen_materiales_pedido(id_pedido)
-
-        # Devuelve formato parecido al antiguo para no romper la pantalla:
         resultado.append((
-            p[0],                    # id
-            p[1],                    # numero_pedido
-            p[2],                    # fecha
-            p[3],                    # operario
-            p[4],                    # centro
-            resumen_materiales,      # material/resumen
-            "",                      # cantidad antigua
-            p[5],                    # prioridad
-            p[6],                    # estado
-            p[7],                    # observaciones
-            p[8],                    # link_material
-            p[9],                    # foto
-            p[10],                   # fecha_preparado
-            p[11],                   # fecha_entrega
+            p[0],
+            p[1],
+            p[2],
+            p[3],
+            p[4],
+            resumenes.get(
+                p[0],
+                "",
+            ),
+            "",
+            p[5],
+            p[6],
+            p[7],
+            p[8],
+            p[9],
+            p[10],
+            p[11],
         ))
 
     return resultado
 
 
-def recalcular_estado_pedido(id_pedido):
-    """
-    Calcula el estado general según las líneas.
-    """
-
-    lineas = obtener_lineas_pedido(id_pedido)
+def recalcular_estado_pedido(
+    id_pedido,
+):
+    lineas = obtener_lineas_pedido(
+        id_pedido
+    )
 
     if not lineas:
         return
 
-    estados = [l[5] for l in lineas]
+    estados = [
+        str(
+            linea[5]
+            or "Pendiente"
+        )
+        for linea in lineas
+    ]
 
-    if all(e == "Entregado" for e in estados):
+    if all(
+        estado == "Entregado"
+        for estado in estados
+    ):
         nuevo_estado = "Entregado"
-    elif all(e == "Cancelado" for e in estados):
+
+    elif all(
+        estado == "Cancelado"
+        for estado in estados
+    ):
         nuevo_estado = "Cancelado"
-    elif any(e == "Preparado" for e in estados):
+
+    elif any(
+        estado == "Preparado"
+        for estado in estados
+    ):
         nuevo_estado = "Preparado"
-    elif any(e == "Sin stock" for e in estados):
+
+    elif any(
+        estado == "Sin stock"
+        for estado in estados
+    ):
         nuevo_estado = "Sin stock"
+
     else:
         nuevo_estado = "Pendiente"
 
     conn = conectar()
     cur = conn.cursor()
 
-    if nuevo_estado == "Preparado":
-        cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?, fecha_preparado = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
-        ))
+    try:
+        ahora = datetime.now().strftime(
+            "%Y-%m-%d %H:%M"
+        )
 
-    elif nuevo_estado == "Entregado":
-        cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?, fecha_entrega = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
-        ))
+        if nuevo_estado == "Preparado":
+            cur.execute(_sql("""
+                UPDATE pedidos_material
+                SET estado = ?,
+                    fecha_preparado =
+                        COALESCE(NULLIF(fecha_preparado, ''), ?)
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                ahora,
+                id_pedido,
+            ))
 
-    else:
-        cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            id_pedido
-        ))
+        elif nuevo_estado == "Entregado":
+            cur.execute(_sql("""
+                UPDATE pedidos_material
+                SET estado = ?,
+                    fecha_entrega =
+                        COALESCE(NULLIF(fecha_entrega, ''), ?)
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                ahora,
+                id_pedido,
+            ))
 
-    conn.commit()
-    conn.close()
+        else:
+            cur.execute(_sql("""
+                UPDATE pedidos_material
+                SET estado = ?
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                id_pedido,
+            ))
 
+        conn.commit()
 
-def cambiar_estado_linea_pedido(id_linea, nuevo_estado):
-    crear_tabla_pedidos_material()
-
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        SELECT pedido_id
-        FROM pedidos_material_lineas
-        WHERE id = ?
-    """), (id_linea,))
-
-    fila = cur.fetchone()
-
-    if not fila:
+    finally:
         conn.close()
-        return False
 
-    pedido_id = fila[0]
 
-    if nuevo_estado == "Preparado":
+def _obtener_linea_para_estado(
+    id_linea,
+):
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
         cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?, fecha_preparado = ?
+            SELECT
+                pedido_id,
+                codigo_material,
+                material,
+                cantidad,
+                estado,
+                inventario_descontado
+            FROM pedidos_material_lineas
             WHERE id = ?
         """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_linea
+            id_linea,
         ))
 
-    elif nuevo_estado == "Entregado":
+        return cur.fetchone()
+
+    finally:
+        conn.close()
+
+
+def _descontar_inventario_linea(
+    numero_pedido,
+    codigo_material,
+    cantidad,
+    operario="",
+):
+    codigo_material = str(
+        codigo_material or ""
+    ).strip()
+
+    if not codigo_material:
+        return (
+            True,
+            "Material externo: no afecta al inventario.",
+        )
+
+    material = obtener_material_por_codigo(
+        codigo_material
+    )
+
+    if not material:
+        return (
+            False,
+            f"El material {codigo_material} ya no existe en inventario.",
+        )
+
+    stock_actual = float(
+        material.get(
+            "stock_actual",
+            0,
+        )
+        or 0
+    )
+
+    cantidad = float(
+        cantidad or 0
+    )
+
+    if stock_actual < cantidad:
+        return (
+            False,
+            (
+                f"Stock insuficiente de "
+                f"{material.get('material', codigo_material)}. "
+                f"Disponible: {stock_actual}."
+            ),
+        )
+
+    return registrar_movimiento_inventario(
+        codigo_material=codigo_material,
+        tipo_movimiento="Salida",
+        cantidad=cantidad,
+        motivo=(
+            f"Entrega pedido material "
+            f"{numero_pedido}"
+        ),
+        numero_ot="",
+        operario=operario,
+    )
+
+
+def cambiar_estado_linea_pedido(
+    id_linea,
+    nuevo_estado,
+):
+    crear_tabla_pedidos_material()
+
+    if nuevo_estado not in ESTADOS_PEDIDO:
+        return (
+            False,
+            "Estado de pedido no válido.",
+        )
+
+    linea = _obtener_linea_para_estado(
+        id_linea
+    )
+
+    if not linea:
+        return (
+            False,
+            "No se ha encontrado la línea del pedido.",
+        )
+
+    (
+        pedido_id,
+        codigo_material,
+        material,
+        cantidad,
+        estado_anterior,
+        inventario_descontado,
+    ) = linea
+
+    # Datos del pedido para trazabilidad.
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
         cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?, fecha_entrega = ?
+            SELECT
+                numero_pedido,
+                operario
+            FROM pedidos_material
             WHERE id = ?
         """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_linea
+            pedido_id,
         ))
 
-    else:
-        cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            id_linea
-        ))
+        cabecera = cur.fetchone()
 
-    conn.commit()
-    conn.close()
+    finally:
+        conn.close()
 
-    recalcular_estado_pedido(pedido_id)
+    numero_pedido = (
+        cabecera[0]
+        if cabecera and cabecera[0]
+        else formatear_numero_pedido(
+            pedido_id
+        )
+    )
 
-    return True
+    operario = (
+        cabecera[1]
+        if cabecera
+        else ""
+    )
+
+    # Descuento físico solo una vez y solo al entregar.
+    if (
+        nuevo_estado == "Entregado"
+        and str(codigo_material or "").strip()
+        and not bool(inventario_descontado)
+    ):
+        ok_stock, mensaje_stock = (
+            _descontar_inventario_linea(
+                numero_pedido=numero_pedido,
+                codigo_material=codigo_material,
+                cantidad=cantidad,
+                operario=operario,
+            )
+        )
+
+        if not ok_stock:
+            # La línea queda marcada Sin stock para que Abel la vea.
+            conn = conectar()
+            cur = conn.cursor()
+
+            try:
+                cur.execute(_sql("""
+                    UPDATE pedidos_material_lineas
+                    SET estado = 'Sin stock'
+                    WHERE id = ?
+                """), (
+                    id_linea,
+                ))
+
+                conn.commit()
+
+            finally:
+                conn.close()
+
+            recalcular_estado_pedido(
+                pedido_id
+            )
+
+            return (
+                False,
+                mensaje_stock,
+            )
+
+        inventario_descontado = 1
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        ahora = datetime.now().strftime(
+            "%Y-%m-%d %H:%M"
+        )
+
+        if nuevo_estado == "Preparado":
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET estado = ?,
+                    fecha_preparado =
+                        COALESCE(NULLIF(fecha_preparado, ''), ?),
+                    inventario_descontado = ?
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                ahora,
+                int(
+                    bool(
+                        inventario_descontado
+                    )
+                ),
+                id_linea,
+            ))
+
+        elif nuevo_estado == "Entregado":
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET estado = ?,
+                    fecha_entrega =
+                        COALESCE(NULLIF(fecha_entrega, ''), ?),
+                    inventario_descontado = ?
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                ahora,
+                int(
+                    bool(
+                        inventario_descontado
+                    )
+                ),
+                id_linea,
+            ))
+
+        else:
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET estado = ?,
+                    inventario_descontado = ?
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                int(
+                    bool(
+                        inventario_descontado
+                    )
+                ),
+                id_linea,
+            ))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    recalcular_estado_pedido(
+        pedido_id
+    )
+
+    return (
+        True,
+        (
+            "Línea actualizada. "
+            if nuevo_estado != "Entregado"
+            else "Material entregado correctamente."
+        ),
+    )
 
 
-def cambiar_estado_pedido(id_pedido, nuevo_estado):
+def cambiar_estado_pedido(
+    id_pedido,
+    nuevo_estado,
+):
+    """
+    Estado general del pedido.
+
+    Para Entregado se procesa línea a línea porque las líneas
+    catalogadas deben descontarse del inventario exactamente una vez.
+    """
+    crear_tabla_pedidos_material()
+
+    if nuevo_estado not in ESTADOS_PEDIDO:
+        return (
+            False,
+            "Estado de pedido no válido.",
+        )
+
+    if nuevo_estado == "Entregado":
+        lineas = obtener_lineas_pedido(
+            id_pedido
+        )
+
+        # Precomprobación de stock para evitar entregas parciales
+        # por falta de existencias.
+        necesidades = {}
+
+        for linea in lineas:
+            codigo = str(
+                linea[2]
+                or ""
+            ).strip()
+
+            descontado = bool(
+                linea[10]
+                if len(linea) > 10
+                else 0
+            )
+
+            if (
+                codigo
+                and not descontado
+            ):
+                necesidades[codigo] = (
+                    necesidades.get(
+                        codigo,
+                        0.0,
+                    )
+                    + float(
+                        linea[4]
+                        or 0
+                    )
+                )
+
+        for codigo, cantidad in necesidades.items():
+            material = obtener_material_por_codigo(
+                codigo
+            )
+
+            if not material:
+                return (
+                    False,
+                    (
+                        f"No existe en inventario el material "
+                        f"{codigo}."
+                    ),
+                )
+
+            stock = float(
+                material.get(
+                    "stock_actual",
+                    0,
+                )
+                or 0
+            )
+
+            if stock < cantidad:
+                return (
+                    False,
+                    (
+                        f"Stock insuficiente de "
+                        f"{material.get('material', codigo)}. "
+                        f"Necesario: {cantidad} · Disponible: {stock}."
+                    ),
+                )
+
+        for linea in lineas:
+            if str(
+                linea[5]
+                or ""
+            ) == "Entregado":
+                continue
+
+            ok, mensaje = cambiar_estado_linea_pedido(
+                linea[0],
+                "Entregado",
+            )
+
+            if not ok:
+                return (
+                    False,
+                    mensaje,
+                )
+
+        recalcular_estado_pedido(
+            id_pedido
+        )
+
+        return (
+            True,
+            "Pedido entregado correctamente.",
+        )
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        ahora = datetime.now().strftime(
+            "%Y-%m-%d %H:%M"
+        )
+
+        if nuevo_estado == "Preparado":
+            cur.execute(_sql("""
+                UPDATE pedidos_material
+                SET estado = ?,
+                    fecha_preparado =
+                        COALESCE(NULLIF(fecha_preparado, ''), ?)
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                ahora,
+                id_pedido,
+            ))
+
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET estado = ?,
+                    fecha_preparado =
+                        COALESCE(NULLIF(fecha_preparado, ''), ?)
+                WHERE pedido_id = ?
+                  AND estado <> 'Entregado'
+            """), (
+                nuevo_estado,
+                ahora,
+                id_pedido,
+            ))
+
+        else:
+            cur.execute(_sql("""
+                UPDATE pedidos_material
+                SET estado = ?
+                WHERE id = ?
+            """), (
+                nuevo_estado,
+                id_pedido,
+            ))
+
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET estado = ?
+                WHERE pedido_id = ?
+                  AND estado <> 'Entregado'
+            """), (
+                nuevo_estado,
+                id_pedido,
+            ))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    return (
+        True,
+        "Estado general actualizado.",
+    )
+
+
+def borrar_pedido_material(
+    id_pedido,
+):
     crear_tabla_pedidos_material()
 
     conn = conectar()
     cur = conn.cursor()
 
-    if nuevo_estado == "Preparado":
+    try:
         cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?, fecha_preparado = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
-        ))
-
-        cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?, fecha_preparado = ?
+            DELETE FROM pedidos_material_lineas
             WHERE pedido_id = ?
         """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
+            id_pedido,
         ))
 
-    elif nuevo_estado == "Entregado":
         cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?, fecha_entrega = ?
+            DELETE FROM pedidos_material
             WHERE id = ?
         """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
+            id_pedido,
         ))
 
-        cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?, fecha_entrega = ?
-            WHERE pedido_id = ?
-        """), (
-            nuevo_estado,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            id_pedido
-        ))
+        conn.commit()
+        return True
 
-    else:
-        cur.execute(_sql("""
-            UPDATE pedidos_material
-            SET estado = ?
-            WHERE id = ?
-        """), (
-            nuevo_estado,
-            id_pedido
-        ))
+    except Exception:
+        conn.rollback()
+        raise
 
-        cur.execute(_sql("""
-            UPDATE pedidos_material_lineas
-            SET estado = ?
-            WHERE pedido_id = ?
-        """), (
-            nuevo_estado,
-            id_pedido
-        ))
-
-    conn.commit()
-    conn.close()
-
-
-def borrar_pedido_material(id_pedido):
-    crear_tabla_pedidos_material()
-
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        DELETE FROM pedidos_material_lineas
-        WHERE pedido_id = ?
-    """), (id_pedido,))
-
-    cur.execute(_sql("""
-        DELETE FROM pedidos_material
-        WHERE id = ?
-    """), (id_pedido,))
-
-    conn.commit()
-    conn.close()
-
-    return True
+    finally:
+        conn.close()
