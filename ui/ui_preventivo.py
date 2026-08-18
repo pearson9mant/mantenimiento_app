@@ -329,12 +329,17 @@ def mostrar_panel_inteligente_preventivo():
 
             st.caption(item.get("mensaje", ""))
 
-    st.markdown("### 🎯 Si hoy solo hicieras una cosa...")
+    st.markdown("### ⚠️ Preventivo que requiere más atención")
 
     with st.container(border=True):
         if prioridad_hoy:
-            st.markdown(f"#### ⭐ {prioridad_hoy.get('numero_ot', '')}")
-            st.markdown(f"### {prioridad_hoy.get('titulo', '')}")
+            st.markdown(
+                f"#### 🔧 {prioridad_hoy.get('numero_ot', '')}"
+            )
+
+            st.markdown(
+                f"### {prioridad_hoy.get('titulo', '')}"
+            )
 
             st.caption(
                 f"{prioridad_hoy.get('centro', '')} · "
@@ -342,26 +347,57 @@ def mostrar_panel_inteligente_preventivo():
                 f"{prioridad_hoy.get('espacio', '')}"
             )
 
-            st.markdown(f"**Área:** {prioridad_hoy.get('area', '-')}")
-            st.markdown(f"**Fecha programada:** {prioridad_hoy.get('fecha_programada', '-')}")
-            st.info(prioridad_hoy.get("accion", "Realizar preventivo."))
+            st.markdown(
+                f"**Área:** "
+                f"{prioridad_hoy.get('area', '-')}"
+            )
 
-            st.markdown("#### 🧠 ¿Por qué recomienda esta actuación?")
-            
             st.markdown(
-                f"**Motivo:** {recomendacion_inteligente.get('motivo', '')}"
+                f"**Fecha programada:** "
+                f"{prioridad_hoy.get('fecha_programada', '-')}"
             )
-            
+
+            st.info(
+                "Este preventivo es el que requiere mayor atención "
+                "dentro de la planificación preventiva."
+            )
+
             st.markdown(
-                f"**Riesgo si no se actúa:** {recomendacion_inteligente.get('riesgo', '')}"
+                "#### 🧠 Estado de esta actuación"
             )
-            
+
             st.markdown(
-                f"**Beneficio esperado:** {recomendacion_inteligente.get('beneficio', '')}"
+                f"**Motivo:** "
+                f"{recomendacion_inteligente.get('motivo', '')}"
             )
-            
+
+            st.markdown(
+                f"**Riesgo de retrasarlo:** "
+                f"{recomendacion_inteligente.get('riesgo', '')}"
+            )
+
+            st.markdown(
+                f"**Beneficio de atenderlo:** "
+                f"{recomendacion_inteligente.get('beneficio', '')}"
+            )
+
+            st.caption(
+                "ℹ️ Este bloque analiza únicamente la planificación "
+                "preventiva. La prioridad diaria de trabajo la determina "
+                "el ❤️ Corazón."
+            )
+
         else:
-            st.success("No hay preventivos prioritarios pendientes.")
+            st.success(
+                "No hay preventivos pendientes que requieran "
+                "atención especial."
+            )
+
+            st.caption(
+                "La planificación preventiva se encuentra controlada. "
+                "La prioridad diaria continúa siendo responsabilidad "
+                "del ❤️ Corazón."
+            )
 
     st.markdown("## 📊 Salud del mantenimiento")
 
