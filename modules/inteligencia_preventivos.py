@@ -141,7 +141,8 @@ def obtener_prioridades_preventivas(centro=None, limite=5):
         filtro_centro = "AND centro = ?"
         params.append(centro)
 
-    df = leer_df_preventivos(f"""
+    df = leer_df_preventivos(
+        f"""
         SELECT *
         FROM ordenes_trabajo
         WHERE UPPER(COALESCE(origen, '')) = 'PREVENTIVO'
@@ -161,9 +162,9 @@ def obtener_prioridades_preventivas(centro=None, limite=5):
                 THEN 1
                 ELSE 0
             END ASC,
-        
+
             fecha_programada ASC,
-        
+
             CASE LOWER(TRIM(COALESCE(prioridad, '')))
                 WHEN 'urgente' THEN 1
                 WHEN 'alta' THEN 2
@@ -171,8 +172,31 @@ def obtener_prioridades_preventivas(centro=None, limite=5):
                 WHEN 'baja' THEN 4
                 ELSE 5
             END ASC,
-        
+
             id ASC
+        """,
+        tuple(params)
+    )
+
+    if df.empty:
+        return []
+
+    prioridades = []
+
+    for _, row in df.head(limite).iterrows():
+        prioridades.append({
+            "numero_ot": row.get("numero_ot", ""),
+            "centro": row.get("centro", ""),
+            "edificio": row.get("edificio", ""),
+            "espacio": row.get("espacio", ""),
+            "area": row.get("area", ""),
+            "prioridad": row.get("prioridad", ""),
+            "descripcion": row.get("descripcion", ""),
+            "fecha_programada": row.get("fecha_programada", ""),
+            "accion": "Realizar preventivo y completar checklist.",
+        })
+
+    return prioridades
 
 
 def evaluar_areas_preventivas(centro=None):
