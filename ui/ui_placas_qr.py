@@ -452,13 +452,13 @@ def pantalla_placas_qr():
         st.markdown("#### Diseño")
 
         mostrar_aula = st.checkbox(
-            'Mostrar texto "AULA"',
+            'Mostrar etiqueta del tipo de espacio',
             value=True,
             key="placas_mostrar_aula",
         )
         
         tamano_texto_aula = st.slider(
-            "Tamaño texto AULA",
+            "Tamaño etiqueta superior",
             6,
             16,
             9,
