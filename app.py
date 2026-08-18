@@ -862,7 +862,9 @@ def mostrar_menu_comunicacion():
 # INICIO APP
 # =====================================================
 
-inicializar_db()
+if "db_inicializada" not in st.session_state:
+    inicializar_db()
+    st.session_state["db_inicializada"] = True
 
 def _registrar_error_automatismo_inicio(nombre, error):
     """
