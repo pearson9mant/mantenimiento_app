@@ -1870,11 +1870,7 @@ def pantalla_operario(modo="ordenes"):
     if not historico_operario:
         st.info("No hay trabajos finalizados todavía.")
         return
-
-    # Orden más reciente primero
-    historico_operario = list(
-        reversed(historico_operario)
-    )
+    
 
     # =====================================================
     # PAGINACIÓN DEL HISTÓRICO
