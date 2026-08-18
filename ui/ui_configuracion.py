@@ -25,6 +25,7 @@ from modules.espacios import (
     icono_tipo_espacio,
     obtener_plantas_config,
     actualizar_visible_planta,
+    qr_habilitado_espacio,
     PLANTAS_BASE,
 )
 
@@ -1252,6 +1253,16 @@ def pantalla_configuracion_espacios():
             key="cfg_catalogo_espacio"
         )
 
+        qr_habilitado = st.checkbox(
+            "📱 Habilitar QR para este espacio",
+            value=(tipo == "Aula"),
+            key="cfg_catalogo_qr_habilitado",
+            help=(
+                "Actívalo si quieres generar una placa QR para comunicar "
+                "incidencias directamente desde este espacio."
+            ),
+        )
+
         if st.button("💾 Guardar espacio", use_container_width=True):
             if not espacio:
                 st.warning("Indica el nombre del espacio.")
@@ -1263,7 +1274,8 @@ def pantalla_configuracion_espacios():
                     edificio=edificio,
                     planta=planta,
                     espacio=espacio,
-                    tipo=tipo
+                    tipo=tipo,
+                    qr_habilitado=qr_habilitado,
                 )
 
                 if ok:
@@ -1328,6 +1340,16 @@ def pantalla_configuracion_espacios():
                         key=f"edit_esp_nombre_{id_espacio}"
                     )
 
+                    nuevo_qr_habilitado = st.checkbox(
+                        "📱 QR habilitado",
+                        value=qr_habilitado_espacio(id_espacio),
+                        key=f"edit_esp_qr_{id_espacio}",
+                        help=(
+                            "Permite generar y utilizar una placa QR "
+                            "para este espacio."
+                        ),
+                    )
+
                     if st.button(
                         "💾 Guardar cambios",
                         key=f"guardar_cambios_espacio_{id_espacio}",
@@ -1339,7 +1361,8 @@ def pantalla_configuracion_espacios():
                             edificio=nuevo_edificio,
                             planta=nueva_planta,
                             espacio=nuevo_espacio,
-                            tipo=nuevo_tipo
+                            tipo=nuevo_tipo,
+                            qr_habilitado=nuevo_qr_habilitado,
                         )
 
                         if ok:
