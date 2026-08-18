@@ -803,6 +803,48 @@ def obtener_historico_operario(operario, limite=500):
     finally:
         conn.close()
 
+def obtener_historico_reciente(limite=500):
+    """
+    Devuelve las últimas OT del histórico.
+
+    Se mantiene obtener_historico() para compatibilidad
+    con otras partes de la aplicación.
+    """
+    asegurar_columnas_observaciones_estado()
+
+    try:
+        limite = int(limite)
+    except Exception:
+        limite = 500
+
+    limite = max(1, min(limite, 2000))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT id, numero_ot, descripcion, estado, fecha_creacion,
+                   centro, edificio, espacio, area, prioridad, operario,
+                   origen, solicitante, fecha_origen, fecha_cierre,
+                   observaciones_cierre, foto, tipo_solicitante,
+                   tipo_orden, empresa_externa, contacto_empresa,
+                   telefono_empresa, email_empresa,
+                   fecha_programada, fecha_realizacion,
+                   coste_estimado, coste_final,
+                   observaciones_estado
+            FROM historico_ordenes
+            ORDER BY id DESC
+            LIMIT ?
+        """), (
+            limite,
+        ))
+
+        return cursor.fetchall()
+
+    finally:
+        conn.close()
+
 
 def obtener_historico():
     asegurar_columnas_observaciones_estado()
