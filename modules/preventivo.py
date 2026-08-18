@@ -915,9 +915,14 @@ Fecha límite: {fecha_limite or '-'}
                 "",                             # 18 email_empresa
                 fecha_programada,               # 19 fecha_aviso/programada
                 "",                             # 20 fecha_realizacion
-                0,                              # 21 coste_estimado
-                0,                              # 22 coste_final
-                observaciones_ot,               # 23 observaciones_estado
+                "",                             # 21 trabajo_a_realizar
+                "",                             # 22 trabajo_realizado
+                "",                             # 23 firma_operario
+                "",                             # 24 fecha_firma_operario
+                0,                              # 25 coste_estimado
+                0,                              # 26 coste_final
+                observaciones_ot,               # 27 observaciones_estado
+                planta or "",                   # 28 planta
             )
 
             crear_orden(
