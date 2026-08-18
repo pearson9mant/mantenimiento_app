@@ -5,7 +5,7 @@ from ui.ui_trabajar_ot import pantalla_trabajar_ot
 
 from modules.ordenes import (
     obtener_ordenes_operario,
-    obtener_historico,
+    obtener_historico_operario,
     actualizar_estado,
     actualizar_observaciones_estado,
     finalizar_orden,
