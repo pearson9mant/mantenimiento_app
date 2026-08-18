@@ -1532,7 +1532,7 @@ def pantalla_ordenes():
 
     with tab3:
         historico = obtener_historico_reciente(
-            limite=500
+            limite=200
         )
     
         historico = filtrar_por_operario_obligatorio(
