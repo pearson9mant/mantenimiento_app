@@ -204,62 +204,166 @@ def asegurar_tabla_contador_ot():
 
 
 def obtener_siguiente_numero_ot(centro="", tipo_ot="INC"):
+    """
+    Genera el siguiente número de OT de forma segura.
+
+    PostgreSQL:
+    - incremento atómico;
+    - evita números duplicados si dos usuarios crean OT a la vez.
+
+    SQLite:
+    - mantiene compatibilidad para uso local;
+    - bloquea brevemente la escritura durante la numeración.
+    """
     asegurar_tabla_contador_ot()
 
     conn = conectar()
     cursor = conn.cursor()
 
-    centro_codigo = obtener_codigo_centro(centro)
-    tipo_codigo = obtener_codigo_tipo(tipo_ot)
+    centro_codigo = obtener_codigo_centro(
+        centro
+    )
+
+    tipo_codigo = obtener_codigo_tipo(
+        tipo_ot
+    )
 
     curso_escolar = obtener_curso_escolar()
     curso_codigo = obtener_codigo_curso_escolar()
 
-    cursor.execute(_sql("""
-        SELECT ultimo_numero
-        FROM contador_ot_curso
-        WHERE centro_codigo = ?
-          AND tipo_codigo = ?
-          AND curso_escolar = ?
-    """), (centro_codigo, tipo_codigo, curso_escolar))
+    modulo = conn.__class__.__module__.lower()
 
-    fila = cursor.fetchone()
+    es_postgres = (
+        "psycopg2" in modulo
+        or "postgres" in modulo
+    )
 
-    if fila:
-        siguiente = int(fila[0]) + 1
+    try:
 
-        cursor.execute(_sql("""
-            UPDATE contador_ot_curso
-            SET ultimo_numero = ?
-            WHERE centro_codigo = ?
-              AND tipo_codigo = ?
-              AND curso_escolar = ?
-        """), (siguiente, centro_codigo, tipo_codigo, curso_escolar))
-    else:
-        siguiente = 1
+        # =================================================
+        # POSTGRESQL / RENDER
+        # =================================================
+        if es_postgres:
 
-        cursor.execute(_sql("""
-            INSERT INTO contador_ot_curso
-            (
+            cursor.execute("""
+                INSERT INTO contador_ot_curso
+                (
+                    centro_codigo,
+                    tipo_codigo,
+                    curso_escolar,
+                    curso_codigo,
+                    ultimo_numero
+                )
+                VALUES (%s, %s, %s, %s, 1)
+
+                ON CONFLICT
+                (
+                    centro_codigo,
+                    tipo_codigo,
+                    curso_escolar
+                )
+
+                DO UPDATE
+                SET ultimo_numero =
+                    contador_ot_curso.ultimo_numero + 1,
+                    curso_codigo = EXCLUDED.curso_codigo
+
+                RETURNING ultimo_numero
+            """, (
                 centro_codigo,
                 tipo_codigo,
                 curso_escolar,
                 curso_codigo,
-                ultimo_numero
+            ))
+
+            fila = cursor.fetchone()
+
+            siguiente = int(
+                fila[0]
             )
-            VALUES (?, ?, ?, ?, ?)
-        """), (
-            centro_codigo,
-            tipo_codigo,
-            curso_escolar,
-            curso_codigo,
-            siguiente
-        ))
 
-    conn.commit()
-    conn.close()
+        # =================================================
+        # SQLITE / LOCAL
+        # =================================================
+        else:
 
-    return f"{tipo_codigo}-{centro_codigo}-{curso_codigo}-{siguiente:04d}"
+            cursor.execute(
+                "BEGIN IMMEDIATE"
+            )
+
+            cursor.execute("""
+                SELECT ultimo_numero
+                FROM contador_ot_curso
+                WHERE centro_codigo = ?
+                  AND tipo_codigo = ?
+                  AND curso_escolar = ?
+            """, (
+                centro_codigo,
+                tipo_codigo,
+                curso_escolar,
+            ))
+
+            fila = cursor.fetchone()
+
+            if fila:
+
+                siguiente = (
+                    int(fila[0])
+                    + 1
+                )
+
+                cursor.execute("""
+                    UPDATE contador_ot_curso
+                    SET ultimo_numero = ?,
+                        curso_codigo = ?
+                    WHERE centro_codigo = ?
+                      AND tipo_codigo = ?
+                      AND curso_escolar = ?
+                """, (
+                    siguiente,
+                    curso_codigo,
+                    centro_codigo,
+                    tipo_codigo,
+                    curso_escolar,
+                ))
+
+            else:
+
+                siguiente = 1
+
+                cursor.execute("""
+                    INSERT INTO contador_ot_curso
+                    (
+                        centro_codigo,
+                        tipo_codigo,
+                        curso_escolar,
+                        curso_codigo,
+                        ultimo_numero
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    centro_codigo,
+                    tipo_codigo,
+                    curso_escolar,
+                    curso_codigo,
+                    siguiente,
+                ))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    return (
+        f"{tipo_codigo}-"
+        f"{centro_codigo}-"
+        f"{curso_codigo}-"
+        f"{siguiente:04d}"
+    )
 
 
 def detectar_tipo_ot_para_numero(origen="", tipo_orden="Interna"):
