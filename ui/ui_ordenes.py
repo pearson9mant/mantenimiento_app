@@ -1553,6 +1553,52 @@ def pantalla_ordenes():
                 h for h in historico
                 if texto in " ".join([str(campo or "") for campo in h]).lower()
             ]
+        # =====================================================
+        # PAGINACIÓN HISTÓRICO ADMINISTRACIÓN
+        # =====================================================
+    
+        historicos_por_pagina = 20
+    
+        total_historicos = len(historico)
+    
+        total_paginas = max(
+            1,
+            (
+                total_historicos
+                + historicos_por_pagina
+                - 1
+            )
+            // historicos_por_pagina
+        )
+    
+        pagina_actual = st.number_input(
+            "Página",
+            min_value=1,
+            max_value=total_paginas,
+            value=1,
+            step=1,
+            key="pagina_historico_admin",
+        )
+    
+        inicio = (
+            int(pagina_actual) - 1
+        ) * historicos_por_pagina
+    
+        fin = (
+            inicio
+            + historicos_por_pagina
+        )
+    
+        historico = historico[
+            inicio:fin
+        ]
+    
+        st.caption(
+            f"Mostrando {len(historico)} de "
+            f"{total_historicos} registros · "
+            f"Página {int(pagina_actual)} "
+            f"de {total_paginas}"
+        )
 
         if not historico:
             if es_operario():
