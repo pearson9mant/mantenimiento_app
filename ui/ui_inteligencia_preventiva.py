@@ -87,10 +87,32 @@ def _mostrar_recomendacion(
         "",
     )
 
+    patron_detectado = recomendacion.get(
+        "patron_detectado",
+        "",
+    )
+
+    repeticiones_patron = recomendacion.get(
+        "repeticiones_patron",
+        0,
+    )
+
+    confianza_patron = recomendacion.get(
+        "confianza_patron",
+        "",
+    )
+
+    porcentaje_patron = recomendacion.get(
+        "porcentaje_patron",
+        0,
+    )
+
     if nivel == "Alta":
         icono = "🔴"
+
     elif nivel == "Media":
         icono = "🟠"
+
     else:
         icono = "🟡"
 
@@ -101,6 +123,7 @@ def _mostrar_recomendacion(
         )
 
         with c1:
+
             st.markdown(
                 f"### {icono} "
                 f"{espacio} · {area}"
@@ -118,6 +141,7 @@ def _mostrar_recomendacion(
             )
 
         with c2:
+
             st.metric(
                 "Índice",
                 score,
@@ -140,6 +164,48 @@ def _mostrar_recomendacion(
             ultima_fecha or "-",
         )
 
+        # ==================================================
+        # PATRÓN TÉCNICO
+        # ==================================================
+
+        if patron_detectado:
+
+            st.markdown(
+                f"**🔎 Patrón detectado:** "
+                f"{patron_detectado}"
+            )
+
+            detalle_patron = (
+                f"{repeticiones_patron} de "
+                f"{cantidad} incidencias"
+            )
+
+            if porcentaje_patron:
+                detalle_patron += (
+                    f" · {porcentaje_patron}%"
+                )
+
+            if confianza_patron:
+                detalle_patron += (
+                    f" · Confianza: "
+                    f"{confianza_patron}"
+                )
+
+            st.caption(
+                detalle_patron
+            )
+
+        else:
+
+            st.caption(
+                "🔎 No se ha confirmado todavía "
+                "un patrón técnico repetido."
+            )
+
+        # ==================================================
+        # RECOMENDACIÓN
+        # ==================================================
+
         st.markdown(
             f"**🧠 Recomendación:** "
             f"{accion}"
@@ -149,36 +215,67 @@ def _mostrar_recomendacion(
             motivo
         )
 
+        # ==================================================
+        # INTERVALO
+        # ==================================================
+
         if intervalo is not None:
+
             st.caption(
-                f"Intervalo medio observado entre incidencias: "
+                f"Intervalo medio observado "
+                f"entre incidencias: "
                 f"{intervalo} días."
             )
 
+        # ==================================================
+        # PREVENTIVO EXISTENTE
+        # ==================================================
+
         if frecuencia_actual:
+
             st.markdown(
                 f"**Preventivo actual:** "
                 f"{frecuencia_actual}"
             )
 
-        if frecuencia_sugerida:
+        # ==================================================
+        # FRECUENCIA SUGERIDA
+        #
+        # Solo tiene sentido si existe patrón confirmado.
+        # Nunca se propone frecuencia cuando la decisión es
+        # simplemente seguir observando.
+        # ==================================================
+
+        if (
+            frecuencia_sugerida
+            and patron_detectado
+            and accion != "Seguir observando"
+        ):
+
             st.markdown(
                 f"**Frecuencia que conviene valorar:** "
                 f"{frecuencia_sugerida}"
             )
 
+        # ==================================================
+        # ÚLTIMA INCIDENCIA
+        # ==================================================
+
         if descripcion:
+
             with st.expander(
                 "Ver última incidencia relacionada",
                 expanded=False,
             ):
+
                 st.write(
                     descripcion
                 )
 
         st.caption(
             "La inteligencia solo recomienda. "
-            "No se ha creado ni modificado ningún preventivo."
+            "No se ha creado ni modificado "
+            "ningún preventivo."
         )
 
 
@@ -190,7 +287,8 @@ def pantalla_inteligencia_preventiva():
 
     st.caption(
         "Analiza el mantenimiento correctivo y busca "
-        "patrones que puedan convertirse en mantenimiento preventivo."
+        "patrones que puedan convertirse en "
+        "mantenimiento preventivo."
     )
 
     st.info(
@@ -203,6 +301,7 @@ def pantalla_inteligencia_preventiva():
     )
 
     with c1:
+
         centro = st.selectbox(
             "Centro a analizar",
             [
@@ -214,6 +313,7 @@ def pantalla_inteligencia_preventiva():
         )
 
     with c2:
+
         periodo = st.selectbox(
             "Periodo",
             [
@@ -238,7 +338,8 @@ def pantalla_inteligencia_preventiva():
     if ejecutar:
 
         with st.spinner(
-            "Analizando histórico de mantenimiento..."
+            "Analizando histórico "
+            "de mantenimiento..."
         ):
 
             resultado = (
@@ -257,26 +358,55 @@ def pantalla_inteligencia_preventiva():
     )
 
     if not resultado:
+
         st.caption(
-            "Pulsa Analizar para iniciar el diagnóstico."
+            "Pulsa Analizar para iniciar "
+            "el diagnóstico."
         )
+
         return
 
-    # Evitar mostrar datos de otro centro después
-    # de cambiar el selector.
+    # ==================================================
+    # EVITAR MOSTRAR DATOS DE OTRO CENTRO
+    # ==================================================
+
     if (
         resultado.get("centro")
         != centro
     ):
+
         st.caption(
-            f"Pulsa Analizar {centro} para actualizar el diagnóstico."
+            f"Pulsa Analizar {centro} "
+            f"para actualizar el diagnóstico."
         )
+
         return
 
     recomendaciones = resultado.get(
         "recomendaciones",
         [],
     )
+
+    # ==================================================
+    # PATRONES REALMENTE CONFIRMADOS
+    # ==================================================
+
+    patrones_confirmados = [
+        r
+        for r in recomendaciones
+        if str(
+            r.get(
+                "patron_detectado",
+                "",
+            )
+        ).strip()
+    ]
+
+    altas = len([
+        r
+        for r in patrones_confirmados
+        if r.get("nivel") == "Alta"
+    ])
 
     st.markdown("---")
 
@@ -291,36 +421,50 @@ def pantalla_inteligencia_preventiva():
     )
 
     c2.metric(
-        "Patrones encontrados",
-        len(recomendaciones),
+        "Patrones confirmados",
+        len(
+            patrones_confirmados
+        ),
     )
-
-    altas = len([
-        r
-        for r in recomendaciones
-        if r.get("nivel") == "Alta"
-    ])
 
     c3.metric(
         "Atención alta",
         altas,
     )
 
+    # ==================================================
+    # SIN CANDIDATOS
+    # ==================================================
+
     if not recomendaciones:
 
         st.success(
-            "No se han encontrado recurrencias suficientes "
-            "para proponer nuevos preventivos en este periodo."
+            "No se han encontrado recurrencias "
+            "suficientes para analizar en este periodo."
         )
 
         return
+
+    # ==================================================
+    # HAY CASOS, PERO NINGÚN PATRÓN CONFIRMADO
+    # ==================================================
+
+    if not patrones_confirmados:
+
+        st.info(
+            "Se han detectado espacios con varias "
+            "incidencias, pero todavía no existe "
+            "un patrón técnico repetido suficientemente "
+            "claro para recomendar un nuevo preventivo."
+        )
 
     st.markdown(
         "### 🎯 Recomendaciones"
     )
 
     st.caption(
-        "Ordenadas por recurrencia, riesgo, prioridad y recencia."
+        "Ordenadas por recurrencia, riesgo, "
+        "prioridad y recencia."
     )
 
     filtro = st.selectbox(
@@ -337,6 +481,7 @@ def pantalla_inteligencia_preventiva():
     visibles = recomendaciones
 
     if filtro != "Todas":
+
         visibles = [
             r
             for r in recomendaciones
@@ -344,15 +489,19 @@ def pantalla_inteligencia_preventiva():
         ]
 
     if not visibles:
+
         st.info(
-            "No hay recomendaciones con este nivel."
+            "No hay recomendaciones "
+            "con este nivel."
         )
+
         return
 
     for indice, recomendacion in enumerate(
         visibles,
         start=1,
     ):
+
         _mostrar_recomendacion(
             recomendacion,
             indice,
