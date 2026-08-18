@@ -1531,8 +1531,14 @@ def pantalla_ordenes():
     # =====================================================
 
     with tab3:
-        historico = obtener_historico()
-        historico = filtrar_por_operario_obligatorio(historico)
+        historico = obtener_historico_reciente(
+            limite=500
+        )
+    
+        historico = filtrar_por_operario_obligatorio(
+            historico
+        )
+    
         st.markdown("### 🔎 Buscar en histórico")
 
         busqueda_historico = st.text_input(
