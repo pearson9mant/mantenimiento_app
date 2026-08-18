@@ -1,11 +1,10 @@
 import streamlit as st
-from pathlib import Path
-
 from modules.ordenes import (
     actualizar_estado,
     actualizar_observaciones_estado,
     finalizar_orden,
     obtener_fotos_ot,
+    guardar_foto_ot,
     crear_correctiva_desde_ot,
 )
 
@@ -32,6 +31,204 @@ from modules.espacios import (
     obtener_plantas_espacios,
     obtener_espacios_por_planta,
 )
+
+
+MAX_FOTOS_CIERRE_OT = 5
+MAX_MB_FOTO_OT = 5
+
+
+def limpiar_nombre_archivo(texto):
+    texto = str(texto or "")
+
+    for caracter in [
+        "/",
+        "\\",
+        ":",
+        "*",
+        "?",
+        '"',
+        "<",
+        ">",
+        "|",
+    ]:
+        texto = texto.replace(
+            caracter,
+            "_",
+        )
+
+    return texto.replace(
+        " ",
+        "_",
+    )
+
+
+def validar_fotos_cierre_ot(fotos):
+    fotos = list(
+        fotos or []
+    )
+
+    errores = []
+
+    if len(fotos) > MAX_FOTOS_CIERRE_OT:
+        errores.append(
+            f"Máximo {MAX_FOTOS_CIERRE_OT} fotos por cierre."
+        )
+
+    for foto in fotos[:MAX_FOTOS_CIERRE_OT]:
+        try:
+            tamano = int(
+                getattr(
+                    foto,
+                    "size",
+                    0,
+                )
+                or 0
+            )
+        except Exception:
+            tamano = 0
+
+        if tamano > MAX_MB_FOTO_OT * 1024 * 1024:
+            errores.append(
+                f"{getattr(foto, 'name', 'Foto')}: "
+                f"supera {MAX_MB_FOTO_OT} MB."
+            )
+
+    return errores
+
+
+def obtener_nombres_fotos_ot(numero_ot):
+    """
+    Consulta únicamente los nombres de fotos ya guardadas.
+    Evita descargar los binarios para comprobar duplicados.
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT nombre_foto
+            FROM ordenes_fotos
+            WHERE numero_ot = ?
+        """), (
+            numero_ot,
+        ))
+
+        return {
+            str(fila[0] or "").strip()
+            for fila in cur.fetchall()
+            if fila and fila[0]
+        }
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+        return set()
+
+    finally:
+        conn.close()
+
+
+def guardar_fotos_cierre_ot(
+    numero_ot,
+    id_orden,
+    fotos,
+):
+    """
+    Guarda las fotos de trabajo realizado.
+
+    Los nombres son deterministas para que un segundo intento
+    de cierre no duplique las mismas fotografías.
+    """
+    fotos = list(
+        fotos or []
+    )[:MAX_FOTOS_CIERRE_OT]
+
+    if not fotos:
+        return (
+            True,
+            0,
+            "",
+        )
+
+    errores = validar_fotos_cierre_ot(
+        fotos
+    )
+
+    if errores:
+        return (
+            False,
+            0,
+            " | ".join(
+                errores
+            ),
+        )
+
+    nombres_existentes = obtener_nombres_fotos_ot(
+        numero_ot
+    )
+
+    guardadas = 0
+
+    try:
+        for indice, foto in enumerate(
+            fotos,
+            start=1,
+        ):
+            nombre_original = limpiar_nombre_archivo(
+                getattr(
+                    foto,
+                    "name",
+                    f"foto_{indice}.jpg",
+                )
+            )
+
+            nombre_foto = limpiar_nombre_archivo(
+                f"{numero_ot}_CIERRE_{id_orden}_"
+                f"{indice}_{nombre_original}"
+            )
+
+            if nombre_foto in nombres_existentes:
+                continue
+
+            contenido = foto.getvalue()
+
+            if len(contenido) > MAX_MB_FOTO_OT * 1024 * 1024:
+                return (
+                    False,
+                    guardadas,
+                    (
+                        f"{nombre_original}: "
+                        f"supera {MAX_MB_FOTO_OT} MB."
+                    ),
+                )
+
+            guardar_foto_ot(
+                numero_ot=numero_ot,
+                nombre_foto=nombre_foto,
+                foto_data=contenido,
+            )
+
+            nombres_existentes.add(
+                nombre_foto
+            )
+
+            guardadas += 1
+
+        return (
+            True,
+            guardadas,
+            "",
+        )
+
+    except Exception as error:
+        return (
+            False,
+            guardadas,
+            str(error),
+        )
 
 
 def normalizar_txt(valor):
@@ -770,6 +967,40 @@ def mostrar_tarjeta_ot(
     if es_operario() and normalizar_operario_nombre(operario) != normalizar_operario_nombre(nombre_operario_actual()):
         return
 
+    # La fila ligera histórica no incluye siempre planta.
+    # Al abrir una única OT podemos consultar su ubicación real.
+    (
+        centro_real,
+        edificio_real,
+        planta_real,
+        espacio_real,
+    ) = obtener_ubicacion_ot(
+        id_orden
+    )
+
+    centro_mostrar = (
+        centro_real
+        or centro
+        or "-"
+    )
+
+    edificio_mostrar = (
+        edificio_real
+        or edificio
+        or "-"
+    )
+
+    planta_mostrar = (
+        planta_real
+        or "-"
+    )
+
+    espacio_mostrar = (
+        espacio_real
+        or espacio
+        or "-"
+    )
+
     estado_icono = {
         "Abierta": "🔴",
         "En curso": "🟠",
@@ -790,7 +1021,12 @@ def mostrar_tarjeta_ot(
         st.markdown(f"### {estado_icono} {num_ot}")
         st.markdown(f"**{prioridad}** | {area or '-'}")
         st.markdown(f"{desc}")
-        st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {espacio or '-'}")
+        st.caption(
+            f"🏢 {centro_mostrar} · "
+            f"{edificio_mostrar} · "
+            f"{planta_mostrar} · "
+            f"{espacio_mostrar}"
+        )
         st.caption(f"Estado actual: {est}")
 
         if observaciones_estado:
@@ -808,45 +1044,125 @@ def mostrar_tarjeta_ot(
             id_orden=id_orden,
             modo=modo,
         )
-        try:
-            fotos_db = obtener_fotos_ot(num_ot)
+        # -------------------------------------------------
+        # FOTOS DE LA OT · CARGA BAJO DEMANDA
+        # -------------------------------------------------
+        clave_fotos_ot = (
+            f"{modo}_mostrar_fotos_ot_{id_orden}"
+        )
 
-            if fotos_db:
-                cols_fotos = st.columns(3)
+        mostrar_fotos_ot = bool(
+            st.session_state.get(
+                clave_fotos_ot,
+                False,
+            )
+        )
 
-                for i, (nombre_foto, foto_data) in enumerate(fotos_db):
-                    with cols_fotos[i % 3]:
-                        try:
-                            st.image(
-                                bytes(foto_data),
-                                caption=f"Foto {i + 1}",
-                                use_container_width=True
-                            )
-                        except Exception as e:
-                            st.caption(f"📷 Foto no disponible: {e}")
+        if not mostrar_fotos_ot:
+            if st.button(
+                "📷 Ver fotos de la OT",
+                key=f"{modo}_ver_fotos_ot_{id_orden}",
+                use_container_width=True,
+            ):
+                st.session_state[
+                    clave_fotos_ot
+                ] = True
+                st.rerun()
 
-            elif foto:
-                fotos = str(foto).split("|")
-                cols_fotos = st.columns(3)
+        else:
+            if st.button(
+                "🙈 Ocultar fotos de la OT",
+                key=f"{modo}_ocultar_fotos_ot_{id_orden}",
+                use_container_width=True,
+            ):
+                st.session_state[
+                    clave_fotos_ot
+                ] = False
+                st.rerun()
 
-                for i, ruta_foto in enumerate(fotos):
-                    ruta_foto = str(ruta_foto).strip()
+            try:
+                fotos_db = obtener_fotos_ot(
+                    num_ot
+                )
 
-                    if not ruta_foto:
-                        continue
+                if fotos_db:
+                    cols_fotos = st.columns(3)
 
-                    with cols_fotos[i % 3]:
-                        try:
-                            st.image(
-                                ruta_foto,
-                                caption=f"Foto {i + 1}",
-                                use_container_width=True
-                            )
-                        except Exception as e:
-                            st.caption(f"📷 Foto no disponible: {e}")
+                    for i, (
+                        nombre_foto,
+                        foto_data,
+                    ) in enumerate(
+                        fotos_db
+                    ):
+                        with cols_fotos[
+                            i % 3
+                        ]:
+                            try:
+                                st.image(
+                                    bytes(
+                                        foto_data
+                                    ),
+                                    caption=(
+                                        nombre_foto
+                                        or f"Foto {i + 1}"
+                                    ),
+                                    use_container_width=True,
+                                )
+                            except Exception as error:
+                                st.caption(
+                                    "📷 Foto no disponible: "
+                                    f"{error}"
+                                )
 
-        except Exception as e:
-            st.error(f"📷 Error mostrando fotos: {e}")
+                elif (
+                    foto
+                    and str(
+                        foto
+                    ).strip().lower()
+                    != "postgres_fotos"
+                ):
+                    fotos_legacy = [
+                        ruta.strip()
+                        for ruta in str(
+                            foto
+                        ).split("|")
+                        if ruta.strip()
+                    ]
+
+                    if fotos_legacy:
+                        cols_fotos = st.columns(3)
+
+                        for i, ruta_foto in enumerate(
+                            fotos_legacy
+                        ):
+                            with cols_fotos[
+                                i % 3
+                            ]:
+                                try:
+                                    st.image(
+                                        ruta_foto,
+                                        caption=f"Foto {i + 1}",
+                                        use_container_width=True,
+                                    )
+                                except Exception:
+                                    st.caption(
+                                        "📷 Foto no disponible."
+                                    )
+                    else:
+                        st.info(
+                            "Esta OT no tiene fotos."
+                        )
+
+                else:
+                    st.info(
+                        "Esta OT no tiene fotos."
+                    )
+
+            except Exception as error:
+                st.caption(
+                    "📷 No se pudieron cargar las fotos: "
+                    f"{error}"
+                )
 
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
@@ -987,21 +1303,52 @@ def mostrar_tarjeta_ot(
                         "en Inventario."
                     )
 
-            st.file_uploader(
+            fotos_cierre = st.file_uploader(
                 "📷 Fotos del trabajo realizado",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=True,
-                key=f"{modo}_fotos_cierre_{id_orden}"
+                key=f"{modo}_fotos_cierre_{id_orden}",
+                help=(
+                    f"Máximo {MAX_FOTOS_CIERRE_OT} fotos "
+                    f"y {MAX_MB_FOTO_OT} MB por foto."
+                ),
             )
+
+            errores_fotos_cierre = validar_fotos_cierre_ot(
+                fotos_cierre
+            )
+
+            if errores_fotos_cierre:
+                for error_foto in errores_fotos_cierre:
+                    st.error(
+                        error_foto
+                    )
+
+            elif fotos_cierre:
+                st.caption(
+                    f"📷 {len(fotos_cierre)} "
+                    "foto(s) preparada(s) para guardar al cerrar."
+                )
 
             if st.button(
                 f"Finalizar con observaciones/material {num_ot}",
                 key=f"{modo}_fin_completo_operario_{id_orden}",
                 use_container_width=True
             ):
-                st.session_state[f"{modo}_materiales_confirmados_{id_orden}"] = materiales_ot.copy()
-                st.session_state[f"{modo}_confirmar_fin_completo_{id_orden}"] = True
-                st.rerun()
+                if errores_fotos_cierre:
+                    st.error(
+                        "Corrige las fotografías antes de continuar."
+                    )
+                else:
+                    st.session_state[
+                        f"{modo}_materiales_confirmados_{id_orden}"
+                    ] = materiales_ot.copy()
+
+                    st.session_state[
+                        f"{modo}_confirmar_fin_completo_{id_orden}"
+                    ] = True
+
+                    st.rerun()
 
             if st.session_state.get(f"{modo}_confirmar_fin_completo_{id_orden}", False):
                 st.warning(f"¿Seguro que quieres finalizar {num_ot} con estas observaciones/material?")
@@ -1050,22 +1397,104 @@ def mostrar_tarjeta_ot(
                                     for error in errores:
                                         st.error(error)
                                 else:
-                                    actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
-                                    finalizar_orden(id_orden, observaciones_fin)
-                                    st.session_state[f"{modo}_confirmar_fin_completo_{id_orden}"] = False
-                                    st.session_state.pop(f"{modo}_materiales_confirmados_{id_orden}", None)
-                                    st.session_state.pop(f"legionella_guardada_{id_orden}", None)
-                                    preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
-                                    st.rerun()
+                                    (
+                                        fotos_ok,
+                                        fotos_guardadas,
+                                        error_fotos,
+                                    ) = guardar_fotos_cierre_ot(
+                                        numero_ot=num_ot,
+                                        id_orden=id_orden,
+                                        fotos=fotos_cierre,
+                                    )
+
+                                    if not fotos_ok:
+                                        st.error(
+                                            "No se han podido guardar "
+                                            "las fotos de cierre: "
+                                            f"{error_fotos}"
+                                        )
+                                    else:
+                                        actualizar_observaciones_estado(
+                                            id_orden,
+                                            observacion_estado_nueva,
+                                        )
+
+                                        finalizar_orden(
+                                            id_orden,
+                                            observaciones_fin,
+                                        )
+
+                                        st.session_state[
+                                            f"{modo}_confirmar_fin_completo_{id_orden}"
+                                        ] = False
+
+                                        st.session_state.pop(
+                                            f"{modo}_materiales_confirmados_{id_orden}",
+                                            None,
+                                        )
+
+                                        st.session_state.pop(
+                                            f"legionella_guardada_{id_orden}",
+                                            None,
+                                        )
+
+                                        preparar_siguiente_mision_corazon(
+                                            num_ot,
+                                            id_orden,
+                                            modo,
+                                        )
+
+                                        st.rerun()
 
                         else:
-                            actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
-                            finalizar_orden(id_orden, observaciones_fin)
-                            st.session_state[f"{modo}_confirmar_fin_completo_{id_orden}"] = False
-                            st.session_state.pop(f"{modo}_materiales_confirmados_{id_orden}", None)
-                            st.session_state.pop(f"legionella_guardada_{id_orden}", None)
-                            preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
-                            st.rerun()
+                            (
+                                fotos_ok,
+                                fotos_guardadas,
+                                error_fotos,
+                            ) = guardar_fotos_cierre_ot(
+                                numero_ot=num_ot,
+                                id_orden=id_orden,
+                                fotos=fotos_cierre,
+                            )
+
+                            if not fotos_ok:
+                                st.error(
+                                    "No se han podido guardar "
+                                    "las fotos de cierre: "
+                                    f"{error_fotos}"
+                                )
+                            else:
+                                actualizar_observaciones_estado(
+                                    id_orden,
+                                    observacion_estado_nueva,
+                                )
+
+                                finalizar_orden(
+                                    id_orden,
+                                    observaciones_fin,
+                                )
+
+                                st.session_state[
+                                    f"{modo}_confirmar_fin_completo_{id_orden}"
+                                ] = False
+
+                                st.session_state.pop(
+                                    f"{modo}_materiales_confirmados_{id_orden}",
+                                    None,
+                                )
+
+                                st.session_state.pop(
+                                    f"legionella_guardada_{id_orden}",
+                                    None,
+                                )
+
+                                preparar_siguiente_mision_corazon(
+                                    num_ot,
+                                    id_orden,
+                                    modo,
+                                )
+
+                                st.rerun()
 
                 with c2:
                     if st.button("❌\nCancelar", key=f"{modo}_no_fin_completo_{id_orden}", use_container_width=True):
