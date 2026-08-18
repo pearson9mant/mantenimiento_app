@@ -182,6 +182,16 @@ def pantalla_incidencia_qr():
 
     if incidencia_enviada:
 
+        error_fotos_envio = st.session_state.get(
+            f"incidencia_qr_error_fotos_{codigo_espacio}",
+            "",
+        )
+
+        if error_fotos_envio:
+            st.warning(
+                error_fotos_envio
+            )
+
         with st.container(border=True):
             st.markdown(
                 "<div style='text-align:center; font-size:54px; "
@@ -350,37 +360,6 @@ def pantalla_incidencia_qr():
             "%Y-%m-%d %H:%M:%S"
         )
 
-        nombres_fotos = []
-
-        try:
-            for indice, (
-                nombre_original,
-                contenido,
-            ) in enumerate(
-                fotos_validas,
-                start=1,
-            ):
-                nombre_foto = limpiar_nombre_archivo(
-                    f"{numero_ot}_{indice}_{nombre_original}"
-                )
-
-                guardar_foto_ot(
-                    numero_ot=numero_ot,
-                    nombre_foto=nombre_foto,
-                    foto_data=contenido,
-                )
-
-                nombres_fotos.append(nombre_foto)
-
-        except Exception as error:
-            st.error(
-                "No se pudieron guardar las fotografías: "
-                f"{error}"
-            )
-            return
-
-        ruta_foto = "|".join(nombres_fotos)
-
         observaciones_origen = (
             "Incidencia comunicada mediante QR del aula.\n"
             f"Código de espacio: "
@@ -396,18 +375,22 @@ def pantalla_incidencia_qr():
             edificio,
             espacio,
             "Otros",
-            "Normal",
+            "Media",
             operario,
-            "APP",
+            "PROFESORES_QR",
             observaciones_origen,
             fecha_origen,
-            ruta_foto,
+            "postgres_fotos" if fotos_validas else "",
             "Formulario QR",
         )
 
+        # Primero se crea la OT. Las fotos se guardan después,
+        # para evitar fotos huérfanas si fallara la creación.
         try:
             with st.spinner("Enviando aviso..."):
-                crear_orden(datos_orden)
+                crear_orden(
+                    datos_orden
+                )
 
         except Exception as error:
             st.error(
@@ -416,5 +399,51 @@ def pantalla_incidencia_qr():
             )
             return
 
-        st.session_state[clave_envio] = numero_ot
+        error_fotos_guardado = ""
+
+        if fotos_validas:
+            try:
+                for indice, (
+                    nombre_original,
+                    contenido,
+                ) in enumerate(
+                    fotos_validas,
+                    start=1,
+                ):
+                    nombre_foto = limpiar_nombre_archivo(
+                        f"{numero_ot}_{indice}_{nombre_original}"
+                    )
+
+                    guardar_foto_ot(
+                        numero_ot=numero_ot,
+                        nombre_foto=nombre_foto,
+                        foto_data=contenido,
+                    )
+
+            except Exception as error:
+                error_fotos_guardado = str(
+                    error
+                )
+
+        st.session_state[
+            clave_envio
+        ] = numero_ot
+
+        clave_error_fotos = (
+            f"incidencia_qr_error_fotos_{codigo_espacio}"
+        )
+
+        if error_fotos_guardado:
+            st.session_state[
+                clave_error_fotos
+            ] = (
+                "El aviso se ha creado, pero alguna fotografía "
+                "no pudo guardarse."
+            )
+        else:
+            st.session_state.pop(
+                clave_error_fotos,
+                None,
+            )
+
         st.rerun()
