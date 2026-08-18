@@ -2,7 +2,10 @@ import streamlit as st
 from pathlib import Path
 
 from config import CENTROS, EDIFICIOS, OPERARIOS
-from modules.ubicaciones import obtener_espacios
+from modules.espacios import (
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
 from modules.preventivo_aulas import (
     crear_tablas_preventivo_aulas,
     crear_revision_aula,
@@ -69,18 +72,45 @@ def pantalla_preventivo_aulas():
             key=f"prev_aula_edificio_{centro}"
         )
 
-        espacios_disponibles = obtener_espacios(edificio, centro)
+        plantas_disponibles = obtener_plantas_espacios(
+            centro,
+            edificio,
+        )
+
+        if not plantas_disponibles:
+            plantas_disponibles = ["Sin planta"]
+
+        planta = st.selectbox(
+            "Planta",
+            plantas_disponibles,
+            key=f"prev_aula_planta_{centro}_{edificio}",
+        )
+
+        espacios_encontrados = obtener_espacios_por_planta(
+            centro,
+            edificio,
+            planta,
+        )
+
+        espacios_disponibles = [
+            fila[0]
+            for fila in espacios_encontrados
+            if fila and fila[0]
+        ]
+
+        if not espacios_disponibles:
+            espacios_disponibles = ["Otro"]
 
         espacio_sel = st.selectbox(
             "Aula / espacio",
             espacios_disponibles,
-            key=f"prev_aula_espacio_{centro}_{edificio}"
+            key=f"prev_aula_espacio_{centro}_{edificio}_{planta}",
         )
 
         if espacio_sel == "Otro":
             espacio = st.text_input(
                 "Especificar aula / espacio",
-                key="prev_aula_espacio_otro"
+                key="prev_aula_espacio_otro",
             )
         else:
             espacio = espacio_sel
@@ -124,6 +154,7 @@ def pantalla_preventivo_aulas():
                     espacio=espacio,
                     operario=operario,
                     observaciones=observaciones,
+                    planta=planta,
                 )
 
                 st.session_state["revision_aula_activa"] = revision_id
@@ -147,6 +178,7 @@ def pantalla_preventivo_aulas():
                     estado,
                     observaciones,
                     numero_ot_preventiva,
+                    planta,
                 ) = rev
 
                 resumen = resumen_revision_aula(revision_id)
@@ -156,7 +188,8 @@ def pantalla_preventivo_aulas():
                 averias_resueltas = resumen.get("averias_resueltas", 0)
 
                 titulo = (
-                    f"{fecha or '-'} | {centro} · {edificio} · {espacio} | "
+                    f"{fecha or '-'} | {centro} · {edificio} · "
+                    f"{planta or '-'} · {espacio} | "
                     f"{estado} | Detectadas: {averias_detectadas} | "
                     f"Pendientes: {averias_pendientes} | Resueltas: {averias_resueltas}"
                 )
@@ -166,6 +199,7 @@ def pantalla_preventivo_aulas():
                         f"""
                         🏢 **Centro:** {centro}  
                         🏫 **Edificio:** {edificio}  
+                        🧱 **Planta:** {planta or '-'}  
                         🚪 **Aula / espacio:** {espacio}  
                         👷 **Operario:** {operario or '-'}  
                         📌 **Estado:** {estado or '-'}  
