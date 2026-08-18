@@ -14,6 +14,9 @@ from database.db import conectar, _sql
 from modules.ordenes import obtener_siguiente_numero_ot, crear_orden
 from modules.inteligencia_legionella import construir_panel_sanitario_legionella
 from modules.informes.informe_legionella import generar_informe_legionella
+from modules.espacios import (
+    obtener_plantas_espacios,
+)
 
 
 OPERARIOS = ["J.A. Almeda", "Abel Vasquez", "Luis Lozano", "Otro"]
@@ -51,6 +54,38 @@ CENTROS = {
         ],
     },
 }
+
+
+def _edificio_catalogo_legionella(edificio):
+    equivalencias = {
+        "Edif. Infantil/Primaria": "Infantil/Primaria",
+        "Edif. Llar (Anexo)": "Llar",
+    }
+
+    return equivalencias.get(
+        str(edificio or "").strip(),
+        str(edificio or "").strip(),
+    )
+
+
+def obtener_plantas_legionella(centro, edificio):
+    edificio_catalogo = _edificio_catalogo_legionella(
+        edificio
+    )
+
+    try:
+        plantas = obtener_plantas_espacios(
+            centro,
+            edificio_catalogo,
+        )
+    except Exception:
+        plantas = []
+
+    return [
+        str(planta).strip()
+        for planta in plantas or []
+        if str(planta or "").strip()
+    ]
 
 
 def adaptar_sql(sql):
@@ -139,6 +174,7 @@ def asegurar_columnas_planificacion_legionella():
         ("observaciones", "TEXT"),
         ("centro", "TEXT"),
         ("edificio", "TEXT"),
+        ("planta", "TEXT DEFAULT ''"),
         ("instalacion", "TEXT"),
         ("punto", "TEXT"),
         ("operario", "TEXT"),
@@ -155,6 +191,24 @@ def asegurar_columnas_planificacion_legionella():
             ejecutar(f"ALTER TABLE legionella_tareas ADD COLUMN {columna} {tipo}")
         except Exception:
             pass
+
+def asegurar_columnas_planta_legionella():
+    cambios = [
+        ("legionella_puntos", "planta", "TEXT DEFAULT ''"),
+        ("legionella_registros", "planta", "TEXT DEFAULT ''"),
+        ("legionella_incidencias", "planta", "TEXT DEFAULT ''"),
+        ("legionella_correctivos_checklist", "planta", "TEXT DEFAULT ''"),
+    ]
+
+    for tabla, columna, tipo in cambios:
+        try:
+            ejecutar(
+                f"ALTER TABLE {tabla} "
+                f"ADD COLUMN {columna} {tipo}"
+            )
+        except Exception:
+            pass
+
 
 def asegurar_columnas_clasificacion_legionella():
     try:
@@ -217,6 +271,7 @@ def asegurar_tabla_correctivos_legionella():
                 numero_ot TEXT,
                 centro TEXT,
                 edificio TEXT,
+                planta TEXT,
                 punto TEXT,
                 tarea TEXT,
                 revisar_consigna INTEGER DEFAULT 0,
@@ -242,6 +297,7 @@ def asegurar_tabla_correctivos_legionella():
                 numero_ot TEXT,
                 centro TEXT,
                 edificio TEXT,
+                planta TEXT,
                 punto TEXT,
                 tarea TEXT,
                 revisar_consigna INTEGER DEFAULT 0,
@@ -282,7 +338,8 @@ def guardar_checklist_correctivo_legionella(
     edificio,
     punto,
     tarea,
-    datos
+    datos,
+    planta="",
 ):
     existente = obtener_checklist_correctivo_legionella(numero_ot)
 
@@ -290,16 +347,16 @@ def guardar_checklist_correctivo_legionella(
         ejecutar("""
             INSERT INTO legionella_correctivos_checklist
             (
-                numero_ot, centro, edificio, punto, tarea,
+                numero_ot, centro, edificio, planta, punto, tarea,
                 revisar_consigna, revisar_termostato, revisar_caldera,
                 revisar_resistencia, revisar_recirculacion, revisar_bomba,
                 purgar_aire, esperar_recuperacion, nueva_medicion,
                 causa_detectada, temperatura_final, empresa_externa,
                 observaciones, fecha_actualizacion
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            numero_ot, centro, edificio, punto, tarea,
+            numero_ot, centro, edificio, planta, punto, tarea,
             datos["revisar_consigna"],
             datos["revisar_termostato"],
             datos["revisar_caldera"],
@@ -318,7 +375,8 @@ def guardar_checklist_correctivo_legionella(
     else:
         ejecutar("""
             UPDATE legionella_correctivos_checklist
-            SET revisar_consigna = ?,
+            SET planta = ?,
+                revisar_consigna = ?,
                 revisar_termostato = ?,
                 revisar_caldera = ?,
                 revisar_resistencia = ?,
@@ -334,6 +392,7 @@ def guardar_checklist_correctivo_legionella(
                 fecha_actualizacion = ?
             WHERE numero_ot = ?
         """, (
+            planta,
             datos["revisar_consigna"],
             datos["revisar_termostato"],
             datos["revisar_caldera"],
@@ -709,31 +768,56 @@ def corregir_consignas_solares():
            OR LOWER(COALESCE(punto, '')) LIKE ?
     """, ("%solar%",))
         
-def existe_ot_legionella_abierta(centro, edificio, descripcion):
+def existe_ot_legionella_abierta(centro, edificio, descripcion, planta=""):
     conn = conectar()
     cur = conn.cursor()
 
     try:
-        cur.execute(
-            adaptar_sql("""
-            SELECT COUNT(*)
-            FROM ordenes_trabajo
-            WHERE centro = ?
-              AND edificio = ?
-              AND area = 'Legionella'
-              AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
-              AND descripcion = ?
-              AND LOWER(COALESCE(estado, '')) NOT IN (
-                    'finalizada',
-                    'finalizado',
-                    'cerrada',
-                    'cerrado',
-                    'cancelada',
-                    'cancelado'
-              )
-            """),
-            (centro, edificio, descripcion),
-        )
+        planta = str(planta or "").strip()
+
+        if planta:
+            cur.execute(
+                adaptar_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND COALESCE(planta, '') = ?
+                  AND area = 'Legionella'
+                  AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
+                  AND descripcion = ?
+                  AND LOWER(COALESCE(estado, '')) NOT IN (
+                        'finalizada',
+                        'finalizado',
+                        'cerrada',
+                        'cerrado',
+                        'cancelada',
+                        'cancelado'
+                  )
+                """),
+                (centro, edificio, planta, descripcion),
+            )
+        else:
+            cur.execute(
+                adaptar_sql("""
+                SELECT COUNT(*)
+                FROM ordenes_trabajo
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND area = 'Legionella'
+                  AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
+                  AND descripcion = ?
+                  AND LOWER(COALESCE(estado, '')) NOT IN (
+                        'finalizada',
+                        'finalizado',
+                        'cerrada',
+                        'cerrado',
+                        'cancelada',
+                        'cancelado'
+                  )
+                """),
+                (centro, edificio, descripcion),
+            )
 
         total = cur.fetchone()[0]
     finally:
@@ -742,11 +826,33 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion):
     return total > 0
 
 
-def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=None):
+def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=None, planta=""):
     if not centro or not edificio or not punto or not tarea:
         return False
 
     from modules.ordenes import vincular_origen_ot
+
+    planta = str(planta or "").strip()
+
+    if punto_id and not planta:
+        try:
+            df_punto_ot = leer_df(
+                """
+                SELECT planta
+                FROM legionella_puntos
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (int(punto_id),),
+            )
+
+            if not df_punto_ot.empty:
+                planta = str(
+                    df_punto_ot.iloc[0].get("planta")
+                    or ""
+                ).strip()
+        except Exception:
+            planta = ""
 
     if str(tarea).startswith("CORRECTIVO LEGIONELLA"):
         descripcion = (
@@ -756,7 +862,7 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=
     else:
         descripcion = f"Control Legionella - {tarea} - {punto}"
 
-    if existe_ot_legionella_abierta(centro, edificio, descripcion):
+    if existe_ot_legionella_abierta(centro, edificio, descripcion, planta):
         return False
 
     numero_ot = obtener_siguiente_numero_ot(centro, "LEG")
@@ -790,7 +896,8 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=
         "",
         0,
         0,
-        ""
+        "",
+        planta,
     )
 
     numero_creado = crear_orden(datos_orden) or numero_ot
@@ -999,6 +1106,7 @@ def sembrar_planificacion_legionella(fecha_inicio):
         punto_id = int(punto["id"])
         centro = punto["centro"]
         edificio = punto["edificio"]
+        planta = str(punto.get("planta") or "").strip()
         instalacion = punto["instalacion"]
         nombre_punto = punto["nombre_punto"]
         tipo_punto = punto["tipo_punto"]
@@ -1042,15 +1150,16 @@ def sembrar_planificacion_legionella(fecha_inicio):
 
             ejecutar("""
                 INSERT INTO legionella_tareas
-                (punto_id, centro, edificio, instalacion, punto, tarea, tipo_control,
+                (punto_id, centro, edificio, planta, instalacion, punto, tarea, tipo_control,
                  frecuencia, frecuencia_dias, unidad, fecha_inicio, ultima_fecha,
                  proxima_fecha, operario, activo, generar_ot,
                  consigna_minima, controla_consigna, observaciones)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, 1, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1, 1, ?, ?, ?)
             """, (
                 punto_id,
                 centro,
                 edificio,
+                planta,
                 instalacion,
                 nombre_punto,
                 tarea,
@@ -1146,6 +1255,11 @@ def asegurar_ruta_semanal_purgas_p9():
         or "Edif. A"
     ).strip()
 
+    planta = str(
+        punto_base.get("planta")
+        or ""
+    ).strip()
+
     instalacion = str(
         punto_base.get("instalacion")
         or "AFCH"
@@ -1161,6 +1275,7 @@ def asegurar_ruta_semanal_purgas_p9():
             punto_id,
             centro,
             edificio,
+            planta,
             instalacion,
             punto,
             tarea,
@@ -1187,6 +1302,7 @@ def asegurar_ruta_semanal_purgas_p9():
         punto_id,
         centro,
         edificio,
+        planta,
         instalacion,
         nombre_ruta,
         nombre_tarea,
@@ -1369,7 +1485,7 @@ def registrar_ruta_semanal_purgas_p9(
 
 def obtener_planificacion_legionella():
     return leer_df("""
-        SELECT id, centro, edificio, instalacion, punto, tarea, tipo_control,
+        SELECT id, centro, edificio, planta, instalacion, punto, tarea, tipo_control,
                frecuencia_dias, proxima_fecha, operario, activo,
                generar_ot, consigna_minima, controla_consigna,
                tipo_planificacion
@@ -1430,13 +1546,15 @@ def crear_punto_legionella(
     nombre_punto,
     ubicacion,
     numero_terminales,
-    observaciones
+    observaciones,
+    planta="",
 ):
     ejecutar("""
         INSERT INTO legionella_puntos
         (
             centro,
             edificio,
+            planta,
             instalacion,
             tipo_punto,
             tipo_control_punto,
@@ -1446,10 +1564,11 @@ def crear_punto_legionella(
             activo,
             observaciones
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     """, (
         centro,
         edificio,
+        planta,
         instalacion,
         tipo_punto,
         tipo_control_punto,
@@ -1476,6 +1595,7 @@ def obtener_puntos_legionella_admin():
         SELECT id,
                centro,
                edificio,
+               planta,
                instalacion,
                tipo_punto,
                tipo_control_punto,
@@ -1636,7 +1756,7 @@ def generar_ots_legionella_planificadas():
     hoy_txt = date.today().strftime("%Y-%m-%d")
 
     df = leer_df("""
-        SELECT id, punto_id, centro, edificio, punto, tarea,
+        SELECT id, punto_id, centro, edificio, planta, punto, tarea,
                frecuencia_dias, proxima_fecha, operario
         FROM legionella_tareas
         WHERE activo = 1
@@ -1660,6 +1780,7 @@ def generar_ots_legionella_planificadas():
             fila["tarea"],
             fila["operario"],
             punto_id=fila.get("punto_id"),
+            planta=fila.get("planta", ""),
         )
 
         if creada:
@@ -1792,6 +1913,7 @@ def registrar_control(
 ):
     centro = punto.get("centro")
     edificio = punto.get("edificio")
+    planta = str(punto.get("planta") or "").strip()
     instalacion = punto.get("instalacion") or ""
     punto_id = punto.get("id")
     punto_nombre = punto.get("nombre_punto")
@@ -1860,14 +1982,15 @@ def registrar_control(
     ejecutar(
         """
         INSERT INTO legionella_registros
-        (fecha, centro, edificio, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
+        (fecha, centro, edificio, planta, instalacion, punto_id, tarea_id, punto, tarea, tipo_control,
          valor, valor_2, valor_3, valor_4, unidad, estado, resultado, operario, observaciones, foto)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             fecha_registro,
             centro,
             edificio,
+            planta,
             instalacion,
             punto_id,
             None,
@@ -2013,12 +2136,13 @@ def registrar_control(
             ejecutar(
                 """
                 INSERT INTO legionella_incidencias
-                (centro, edificio, punto, tarea, descripcion, estado, prioridad, operario)
-                VALUES (?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+                (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
+                VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
                 """,
                 (
                     centro,
                     edificio,
+                    planta,
                     punto_nombre,
                     tarea,
                     resultado + (" | " + observaciones if observaciones else ""),
@@ -2033,6 +2157,7 @@ def registrar_control(
                 f"CORRECTIVO LEGIONELLA - {tarea} - {resultado}",
                 operario,
                 punto_id=punto_id,
+                planta=planta,
             )
 
     return estado, resultado
@@ -2048,7 +2173,8 @@ def crear_tarea_legionella_manual(
     unidad,
     operario,
     generar_ot,
-    fecha_programada=None
+    fecha_programada=None,
+    planta="",
 ):
     consigna_minima = 0
     controla_consigna = 0
@@ -2088,6 +2214,7 @@ def crear_tarea_legionella_manual(
             punto_id,
             centro,
             edificio,
+            planta,
             instalacion,
             punto,
             tarea,
@@ -2108,13 +2235,14 @@ def crear_tarea_legionella_manual(
         )
         VALUES
         (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL,
             ?, ?, 1, ?, ?, ?, ?, ?
         )
     """, (
         int(punto_id),
         centro,
         edificio,
+        planta,
         instalacion,
         punto,
         tarea,
@@ -2197,12 +2325,14 @@ def actualizar_punto_legionella(
     plano_data=None,
     categoria_panel=None,
     subcategoria_panel=None,
-    codigo_panel=None
+    codigo_panel=None,
+    planta=None,
 ):
     ejecutar("""
         UPDATE legionella_puntos
         SET centro = ?,
             edificio = ?,
+            planta = COALESCE(?, planta),
             instalacion = ?,
             tipo_punto = ?,
             tipo_control_punto = ?,
@@ -2221,6 +2351,7 @@ def actualizar_punto_legionella(
     """, (
         centro,
         edificio,
+        planta,
         instalacion,
         tipo_punto,
         tipo_control_punto,
@@ -2687,6 +2818,7 @@ def mostrar_panel_inteligente_legionella():
 
 def pantalla_legionella():
     asegurar_columnas_planificacion_legionella()
+    asegurar_columnas_planta_legionella()
     asegurar_columnas_clasificacion_legionella()
     asegurar_tabla_informes_legionella()
     corregir_consignas_solares()
@@ -3965,6 +4097,30 @@ def pantalla_legionella():
                         key="nuevo_punto_edificio_otro"
                     )
 
+                plantas_nuevo = obtener_plantas_legionella(
+                    centro_nuevo,
+                    edificio_nuevo,
+                )
+
+                if plantas_nuevo:
+                    planta_nueva = st.selectbox(
+                        "Planta",
+                        plantas_nuevo,
+                        key="nuevo_punto_planta",
+                    )
+                else:
+                    planta_nueva = st.text_input(
+                        "Planta",
+                        placeholder=(
+                            "Ejemplo: Planta 0, Planta 2, Terrado..."
+                        ),
+                        key="nuevo_punto_planta_manual",
+                        help=(
+                            "No se ha encontrado este edificio en el "
+                            "catálogo central. Indica la planta real."
+                        ),
+                    )
+
                 instalacion_nueva = st.selectbox(
                     "Instalación",
                     ["ACS", "AFCH", "Solar", "Otro"],
@@ -4054,7 +4210,8 @@ def pantalla_legionella():
                         nombre_punto_nuevo,
                         ubicacion_nueva,
                         numero_terminales_nuevo,
-                        observaciones_nueva
+                        observaciones_nueva,
+                        planta_nueva,
                     )
 
                     st.success("Punto creado correctamente.")
@@ -4201,7 +4358,8 @@ def pantalla_legionella():
                         unidad_manual,
                         operario_manual,
                         generar_ot_manual,
-                        fecha_programada_manual.strftime("%Y-%m-%d")
+                        fecha_programada_manual.strftime("%Y-%m-%d"),
+                        str(fila_punto.get("planta") or "").strip(),
                     )
 
                     st.success("Tarea creada correctamente sobre el punto seleccionado.")
@@ -4265,6 +4423,49 @@ def pantalla_legionella():
                                 "Nombre edificio / zona",
                                 value=str(row["edificio"] or ""),
                                 key=f"edit_edificio_otro_punto_{row['id']}"
+                            )
+
+                        plantas_edit = obtener_plantas_legionella(
+                            centro_edit,
+                            edificio_edit,
+                        )
+
+                        planta_actual = str(
+                            row.get("planta")
+                            or ""
+                        ).strip()
+
+                        if plantas_edit:
+                            opciones_planta_edit = list(
+                                plantas_edit
+                            )
+
+                            if (
+                                planta_actual
+                                and planta_actual not in opciones_planta_edit
+                            ):
+                                opciones_planta_edit.insert(
+                                    0,
+                                    planta_actual,
+                                )
+
+                            planta_edit = st.selectbox(
+                                "Planta",
+                                opciones_planta_edit,
+                                index=(
+                                    opciones_planta_edit.index(
+                                        planta_actual
+                                    )
+                                    if planta_actual in opciones_planta_edit
+                                    else 0
+                                ),
+                                key=f"edit_planta_punto_{row['id']}",
+                            )
+                        else:
+                            planta_edit = st.text_input(
+                                "Planta",
+                                value=planta_actual,
+                                key=f"edit_planta_manual_punto_{row['id']}",
                             )
 
                         instalacion_edit = st.text_input(
@@ -4453,7 +4654,8 @@ def pantalla_legionella():
                             plano_data,
                             categoria_panel_edit,
                             subcategoria_panel_edit,
-                            codigo_panel_edit
+                            codigo_panel_edit,
+                            planta_edit,
                         )
 
                         st.success("Punto actualizado correctamente.")
