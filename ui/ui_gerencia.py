@@ -1429,7 +1429,9 @@ def aplicar_estilo_colegio_vivo():
     }
 
     /* Solo los botones de los edificios del mapa */
-    .st-key-gerencia_mapa_edificios
+    .st-key-gerencia_mapa_edificios_p9
+    div[data-testid="stButton"] > button,
+    .st-key-gerencia_mapa_edificios_p22
     div[data-testid="stButton"] > button{
         min-height:43px !important;
         height:43px !important;
@@ -1446,7 +1448,9 @@ def aplicar_estilo_colegio_vivo():
         box-shadow:inset 0 0 0 1px rgba(255,255,255,.30) !important;
     }
 
-    .st-key-gerencia_mapa_edificios
+    .st-key-gerencia_mapa_edificios_p9
+    div[data-testid="stButton"] > button[kind="primary"],
+    .st-key-gerencia_mapa_edificios_p22
     div[data-testid="stButton"] > button[kind="primary"]{
         background:linear-gradient(135deg,#173a6e,#2459a7) !important;
         color:#fff !important;
@@ -1518,19 +1522,25 @@ def aplicar_estilo_colegio_vivo():
             border-bottom-width:2px;
         }
 
-        .st-key-gerencia_mapa_edificios
+        .st-key-gerencia_mapa_edificios_p9
+        div[data-testid="stHorizontalBlock"],
+        .st-key-gerencia_mapa_edificios_p22
         div[data-testid="stHorizontalBlock"]{
             flex-wrap:nowrap !important;
             gap:4px !important;
         }
 
-        .st-key-gerencia_mapa_edificios
+        .st-key-gerencia_mapa_edificios_p9
+        div[data-testid="stHorizontalBlock"] > div,
+        .st-key-gerencia_mapa_edificios_p22
         div[data-testid="stHorizontalBlock"] > div{
             min-width:0 !important;
             flex:1 1 0 !important;
         }
 
-        .st-key-gerencia_mapa_edificios
+        .st-key-gerencia_mapa_edificios_p9
+        div[data-testid="stButton"] > button,
+        .st-key-gerencia_mapa_edificios_p22
         div[data-testid="stButton"] > button{
             min-height:39px !important;
             height:39px !important;
@@ -2070,7 +2080,13 @@ def mostrar_mapa_visual_centro_gerencia(
         unsafe_allow_html=True,
     )
 
-    with st.container(key="gerencia_mapa_edificios"):
+    clave_mapa = (
+        "gerencia_mapa_edificios_p9"
+        if centro == "Pearson 9"
+        else "gerencia_mapa_edificios_p22"
+    )
+
+    with st.container(key=clave_mapa):
         if centro == "Pearson 9":
             columnas = st.columns(
                 3,
