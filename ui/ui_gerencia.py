@@ -1052,20 +1052,146 @@ def _texto_resolucion(horas):
 
 
 def _reincidencias_ejecutivas(df, centro, dias=90):
+    """
+    Detecta espacios con 2 o más incidencias en el periodo indicado.
+
+    Devuelve información suficiente para que Gerencia pueda empezar a
+    seguir reincidencias desde ahora sin convertirlo todavía en un módulo
+    complejo de causa raíz.
+    """
     datos = _datos_centro_ejecutivo(df, centro)
+
     if datos.empty:
         return pd.DataFrame()
+
     limite = pd.Timestamp.today() - pd.Timedelta(days=dias)
-    datos = datos[datos["fecha_dt"].notna() & (datos["fecha_dt"] >= limite)].copy()
-    datos = datos[_es_incidencia_df(datos)].copy()
+
+    datos = datos[
+        datos["fecha_dt"].notna()
+        & (datos["fecha_dt"] >= limite)
+    ].copy()
+
+    datos = datos[
+        _es_incidencia_df(datos)
+    ].copy()
+
     if datos.empty:
         return pd.DataFrame()
-    datos["espacio_limpio"] = datos["espacio"].fillna("").astype(str).str.strip()
-    datos = datos[~datos["espacio_limpio"].str.lower().isin(["", "general", "-"])].copy()
+
+    datos["espacio_limpio"] = (
+        datos["espacio"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    datos = datos[
+        ~datos["espacio_limpio"]
+        .str.lower()
+        .isin(["", "general", "-"])
+    ].copy()
+
     if datos.empty:
         return pd.DataFrame()
-    r = datos.groupby(["edificio", "planta", "espacio_limpio"], dropna=False).size().rename("incidencias").reset_index()
-    return r[r["incidencias"] >= 2].sort_values(["incidencias", "espacio_limpio"], ascending=[False, True])
+
+    datos["area_limpia"] = (
+        datos["area"]
+        .fillna("Sin área")
+        .replace("", "Sin área")
+        .astype(str)
+        .str.strip()
+    )
+
+    datos["descripcion_limpia"] = (
+        datos["descripcion"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    datos["edificio"] = (
+        datos["edificio"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    datos["planta"] = (
+        datos["planta"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    agrupadas = []
+
+    for (
+        edificio,
+        planta,
+        espacio,
+    ), grupo in datos.groupby(
+        [
+            "edificio",
+            "planta",
+            "espacio_limpio",
+        ],
+        dropna=False,
+    ):
+        total = len(grupo)
+
+        if total < 2:
+            continue
+
+        grupo = grupo.sort_values(
+            "fecha_dt",
+            ascending=False,
+        )
+
+        ultima = grupo.iloc[0]
+
+        areas = sorted({
+            str(area).strip()
+            for area in grupo["area_limpia"].tolist()
+            if str(area).strip()
+        })
+
+        agrupadas.append({
+            "edificio": edificio,
+            "planta": planta,
+            "espacio_limpio": espacio,
+            "incidencias": int(total),
+            "areas": ", ".join(areas),
+            "ultima_fecha": ultima.get("fecha_dt"),
+            "ultima_ot": str(
+                ultima.get("numero_ot")
+                or ""
+            ).strip(),
+            "ultima_descripcion": str(
+                ultima.get("descripcion_limpia")
+                or ""
+            ).strip(),
+        })
+
+    if not agrupadas:
+        return pd.DataFrame()
+
+    resumen = pd.DataFrame(
+        agrupadas
+    )
+
+    return resumen.sort_values(
+        [
+            "incidencias",
+            "ultima_fecha",
+            "espacio_limpio",
+        ],
+        ascending=[
+            False,
+            False,
+            True,
+        ],
+    ).reset_index(drop=True)
+
 
 
 def _area_crecimiento(df, centro):
@@ -1117,34 +1243,104 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
     k3.metric("⏱️ Resolución media", _texto_resolucion(horas), help=f"{n_res} OTs cerradas analizadas en los últimos 90 días.")
     k4.metric("🔁 Espacios reincidentes", len(reinc), help="2 o más incidencias en el mismo espacio durante los últimos 90 días.")
 
-    color, _, _ = evaluar_estado_centro(df, centro)
+    color_operativo, _, _ = evaluar_estado_centro(
+        df,
+        centro,
+    )
+
     diferencia = ia - ib
-    lineas = []
-    if color == "rojo":
-        lineas.append("**Situación general: requiere atención.**")
-        tipo = "error"
-    elif diferencia > 0:
-        lineas.append("**Situación general: requiere seguimiento.**")
-        tipo = "warning"
-    else:
-        lineas.append("**Situación general: estable.**")
-        tipo = "success"
 
     if diferencia < 0:
-        lineas.append(f"Las incidencias bajan de {ib} a {ia}: {abs(diferencia)} menos que el mes anterior.")
+        tendencia = "favorable"
+        tipo_tendencia = "success"
     elif diferencia > 0:
-        lineas.append(f"Las incidencias suben de {ib} a {ia}: {diferencia} más que el mes anterior.")
+        tendencia = "desfavorable"
+        tipo_tendencia = "warning"
     else:
-        lineas.append(f"Las incidencias se mantienen en {ia}, igual que el mes anterior.")
+        tendencia = "estable"
+        tipo_tendencia = "success"
 
-    area, cambio, va, vb = _area_crecimiento(df, centro)
+    if color_operativo == "rojo":
+        situacion_operativa = "requiere atención"
+    elif color_operativo == "amarillo":
+        situacion_operativa = "requiere seguimiento"
+    else:
+        situacion_operativa = "bajo control"
+
+    lineas = [
+        (
+            f"**Situación operativa: {situacion_operativa}. "
+            f"Tendencia: {tendencia}.**"
+        )
+    ]
+
+    if diferencia < 0:
+        lineas.append(
+            f"Las incidencias bajan de {ib} a {ia}: "
+            f"{abs(diferencia)} menos que el mes anterior."
+        )
+    elif diferencia > 0:
+        lineas.append(
+            f"Las incidencias suben de {ib} a {ia}: "
+            f"{diferencia} más que el mes anterior."
+        )
+    else:
+        lineas.append(
+            f"Las incidencias se mantienen en {ia}, "
+            "igual que el mes anterior."
+        )
+
+    area, cambio, va, vb = _area_crecimiento(
+        df,
+        centro,
+    )
+
     if area and cambio > 0:
-        lineas.append(f"{area} es el área con mayor crecimiento: pasa de {vb} a {va} incidencias.")
+        lineas.append(
+            f"{area} es el área con mayor crecimiento: "
+            f"pasa de {vb} a {va} incidencias."
+        )
+
     if cumpl is not None:
-        lineas.append(f"El {cumpl}% de los preventivos registrados figura cerrado.")
-    lineas.append(f"{len(reinc)} espacios presentan reincidencia en los últimos 90 días." if not reinc.empty else "No se detectan espacios reincidentes en los últimos 90 días.")
-    mensaje = "\n\n".join(lineas)
-    {"error": st.error, "warning": st.warning, "success": st.success}[tipo](mensaje)
+        lineas.append(
+            f"El {cumpl}% de los preventivos registrados figura cerrado."
+        )
+
+    if not reinc.empty:
+        max_reinc = int(
+            reinc.iloc[0]["incidencias"]
+        )
+
+        espacio_mas_reincidente = str(
+            reinc.iloc[0]["espacio_limpio"]
+        )
+
+        lineas.append(
+            f"{len(reinc)} espacios presentan reincidencia en los últimos "
+            f"90 días. El más repetido es {espacio_mas_reincidente} "
+            f"con {max_reinc} incidencias."
+        )
+    else:
+        lineas.append(
+            "No se detectan espacios reincidentes en los últimos 90 días."
+        )
+
+    mensaje = "\n\n".join(
+        lineas
+    )
+
+    if tipo_tendencia == "warning":
+        st.warning(
+            mensaje
+        )
+    elif color_operativo == "rojo":
+        st.info(
+            mensaje
+        )
+    else:
+        st.success(
+            mensaje
+        )
 
     with st.expander("📊 Ver detalle de salud del mantenimiento", expanded=False):
         c1, c2 = st.columns(2)
@@ -1157,14 +1353,122 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
                 st.caption("Mide preventivos cerrados/registrados. No se presenta como «en plazo» porque este módulo no dispone aquí de la fecha límite planificada necesaria para calcularlo con rigor.")
         with c2:
             st.markdown("#### Reincidencias")
+
             if reinc.empty:
-                st.success("Sin espacios reincidentes en los últimos 90 días.")
+                st.success(
+                    "Sin espacios reincidentes en los últimos 90 días."
+                )
+
             else:
-                vista = reinc.head(8).rename(columns={"edificio":"Edificio","planta":"Planta","espacio_limpio":"Espacio","incidencias":"Incidencias"})
-                st.dataframe(vista[["Edificio","Planta","Espacio","Incidencias"]], use_container_width=True, hide_index=True)
+                vista = reinc.head(10).copy()
+
+                vista["Última incidencia"] = pd.to_datetime(
+                    vista["ultima_fecha"],
+                    errors="coerce",
+                ).dt.strftime("%d/%m/%Y")
+
+                vista = vista.rename(
+                    columns={
+                        "edificio": "Edificio",
+                        "planta": "Planta",
+                        "espacio_limpio": "Espacio",
+                        "incidencias": "Incidencias",
+                        "areas": "Áreas",
+                    }
+                )
+
+                st.dataframe(
+                    vista[
+                        [
+                            "Edificio",
+                            "Planta",
+                            "Espacio",
+                            "Incidencias",
+                            "Áreas",
+                            "Última incidencia",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                st.caption(
+                    "Se considera reincidencia cuando un mismo espacio acumula "
+                    "2 o más incidencias en los últimos 90 días."
+                )
         if area and cambio > 0:
-            st.warning(f"📈 **Área a vigilar: {area}.** Pasa de {vb} a {va} incidencias respecto al mes anterior.")
-        st.caption("Gerencia interpreta tendencias y salud del mantenimiento. La prioridad diaria de ejecución continúa correspondiendo al ❤️ Corazón.")
+            st.warning(
+                f"📈 **Área a vigilar: {area}.** "
+                f"Pasa de {vb} a {va} incidencias respecto al mes anterior."
+            )
+
+        if not reinc.empty:
+            primera = reinc.iloc[0]
+
+            with st.container(border=True):
+                st.markdown(
+                    "#### 🔁 Reincidencia a observar"
+                )
+
+                st.markdown(
+                    f"**{primera.get('espacio_limpio', '-')}** · "
+                    f"{primera.get('incidencias', 0)} incidencias"
+                )
+
+                ubicacion_reinc = " · ".join(
+                    [
+                        str(valor).strip()
+                        for valor in [
+                            primera.get("edificio"),
+                            primera.get("planta"),
+                        ]
+                        if str(valor or "").strip()
+                    ]
+                )
+
+                if ubicacion_reinc:
+                    st.caption(
+                        f"📍 {ubicacion_reinc}"
+                    )
+
+                if primera.get("areas"):
+                    st.write(
+                        f"**Áreas implicadas:** {primera.get('areas')}"
+                    )
+
+                ultima_fecha = pd.to_datetime(
+                    primera.get("ultima_fecha"),
+                    errors="coerce",
+                )
+
+                if pd.notna(
+                    ultima_fecha
+                ):
+                    st.write(
+                        f"**Última incidencia:** "
+                        f"{ultima_fecha.strftime('%d/%m/%Y')}"
+                    )
+
+                if primera.get("ultima_ot"):
+                    st.write(
+                        f"**Última OT:** {primera.get('ultima_ot')}"
+                    )
+
+                if primera.get("ultima_descripcion"):
+                    st.caption(
+                        primera.get("ultima_descripcion")
+                    )
+
+                st.info(
+                    "Por ahora Gerencia solo la señala para seguimiento. "
+                    "Más adelante podremos añadir causa repetitiva, equipo asociado "
+                    "o propuesta de actuación definitiva cuando tengamos suficiente histórico."
+                )
+
+        st.caption(
+            "Gerencia interpreta tendencias y salud del mantenimiento. "
+            "La prioridad diaria de ejecución continúa correspondiendo al ❤️ Corazón."
+        )
 
 
 def mostrar_menu_centro(df, centro):
