@@ -2014,6 +2014,7 @@ def _mostrar_edificio_jornada(
             st.markdown("---")
 
 
+@st.fragment(run_every="30s")
 def mostrar_corazon_operario():
     operario = str(
         st.session_state.get("operario_activo")
@@ -2077,6 +2078,10 @@ def mostrar_corazon_operario():
 
     st.caption(
         f"📍 Centro asignado: {centro_motor}"
+    )
+
+    st.caption(
+        "🔄 Corazón activo · comprueba nuevas OT automáticamente cada 30 s"
     )
 
     prioridades = panel.get(
