@@ -1,10 +1,37 @@
 import streamlit as st
+
+st.set_page_config(
+    page_title="Mantenimiento PRO",
+    page_icon="🛠️",
+    layout="wide"
+)
+
+# =====================================================
+# ENTRADA PÚBLICA RÁPIDA
+# =====================================================
+_params_inicio = st.query_params
+_qr_inicio = _params_inicio.get("qr")
+_modo_inicio = _params_inicio.get("modo")
+
+if _qr_inicio == "1":
+    from ui.ui_incidencia_qr import pantalla_incidencia_qr
+    pantalla_incidencia_qr()
+    st.stop()
+
+if _modo_inicio == "incidencias":
+    from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
+    pantalla_incidencias_profesores()
+    st.stop()
+
+# =====================================================
+# APP INTERNA
+# =====================================================
 from datetime import datetime
+
 from ui.ui_qr_aulas import pantalla_qr_aulas
 from modules.auth import barra_sesion, USUARIOS
 from database.db import inicializar_db
 from ui.ui_planos_legionella import pantalla_planos_legionella
-from ui.ui_incidencia_qr import pantalla_incidencia_qr
 from ui.ui_panel import pantalla_panel
 from ui.ui_ordenes import pantalla_ordenes
 from ui.ui_ordenes_lectura import pantalla_ordenes_lectura
@@ -17,7 +44,6 @@ from ui.ui_preventivo import pantalla_preventivo
 from ui.ui_operarios_admin import pantalla_operarios_admin
 from ui.ui_inventario_aulas import pantalla_inventario_aulas
 from ui.preventivo_aulas import pantalla_preventivo_aulas
-from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_configuracion import pantalla_configuracion
 from ui.ui_gerencia import pantalla_gerencia
 from modules.preventivo import generar_ots_preventivo_si_toca
@@ -51,13 +77,6 @@ from ui.ui_activos_colegio import pantalla_activos_colegio
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
 COLEGIO = "Loreto Abat Oliba"
-
-
-st.set_page_config(
-    page_title="Mantenimiento PRO",
-    page_icon="🛠️",
-    layout="wide"
-)
 
 
 st.markdown("""
@@ -939,20 +958,6 @@ if "externas_auto_revisadas" not in st.session_state:
             "Empresas externas",
             e
         )
-
-
-params = st.query_params
-
-modo = params.get("modo")
-qr = params.get("qr")
-
-if qr == "1":
-    pantalla_incidencia_qr()
-    st.stop()
-
-if modo == "incidencias":
-    pantalla_incidencias_profesores()
-    st.stop()
 
 
 if "seccion_actual" not in st.session_state:
