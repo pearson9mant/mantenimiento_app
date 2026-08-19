@@ -1280,48 +1280,114 @@ def _diagnostico_ejecutivo_centro(df, centro):
     # -------------------------------------------------
     # ÍNDICE EJECUTIVO · 0-100
     # -------------------------------------------------
+    # Filosofía:
+    # - Gerencia interpreta la situación, no suma castigos OT por OT.
+    # - Una misma actuación puede ser abierta + crítica + pendiente material;
+    #   por eso usamos BLOQUES de riesgo con techo y no penalizaciones lineales.
+    # - La tendencia puede compensar parcialmente la carga acumulada.
+    # - Los valores muy bajos quedan reservados para escenarios realmente graves.
     indice = 100.0
 
-    # Carga activa: penalización gradual, con techo.
-    indice -= min(25, abiertas * 1.5)
+    # 1) CARGA ACTIVA · máximo -15
+    if abiertas >= 30:
+        indice -= 15
+    elif abiertas >= 20:
+        indice -= 12
+    elif abiertas >= 10:
+        indice -= 8
+    elif abiertas >= 5:
+        indice -= 5
+    elif abiertas > 0:
+        indice -= 2
 
-    # Riesgo real: pesa más que la cantidad.
-    indice -= min(30, criticas * 8)
+    # 2) RIESGO ACTUAL · máximo -20
+    # No multiplicamos por cada crítica: evitamos hundir el índice
+    # cuando varias pertenecen a la misma carga operativa.
+    if criticas >= 10:
+        indice -= 20
+    elif criticas >= 6:
+        indice -= 16
+    elif criticas >= 3:
+        indice -= 11
+    elif criticas >= 1:
+        indice -= 6
 
-    # Trabajos bloqueados por material.
-    indice -= min(15, material * 3)
+    # 3) BLOQUEOS POR MATERIAL · máximo -10
+    if material >= 10:
+        indice -= 10
+    elif material >= 5:
+        indice -= 7
+    elif material >= 2:
+        indice -= 4
+    elif material == 1:
+        indice -= 2
 
-    # Reincidencias: síntoma de problema no resuelto de raíz.
-    indice -= min(15, len(reinc) * 2)
+    # 4) REINCIDENCIA · máximo -10
+    n_reinc = len(reinc)
+    if n_reinc >= 10:
+        indice -= 10
+    elif n_reinc >= 5:
+        indice -= 7
+    elif n_reinc >= 2:
+        indice -= 4
+    elif n_reinc == 1:
+        indice -= 2
 
-    # Tendencia mensual.
+    # 5) TENDENCIA MENSUAL · puede recuperar hasta +12
     if diferencia > 0:
-        indice -= min(10, diferencia * 2)
         tendencia = "desfavorable"
+        if ib > 0:
+            subida_pct = ((ia - ib) / ib) * 100
+            if subida_pct >= 100:
+                indice -= 10
+            elif subida_pct >= 50:
+                indice -= 7
+            elif subida_pct >= 20:
+                indice -= 4
+            else:
+                indice -= 2
+        else:
+            indice -= min(8, ia * 2)
     elif diferencia < 0:
-        indice += min(5, abs(diferencia))
         tendencia = "favorable"
+        if ib > 0:
+            bajada_pct = ((ib - ia) / ib) * 100
+            if bajada_pct >= 75:
+                indice += 12
+            elif bajada_pct >= 50:
+                indice += 9
+            elif bajada_pct >= 20:
+                indice += 6
+            else:
+                indice += 3
     else:
         tendencia = "estable"
 
-    # Resolución media reciente.
+    # 6) RESOLUCIÓN · máximo -6
     if horas is not None:
-        if horas > 24 * 7:
-            indice -= 10
+        if horas > 24 * 10:
+            indice -= 6
+        elif horas > 24 * 7:
+            indice -= 4
         elif horas > 72:
-            indice -= 5
+            indice -= 2
 
-    # Preventivo: solo refuerzo/alerta cuando existe muestra real.
+    # 7) PREVENTIVO · máximo -6 / refuerzo +3
     if cumpl is not None:
-        if cumpl < 60:
-            indice -= 8
+        if cumpl < 50:
+            indice -= 6
+        elif cumpl < 70:
+            indice -= 3
         elif cumpl >= 90:
             indice += 3
 
     indice = max(0, min(100, indice))
     indice = int(round(indice / 5.0) * 5)
 
-    if indice < 60 or criticas >= 3:
+    # El color combina índice y existencia de riesgo real.
+    # Tener críticas no convierte automáticamente una situación favorable
+    # en "rojo"; sí obliga, como mínimo, a seguimiento.
+    if indice < 45 or (criticas >= 10 and tendencia == "desfavorable"):
         color = "rojo"
         estado = "Requiere atención"
     elif indice < 80 or criticas > 0 or material > 0:
