@@ -2,6 +2,7 @@ import html
 
 import streamlit as st
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 from modules.colegio_vivo import obtener_colegio_vivo
 from modules.corazon_sistema import (
