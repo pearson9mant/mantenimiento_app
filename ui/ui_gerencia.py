@@ -668,16 +668,25 @@ def mostrar_selector_centros():
             seleccionar_centro("Pearson 22")
 
 def evaluar_estado_centro(df, centro):
-    abiertas = contar(df, centro, "abiertas")
-    material = contar(df, centro, "material")
+    diagnostico = _diagnostico_ejecutivo_centro(
+        df,
+        centro,
+    )
 
-    if abiertas >= 20 or material >= 5:
-        return "rojo", 55, "Existen incidencias que requieren atención prioritaria."
+    mensajes = {
+        "rojo": "Existen factores que requieren atención prioritaria.",
+        "amarillo": "Hay actuaciones o tendencias que conviene seguir.",
+        "verde": "La situación general está bajo control.",
+    }
 
-    if abiertas >= 8 or material > 0:
-        return "amarillo", 76, "Hay actuaciones pendientes que conviene seguir."
-
-    return "verde", 94, "Estado general correcto."
+    return (
+        diagnostico["color"],
+        diagnostico["indice"],
+        mensajes.get(
+            diagnostico["color"],
+            diagnostico["mensaje"],
+        ),
+    )
 
 
 def obtener_riesgos_criticos(df, centro):
@@ -709,46 +718,39 @@ def obtener_riesgos_criticos(df, centro):
 
 
 def mostrar_resumen_ejecutivo(df, centro):
-    color, porcentaje, mensaje = evaluar_estado_centro(df, centro)
+    """
+    Resumen compacto para las vistas antiguas de Gerencia.
+    La lectura ejecutiva completa se concentra en Diagnóstico de Gerencia.
+    """
+    diagnostico = _mostrar_diagnostico_gerencia(
+        df,
+        centro,
+    )
 
-    if color == "verde":
-        st.success(f"🟢 Estado general del centro · {porcentaje}%\n\n{mensaje}")
-    elif color == "amarillo":
-        st.warning(f"🟠 Estado general del centro · {porcentaje}%\n\n{mensaje}")
-    else:
-        st.error(f"🔴 Estado general del centro · {porcentaje}%\n\n{mensaje}")
+    riesgos = obtener_riesgos_criticos(
+        df,
+        centro,
+    )
 
-    riesgos = obtener_riesgos_criticos(df, centro)
+    if not riesgos.empty:
+        with st.expander(
+            f"🔴 Riesgos críticos ({len(riesgos)})",
+            expanded=False,
+        ):
+            for _, row in riesgos.iterrows():
+                st.markdown(
+                    f"**{row.get('espacio', '-') or '-'}** · "
+                    f"`{row.get('numero_ot', '-') or '-'}`"
+                )
+                st.caption(
+                    row.get("descripcion", "") or ""
+                )
 
-    st.markdown("### 🔴 Riesgos críticos")
+    st.caption(
+        "Gerencia interpreta la situación. "
+        "La prioridad diaria de ejecución la determina el ❤️ Corazón."
+    )
 
-    if riesgos.empty:
-        st.success("No hay riesgos críticos detectados.")
-    else:
-        for _, row in riesgos.iterrows():
-            st.markdown(
-                f"**{row.get('espacio', '-') or '-'}** · "
-                f"`{row.get('numero_ot', '-') or '-'}`"
-            )
-            st.caption(row.get("descripcion", "") or "")
-
-    st.markdown("### 📌 Actuaciones abiertas a seguir")
-
-    abiertas = obtener_df_tarjeta(df, centro, "abiertas").head(5)
-
-    if abiertas.empty:
-        st.success("No hay actuaciones pendientes.")
-    else:
-        for i, (_, row) in enumerate(abiertas.iterrows(), start=1):
-            st.markdown(
-                f"{i}. **{row.get('espacio', '-') or '-'}** · "
-                f"{row.get('descripcion', '-') or '-'}"
-            )
-
-        st.caption(
-            "Gerencia muestra actuaciones abiertas para seguimiento. "
-            "La prioridad diaria de trabajo la determina el ❤️ Corazón."
-        )
 
 
 def _serie_mensual_base():
@@ -1219,11 +1221,254 @@ def _preventivos_cerrados(df, centro):
     return round(cerrados / total * 100), cerrados, total
 
 
-def mostrar_capa_ejecutiva_gerencia(df, centro):
-    st.markdown("### 🧭 Visión ejecutiva")
+
+def _diagnostico_ejecutivo_centro(df, centro):
+    """
+    Diagnóstico ejecutivo único de Gerencia.
+
+    Usa únicamente datos ya disponibles en este módulo:
+    carga activa, riesgos críticos, material pendiente,
+    tendencia mensual, reincidencias, resolución y preventivo.
+
+    El índice se redondea a bloques de 5 puntos para no transmitir
+    una falsa precisión.
+    """
+    datos_centro = _datos_centro_ejecutivo(df, centro)
+
+    if datos_centro.empty:
+        return {
+            "color": "verde",
+            "indice": 100,
+            "estado": "Sin carga registrada",
+            "mensaje": "No hay actuaciones registradas para este centro.",
+            "abiertas": 0,
+            "material": 0,
+            "criticas": 0,
+            "incidencias_mes": 0,
+            "incidencias_mes_anterior": 0,
+            "diferencia": 0,
+            "tendencia": "estable",
+            "reincidencias": pd.DataFrame(),
+            "resolucion_horas": None,
+            "resolucion_muestra": 0,
+            "cumpl_preventivo": None,
+            "preventivos_cerrados": 0,
+            "preventivos_total": 0,
+            "area_crecimiento": (None, 0, 0, 0),
+            "puntos_alerta": [],
+            "puntos_favorables": [],
+        }
+
+    abiertas_df = obtener_df_tarjeta(df, centro, "abiertas")
+    material_df = obtener_df_tarjeta(df, centro, "material")
+    criticas_df = obtener_riesgos_criticos(df, centro)
+
     actual, anterior = _periodos_ejecutivos()
     ia = len(_incidencias_periodo(df, centro, actual))
     ib = len(_incidencias_periodo(df, centro, anterior))
+    diferencia = ia - ib
+
+    reinc = _reincidencias_ejecutivas(df, centro)
+    horas, n_res = _resolucion_media(df, centro)
+    cumpl, cerrados_prev, total_prev = _preventivos_cerrados(df, centro)
+    area_crecimiento = _area_crecimiento(df, centro)
+
+    abiertas = len(abiertas_df)
+    material = len(material_df)
+    criticas = len(criticas_df)
+
+    # -------------------------------------------------
+    # ÍNDICE EJECUTIVO · 0-100
+    # -------------------------------------------------
+    indice = 100.0
+
+    # Carga activa: penalización gradual, con techo.
+    indice -= min(25, abiertas * 1.5)
+
+    # Riesgo real: pesa más que la cantidad.
+    indice -= min(30, criticas * 8)
+
+    # Trabajos bloqueados por material.
+    indice -= min(15, material * 3)
+
+    # Reincidencias: síntoma de problema no resuelto de raíz.
+    indice -= min(15, len(reinc) * 2)
+
+    # Tendencia mensual.
+    if diferencia > 0:
+        indice -= min(10, diferencia * 2)
+        tendencia = "desfavorable"
+    elif diferencia < 0:
+        indice += min(5, abs(diferencia))
+        tendencia = "favorable"
+    else:
+        tendencia = "estable"
+
+    # Resolución media reciente.
+    if horas is not None:
+        if horas > 24 * 7:
+            indice -= 10
+        elif horas > 72:
+            indice -= 5
+
+    # Preventivo: solo refuerzo/alerta cuando existe muestra real.
+    if cumpl is not None:
+        if cumpl < 60:
+            indice -= 8
+        elif cumpl >= 90:
+            indice += 3
+
+    indice = max(0, min(100, indice))
+    indice = int(round(indice / 5.0) * 5)
+
+    if indice < 60 or criticas >= 3:
+        color = "rojo"
+        estado = "Requiere atención"
+    elif indice < 80 or criticas > 0 or material > 0:
+        color = "amarillo"
+        estado = "Requiere seguimiento"
+    else:
+        color = "verde"
+        estado = "Bajo control"
+
+    puntos_alerta = []
+    puntos_favorables = []
+
+    if criticas:
+        puntos_alerta.append(
+            f"{criticas} actuación"
+            f"{' crítica' if criticas == 1 else 'es críticas'} abierta"
+            f"{'' if criticas == 1 else 's'}."
+        )
+
+    if material:
+        puntos_alerta.append(
+            f"{material} actuación"
+            f"{' bloqueada' if material == 1 else 'es bloqueadas'} "
+            "por material."
+        )
+
+    if not reinc.empty:
+        puntos_alerta.append(
+            f"{len(reinc)} espacio"
+            f"{' reincidente' if len(reinc) == 1 else 's reincidentes'} "
+            "en 90 días."
+        )
+
+    if diferencia > 0:
+        puntos_alerta.append(
+            f"Las incidencias suben de {ib} a {ia} este mes."
+        )
+    elif diferencia < 0:
+        puntos_favorables.append(
+            f"Las incidencias bajan de {ib} a {ia} este mes."
+        )
+    else:
+        puntos_favorables.append(
+            f"Las incidencias se mantienen en {ia} respecto al mes anterior."
+        )
+
+    if cumpl is not None:
+        if cumpl >= 90:
+            puntos_favorables.append(
+                f"Preventivo cerrado: {cumpl}%."
+            )
+        elif cumpl < 70:
+            puntos_alerta.append(
+                f"Preventivo cerrado: {cumpl}%."
+            )
+
+    if horas is not None:
+        if horas <= 72:
+            puntos_favorables.append(
+                f"Resolución media reciente: {_texto_resolucion(horas)}."
+            )
+        elif horas > 24 * 7:
+            puntos_alerta.append(
+                f"Resolución media elevada: {_texto_resolucion(horas)}."
+            )
+
+    mensaje = (
+        f"Situación operativa: {estado.lower()}. "
+        f"Tendencia: {tendencia}."
+    )
+
+    return {
+        "color": color,
+        "indice": indice,
+        "estado": estado,
+        "mensaje": mensaje,
+        "abiertas": abiertas,
+        "material": material,
+        "criticas": criticas,
+        "incidencias_mes": ia,
+        "incidencias_mes_anterior": ib,
+        "diferencia": diferencia,
+        "tendencia": tendencia,
+        "reincidencias": reinc,
+        "resolucion_horas": horas,
+        "resolucion_muestra": n_res,
+        "cumpl_preventivo": cumpl,
+        "preventivos_cerrados": cerrados_prev,
+        "preventivos_total": total_prev,
+        "area_crecimiento": area_crecimiento,
+        "puntos_alerta": puntos_alerta,
+        "puntos_favorables": puntos_favorables,
+    }
+
+
+def _mostrar_diagnostico_gerencia(df, centro):
+    diagnostico = _diagnostico_ejecutivo_centro(df, centro)
+
+    st.markdown("### 🧭 Diagnóstico de Gerencia")
+
+    cabecera = (
+        f"**{diagnostico['estado']} · "
+        f"Índice operativo {diagnostico['indice']}%**\n\n"
+        f"{diagnostico['mensaje']}"
+    )
+
+    if diagnostico["color"] == "rojo":
+        st.error(cabecera)
+    elif diagnostico["color"] == "amarillo":
+        st.warning(cabecera)
+    else:
+        st.success(cabecera)
+
+    alertas = diagnostico.get("puntos_alerta", [])
+    favorables = diagnostico.get("puntos_favorables", [])
+
+    if alertas:
+        for linea in alertas[:3]:
+            st.markdown(f"⚠️ {linea}")
+
+    if favorables:
+        for linea in favorables[:2]:
+            st.caption(f"✓ {linea}")
+
+    area, cambio, va, vb = diagnostico.get(
+        "area_crecimiento",
+        (None, 0, 0, 0),
+    )
+
+    if area and cambio > 0:
+        st.caption(
+            f"📈 Área a vigilar: {area} · "
+            f"{vb} → {va} incidencias."
+        )
+
+    return diagnostico
+
+
+def mostrar_capa_ejecutiva_gerencia(df, centro):
+    diagnostico = _mostrar_diagnostico_gerencia(
+        df,
+        centro,
+    )
+
+    ia = diagnostico["incidencias_mes"]
+    ib = diagnostico["incidencias_mes_anterior"]
+
     if ib > 0:
         variacion = ((ia - ib) / ib) * 100
         delta = f"{variacion:+.0f}% vs mes anterior"
@@ -1232,125 +1477,76 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
     else:
         delta = "Sin variación"
 
-    pct_prev, n_prev, n_corr = _salud_preventivo_correctivo(df, centro)
-    horas, n_res = _resolucion_media(df, centro)
-    reinc = _reincidencias_ejecutivas(df, centro)
-    cumpl, cerrados_prev, total_prev = _preventivos_cerrados(df, centro)
+    pct_prev, n_prev, n_corr = _salud_preventivo_correctivo(
+        df,
+        centro,
+    )
+
+    horas = diagnostico["resolucion_horas"]
+    n_res = diagnostico["resolucion_muestra"]
+    reinc = diagnostico["reincidencias"]
+    cumpl = diagnostico["cumpl_preventivo"]
+    cerrados_prev = diagnostico["preventivos_cerrados"]
+    total_prev = diagnostico["preventivos_total"]
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("⚠️ Incidencias este mes", ia, delta=delta, delta_color="inverse", help=f"Mes anterior: {ib}")
-    k2.metric("🛡️ Preventivo / correctivo", f"{pct_prev}% preventivo", help=f"Este mes: {n_prev} preventivos y {n_corr} correctivos.")
-    k3.metric("⏱️ Resolución media", _texto_resolucion(horas), help=f"{n_res} OTs cerradas analizadas en los últimos 90 días.")
-    k4.metric("🔁 Espacios reincidentes", len(reinc), help="2 o más incidencias en el mismo espacio durante los últimos 90 días.")
 
-    color_operativo, _, _ = evaluar_estado_centro(
-        df,
-        centro,
+    k1.metric(
+        "⚠️ Incidencias este mes",
+        ia,
+        delta=delta,
+        delta_color="inverse",
+        help=f"Mes anterior: {ib}",
     )
 
-    diferencia = ia - ib
-
-    if diferencia < 0:
-        tendencia = "favorable"
-        tipo_tendencia = "success"
-    elif diferencia > 0:
-        tendencia = "desfavorable"
-        tipo_tendencia = "warning"
-    else:
-        tendencia = "estable"
-        tipo_tendencia = "success"
-
-    if color_operativo == "rojo":
-        situacion_operativa = "requiere atención"
-    elif color_operativo == "amarillo":
-        situacion_operativa = "requiere seguimiento"
-    else:
-        situacion_operativa = "bajo control"
-
-    lineas = [
-        (
-            f"**Situación operativa: {situacion_operativa}. "
-            f"Tendencia: {tendencia}.**"
-        )
-    ]
-
-    if diferencia < 0:
-        lineas.append(
-            f"Las incidencias bajan de {ib} a {ia}: "
-            f"{abs(diferencia)} menos que el mes anterior."
-        )
-    elif diferencia > 0:
-        lineas.append(
-            f"Las incidencias suben de {ib} a {ia}: "
-            f"{diferencia} más que el mes anterior."
-        )
-    else:
-        lineas.append(
-            f"Las incidencias se mantienen en {ia}, "
-            "igual que el mes anterior."
-        )
-
-    area, cambio, va, vb = _area_crecimiento(
-        df,
-        centro,
+    k2.metric(
+        "🛡️ Preventivo / correctivo",
+        f"{pct_prev}% preventivo",
+        help=f"Este mes: {n_prev} preventivos y {n_corr} correctivos.",
     )
 
-    if area and cambio > 0:
-        lineas.append(
-            f"{area} es el área con mayor crecimiento: "
-            f"pasa de {vb} a {va} incidencias."
-        )
-
-    if cumpl is not None:
-        lineas.append(
-            f"El {cumpl}% de los preventivos registrados figura cerrado."
-        )
-
-    if not reinc.empty:
-        max_reinc = int(
-            reinc.iloc[0]["incidencias"]
-        )
-
-        espacio_mas_reincidente = str(
-            reinc.iloc[0]["espacio_limpio"]
-        )
-
-        lineas.append(
-            f"{len(reinc)} espacios presentan reincidencia en los últimos "
-            f"90 días. El más repetido es {espacio_mas_reincidente} "
-            f"con {max_reinc} incidencias."
-        )
-    else:
-        lineas.append(
-            "No se detectan espacios reincidentes en los últimos 90 días."
-        )
-
-    mensaje = "\n\n".join(
-        lineas
+    k3.metric(
+        "⏱️ Resolución media",
+        _texto_resolucion(horas),
+        help=f"{n_res} OTs cerradas analizadas en los últimos 90 días.",
     )
 
-    if tipo_tendencia == "warning":
-        st.warning(
-            mensaje
-        )
-    elif color_operativo == "rojo":
-        st.info(
-            mensaje
-        )
-    else:
-        st.success(
-            mensaje
-        )
+    k4.metric(
+        "🔁 Espacios reincidentes",
+        len(reinc),
+        help="2 o más incidencias en el mismo espacio durante los últimos 90 días.",
+    )
 
-    with st.expander("📊 Ver detalle de salud del mantenimiento", expanded=False):
+    with st.expander(
+        "📊 Ver detalle de salud del mantenimiento",
+        expanded=False,
+    ):
         c1, c2 = st.columns(2)
+
         with c1:
             st.markdown("#### Preventivo")
+
             if cumpl is None:
-                st.info("Todavía no hay preventivos registrados para calcular el indicador.")
+                st.info(
+                    "Todavía no hay preventivos registrados "
+                    "para calcular el indicador."
+                )
             else:
-                st.metric("Preventivos cerrados", f"{cumpl}%", help=f"{cerrados_prev} cerrados de {total_prev} registrados.")
-                st.caption("Mide preventivos cerrados/registrados. No se presenta como «en plazo» porque este módulo no dispone aquí de la fecha límite planificada necesaria para calcularlo con rigor.")
+                st.metric(
+                    "Preventivos cerrados",
+                    f"{cumpl}%",
+                    help=(
+                        f"{cerrados_prev} cerrados de "
+                        f"{total_prev} registrados."
+                    ),
+                )
+
+                st.caption(
+                    "Mide preventivos cerrados/registrados. "
+                    "No se presenta como «en plazo» porque este módulo "
+                    "no dispone aquí de la fecha límite planificada."
+                )
+
         with c2:
             st.markdown("#### Reincidencias")
 
@@ -1358,7 +1554,6 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
                 st.success(
                     "Sin espacios reincidentes en los últimos 90 días."
                 )
-
             else:
                 vista = reinc.head(10).copy()
 
@@ -1393,9 +1588,15 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
                 )
 
                 st.caption(
-                    "Se considera reincidencia cuando un mismo espacio acumula "
-                    "2 o más incidencias en los últimos 90 días."
+                    "Reincidencia = 2 o más incidencias en el mismo "
+                    "edificio + planta + espacio durante 90 días."
                 )
+
+        area, cambio, va, vb = diagnostico.get(
+            "area_crecimiento",
+            (None, 0, 0, 0),
+        )
+
         if area and cambio > 0:
             st.warning(
                 f"📈 **Área a vigilar: {area}.** "
@@ -1441,9 +1642,7 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
                     errors="coerce",
                 )
 
-                if pd.notna(
-                    ultima_fecha
-                ):
+                if pd.notna(ultima_fecha):
                     st.write(
                         f"**Última incidencia:** "
                         f"{ultima_fecha.strftime('%d/%m/%Y')}"
@@ -1460,15 +1659,17 @@ def mostrar_capa_ejecutiva_gerencia(df, centro):
                     )
 
                 st.info(
-                    "Por ahora Gerencia solo la señala para seguimiento. "
-                    "Más adelante podremos añadir causa repetitiva, equipo asociado "
-                    "o propuesta de actuación definitiva cuando tengamos suficiente histórico."
+                    "Gerencia la señala para seguimiento. "
+                    "La causa raíz se incorporará cuando exista "
+                    "suficiente histórico fiable."
                 )
 
         st.caption(
             "Gerencia interpreta tendencias y salud del mantenimiento. "
-            "La prioridad diaria de ejecución continúa correspondiendo al ❤️ Corazón."
+            "La prioridad diaria de ejecución continúa correspondiendo "
+            "al ❤️ Corazón."
         )
+
 
 
 def mostrar_menu_centro(df, centro):
@@ -1479,7 +1680,37 @@ def mostrar_menu_centro(df, centro):
 
     mostrar_resumen_ejecutivo(df, centro)
 
-    mostrar_capa_ejecutiva_gerencia(df, centro)
+    # Indicadores ejecutivos sin repetir el diagnóstico principal.
+    diagnostico_ya_mostrado = True
+
+    if diagnostico_ya_mostrado:
+        ia = len(_incidencias_periodo(df, centro, _periodos_ejecutivos()[0]))
+        ib = len(_incidencias_periodo(df, centro, _periodos_ejecutivos()[1]))
+        pct_prev, n_prev, n_corr = _salud_preventivo_correctivo(df, centro)
+        horas, n_res = _resolucion_media(df, centro)
+        reinc = _reincidencias_ejecutivas(df, centro)
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric(
+            "⚠️ Incidencias este mes",
+            ia,
+            delta=(f"{((ia-ib)/ib)*100:+.0f}% vs mes anterior" if ib else (f"+{ia} vs mes anterior" if ia else "Sin variación")),
+            delta_color="inverse",
+        )
+        k2.metric(
+            "🛡️ Preventivo / correctivo",
+            f"{pct_prev}% preventivo",
+            help=f"Este mes: {n_prev} preventivos y {n_corr} correctivos.",
+        )
+        k3.metric(
+            "⏱️ Resolución media",
+            _texto_resolucion(horas),
+            help=f"{n_res} OTs cerradas analizadas en los últimos 90 días.",
+        )
+        k4.metric(
+            "🔁 Espacios reincidentes",
+            len(reinc),
+        )
 
     mostrar_evolucion_mantenimiento(df, centro)
 
