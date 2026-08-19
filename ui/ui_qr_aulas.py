@@ -2,6 +2,7 @@ import io
 import re
 from urllib.parse import quote
 
+import pandas as pd
 import qrcode
 import streamlit as st
 from reportlab.lib.colors import HexColor, black, white
@@ -10,8 +11,10 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from modules.espacios import obtener_espacios_para_qr
 from modules.espacios import (
+    obtener_espacios_para_qr,
+    obtener_espacios,
+    actualizar_qr_habilitado_espacio,
     obtener_centros_espacios,
     obtener_edificios_espacios,
     obtener_plantas_espacios,
@@ -151,6 +154,40 @@ def obtener_configuracion_placas():
             or 27.5
         ),
     }
+
+
+def habilitar_qr_masivo_espacios(filas):
+    """
+    Habilita QR en varios espacios activos del catálogo.
+
+    Reutiliza actualizar_qr_habilitado_espacio() para mantener
+    una única lógica de escritura.
+    """
+    actualizados = 0
+    errores = []
+
+    for fila in filas:
+        try:
+            id_espacio = int(fila[0])
+
+            ok = actualizar_qr_habilitado_espacio(
+                id_espacio,
+                True,
+            )
+
+            if ok:
+                actualizados += 1
+            else:
+                errores.append(
+                    f"{fila[1]} · {fila[2]} · {fila[3]} · {fila[4]}"
+                )
+
+        except Exception as e:
+            errores.append(
+                f"{fila}: {e}"
+            )
+
+    return actualizados, errores
 
 
 def limpiar_nombre_archivo(texto):
@@ -1129,17 +1166,221 @@ def pantalla_qr_aulas():
     st.markdown("## 📱 QR de espacios")
 
     st.info(
-        "Aquí aparecen únicamente los espacios del catálogo que tienen "
-        "activado 📱 QR habilitado. Puedes probar el formulario, "
-        "descargar un QR individual o generar el PDF de placas."
+        "Aquí aparecen los espacios del catálogo que tienen "
+        "activado 📱 QR habilitado. Puedes activar varios de una vez, "
+        "probar el formulario, descargar un QR individual o generar el PDF de placas."
     )
+
+    # =========================================================
+    # ACTIVACIÓN MASIVA / SELECCIONABLE DESDE LA MISMA PANTALLA
+    # =========================================================
+    espacios_catalogo = obtener_espacios(
+        activos=True
+    )
+
+    if espacios_catalogo:
+        with st.expander(
+            "📱 Activar QR para varios espacios",
+            expanded=False,
+        ):
+            st.caption(
+                "Filtra el ámbito y selecciona exactamente qué espacios "
+                "quieres habilitar. Puedes seleccionar todos y desmarcar "
+                "los que todavía no quieras."
+            )
+
+            centros_catalogo = sorted({
+                str(fila[1])
+                for fila in espacios_catalogo
+                if len(fila) >= 7 and fila[1]
+            })
+
+            centro_masivo = st.selectbox(
+                "Centro",
+                centros_catalogo,
+                index=(
+                    centros_catalogo.index("Pearson 22")
+                    if "Pearson 22" in centros_catalogo
+                    else 0
+                ),
+                key="qr_masivo_centro",
+            )
+
+            filas_centro = [
+                fila
+                for fila in espacios_catalogo
+                if str(fila[1]) == centro_masivo
+            ]
+
+            edificios_catalogo = sorted({
+                str(fila[2])
+                for fila in filas_centro
+                if fila[2]
+            })
+
+            edificio_masivo = st.selectbox(
+                "Edificio",
+                ["Todos"] + edificios_catalogo,
+                key="qr_masivo_edificio",
+            )
+
+            filas_edificio = [
+                fila
+                for fila in filas_centro
+                if (
+                    edificio_masivo == "Todos"
+                    or str(fila[2]) == edificio_masivo
+                )
+            ]
+
+            plantas_catalogo = sorted({
+                str(fila[3])
+                for fila in filas_edificio
+                if fila[3]
+            })
+
+            planta_masiva = st.selectbox(
+                "Planta / zona",
+                ["Todas"] + plantas_catalogo,
+                key="qr_masivo_planta",
+            )
+
+            filas_filtradas = [
+                fila
+                for fila in filas_edificio
+                if (
+                    planta_masiva == "Todas"
+                    or str(fila[3]) == planta_masiva
+                )
+            ]
+
+            st.metric(
+                "Espacios incluidos en el filtro",
+                len(filas_filtradas),
+            )
+
+            if filas_filtradas:
+                seleccionar_todos = st.checkbox(
+                    "Seleccionar todos los espacios del filtro",
+                    value=True,
+                    key="qr_masivo_seleccionar_todos",
+                )
+
+                clave_filtro = (
+                    f"{centro_masivo}|"
+                    f"{edificio_masivo}|"
+                    f"{planta_masiva}"
+                )
+
+                df_seleccion = pd.DataFrame(
+                    [
+                        {
+                            "Seleccionar": bool(seleccionar_todos),
+                            "ID": int(fila[0]),
+                            "Edificio": fila[2],
+                            "Planta / zona": fila[3],
+                            "Espacio": fila[4],
+                            "Tipo": fila[5],
+                        }
+                        for fila in filas_filtradas
+                    ]
+                )
+
+                tabla_editada = st.data_editor(
+                    df_seleccion,
+                    use_container_width=True,
+                    hide_index=True,
+                    disabled=[
+                        "ID",
+                        "Edificio",
+                        "Planta / zona",
+                        "Espacio",
+                        "Tipo",
+                    ],
+                    column_config={
+                        "Seleccionar": st.column_config.CheckboxColumn(
+                            "Seleccionar",
+                            help="Desmarca los espacios que todavía no quieras habilitar.",
+                        ),
+                        "ID": None,
+                    },
+                    key=f"qr_masivo_editor_{clave_filtro}",
+                )
+
+                ids_seleccionados = set(
+                    tabla_editada.loc[
+                        tabla_editada["Seleccionar"] == True,
+                        "ID",
+                    ]
+                    .astype(int)
+                    .tolist()
+                )
+
+                filas_seleccionadas = [
+                    fila
+                    for fila in filas_filtradas
+                    if int(fila[0]) in ids_seleccionados
+                ]
+
+                st.caption(
+                    f"Seleccionados: {len(filas_seleccionadas)} de "
+                    f"{len(filas_filtradas)} espacios."
+                )
+
+                confirmar_masivo = st.checkbox(
+                    f"Confirmo habilitar QR en los "
+                    f"{len(filas_seleccionadas)} espacios seleccionados",
+                    key="qr_masivo_confirmar",
+                )
+
+                if st.button(
+                    "📱 Habilitar QR en los espacios seleccionados",
+                    key="qr_masivo_habilitar",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not bool(filas_seleccionadas),
+                ):
+                    if not confirmar_masivo:
+                        st.error(
+                            "Marca primero la casilla de confirmación."
+                        )
+                    else:
+                        actualizados, errores = habilitar_qr_masivo_espacios(
+                            filas_seleccionadas
+                        )
+
+                        if actualizados:
+                            st.success(
+                                f"QR habilitado en {actualizados} espacios."
+                            )
+
+                        if errores:
+                            st.warning(
+                                f"No se pudieron actualizar "
+                                f"{len(errores)} espacios."
+                            )
+
+                            with st.expander(
+                                "Ver errores",
+                                expanded=False,
+                            ):
+                                for error in errores:
+                                    st.write(f"• {error}")
+
+                        if not errores:
+                            st.rerun()
+            else:
+                st.info(
+                    "No hay espacios activos dentro de este filtro."
+                )
+
+    st.markdown("---")
 
     espacios_qr = obtener_espacios_para_qr()
 
     if not espacios_qr:
         st.warning(
-            "No hay espacios con QR habilitado. "
-            "Actívalos desde Configuración → Espacios."
+            "No hay espacios con QR habilitado todavía."
         )
         return
 
