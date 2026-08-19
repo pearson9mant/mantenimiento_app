@@ -1473,12 +1473,6 @@ def aplicar_estilo_colegio_vivo():
     }
     .cv-panel-title {font-size:21px;font-weight:900;color:#0f172a;margin-bottom:2px}
     .cv-panel-subtitle {font-size:13px;color:#64748b;font-weight:650;margin-bottom:10px}
-    .cv-priority {
-        border:1px solid #fecaca;background:#fff7f7;border-radius:14px;padding:11px 13px;
-        margin-top:6px;
-    }
-    .cv-priority-title {font-size:16px;font-weight:900;color:#991b1b}
-    .cv-priority-text {font-size:13px;color:#334155;margin-top:3px}
     .cv-kpi {
         border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;background:#f8fafc;
         min-height:82px;
@@ -2147,18 +2141,31 @@ def _mostrar_areas_cv(activas):
     if activas.empty:
         st.success("Sin incidencias activas en esta planta.")
         return
-    areas = activas["area"].fillna("Sin área").replace("", "Sin área").value_counts().head(5)
+
+    areas = (
+        activas["area"]
+        .fillna("Sin área")
+        .replace("", "Sin área")
+        .value_counts()
+        .head(5)
+    )
+
     maximo = max(int(areas.max()), 1)
+
     for area, cantidad in areas.items():
-        porcentaje = max(8, int((int(cantidad) / maximo) * 100))
-        st.markdown(
-            f"<div style='display:grid;grid-template-columns:110px 1fr 28px;gap:8px;align-items:center;margin:5px 0'>"
-            f"<span style='font-size:12px;font-weight:700;color:#334155'>{area}</span>"
-            f"<div style='height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden'>"
-            f"<div style='height:8px;width:{porcentaje}%;background:#3b82f6;border-radius:999px'></div></div>"
-            f"<strong style='font-size:12px'>{int(cantidad)}</strong></div>",
-            unsafe_allow_html=True,
-        )
+        cantidad = int(cantidad)
+        progreso = cantidad / maximo
+
+        c1, c2 = st.columns([1.25, 3.75])
+
+        with c1:
+            st.markdown(f"**{area}**")
+
+        with c2:
+            st.progress(
+                progreso,
+                text=str(cantidad),
+            )
 
 
 def mostrar_panel_planta_cv(df):
@@ -2195,20 +2202,62 @@ def mostrar_panel_planta_cv(df):
         _mostrar_areas_cv(activas)
     with c_prioridad:
         st.markdown("#### Actuación que requiere más atención")
+
         if activas.empty:
             st.success("No hay actuaciones pendientes.")
+
         else:
-            candidatos = urgentes if not urgentes.empty else activas
-            candidatos = candidatos.sort_values(["fecha_dt"], ascending=True, na_position="last")
-            fila = candidatos.iloc[0]
-            st.markdown(
-                f"<div class='cv-priority'><div class='cv-priority-title'>"
-                f"{fila.get('descripcion','') or 'Actuación pendiente'}</div>"
-                f"<div class='cv-priority-text'>📍 {fila.get('espacio','') or planta}<br>"
-                f"{fila.get('prioridad','') or 'Prioridad pendiente de valorar'} · "
-                f"{fila.get('numero_ot','') or ''}</div></div>",
-                unsafe_allow_html=True,
+            candidatos = (
+                urgentes
+                if not urgentes.empty
+                else activas
             )
+
+            candidatos = candidatos.sort_values(
+                ["fecha_dt"],
+                ascending=True,
+                na_position="last",
+            )
+
+            fila = candidatos.iloc[0]
+
+            descripcion_prioritaria = str(
+                fila.get("descripcion", "")
+                or "Actuación pendiente"
+            ).strip()
+
+            espacio_prioritario = str(
+                fila.get("espacio", "")
+                or planta
+            ).strip()
+
+            prioridad_prioritaria = str(
+                fila.get("prioridad", "")
+                or "Prioridad pendiente de valorar"
+            ).strip()
+
+            numero_ot_prioritaria = str(
+                fila.get("numero_ot", "")
+                or ""
+            ).strip()
+
+            with st.container(border=True):
+                st.markdown(
+                    f"**{descripcion_prioritaria}**"
+                )
+
+                st.caption(
+                    f"📍 {espacio_prioritario}"
+                )
+
+                st.markdown(
+                    f"**{prioridad_prioritaria}**"
+                    + (
+                        f" · `{numero_ot_prioritaria}`"
+                        if numero_ot_prioritaria
+                        else ""
+                    )
+                )
 
             st.caption(
                 "Esta referencia es para seguimiento de Gerencia. "
