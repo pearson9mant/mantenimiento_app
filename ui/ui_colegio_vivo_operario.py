@@ -1026,8 +1026,23 @@ def _mostrar_ots_sin_planta(ordenes):
                     )
 
 def pantalla_colegio_vivo_operario():
+
+    # =====================================================
+    # LATIDO AUTOMÁTICO · COLEGIO VIVO
+    # Refresca únicamente esta pantalla cada 30 segundos.
+    # Permite detectar nuevas OT/QR sin tocar ningún botón.
+    # =====================================================
+    st_autorefresh(
+        interval=30_000,
+        limit=None,
+        key="latido_colegio_vivo_operario"
+    )
+
     _css_pantalla_operario()
     css_edificio_vivo()
+
+    if _mostrar_planta_seleccionada():
+        return
 
     if _mostrar_planta_seleccionada():
         return
