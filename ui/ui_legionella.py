@@ -1861,7 +1861,7 @@ def generar_ots_legionella_si_toca():
 
     df_ultimos = (
         df.sort_values("fecha", ascending=False)
-        .drop_duplicates(subset=["centro", "edificio", "punto", "tarea"])
+        .drop_duplicates(subset=["centro", "edificio", "planta", "punto", "tarea"])
         .copy()
     )
 
@@ -4110,6 +4110,7 @@ def pantalla_legionella():
                         "estado_control",
                         "centro",
                         "edificio",
+                        "planta",
                         "punto",
                         "tarea",
                         "frecuencia_dias",
@@ -5150,6 +5151,7 @@ def pantalla_legionella():
                         "estado_control",
                         "centro",
                         "edificio",
+                        "planta",
                         "punto",
                         "tarea",
                         "frecuencia_dias",
@@ -5163,7 +5165,7 @@ def pantalla_legionella():
 
         else:
             df = leer_df("""
-                SELECT fecha, centro, edificio, instalacion, punto, tarea, estado, resultado, operario
+                SELECT fecha, centro, edificio, planta, instalacion, punto, tarea, estado, resultado, operario
                 FROM legionella_registros
                 WHERE centro IS NOT NULL
                   AND edificio IS NOT NULL
@@ -5247,7 +5249,7 @@ def pantalla_legionella():
         st.markdown("---")
 
         df = leer_df("""
-            SELECT fecha, centro, edificio, instalacion, punto, tarea, tipo_control,
+            SELECT fecha, centro, edificio, planta, instalacion, punto, tarea, tipo_control,
                    valor, valor_2, valor_3, valor_4, unidad, estado, resultado, operario, observaciones, foto
             FROM legionella_registros
             WHERE centro IS NOT NULL
@@ -5281,6 +5283,26 @@ def pantalla_legionella():
                 ):
             
                     st.write(f"**Resultado:** {row['resultado']}")
+
+                    ubicacion_detalle = " · ".join(
+                        [
+                            str(valor).strip()
+                            for valor in [
+                                row.get("centro"),
+                                row.get("edificio"),
+                                row.get("planta"),
+                                row.get("punto"),
+                            ]
+                            if pd.notna(valor)
+                            and str(valor).strip()
+                        ]
+                    )
+
+                    if ubicacion_detalle:
+                        st.write(
+                            f"📍 **Ubicación:** {ubicacion_detalle}"
+                        )
+
             
                     if row["tarea"] == "Control punto terminal completo":
             
