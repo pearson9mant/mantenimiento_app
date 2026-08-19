@@ -156,27 +156,39 @@ def obtener_configuracion_placas():
     }
 
 
-def habilitar_qr_masivo_espacios(filas):
+def sincronizar_qr_espacios(filas_filtradas, ids_seleccionados):
     """
-    Habilita QR en varios espacios activos del catálogo.
+    Sincroniza exactamente el estado QR del filtro:
 
-    Reutiliza actualizar_qr_habilitado_espacio() para mantener
-    una única lógica de escritura.
+    - seleccionado   -> QR habilitado
+    - no seleccionado -> QR deshabilitado
+
+    Así el PDF posterior refleja exactamente la selección realizada.
     """
-    actualizados = 0
+    habilitados = 0
+    deshabilitados = 0
     errores = []
 
-    for fila in filas:
+    ids_seleccionados = {
+        int(valor)
+        for valor in ids_seleccionados
+    }
+
+    for fila in filas_filtradas:
         try:
             id_espacio = int(fila[0])
+            habilitar = id_espacio in ids_seleccionados
 
             ok = actualizar_qr_habilitado_espacio(
                 id_espacio,
-                True,
+                habilitar,
             )
 
             if ok:
-                actualizados += 1
+                if habilitar:
+                    habilitados += 1
+                else:
+                    deshabilitados += 1
             else:
                 errores.append(
                     f"{fila[1]} · {fila[2]} · {fila[3]} · {fila[4]}"
@@ -187,7 +199,7 @@ def habilitar_qr_masivo_espacios(filas):
                 f"{fila}: {e}"
             )
 
-    return actualizados, errores
+    return habilitados, deshabilitados, errores
 
 
 def limpiar_nombre_archivo(texto):
@@ -1184,9 +1196,9 @@ def pantalla_qr_aulas():
             expanded=False,
         ):
             st.caption(
-                "Filtra el ámbito y selecciona exactamente qué espacios "
-                "quieres habilitar. Puedes seleccionar todos y desmarcar "
-                "los que todavía no quieras."
+                "La tabla representa el estado final: ✅ marcado = tendrá QR · "
+                "⬜ desmarcado = no tendrá QR. Al aplicar, el PDF mostrará "
+                "únicamente los que queden habilitados."
             )
 
             centros_catalogo = sorted({
@@ -1260,10 +1272,28 @@ def pantalla_qr_aulas():
             )
 
             if filas_filtradas:
+                # Estado QR real actual, sin hacer una consulta por cada fila.
+                espacios_qr_actuales = obtener_espacios_para_qr()
+
+                claves_qr_activas = {
+                    (
+                        str(fila[1] or "").strip(),
+                        str(fila[2] or "").strip(),
+                        str(fila[3] or "").strip(),
+                        str(fila[4] or "").strip(),
+                    )
+                    for fila in espacios_qr_actuales
+                    if len(fila) >= 6
+                }
+
                 seleccionar_todos = st.checkbox(
                     "Seleccionar todos los espacios del filtro",
-                    value=True,
+                    value=False,
                     key="qr_masivo_seleccionar_todos",
+                    help=(
+                        "Si lo marcas, todos aparecerán seleccionados. "
+                        "Si lo dejas desmarcado, la tabla refleja el estado QR actual."
+                    ),
                 )
 
                 clave_filtro = (
@@ -1275,7 +1305,19 @@ def pantalla_qr_aulas():
                 df_seleccion = pd.DataFrame(
                     [
                         {
-                            "Seleccionar": bool(seleccionar_todos),
+                            "Seleccionar": (
+                                True
+                                if seleccionar_todos
+                                else (
+                                    (
+                                        str(fila[1] or "").strip(),
+                                        str(fila[2] or "").strip(),
+                                        str(fila[3] or "").strip(),
+                                        str(fila[4] or "").strip(),
+                                    )
+                                    in claves_qr_activas
+                                )
+                            ),
                             "ID": int(fila[0]),
                             "Edificio": fila[2],
                             "Planta / zona": fila[3],
@@ -1327,37 +1369,50 @@ def pantalla_qr_aulas():
                     f"{len(filas_filtradas)} espacios."
                 )
 
+                no_seleccionados = (
+                    len(filas_filtradas)
+                    - len(filas_seleccionadas)
+                )
+
+                st.info(
+                    f"Al aplicar: **{len(filas_seleccionadas)}** quedarán con QR "
+                    f"y **{no_seleccionados}** quedarán sin QR dentro de este filtro."
+                )
+
                 confirmar_masivo = st.checkbox(
-                    f"Confirmo habilitar QR en los "
-                    f"{len(filas_seleccionadas)} espacios seleccionados",
+                    "Confirmo aplicar exactamente esta selección",
                     key="qr_masivo_confirmar",
                 )
 
                 if st.button(
-                    "📱 Habilitar QR en los espacios seleccionados",
+                    "📱 Aplicar selección de QR",
                     key="qr_masivo_habilitar",
                     type="primary",
                     use_container_width=True,
-                    disabled=not bool(filas_seleccionadas),
                 ):
                     if not confirmar_masivo:
                         st.error(
                             "Marca primero la casilla de confirmación."
                         )
                     else:
-                        actualizados, errores = habilitar_qr_masivo_espacios(
-                            filas_seleccionadas
+                        habilitados, deshabilitados, errores = (
+                            sincronizar_qr_espacios(
+                                filas_filtradas,
+                                ids_seleccionados,
+                            )
                         )
 
-                        if actualizados:
+                        if not errores:
                             st.success(
-                                f"QR habilitado en {actualizados} espacios."
+                                f"Selección aplicada: "
+                                f"{habilitados} con QR y "
+                                f"{deshabilitados} sin QR."
                             )
-
-                        if errores:
+                            st.rerun()
+                        else:
                             st.warning(
-                                f"No se pudieron actualizar "
-                                f"{len(errores)} espacios."
+                                f"La selección se aplicó parcialmente. "
+                                f"Hubo {len(errores)} errores."
                             )
 
                             with st.expander(
@@ -1366,9 +1421,6 @@ def pantalla_qr_aulas():
                             ):
                                 for error in errores:
                                     st.write(f"• {error}")
-
-                        if not errores:
-                            st.rerun()
             else:
                 st.info(
                     "No hay espacios activos dentro de este filtro."
