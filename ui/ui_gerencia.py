@@ -992,6 +992,181 @@ def mostrar_evolucion_mantenimiento(df, centro):
 
 
 
+
+def _periodos_ejecutivos():
+    actual = pd.Timestamp.today().to_period("M")
+    return actual, actual - 1
+
+
+def _datos_centro_ejecutivo(df, centro):
+    if df.empty:
+        return df.copy()
+    return df[df["centro"].fillna("").astype(str).str.strip() == centro].copy()
+
+
+def _incidencias_periodo(df, centro, periodo):
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return datos
+    datos = datos[_es_incidencia_df(datos) & datos["fecha_dt"].notna()].copy()
+    if datos.empty:
+        return datos
+    return datos[datos["fecha_dt"].dt.to_period("M") == periodo].copy()
+
+
+def _salud_preventivo_correctivo(df, centro):
+    actual, _ = _periodos_ejecutivos()
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return 0, 0, 0
+    datos = datos[datos["fecha_dt"].notna()].copy()
+    datos = datos[datos["fecha_dt"].dt.to_period("M") == actual].copy()
+    if datos.empty:
+        return 0, 0, 0
+    preventivos = int(_es_preventivo_df(datos).sum())
+    correctivos = int(_es_incidencia_df(datos).sum())
+    total = preventivos + correctivos
+    return (round(preventivos / total * 100) if total else 0), preventivos, correctivos
+
+
+def _resolucion_media(df, centro, dias=90):
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return None, 0
+    datos = datos[es_cerrada(datos) & datos["fecha_dt"].notna() & datos["fecha_cierre_dt"].notna()].copy()
+    limite = pd.Timestamp.today() - pd.Timedelta(days=dias)
+    datos = datos[datos["fecha_cierre_dt"] >= limite].copy()
+    if datos.empty:
+        return None, 0
+    horas = (datos["fecha_cierre_dt"] - datos["fecha_dt"]).dt.total_seconds() / 3600
+    horas = horas[(horas >= 0) & (horas <= 24 * 365)]
+    return (float(horas.mean()), len(horas)) if not horas.empty else (None, 0)
+
+
+def _texto_resolucion(horas):
+    if horas is None:
+        return "Sin datos"
+    if horas < 24:
+        return f"{horas:.1f} h".replace(".", ",")
+    return f"{horas / 24:.1f} días".replace(".", ",")
+
+
+def _reincidencias_ejecutivas(df, centro, dias=90):
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return pd.DataFrame()
+    limite = pd.Timestamp.today() - pd.Timedelta(days=dias)
+    datos = datos[datos["fecha_dt"].notna() & (datos["fecha_dt"] >= limite)].copy()
+    datos = datos[_es_incidencia_df(datos)].copy()
+    if datos.empty:
+        return pd.DataFrame()
+    datos["espacio_limpio"] = datos["espacio"].fillna("").astype(str).str.strip()
+    datos = datos[~datos["espacio_limpio"].str.lower().isin(["", "general", "-"])].copy()
+    if datos.empty:
+        return pd.DataFrame()
+    r = datos.groupby(["edificio", "planta", "espacio_limpio"], dropna=False).size().rename("incidencias").reset_index()
+    return r[r["incidencias"] >= 2].sort_values(["incidencias", "espacio_limpio"], ascending=[False, True])
+
+
+def _area_crecimiento(df, centro):
+    actual, anterior = _periodos_ejecutivos()
+    a = _incidencias_periodo(df, centro, actual)
+    b = _incidencias_periodo(df, centro, anterior)
+    ca = a["area"].fillna("Sin área").replace("", "Sin área").value_counts() if not a.empty else pd.Series(dtype="int64")
+    cb = b["area"].fillna("Sin área").replace("", "Sin área").value_counts() if not b.empty else pd.Series(dtype="int64")
+    mejor = (None, 0, 0, 0)
+    for area in set(ca.index).union(set(cb.index)):
+        va, vb = int(ca.get(area, 0)), int(cb.get(area, 0))
+        if va - vb > mejor[1]:
+            mejor = (str(area), va - vb, va, vb)
+    return mejor
+
+
+def _preventivos_cerrados(df, centro):
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return None, 0, 0
+    p = datos[_es_preventivo_df(datos)].copy()
+    if p.empty:
+        return None, 0, 0
+    total = len(p); cerrados = len(p[es_cerrada(p)])
+    return round(cerrados / total * 100), cerrados, total
+
+
+def mostrar_capa_ejecutiva_gerencia(df, centro):
+    st.markdown("### 🧭 Visión ejecutiva")
+    actual, anterior = _periodos_ejecutivos()
+    ia = len(_incidencias_periodo(df, centro, actual))
+    ib = len(_incidencias_periodo(df, centro, anterior))
+    if ib > 0:
+        variacion = ((ia - ib) / ib) * 100
+        delta = f"{variacion:+.0f}% vs mes anterior"
+    elif ia > 0:
+        delta = f"+{ia} vs mes anterior"
+    else:
+        delta = "Sin variación"
+
+    pct_prev, n_prev, n_corr = _salud_preventivo_correctivo(df, centro)
+    horas, n_res = _resolucion_media(df, centro)
+    reinc = _reincidencias_ejecutivas(df, centro)
+    cumpl, cerrados_prev, total_prev = _preventivos_cerrados(df, centro)
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("⚠️ Incidencias este mes", ia, delta=delta, delta_color="inverse", help=f"Mes anterior: {ib}")
+    k2.metric("🛡️ Preventivo / correctivo", f"{pct_prev}% preventivo", help=f"Este mes: {n_prev} preventivos y {n_corr} correctivos.")
+    k3.metric("⏱️ Resolución media", _texto_resolucion(horas), help=f"{n_res} OTs cerradas analizadas en los últimos 90 días.")
+    k4.metric("🔁 Espacios reincidentes", len(reinc), help="2 o más incidencias en el mismo espacio durante los últimos 90 días.")
+
+    color, _, _ = evaluar_estado_centro(df, centro)
+    diferencia = ia - ib
+    lineas = []
+    if color == "rojo":
+        lineas.append("**Situación general: requiere atención.**")
+        tipo = "error"
+    elif diferencia > 0:
+        lineas.append("**Situación general: requiere seguimiento.**")
+        tipo = "warning"
+    else:
+        lineas.append("**Situación general: estable.**")
+        tipo = "success"
+
+    if diferencia < 0:
+        lineas.append(f"Las incidencias bajan de {ib} a {ia}: {abs(diferencia)} menos que el mes anterior.")
+    elif diferencia > 0:
+        lineas.append(f"Las incidencias suben de {ib} a {ia}: {diferencia} más que el mes anterior.")
+    else:
+        lineas.append(f"Las incidencias se mantienen en {ia}, igual que el mes anterior.")
+
+    area, cambio, va, vb = _area_crecimiento(df, centro)
+    if area and cambio > 0:
+        lineas.append(f"{area} es el área con mayor crecimiento: pasa de {vb} a {va} incidencias.")
+    if cumpl is not None:
+        lineas.append(f"El {cumpl}% de los preventivos registrados figura cerrado.")
+    lineas.append(f"{len(reinc)} espacios presentan reincidencia en los últimos 90 días." if not reinc.empty else "No se detectan espacios reincidentes en los últimos 90 días.")
+    mensaje = "\n\n".join(lineas)
+    {"error": st.error, "warning": st.warning, "success": st.success}[tipo](mensaje)
+
+    with st.expander("📊 Ver detalle de salud del mantenimiento", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### Preventivo")
+            if cumpl is None:
+                st.info("Todavía no hay preventivos registrados para calcular el indicador.")
+            else:
+                st.metric("Preventivos cerrados", f"{cumpl}%", help=f"{cerrados_prev} cerrados de {total_prev} registrados.")
+                st.caption("Mide preventivos cerrados/registrados. No se presenta como «en plazo» porque este módulo no dispone aquí de la fecha límite planificada necesaria para calcularlo con rigor.")
+        with c2:
+            st.markdown("#### Reincidencias")
+            if reinc.empty:
+                st.success("Sin espacios reincidentes en los últimos 90 días.")
+            else:
+                vista = reinc.head(8).rename(columns={"edificio":"Edificio","planta":"Planta","espacio_limpio":"Espacio","incidencias":"Incidencias"})
+                st.dataframe(vista[["Edificio","Planta","Espacio","Incidencias"]], use_container_width=True, hide_index=True)
+        if area and cambio > 0:
+            st.warning(f"📈 **Área a vigilar: {area}.** Pasa de {vb} a {va} incidencias respecto al mes anterior.")
+        st.caption("Gerencia interpreta tendencias y salud del mantenimiento. La prioridad diaria de ejecución continúa correspondiendo al ❤️ Corazón.")
+
+
 def mostrar_menu_centro(df, centro):
     st.markdown(f"<div class='gerencia-section-title'>🏫 {centro}</div>", unsafe_allow_html=True)
 
@@ -999,6 +1174,8 @@ def mostrar_menu_centro(df, centro):
         volver_a_centros()
 
     mostrar_resumen_ejecutivo(df, centro)
+
+    mostrar_capa_ejecutiva_gerencia(df, centro)
 
     mostrar_evolucion_mantenimiento(df, centro)
 
@@ -2410,6 +2587,8 @@ def mostrar_colegio_vivo_gerencia(
             with st.container(border=True):
                 mostrar_panel_planta_cv(df)
 
+        mostrar_capa_ejecutiva_gerencia(df, centro_objetivo)
+
         mostrar_resumen_inferior_cv(df)
 
         with st.expander(
@@ -2521,6 +2700,10 @@ def mostrar_colegio_vivo_gerencia(
     with derecha:
         with st.container(border=True):
             mostrar_panel_planta_cv(df)
+
+    centro_ejecutivo = st.session_state["gerencia_cv_centro"]
+    st.caption(f"Visión ejecutiva del centro seleccionado · {centro_ejecutivo}")
+    mostrar_capa_ejecutiva_gerencia(df, centro_ejecutivo)
 
     mostrar_resumen_inferior_cv(df)
 
