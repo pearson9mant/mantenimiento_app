@@ -493,6 +493,59 @@ def obtener_historico_preventivos():
     return datos
 
 
+def borrar_historico_preventivo(
+    id_historico,
+    numero_ot,
+):
+    """
+    Elimina una ejecución preventiva finalizada del histórico.
+
+    Borra la ejecución y sus datos asociados, pero conserva
+    la tarea preventiva y su planificación futura.
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            _sql("""
+                DELETE FROM preventivo_checklist
+                WHERE numero_ot = ?
+            """),
+            (numero_ot,),
+        )
+
+        cursor.execute(
+            _sql("""
+                DELETE FROM preventivo_registros
+                WHERE numero_ot = ?
+            """),
+            (numero_ot,),
+        )
+
+        cursor.execute(
+            _sql("""
+                DELETE FROM historico_ordenes
+                WHERE id = ?
+                  AND numero_ot = ?
+            """),
+            (
+                int(id_historico),
+                numero_ot,
+            ),
+        )
+
+        conn.commit()
+        return True, "Histórico preventivo eliminado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo borrar el histórico preventivo: {e}"
+
+    finally:
+        conn.close()
+
+
 def obtener_checklist_historico_preventivo(numero_ot):
     conn = conectar()
     cursor = conn.cursor()
@@ -693,6 +746,57 @@ def mostrar_historico_preventivo():
         c3.metric("🛠 Ajustados", ajustados)
         c4.metric("🟡 Revisar", revisar)
         c5.metric("🔴 Averías", averias)
+
+        st.markdown("---")
+
+        with st.expander(
+            "🗑️ Eliminar este histórico preventivo",
+            expanded=False,
+        ):
+            st.warning(
+                "Se eliminará esta ejecución finalizada y sus registros "
+                "asociados. La tarea preventiva y su planificación futura "
+                "se conservarán."
+            )
+
+            confirmar_borrado = st.checkbox(
+                "Confirmo que quiero eliminar este histórico preventivo",
+                key=f"confirmar_borrar_hist_prev_{id_historico}",
+            )
+
+            texto_confirmacion = st.text_input(
+                "Para confirmar escribe BORRAR",
+                key=f"texto_borrar_hist_prev_{id_historico}",
+            )
+
+            if st.button(
+                "🗑️ Borrar histórico preventivo",
+                key=f"borrar_hist_prev_{id_historico}",
+                use_container_width=True,
+            ):
+                if not confirmar_borrado:
+                    st.error(
+                        "Marca primero la casilla de confirmación."
+                    )
+                elif texto_confirmacion.strip().upper() != "BORRAR":
+                    st.error(
+                        "Escribe BORRAR para confirmar."
+                    )
+                else:
+                    ok, mensaje = borrar_historico_preventivo(
+                        id_historico=id_historico,
+                        numero_ot=numero_ot,
+                    )
+
+                    if ok:
+                        st.session_state.pop(
+                            "historico_preventivo_ot_abierta",
+                            None,
+                        )
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.error(mensaje)
 
         return
 
