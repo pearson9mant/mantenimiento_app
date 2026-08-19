@@ -21,6 +21,10 @@ from ui.ui_inteligencia_preventiva import (
 )
 
 
+_ESTRUCTURA_PREVENTIVO_ASEGURADA = False
+_GENERACION_PREVENTIVO_COMPROBADA = False
+
+
 TAREAS_PREVENTIVAS_POR_AREA = {
     "Electricidad": [
         "Revisar cuadro eléctrico",
@@ -118,6 +122,11 @@ TAREAS_PREVENTIVAS_POR_AREA = {
 
 
 def asegurar_columnas_preventivo():
+    global _ESTRUCTURA_PREVENTIVO_ASEGURADA
+
+    if _ESTRUCTURA_PREVENTIVO_ASEGURADA:
+        return
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -156,20 +165,24 @@ def asegurar_columnas_preventivo():
     finally:
         conn.close()
 
+    _ESTRUCTURA_PREVENTIVO_ASEGURADA = True
+
 
 def ejecutar_preventivos_automaticos():
-    """
-    Comprueba automáticamente las planificaciones preventivas.
-    La protección contra duplicados está en generar_ots_preventivo_si_toca().
-    """
+    """Comprueba preventivos automáticos una sola vez por proceso."""
+    global _GENERACION_PREVENTIVO_COMPROBADA
+
+    if _GENERACION_PREVENTIVO_COMPROBADA:
+        return
+
     try:
         n = generar_ots_preventivo_si_toca()
+        _GENERACION_PREVENTIVO_COMPROBADA = True
 
         if n > 0:
             st.toast(
                 f"🔧 Se han generado {n} OTs preventivas automáticamente"
             )
-
     except Exception as e:
         st.warning(
             f"No se pudieron generar preventivos automáticos: {e}"
@@ -932,7 +945,39 @@ def pantalla_preventivo():
 
     st.subheader("🔧 Mantenimiento preventivo")
     
-    mostrar_panel_inteligente_preventivo()
+    panel_cargado = bool(
+        st.session_state.get(
+            "preventivo_panel_inteligente_cargado",
+            False,
+        )
+    )
+
+    if not panel_cargado:
+        st.caption(
+            "El Centro de Control Preventivo se carga solo cuando lo necesitas."
+        )
+        if st.button(
+            "🧠 Cargar Centro de Control Preventivo",
+            key="cargar_panel_inteligente_preventivo",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state["preventivo_panel_inteligente_cargado"] = True
+            st.rerun()
+    else:
+        c_panel1, c_panel2 = st.columns([4, 1])
+        with c_panel1:
+            st.success("Centro de Control Preventivo cargado.")
+        with c_panel2:
+            if st.button(
+                "⚡ Ocultar",
+                key="ocultar_panel_inteligente_preventivo",
+                use_container_width=True,
+            ):
+                st.session_state["preventivo_panel_inteligente_cargado"] = False
+                st.rerun()
+
+        mostrar_panel_inteligente_preventivo()
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         [
@@ -1268,7 +1313,27 @@ def pantalla_preventivo():
         if not tareas:
             st.info("No hay tareas preventivas")
         else:
-            for t in tareas:
+            tareas_por_pagina = 20
+            total_paginas_tareas = max(
+                1, (len(tareas) + tareas_por_pagina - 1) // tareas_por_pagina
+            )
+            pagina_tareas = st.number_input(
+                "Página de tareas",
+                min_value=1,
+                max_value=total_paginas_tareas,
+                value=1,
+                step=1,
+                key="pagina_tareas_preventivo",
+            )
+            inicio_tareas = (int(pagina_tareas) - 1) * tareas_por_pagina
+            fin_tareas = inicio_tareas + tareas_por_pagina
+
+            st.caption(
+                f"Mostrando {inicio_tareas + 1}-"
+                f"{min(fin_tareas, len(tareas))} de {len(tareas)} tareas"
+            )
+
+            for t in tareas[inicio_tareas:fin_tareas]:
                 (
                     id_tarea, centro, edificio, planta, espacio, area,
                     tarea, frecuencia, ultima_fecha, proxima_fecha, operario, activo, foto,
@@ -1474,7 +1539,30 @@ def pantalla_preventivo():
 
             st.markdown("---")
 
-            for fila in planificaciones_filtradas:
+            plan_por_pagina = 15
+            total_paginas_plan = max(
+                1,
+                (len(planificaciones_filtradas) + plan_por_pagina - 1)
+                // plan_por_pagina
+            )
+            pagina_plan = st.number_input(
+                "Página de planificación",
+                min_value=1,
+                max_value=total_paginas_plan,
+                value=1,
+                step=1,
+                key="pagina_planificacion_preventivo",
+            )
+            inicio_plan = (int(pagina_plan) - 1) * plan_por_pagina
+            fin_plan = inicio_plan + plan_por_pagina
+
+            st.caption(
+                f"Mostrando {inicio_plan + 1}-"
+                f"{min(fin_plan, len(planificaciones_filtradas))} "
+                f"de {len(planificaciones_filtradas)} planificaciones"
+            )
+
+            for fila in planificaciones_filtradas[inicio_plan:fin_plan]:
                 (
                     tarea_id,
                     centro,
