@@ -1192,29 +1192,45 @@ def finalizar_trabajo_externo(
 # =====================================================
 
 def finalizar_orden(id_orden, observaciones=""):
+    """
+    Finaliza una OT de forma transaccional y segura.
+
+    - INSERT histórico + DELETE activa en una sola transacción.
+    - rollback completo si falla.
+    - evita duplicar histórico por doble clic/rerun.
+    - acciones secundarias solo después del commit.
+    """
     asegurar_columnas_observaciones_estado()
 
     conn = conectar()
     cursor = conn.cursor()
+    datos_post_commit = None
 
-    cursor.execute(_sql("""
-        SELECT numero_ot, descripcion, estado, fecha_creacion,
-               centro, edificio, espacio, area, prioridad, operario, origen,
-               solicitante, fecha_origen, foto, tipo_solicitante,
-               tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
-               email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
-               trabajo_a_realizar, trabajo_realizado, firma_operario,
-               fecha_firma_operario, coste_estimado, coste_final,
-               observaciones_estado,
-               origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
-               planta
-        FROM ordenes_trabajo
-        WHERE id = ?
-    """), (id_orden,))
+    try:
+        cursor.execute(_sql("""
+            SELECT numero_ot, descripcion, estado, fecha_creacion,
+                   centro, edificio, espacio, area, prioridad, operario, origen,
+                   solicitante, fecha_origen, foto, tipo_solicitante,
+                   tipo_orden, empresa_externa, contacto_empresa, telefono_empresa,
+                   email_empresa, fecha_programada, fecha_aviso_empresa, fecha_realizacion,
+                   trabajo_a_realizar, trabajo_realizado, firma_operario,
+                   fecha_firma_operario, coste_estimado, coste_final,
+                   observaciones_estado,
+                   origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
+                   planta
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
 
-    orden = cursor.fetchone()
+        orden = cursor.fetchone()
 
-    if orden:
+        if not orden:
+            return {
+                "ok": False,
+                "motivo": "orden_no_encontrada_o_ya_finalizada",
+                "id_orden": id_orden,
+            }
+
         (
             numero_ot, descripcion, estado, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
@@ -1231,137 +1247,130 @@ def finalizar_orden(id_orden, observaciones=""):
         if tipo_orden == "Externa":
             if not operario:
                 operario = "Proveedor externo"
-
             if not origen:
                 origen = "EXTERNA"
-
             if not fecha_realizacion:
                 fecha_realizacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cursor.execute(_sql("""
+            SELECT id
+            FROM historico_ordenes
+            WHERE numero_ot = ?
+            LIMIT 1
+        """), (numero_ot,))
+
+        if cursor.fetchone():
+            cursor.execute(
+                _sql("DELETE FROM ordenes_trabajo WHERE id = ?"),
+                (id_orden,)
+            )
+            conn.commit()
+
+            return {
+                "ok": True,
+                "motivo": "ya_estaba_en_historico",
+                "id_orden": id_orden,
+                "numero_ot": numero_ot,
+            }
+
+        cursor.execute(_sql("""
             INSERT INTO historico_ordenes
             (
-                numero_ot,
-                descripcion,
-                estado,
-                fecha_creacion,
-                centro,
-                edificio,
-                espacio,
-                area,
-                prioridad,
-                operario,
-                origen,
-                solicitante,
-                fecha_origen,
-                observaciones_cierre,
-                foto,
-                tipo_solicitante,
-                tipo_orden,
-                empresa_externa,
-                contacto_empresa,
-                telefono_empresa,
-                email_empresa,
-                fecha_programada,
-                fecha_aviso_empresa,
-                fecha_realizacion,
-                trabajo_a_realizar,
-                trabajo_realizado,
-                firma_operario,
-                fecha_firma_operario,
-                coste_estimado,
-                coste_final,
-                observaciones_estado,
-                origen_tabla,
-                origen_id,
-                id_punto_legionella,
-                id_preventivo,
-                id_incidencia,
-                planta
+                numero_ot, descripcion, estado, fecha_creacion,
+                centro, edificio, espacio, area, prioridad, operario, origen,
+                solicitante, fecha_origen, observaciones_cierre, foto,
+                tipo_solicitante, tipo_orden, empresa_externa, contacto_empresa,
+                telefono_empresa, email_empresa, fecha_programada,
+                fecha_aviso_empresa, fecha_realizacion, trabajo_a_realizar,
+                trabajo_realizado, firma_operario, fecha_firma_operario,
+                coste_estimado, coste_final, observaciones_estado,
+                origen_tabla, origen_id, id_punto_legionella,
+                id_preventivo, id_incidencia, planta
             )
             VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
-            numero_ot,
-            descripcion,
-            fecha_creacion,
-            centro,
-            edificio,
-            espacio,
-            area,
-            prioridad,
-            operario,
-            origen,
-            solicitante,
-            fecha_origen,
-            observaciones,
-            foto,
-            tipo_solicitante,
-            tipo_orden,
-            empresa_externa,
-            contacto_empresa,
-            telefono_empresa,
-            email_empresa,
-            fecha_programada,
-            fecha_aviso_empresa,
-            fecha_realizacion,
-            trabajo_a_realizar,
-            trabajo_realizado,
-            firma_operario,
-            fecha_firma_operario,
-            coste_estimado,
-            coste_final,
-            observaciones_estado,
-            origen_tabla,
-            origen_id,
-            id_punto_legionella,
-            id_preventivo,
-            id_incidencia,
-            planta
+            numero_ot, descripcion, fecha_creacion,
+            centro, edificio, espacio, area, prioridad, operario, origen,
+            solicitante, fecha_origen, observaciones, foto,
+            tipo_solicitante, tipo_orden, empresa_externa, contacto_empresa,
+            telefono_empresa, email_empresa, fecha_programada,
+            fecha_aviso_empresa, fecha_realizacion, trabajo_a_realizar,
+            trabajo_realizado, firma_operario, fecha_firma_operario,
+            coste_estimado, coste_final, observaciones_estado,
+            origen_tabla, origen_id, id_punto_legionella,
+            id_preventivo, id_incidencia, planta
         ))
 
+        cursor.execute(
+            _sql("DELETE FROM ordenes_trabajo WHERE id = ?"),
+            (id_orden,)
+        )
+
+        conn.commit()
+
+        datos_post_commit = {
+            "numero_ot": numero_ot,
+            "descripcion": descripcion,
+            "centro": centro,
+            "edificio": edificio,
+            "espacio": espacio,
+            "area": area,
+            "operario": operario,
+            "observaciones": observaciones,
+            "origen": origen,
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    if datos_post_commit:
         if registrar_historial_espacio is not None:
             try:
                 registrar_historial_espacio(
-                    centro=centro,
-                    edificio=edificio,
-                    espacio=espacio,
+                    centro=datos_post_commit["centro"],
+                    edificio=datos_post_commit["edificio"],
+                    espacio=datos_post_commit["espacio"],
                     elemento="",
                     tipo="OT finalizada",
-                    numero_ot=numero_ot,
-                    descripcion=descripcion,
-                    area=area,
+                    numero_ot=datos_post_commit["numero_ot"],
+                    descripcion=datos_post_commit["descripcion"],
+                    area=datos_post_commit["area"],
                     estado="Finalizada",
-                    operario=operario,
-                    observaciones=observaciones
+                    operario=datos_post_commit["operario"],
+                    observaciones=datos_post_commit["observaciones"]
                 )
             except Exception:
                 pass
 
         try:
-            origen_txt = str(origen or "").upper()
-            descripcion_txt = str(descripcion or "")
-
-            if origen_txt == "INVENTARIO":
+            if str(datos_post_commit["origen"] or "").upper() == "INVENTARIO":
                 import re
-                match = re.search(r"OT origen:\s*INV-(\d+)", descripcion_txt)
-
+                match = re.search(
+                    r"OT origen:\s*INV-(\d+)",
+                    str(datos_post_commit["descripcion"] or "")
+                )
                 if match:
-                    id_elemento_inv = int(match.group(1))
-
                     from modules.inventario_aulas import cerrar_correctivo_inventario
-
                     cerrar_correctivo_inventario(
-                        id_elemento=id_elemento_inv,
+                        id_elemento=int(match.group(1)),
                         estado_final="Correcto"
                     )
-
         except Exception:
             pass
 
-        cursor.execute(_sql("DELETE FROM ordenes_trabajo WHERE id = ?"), (id_orden,))
+    return {
+        "ok": True,
+        "motivo": "finalizada",
+        "id_orden": id_orden,
+        "numero_ot": datos_post_commit["numero_ot"] if datos_post_commit else None,
+    }
 
-    conn.commit()
-    conn.close()
+
+
 # =====================================================
 # RECLASIFICAR ÁREAS DE OT ANTIGUAS
 # =====================================================
