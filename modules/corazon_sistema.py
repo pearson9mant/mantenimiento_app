@@ -755,6 +755,43 @@ PESO_IMPACTO_AREA_CORAZON = {
 }
 
 
+def _riesgo_operativo_critico_corazon(row):
+    area = normalizar(row.get("area"))
+    descripcion = normalizar(row.get("descripcion"))
+    prioridad = normalizar(row.get("prioridad"))
+    texto = f"{area} {descripcion}"
+
+    reglas = [
+        (["pierde agua", "perdida de agua", "pérdida de agua", "fuga", "inund", "sale agua", "escape de agua", "reventado", "reventada"],
+         88, "Fuga o pérdida activa de agua.", "agua"),
+        (["chispas", "chispa", "humo", "olor a quemado", "cortocircuito", "corto circuito", "sin corriente", "sin electricidad"],
+         90, "Riesgo eléctrico activo.", "electricidad"),
+        (["sin calefaccion", "sin calefacción", "sin aire acondicionado", "climatizacion parada", "climatización parada", "averia climatizacion", "avería climatización"],
+         76, "Avería relevante de climatización.", "climatizacion"),
+    ]
+
+    mejor = {"critico": False, "score_minimo": 0, "motivo": "", "tipo": ""}
+
+    for palabras, score_minimo, motivo, tipo in reglas:
+        if any(p in texto for p in palabras) and score_minimo > mejor["score_minimo"]:
+            mejor = {
+                "critico": True,
+                "score_minimo": score_minimo,
+                "motivo": motivo,
+                "tipo": tipo,
+            }
+
+    if "urgente" in prioridad:
+        mejor = {
+            "critico": True,
+            "score_minimo": max(90, mejor["score_minimo"]),
+            "motivo": mejor["motivo"] or "Prioridad urgente.",
+            "tipo": mejor["tipo"] or "urgente",
+        }
+
+    return mejor
+
+
 def _peso_impacto_operativo_corazon(row):
     area = normalizar(row.get("area"))
     descripcion = normalizar(row.get("descripcion"))
@@ -864,6 +901,21 @@ def puntuar_orden(row):
         score += peso_impacto
         if motivo_impacto and motivo_impacto not in motivos:
             motivos.append(motivo_impacto)
+
+    riesgo_critico = _riesgo_operativo_critico_corazon(row)
+
+    if riesgo_critico.get("critico"):
+        score = max(
+            score,
+            int(riesgo_critico.get("score_minimo", 0) or 0),
+        )
+
+        motivo_riesgo = str(
+            riesgo_critico.get("motivo") or ""
+        ).strip()
+
+        if motivo_riesgo and motivo_riesgo not in motivos:
+            motivos.append(motivo_riesgo)
 
     # -------------------------------------------------
     # 3. SOLICITUD DIRECTA DE DIRECCIÓN
@@ -1027,7 +1079,12 @@ def clasificar_capa_decision_corazon(item):
     prioridad = normalizar(item.get("prioridad"))
     bonus_ubicacion = int(item.get("bonus_ubicacion", 0) or 0)
 
-    if tipo == "Sanitaria" or prioridad == "urgente" or score >= 90:
+    if (
+        tipo == "Sanitaria"
+        or prioridad == "urgente"
+        or bool(item.get("riesgo_operativo_critico"))
+        or score >= 90
+    ):
         return {
             "codigo": "CRITICO",
             "etiqueta": "🚨 CRÍTICO",
@@ -1175,9 +1232,14 @@ def construir_prioridades_globales(
                 f"{total_historial} actuaciones anteriores."
             )
 
+        riesgo_operativo = _riesgo_operativo_critico_corazon(row)
+
         prioridades.append({
             "score": score,
             "tipo_prioridad": calcular_tipo_prioridad(row),
+            "riesgo_operativo_critico": bool(riesgo_operativo.get("critico")),
+            "tipo_riesgo_operativo": riesgo_operativo.get("tipo", ""),
+            "motivo_riesgo_operativo": riesgo_operativo.get("motivo", ""),
             "numero_ot": row.get("numero_ot", ""),
             "titulo": row.get("descripcion", ""),
             "centro": row.get("centro", ""),
@@ -1807,6 +1869,55 @@ def obtener_ordenes_bloqueadas_corazon(operario=None, centro=None):
     ]
 
 
+def _evaluar_interrupcion_corazon(
+    operario,
+    en_curso,
+    centro=None,
+    ubicacion_preferida=None,
+):
+    if not en_curso:
+        return None
+
+    df = obtener_ordenes_abiertas_corazon(
+        centro=centro,
+        operario=operario,
+    )
+
+    if df.empty:
+        return None
+
+    numero_en_curso = str(en_curso.get("numero_ot") or "").strip()
+    estados = df["estado"].fillna("").astype(str).str.strip().str.lower()
+    candidatas = df[estados.isin(ESTADOS_EJECUTABLES_CORAZON)].copy()
+
+    if numero_en_curso and "numero_ot" in candidatas.columns:
+        candidatas = candidatas[
+            candidatas["numero_ot"].fillna("").astype(str).str.strip()
+            != numero_en_curso
+        ].copy()
+
+    if candidatas.empty:
+        return None
+
+    prioridades = construir_prioridades_globales(
+        centro=centro,
+        operario=operario,
+        limite=20,
+        df_ordenes_abiertas=candidatas,
+        ubicacion_preferida=ubicacion_preferida,
+    )
+
+    for candidata in prioridades:
+        if (
+            bool(candidata.get("riesgo_operativo_critico"))
+            or str(candidata.get("tipo_prioridad") or "").strip() == "Sanitaria"
+            or normalizar(candidata.get("prioridad")) == "urgente"
+        ):
+            return candidata
+
+    return None
+
+
 def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     """
     Responde a la pregunta principal del Corazón:
@@ -1832,6 +1943,69 @@ def obtener_mision_actual(operario, centro=None, ubicacion_preferida=None):
     )
 
     if en_curso:
+        interrupcion = _evaluar_interrupcion_corazon(
+            operario=operario_txt,
+            en_curso=en_curso,
+            centro=centro,
+            ubicacion_preferida=ubicacion_preferida,
+        )
+
+        if interrupcion:
+            numero_interrupcion = str(
+                interrupcion.get("numero_ot") or ""
+            ).strip()
+
+            df_interrupcion = obtener_ordenes_abiertas_corazon(
+                centro=centro,
+                operario=operario_txt,
+            )
+
+            fila_interrupcion = df_interrupcion[
+                df_interrupcion["numero_ot"].fillna("").astype(str).str.strip()
+                == numero_interrupcion
+            ]
+
+            mision_interrupcion = (
+                _fila_corazon_a_dict(fila_interrupcion.iloc[0])
+                if not fila_interrupcion.empty
+                else dict(interrupcion)
+            )
+
+            mision_interrupcion["score_corazon"] = interrupcion.get("score")
+            mision_interrupcion["motivos_corazon"] = interrupcion.get("motivos", [])
+            mision_interrupcion["planta_resuelta_corazon"] = interrupcion.get("planta")
+            mision_interrupcion["interrumpe_ot_en_curso"] = True
+            mision_interrupcion["ot_en_curso_anterior"] = str(
+                en_curso.get("numero_ot") or ""
+            ).strip()
+            mision_interrupcion["riesgo_operativo_critico"] = bool(
+                interrupcion.get("riesgo_operativo_critico")
+            )
+            mision_interrupcion["decision_humana_corazon"] = {
+                "nivel": "interrumpir",
+                "etiqueta": "🚨 HA ENTRADO ALGO MÁS IMPORTANTE",
+                "mensaje": (
+                    "Esta incidencia tiene riesgo suficiente para interrumpir "
+                    "temporalmente la ruta normal."
+                ),
+            }
+
+            return {
+                "estado_corazon": "interrumpir",
+                "mision": mision_interrupcion,
+                "mensaje": (
+                    "Ha entrado una actuación crítica que debe revisarse "
+                    "antes de continuar con la OT en curso."
+                ),
+                "bloqueadas": len(
+                    obtener_ordenes_bloqueadas_corazon(
+                        operario=operario_txt,
+                        centro=centro,
+                    )
+                ),
+                "ot_en_curso": en_curso,
+            }
+
         en_curso["decision_humana_corazon"] = {
             "nivel": "continuar",
             "etiqueta": "🔵 CONTINÚA LO QUE ESTÁS HACIENDO",
@@ -2228,6 +2402,8 @@ def clasificar_decision_corazon(mision):
     critica = (
         "urgente" in prioridad
         or "legionella" in texto_global
+        or bool(mision.get("riesgo_operativo_critico"))
+        or bool(mision.get("interrumpe_ot_en_curso"))
         or score >= 90
     )
 
