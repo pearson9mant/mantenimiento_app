@@ -1181,6 +1181,37 @@ def mostrar_arbol_colegio():
 # CONFIGURACIÓN ESPACIOS
 # =====================================================
 
+ZONAS_ESPECIALES_P22 = [
+    "Exterior",
+    "Sala técnica / Instalaciones",
+]
+
+
+def obtener_plantas_catalogo_config(centro, edificio):
+    """
+    Devuelve las plantas normales del edificio y añade zonas técnicas
+    especiales cuando corresponda.
+
+    No modifica PLANTAS_BASE ni elimina ninguna planta existente.
+    """
+    plantas = list(
+        PLANTAS_BASE.get(
+            centro,
+            {},
+        ).get(
+            edificio,
+            [],
+        )
+    )
+
+    if centro == "Pearson 22":
+        for zona in ZONAS_ESPECIALES_P22:
+            if zona not in plantas:
+                plantas.append(zona)
+
+    return plantas
+
+
 def pantalla_configuracion_espacios():
     crear_tabla_espacios()
 
@@ -1203,7 +1234,9 @@ def pantalla_configuracion_espacios():
         "Sala técnica",
         "Pasillo",
         "Patio",
+        "Exterior",
         "Terrado",
+        "Sala técnica / Instalaciones",
         "Almacén",
         "Laboratorio",
         "Gimnasio",
@@ -1227,7 +1260,10 @@ def pantalla_configuracion_espacios():
             key="cfg_catalogo_edificio"
         )
 
-        plantas = PLANTAS_BASE.get(centro, {}).get(edificio, [])
+        plantas = obtener_plantas_catalogo_config(
+            centro,
+            edificio,
+        )
 
         planta = st.selectbox(
             "Planta",
@@ -1316,7 +1352,20 @@ def pantalla_configuracion_espacios():
                         key=f"edit_esp_edificio_{id_espacio}"
                     )
 
-                    nuevas_plantas = PLANTAS_BASE.get(nuevo_centro, {}).get(nuevo_edificio, [])
+                    nuevas_plantas = obtener_plantas_catalogo_config(
+                        nuevo_centro,
+                        nuevo_edificio,
+                    )
+
+                    # Compatibilidad con espacios ya existentes que
+                    # tengan una zona no incluida todavía en la lista.
+                    if (
+                        planta
+                        and planta not in nuevas_plantas
+                    ):
+                        nuevas_plantas.append(
+                            planta
+                        )
 
                     nueva_planta = st.selectbox(
                         "Planta",
