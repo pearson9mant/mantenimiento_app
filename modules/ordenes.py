@@ -76,6 +76,7 @@ def asegurar_columnas_observaciones_estado():
         ("origen_tabla", "TEXT"),
         ("origen_id", "INTEGER"),
         ("id_punto_legionella", "INTEGER"),
+        ("id_tarea_legionella", "INTEGER"),
         ("id_preventivo", "INTEGER"),
         ("id_incidencia", "INTEGER"),
     ]
@@ -391,6 +392,7 @@ def vincular_origen_ot(
     origen_tabla=None,
     origen_id=None,
     id_punto_legionella=None,
+    id_tarea_legionella=None,
     id_preventivo=None,
     id_incidencia=None,
 ):
@@ -413,6 +415,7 @@ def vincular_origen_ot(
             SET origen_tabla = ?,
                 origen_id = ?,
                 id_punto_legionella = ?,
+                id_tarea_legionella = ?,
                 id_preventivo = ?,
                 id_incidencia = ?
             WHERE numero_ot = ?
@@ -420,6 +423,7 @@ def vincular_origen_ot(
             origen_tabla,
             origen_id,
             id_punto_legionella,
+            id_tarea_legionella,
             id_preventivo,
             id_incidencia,
             numero_ot,
@@ -453,6 +457,7 @@ def obtener_vinculacion_ot(numero_ot=None, id_orden=None):
                 SELECT origen_tabla,
                        origen_id,
                        id_punto_legionella,
+                       id_tarea_legionella,
                        id_preventivo,
                        id_incidencia
                 FROM ordenes_trabajo
@@ -463,6 +468,7 @@ def obtener_vinculacion_ot(numero_ot=None, id_orden=None):
                 SELECT origen_tabla,
                        origen_id,
                        id_punto_legionella,
+                       id_tarea_legionella,
                        id_preventivo,
                        id_incidencia
                 FROM ordenes_trabajo
@@ -482,6 +488,7 @@ def obtener_vinculacion_ot(numero_ot=None, id_orden=None):
             "origen_tabla": None,
             "origen_id": None,
             "id_punto_legionella": None,
+            "id_tarea_legionella": None,
             "id_preventivo": None,
             "id_incidencia": None,
         }
@@ -490,8 +497,9 @@ def obtener_vinculacion_ot(numero_ot=None, id_orden=None):
         "origen_tabla": fila[0],
         "origen_id": fila[1],
         "id_punto_legionella": fila[2],
-        "id_preventivo": fila[3],
-        "id_incidencia": fila[4],
+        "id_tarea_legionella": fila[3],
+        "id_preventivo": fila[4],
+        "id_incidencia": fila[5],
     }
 
 
@@ -1216,7 +1224,8 @@ def finalizar_orden(id_orden, observaciones=""):
                    trabajo_a_realizar, trabajo_realizado, firma_operario,
                    fecha_firma_operario, coste_estimado, coste_final,
                    observaciones_estado,
-                   origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
+                   origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
+                   id_preventivo, id_incidencia,
                    planta
             FROM ordenes_trabajo
             WHERE id = ?
@@ -1240,7 +1249,8 @@ def finalizar_orden(id_orden, observaciones=""):
             trabajo_a_realizar, trabajo_realizado, firma_operario,
             fecha_firma_operario, coste_estimado, coste_final,
             observaciones_estado,
-            origen_tabla, origen_id, id_punto_legionella, id_preventivo, id_incidencia,
+            origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
+            id_preventivo, id_incidencia,
             planta
         ) = orden
 
@@ -1285,9 +1295,9 @@ def finalizar_orden(id_orden, observaciones=""):
                 trabajo_realizado, firma_operario, fecha_firma_operario,
                 coste_estimado, coste_final, observaciones_estado,
                 origen_tabla, origen_id, id_punto_legionella,
-                id_preventivo, id_incidencia, planta
+                id_tarea_legionella, id_preventivo, id_incidencia, planta
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot, descripcion, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
@@ -1298,7 +1308,7 @@ def finalizar_orden(id_orden, observaciones=""):
             trabajo_realizado, firma_operario, fecha_firma_operario,
             coste_estimado, coste_final, observaciones_estado,
             origen_tabla, origen_id, id_punto_legionella,
-            id_preventivo, id_incidencia, planta
+            id_tarea_legionella, id_preventivo, id_incidencia, planta
         ))
 
         cursor.execute(
