@@ -86,27 +86,101 @@ def mostrar_ejecucion_legionella_operario(
 ):
     st.markdown("### 💧 Ejecutar control Legionella")
 
-    tarea, punto_nombre = extraer_datos_ot_legionella(desc, espacio)
+    # -------------------------------------------------
+    # VINCULACIÓN SEGURA DE TAREA LEGIONELLA
+    #
+    # 1. Si la OT tiene id_tarea_legionella, usamos esa fila exacta.
+    # 2. Si es una OT antigua sin vínculo, mantenemos compatibilidad
+    #    leyendo la tarea desde la descripción como hasta ahora.
+    # -------------------------------------------------
+    tarea_desc, punto_nombre_desc = extraer_datos_ot_legionella(
+        desc,
+        espacio,
+    )
 
-    if not tarea:
-        st.warning("No se ha podido identificar la tarea de Legionella desde la OT.")
-        return False
-
-    tarea_txt = str(tarea or "").strip()
-
-    if tarea_txt.lower() in ["sala acs completa", "control sala acs"]:
-        tarea = "Control sala ACS"
+    tarea = str(tarea_desc or "").strip()
+    punto_nombre = str(
+        punto_nombre_desc
+        or espacio
+        or ""
+    ).strip()
 
     punto = None
 
     try:
         vinculacion = obtener_vinculacion_ot(
             numero_ot=num_ot,
-            id_orden=id_orden
+            id_orden=id_orden,
         )
 
-        id_punto_legionella = vinculacion.get("id_punto_legionella")
+        id_punto_legionella = vinculacion.get(
+            "id_punto_legionella"
+        )
 
+        id_tarea_legionella = vinculacion.get(
+            "id_tarea_legionella"
+        )
+
+        # -------------------------------------------------
+        # TAREA EXACTA DE PLANIFICACIÓN
+        # -------------------------------------------------
+        if id_tarea_legionella:
+            df_tarea_vinculada = leer_df(
+                """
+                SELECT id,
+                       punto_id,
+                       centro,
+                       edificio,
+                       planta,
+                       punto,
+                       tarea,
+                       tipo_control,
+                       activo
+                FROM legionella_tareas
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (int(id_tarea_legionella),),
+            )
+
+            if not df_tarea_vinculada.empty:
+                fila_tarea = df_tarea_vinculada.iloc[0]
+
+                tarea_vinculada = str(
+                    fila_tarea.get("tarea")
+                    or ""
+                ).strip()
+
+                punto_vinculado = str(
+                    fila_tarea.get("punto")
+                    or ""
+                ).strip()
+
+                if tarea_vinculada:
+                    tarea = tarea_vinculada
+
+                if punto_vinculado:
+                    punto_nombre = punto_vinculado
+
+                if not str(planta or "").strip():
+                    planta = str(
+                        fila_tarea.get("planta")
+                        or ""
+                    ).strip()
+
+                # Si por algún motivo la OT antigua no conserva punto_id,
+                # recuperamos también el punto desde la tarea vinculada.
+                if not id_punto_legionella:
+                    try:
+                        id_punto_legionella = int(
+                            fila_tarea.get("punto_id")
+                        )
+                    except Exception:
+                        id_punto_legionella = None
+
+        # -------------------------------------------------
+        # PUNTO EXACTO DE LEGIONELLA
+        # -------------------------------------------------
         if id_punto_legionella:
             puntos_df = leer_df(
                 """
@@ -122,6 +196,14 @@ def mostrar_ejecucion_legionella_operario(
             if not puntos_df.empty:
                 punto = puntos_df.iloc[0].to_dict()
 
+                nombre_punto_real = str(
+                    punto.get("nombre_punto")
+                    or ""
+                ).strip()
+
+                if nombre_punto_real:
+                    punto_nombre = nombre_punto_real
+
                 if not str(planta or "").strip():
                     planta = str(
                         punto.get("planta")
@@ -130,6 +212,21 @@ def mostrar_ejecucion_legionella_operario(
 
     except Exception:
         punto = None
+
+    if not tarea:
+        st.warning(
+            "No se ha podido identificar la tarea de Legionella "
+            "desde la vinculación ni desde la OT."
+        )
+        return False
+
+    tarea_txt = str(tarea or "").strip()
+
+    if tarea_txt.lower() in [
+        "sala acs completa",
+        "control sala acs",
+    ]:
+        tarea = "Control sala ACS"
 
     if punto is None:
         puntos_df = leer_df(
