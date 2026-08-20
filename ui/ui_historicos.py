@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date
 
 from database.db import conectar
+from ui.ui_historico_general import pantalla_historico_general
 
 
 def _leer_df(sql, params=None):
@@ -456,8 +457,9 @@ def pantalla_historicos():
         "Consulta por fechas sin entrar en cada módulo."
     )
 
-    tab1, tab2, tab3, tab4 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
+            "🌍 General",
             "🛠️ OT",
             "💧 Legionella",
             "🔧 Preventivos",
@@ -466,13 +468,16 @@ def pantalla_historicos():
     )
 
     with tab1:
-        _historico_ot()
+        pantalla_historico_general()
 
     with tab2:
-        _historico_legionella()
+        _historico_ot()
 
     with tab3:
-        _historico_preventivos()
+        _historico_legionella()
 
     with tab4:
+        _historico_preventivos()
+
+    with tab5:
         _historico_informes_externos()
