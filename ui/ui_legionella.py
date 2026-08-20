@@ -829,7 +829,16 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion, planta=""):
     return total > 0
 
 
-def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=None, planta=""):
+def crear_ot_legionella(
+    centro,
+    edificio,
+    punto,
+    tarea,
+    operario=None,
+    punto_id=None,
+    planta="",
+    tarea_id=None,
+):
     if not centro or not edificio or not punto or not tarea:
         return False
 
@@ -911,6 +920,11 @@ def crear_ot_legionella(centro, edificio, punto, tarea, operario=None, punto_id=
             origen_tabla="legionella_puntos",
             origen_id=int(punto_id),
             id_punto_legionella=int(punto_id),
+            id_tarea_legionella=(
+                int(tarea_id)
+                if tarea_id is not None
+                else None
+            ),
         )
 
     return True
@@ -1784,6 +1798,7 @@ def generar_ots_legionella_planificadas():
             fila["operario"],
             punto_id=fila.get("punto_id"),
             planta=fila.get("planta", ""),
+            tarea_id=fila.get("id"),
         )
 
         if creada:
