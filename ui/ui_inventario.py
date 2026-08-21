@@ -1,1078 +1,1499 @@
-import streamlit as st
-from modules.inventario import (
-    generar_codigo_material,
-    crear_material_inventario,
-    obtener_materiales_inventario,
-    obtener_materiales_inventario_ligero,
-    obtener_foto_material,
-    registrar_movimiento_inventario,
-    obtener_movimientos_por_material,
-    desactivar_material,
-    activar_material,
-    comprobar_material_antes_crear,
-    actualizar_material_abel,
-    categorias_inventario_disponibles,
-    sugerir_categoria_material,
-    prefijo_codigo_categoria,
-)
+import re
+import unicodedata
+from difflib import SequenceMatcher
 
-from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
-from modules.alertas_empresas import obtener_alertas_empresas_externas
-from modules.pedidos_material import crear_pedido_material
+from database.db import conectar
+_COLUMNAS_INVENTARIO_ASEGURADAS = False
 
 
-CATEGORIAS_INVENTARIO_UI = categorias_inventario_disponibles()
+def _ph(conn):
+    modulo = conn.__class__.__module__.lower()
+    return "?" if "sqlite" in modulo else "%s"
 
 
-def _categoria_segura(valor):
-    valor = str(valor or "").strip()
-    if valor in CATEGORIAS_INVENTARIO_UI:
-        return valor
-    return "Otros"
+def _log_inventario_warning(contexto, error):
+    """
+    Registra avisos internos del inventario en los logs.
+    No interrumpe el funcionamiento de la aplicación.
+    """
+    try:
+        print(
+            f"[INVENTARIO WARNING] {contexto}: "
+            f"{type(error).__name__}: {error}"
+        )
+    except Exception:
+        pass
 
 
-def _aplicar_categoria_sugerida_creacion():
-    material = st.session_state.get("crear_material_nombre", "")
-    sugerencia = sugerir_categoria_material(material)
-    st.session_state["crear_categoria_material"] = sugerencia["categoria"]
+def _add_columna_segura(cursor, tabla, columna, tipo):
+    try:
+        cursor.execute(
+            f"ALTER TABLE {tabla} "
+            f"ADD COLUMN IF NOT EXISTS {columna} {tipo}"
+        )
+        return True
+
+    except Exception:
+        try:
+            cursor.execute(
+                f"ALTER TABLE {tabla} "
+                f"ADD COLUMN {columna} {tipo}"
+            )
+            return True
+
+        except Exception as e:
+            _log_inventario_warning(
+                f"Añadiendo columna {tabla}.{columna}",
+                e
+            )
+            return False
 
 
-def _aplicar_categoria_sugerida_edicion(codigo):
-    material = st.session_state.get(f"abel_edit_material_{codigo}", "")
-    sugerencia = sugerir_categoria_material(material)
-    st.session_state[f"abel_edit_categoria_{codigo}"] = sugerencia["categoria"]
+# =====================================================
+# NORMALIZACIÓN / DUPLICADOS
+# =====================================================
+
+PALABRAS_IGNORAR_MATERIAL = {
+    "de", "del", "la", "el", "los", "las", "un", "una",
+    "para", "por", "con", "sin", "y", "o"
+}
 
 
-def rol_actual():
-    return str(
-        st.session_state.get("rol")
-        or st.session_state.get("tipo_usuario")
-        or st.session_state.get("perfil")
-        or st.session_state.get("modo")
-        or ""
-    ).strip().lower()
+CATEGORIAS_INVENTARIO_INTELIGENTE = [
+    "Electricidad",
+    "Fontanería",
+    "Climatización",
+    "Cerrajería",
+    "Mobiliario",
+    "Ferretería",
+    "Albañilería",
+    "Pintura",
+    "Limpieza",
+    "Jardinería",
+    "Seguridad",
+    "Legionella",
+    "Otros",
+]
 
 
-def puede_borrar_inventario():
-    return rol_actual() in ["admin", "administracion", "administración"]
+def categorias_inventario_disponibles():
+    return list(CATEGORIAS_INVENTARIO_INTELIGENTE)
 
 
-def limpiar_nombre_archivo(texto):
-    texto = str(texto)
-    caracteres_malos = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
-    for c in caracteres_malos:
-        texto = texto.replace(c, "_")
-    return texto.replace(" ", "_")
+# Palabras con peso. Las palabras que identifican el TIPO de objeto
+# tienen más peso que palabras de composición como hierro, acero o plástico.
+_REGLAS_CATEGORIA_MATERIAL = {
+    "Electricidad": {
+        "downlight": 18,
+        "foco": 14,
+        "lampara": 14,
+        "bombilla": 14,
+        "led": 10,
+        "interruptor": 18,
+        "enchufe": 18,
+        "base enchufe": 20,
+        "magnetotermico": 20,
+        "diferencial": 20,
+        "contactor": 18,
+        "rele": 16,
+        "cable": 12,
+        "manguera electrica": 16,
+        "regleta": 14,
+        "fluorescente": 16,
+        "driver": 15,
+        "fuente alimentacion": 16,
+        "transformador": 18,
+        "sensor movimiento": 15,
+    },
+    "Fontanería": {
+        "grifo": 20,
+        "sifon": 20,
+        "latiguillo": 20,
+        "racor": 18,
+        "tuberia": 18,
+        "tubo agua": 18,
+        "manguito": 16,
+        "codo": 12,
+        "te fontaneria": 16,
+        "valvula": 13,
+        "llave paso": 20,
+        "fluxor": 20,
+        "cisterna": 18,
+        "desague": 18,
+        "sumidero": 18,
+        "junta grifo": 18,
+        "aireador": 16,
+    },
+    "Climatización": {
+        "aire acondicionado": 24,
+        "split": 20,
+        "fancoil": 20,
+        "fan coil": 20,
+        "termostato": 16,
+        "filtro aire": 18,
+        "conducto": 14,
+        "rejilla climatizacion": 18,
+        "compresor": 16,
+        "gas refrigerante": 20,
+        "bomba condensados": 20,
+    },
+    "Cerrajería": {
+        "cerradura": 25,
+        "bombin": 24,
+        "cilindro cerradura": 25,
+        "cerrojo": 24,
+        "candado": 22,
+        "bisagra": 20,
+        "manilla": 20,
+        "pomo": 16,
+        "picaporte": 22,
+        "pasador": 18,
+        "muelle puerta": 18,
+        "cierrapuertas": 22,
+        "llave cerradura": 22,
+    },
+    "Mobiliario": {
+        "mesa": 25,
+        "silla": 25,
+        "pupitre": 25,
+        "armario": 24,
+        "estanteria": 24,
+        "taquilla": 22,
+        "mueble": 22,
+        "cajonera": 22,
+        "banco": 16,
+        "perchero": 20,
+        "pizarra": 18,
+        "papelera": 15,
+        "taburete": 20,
+    },
+    "Ferretería": {
+        "tornillo": 24,
+        "tuerca": 24,
+        "arandela": 24,
+        "taco": 22,
+        "broca": 22,
+        "remache": 22,
+        "brida": 18,
+        "silicona": 18,
+        "sellador": 18,
+        "adhesivo": 14,
+        "cinta americana": 18,
+        "cinta aislante": 16,
+        "abrazadera": 18,
+        "muelle": 10,
+        "cadena": 12,
+    },
+    "Albañilería": {
+        "mortero": 24,
+        "cemento": 24,
+        "yeso": 22,
+        "ladrillo": 22,
+        "bloque hormigon": 22,
+        "hormigon": 20,
+        "rachola": 22,
+        "baldosa": 22,
+        "azulejo": 22,
+        "masilla pared": 18,
+        "lechada": 18,
+        "arena": 12,
+    },
+    "Pintura": {
+        "pintura": 25,
+        "esmalte": 22,
+        "imprimacion": 22,
+        "rodillo": 20,
+        "brocha": 20,
+        "pincel": 18,
+        "disolvente": 18,
+        "aguarras": 18,
+        "barniz": 20,
+        "cubeta pintura": 16,
+    },
+    "Limpieza": {
+        "detergente": 22,
+        "desengrasante": 22,
+        "lejia": 22,
+        "limpiador": 18,
+        "fregona": 20,
+        "escoba": 20,
+        "recogedor": 18,
+        "bayeta": 18,
+        "guante limpieza": 18,
+        "bolsa basura": 20,
+    },
+    "Jardinería": {
+        "manguera riego": 22,
+        "aspersor": 22,
+        "gotero": 20,
+        "abono": 20,
+        "tierra vegetal": 20,
+        "pala jardin": 18,
+        "tijera podar": 20,
+        "semilla": 18,
+        "maceta": 16,
+    },
+    "Seguridad": {
+        "extintor": 25,
+        "senal emergencia": 22,
+        "señal emergencia": 22,
+        "detector humo": 24,
+        "pulsador alarma": 22,
+        "sirena": 20,
+        "botiquin": 20,
+        "baliza": 16,
+        "cinta balizamiento": 18,
+    },
+    "Legionella": {
+        "reactivo dpd": 25,
+        "dpd": 22,
+        "fotometro": 22,
+        "medidor cloro": 24,
+        "cloro residual": 22,
+        "termometro legionella": 25,
+        "bote muestra": 18,
+        "frasco muestra": 18,
+    },
+}
 
 
-def limpiar_formulario_crear_material():
-    claves = [
-        "crear_material_nombre",
-        "crear_categoria_material",
-        "crear_material_unidad",
-        "crear_material_stock_actual",
-        "crear_material_stock_minimo",
-        "crear_material_precio_unitario",
-        "crear_material_fecha_compra",
-        "crear_material_referencia_factura",
-        "crear_material_observaciones_coste",
-        "inv_mat_centro",
-        "inv_mat_edificio",
-        "inv_mat_ubicacion",
-        "crear_material_proveedor",
-        "crear_material_observaciones",
-        "foto_material_mantenimiento"
-    ]
+def sugerir_categoria_material(material, observaciones=""):
+    """
+    Sugiere una categoría sin imponerla.
 
-    for clave in claves:
-        if clave in st.session_state:
-            del st.session_state[clave]
+    Devuelve:
+        {
+            "categoria": "Mobiliario",
+            "confianza": 92,
+            "motivos": ["mesa"],
+            "puntuaciones": {...}
+        }
 
-    st.session_state["inventario_material_creado_ok"] = True
-    st.session_state["inventario_abrir_crear_material"] = True
-
-
-def limpiar_formulario_pedido_abel():
-    claves = [
-        "abel_pedido_operario",
-        "abel_pedido_centro",
-        "abel_pedido_material",
-        "abel_pedido_cantidad",
-        "abel_pedido_prioridad",
-        "abel_pedido_estado",
-        "abel_pedido_observaciones",
-    ]
-
-    for clave in claves:
-        if clave in st.session_state:
-            del st.session_state[clave]
-
-    st.session_state["abel_pedido_creado_ok"] = True
-
-
-def mostrar_historial_material(codigo):
-    movimientos = obtener_movimientos_por_material(codigo)
-
-    if not movimientos:
-        st.info("Sin movimientos.")
-        return
-
-    total_entradas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Entrada")
-    total_salidas = sum(float(mov[1]) for mov in movimientos if mov[0] == "Salida")
-    total_con_ot = len([mov for mov in movimientos if mov[3]])
-
-    h1, h2, h3 = st.columns(3)
-    h1.metric("Entradas", total_entradas)
-    h2.metric("Salidas", total_salidas)
-    h3.metric("Con OT", total_con_ot)
-
-    filtro_historial = st.selectbox(
-        "Filtrar historial",
-        ["Todos", "Entradas", "Salidas", "Con OT"],
-        key=f"filtro_historial_{codigo}"
+    Filosofía:
+    - pesa más el tipo de objeto que su material/composición;
+    - 'mesa patas hierro' => Mobiliario, no Cerrajería;
+    - 'cerradura taquilla' => Cerrajería, aunque aparezca 'taquilla';
+    - si no hay evidencia suficiente => Otros.
+    """
+    texto = normalizar_texto_material(
+        f"{material or ''} {observaciones or ''}"
     )
 
-    movimientos_filtrados = movimientos
+    if not texto:
+        return {
+            "categoria": "Otros",
+            "confianza": 0,
+            "motivos": [],
+            "puntuaciones": {},
+        }
 
-    if filtro_historial == "Entradas":
-        movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Entrada"]
+    puntuaciones = {}
+    motivos_por_categoria = {}
 
-    elif filtro_historial == "Salidas":
-        movimientos_filtrados = [mov for mov in movimientos if mov[0] == "Salida"]
+    for categoria, reglas in _REGLAS_CATEGORIA_MATERIAL.items():
+        puntos = 0
+        motivos = []
 
-    elif filtro_historial == "Con OT":
-        movimientos_filtrados = [mov for mov in movimientos if mov[3]]
+        for termino, peso in reglas.items():
+            termino_norm = normalizar_texto_material(termino)
 
-    for mov in movimientos_filtrados[:30]:
-        tipo = mov[0]
-        cantidad = mov[1]
-        motivo = mov[2]
-        ot = mov[3]
-        operario_mov = mov[4]
-        fecha = mov[5]
+            if termino_norm and termino_norm in texto:
+                puntos += int(peso)
+                motivos.append(termino)
 
-        descripcion_ot = mov[6] if len(mov) > 6 else ""
-        centro_ot = mov[7] if len(mov) > 7 else ""
-        edificio_ot = mov[8] if len(mov) > 8 else ""
-        espacio_ot = mov[9] if len(mov) > 9 else ""
-        area_ot = mov[10] if len(mov) > 10 else ""
-        prioridad_ot = mov[11] if len(mov) > 11 else ""
-        estado_ot = mov[12] if len(mov) > 12 else ""
-        fecha_creacion_ot = mov[13] if len(mov) > 13 else ""
-        origen_ot = mov[14] if len(mov) > 14 else ""
+        if puntos > 0:
+            puntuaciones[categoria] = puntos
+            motivos_por_categoria[categoria] = motivos
 
-        if tipo == "Entrada":
-            st.success(
-                f"""
-➕ Entrada · {cantidad}
+    if not puntuaciones:
+        return {
+            "categoria": "Otros",
+            "confianza": 20,
+            "motivos": [],
+            "puntuaciones": {},
+        }
 
-📅 {fecha}  
-👷 {operario_mov or '-'}
+    ordenadas = sorted(
+        puntuaciones.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )
 
-📝 {motivo or '-'}
-"""
-            )
+    categoria_ganadora, puntos_ganador = ordenadas[0]
+    segundo = ordenadas[1][1] if len(ordenadas) > 1 else 0
 
-        else:
-            if ot:
-                html_ot = f"""
-<div style="
-    background:#f8fafc;
-    border-radius:14px;
-    padding:14px;
-    margin-bottom:12px;
-    border-left:5px solid #f59e0b;
-">
+    # Confianza orientativa: combina fuerza y distancia al segundo.
+    margen = max(puntos_ganador - segundo, 0)
+    confianza = min(
+        99,
+        55 + min(puntos_ganador, 30) + min(margen, 14)
+    )
 
-<div style="font-size:18px;font-weight:800;color:#0f172a;">
-🛠 {ot}
-</div>
-
-<div style="margin-top:8px;font-size:15px;">
-📦 Salida: <b>{cantidad}</b>
-</div>
-
-<div style="margin-top:8px;font-size:14px;line-height:1.6;color:#334155;">
-📍 <b>{centro_ot or '-'}</b> · {edificio_ot or '-'} · {espacio_ot or '-'}<br>
-🧰 Área: {area_ot or '-'}<br>
-⚡ Prioridad: <b>{prioridad_ot or '-'}</b><br>
-📌 Estado OT: <b>{estado_ot or '-'}</b><br>
-👷 Operario: {operario_mov or '-'}<br>
-🕓 Movimiento: {fecha or '-'}<br>
-🗂 Origen: {origen_ot or '-'}<br>
-</div>
-
-<div style="
-    margin-top:10px;
-    background:#ffffff;
-    border-radius:10px;
-    padding:10px;
-    border:1px solid #e2e8f0;
-">
-
-<div style="font-size:14px;font-weight:700;margin-bottom:4px;">
-📝 Descripción OT
-</div>
-
-<div style="font-size:14px;color:#111827;">
-{descripcion_ot or '-'}
-</div>
-
-</div>
-
-<div style="
-    margin-top:10px;
-    font-size:13px;
-    color:#64748b;
-">
-📅 Fecha creación OT: {fecha_creacion_ot or '-'}
-</div>
-
-</div>
-"""
-                st.markdown(html_ot, unsafe_allow_html=True)
-
-            else:
-                st.error(
-                    f"""
-➖ Salida manual · {cantidad}
-
-📅 {fecha}  
-👷 {operario_mov or '-'}
-
-📝 {motivo or '-'}
-"""
-                )
+    return {
+        "categoria": categoria_ganadora,
+        "confianza": int(confianza),
+        "motivos": motivos_por_categoria.get(categoria_ganadora, []),
+        "puntuaciones": puntuaciones,
+    }
 
 
-def pantalla_inventario():
-    st.subheader("📦 Inventario mantenimiento")
+def prefijo_codigo_categoria(categoria):
+    categoria_norm = normalizar_texto_material(categoria)
+
+    equivalencias = {
+        "electricidad": "ELECTRICIDAD",
+        "fontaneria": "FONTANERIA",
+        "climatizacion": "CLIMATIZACION",
+        "cerrajeria": "CERRAJERIA",
+        "mobiliario": "MOBILIARIO",
+        "ferreteria": "FERRETERIA",
+        "albanileria": "ALBANILERIA",
+        "pintura": "PINTURA",
+        "limpieza": "LIMPIEZA",
+        "jardineria": "JARDINERIA",
+        "seguridad": "SEGURIDAD",
+        "legionella": "LEGIONELLA",
+        "otros": "OTROS",
+        "otro": "OTROS",
+    }
+
+    if categoria_norm in equivalencias:
+        return equivalencias[categoria_norm]
+
+    limpio = re.sub(
+        r"[^A-Z0-9]+",
+        "_",
+        categoria_norm.upper(),
+    ).strip("_")
+
+    return limpio or "OTROS"
+
+
+def normalizar_texto_material(texto):
+    texto = str(texto or "").strip().lower()
+
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+
+    texto = texto.replace("á", "a")
+    texto = texto.replace("é", "e")
+    texto = texto.replace("í", "i")
+    texto = texto.replace("ó", "o")
+    texto = texto.replace("ú", "u")
+    texto = texto.replace("ñ", "n")
+
+    texto = re.sub(r"[^a-z0-9 ]+", " ", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
+
+    return texto
+
+
+def palabras_clave_material(texto):
+    texto_norm = normalizar_texto_material(texto)
+
+    palabras = [
+        p for p in texto_norm.split()
+        if p and p not in PALABRAS_IGNORAR_MATERIAL and len(p) >= 3
+    ]
+
+    return list(dict.fromkeys(palabras))
+
+
+
+def terminos_busqueda_material(texto):
+    """Normaliza la consulta y expande alias habituales del colegio."""
+    texto_norm = normalizar_texto_material(texto)
+    if not texto_norm:
+        return []
+
+    alias = {
+        "p22": ["pearson", "22"],
+        "p9": ["pearson", "9"],
+    }
+
+    terminos = []
+    for termino in texto_norm.split():
+        terminos.extend(alias.get(termino, [termino]))
+
+    return list(dict.fromkeys(t for t in terminos if t))
+
+
+def _texto_busqueda_fila_inventario(fila):
+    """Une y normaliza todos los campos útiles para buscar."""
+    indices = [1, 2, 3, 4, 7, 8, 9, 10, 11, 19, 20, 21]
+    valores = []
+    for indice in indices:
+        try:
+            valores.append(str(fila[indice] or ""))
+        except Exception:
+            pass
+    return normalizar_texto_material(" ".join(valores))
+
+
+def _termino_coincide_busqueda(termino, texto_fila):
+    """Substring, prefijo y pequeño error tipográfico."""
+    termino = normalizar_texto_material(termino)
+    texto_fila = normalizar_texto_material(texto_fila)
+    if not termino:
+        return True
+
+    if termino in texto_fila:
+        return True
+
+    tokens = [t for t in texto_fila.split() if t]
+
+    for token in tokens:
+        if len(termino) >= 2 and token.startswith(termino):
+            return True
+
+    if len(termino) >= 4:
+        for token in tokens:
+            if len(token) < 4 or token[0] != termino[0]:
+                continue
+            ratio = SequenceMatcher(None, termino, token).ratio()
+            umbral = 0.78 if len(termino) >= 6 else 0.82
+            if ratio >= umbral:
+                return True
+
+    return False
+
+
+def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
+    """
+    Todas las palabras deben coincidir, pero pueden estar repartidas entre
+    material, código, categoría, centro, edificio, ubicación, proveedor y notas.
+    """
+    terminos = terminos_busqueda_material(filtro_texto)
+    if not terminos:
+        return list(filas)
+
+    resultado = []
+    for fila in filas:
+        texto_fila = _texto_busqueda_fila_inventario(fila)
+        if all(_termino_coincide_busqueda(t, texto_fila) for t in terminos):
+            resultado.append(fila)
+    return resultado
+
+
+def buscar_material_duplicado_exacto(material, categoria="", unidad=""):
+    asegurar_columnas_inventario()
+
+    material_norm = normalizar_texto_material(material)
+    categoria_norm = normalizar_texto_material(categoria)
+    unidad_norm = normalizar_texto_material(unidad)
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, codigo, material, categoria, unidad, stock_actual, activo
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+    """)
+
+    filas = cursor.fetchall()
+    conn.close()
+
+    for fila in filas:
+        id_mat, codigo, mat, cat, uni, stock, activo = fila
+
+        if (
+            normalizar_texto_material(mat) == material_norm
+            and normalizar_texto_material(cat) == categoria_norm
+            and normalizar_texto_material(uni) == unidad_norm
+        ):
+            return {
+                "id": id_mat,
+                "codigo": codigo,
+                "material": mat,
+                "categoria": cat,
+                "unidad": uni,
+                "stock_actual": stock,
+            }
+
+    return None
+
+
+def buscar_materiales_parecidos(material, limite=8):
+    asegurar_columnas_inventario()
+
+    palabras_nuevo = set(palabras_clave_material(material))
+
+    if not palabras_nuevo:
+        return []
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, codigo, material, categoria, unidad, stock_actual
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+        ORDER BY material ASC
+    """)
+
+    filas = cursor.fetchall()
+    conn.close()
+
+    parecidos = []
+
+    for fila in filas:
+        id_mat, codigo, mat, cat, uni, stock = fila
+
+        palabras_existente = set(palabras_clave_material(mat))
+
+        if not palabras_existente:
+            continue
+
+        coincidencias = palabras_nuevo.intersection(palabras_existente)
+
+        if coincidencias:
+            puntuacion = len(coincidencias)
+
+            mat_norm = normalizar_texto_material(mat)
+            nuevo_norm = normalizar_texto_material(material)
+
+            for p in palabras_nuevo:
+                if p in mat_norm:
+                    puntuacion += 1
+
+            for p in palabras_existente:
+                if p in nuevo_norm:
+                    puntuacion += 1
+
+            parecidos.append({
+                "id": id_mat,
+                "codigo": codigo,
+                "material": mat,
+                "categoria": cat,
+                "unidad": uni,
+                "stock_actual": stock,
+                "coincidencias": ", ".join(sorted(coincidencias)),
+                "puntuacion": puntuacion,
+            })
+
+    return sorted(parecidos, key=lambda x: x["puntuacion"], reverse=True)[:limite]
+
+
+def comprobar_material_antes_crear(material, categoria="", unidad=""):
+    exacto = buscar_material_duplicado_exacto(material, categoria, unidad)
+    parecidos = buscar_materiales_parecidos(material)
+
+    return exacto, parecidos
+
+
+# =====================================================
+# COLUMNAS
+# =====================================================
+
+def asegurar_columnas_inventario():
+    global _COLUMNAS_INVENTARIO_ASEGURADAS
+
+    if _COLUMNAS_INVENTARIO_ASEGURADAS:
+        return
+
+    conn = conectar()
+    cursor = conn.cursor()
 
     try:
-        alertas = obtener_alertas_empresas_externas()
+        _add_columna_segura(cursor, "inventario", "foto", "TEXT")
+        _add_columna_segura(cursor, "inventario", "foto_nombre", "TEXT")
 
-        if alertas["toca"] or alertas["proximo"]:
-            st.markdown("### 🔔 Avisos empresas externas / Legionella")
+        if "sqlite" in conn.__class__.__module__.lower():
+            _add_columna_segura(cursor, "inventario", "foto_data", "BLOB")
+        else:
+            _add_columna_segura(cursor, "inventario", "foto_data", "BYTEA")
 
-            for item in alertas["toca"]:
-                st.error(
-                    f"🔴 TOCA gestionar: "
-                    f"{item['tipo']} · "
-                    f"{item['empresa']} · "
-                    f"{item['centro']} · "
-                    f"{item['fecha']}"
+        _add_columna_segura(cursor, "inventario", "activo", "INTEGER DEFAULT 1")
+        _add_columna_segura(cursor, "inventario", "material_normalizado", "TEXT")
+
+        _add_columna_segura(cursor, "inventario", "precio_unitario", "REAL DEFAULT 0")
+        _add_columna_segura(cursor, "inventario", "coste_total", "REAL DEFAULT 0")
+        _add_columna_segura(cursor, "inventario", "fecha_compra", "TEXT")
+        _add_columna_segura(cursor, "inventario", "referencia_factura", "TEXT")
+        _add_columna_segura(cursor, "inventario", "observaciones_coste", "TEXT")
+
+        # Datos ampliados de OT en historial de inventario
+        _add_columna_segura(cursor, "movimientos_inventario", "descripcion_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "centro_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "edificio_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "espacio_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "area_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "prioridad_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "estado_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "fecha_creacion_ot", "TEXT")
+        _add_columna_segura(cursor, "movimientos_inventario", "origen_ot", "TEXT")
+
+        cursor.execute("UPDATE inventario SET activo = 1 WHERE activo IS NULL")
+        cursor.execute("UPDATE inventario SET precio_unitario = 0 WHERE precio_unitario IS NULL")
+        cursor.execute("UPDATE inventario SET coste_total = 0 WHERE coste_total IS NULL")
+
+        # Índices de uso frecuente del módulo.
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_inv_material_norm "
+            "ON inventario(material_normalizado)",
+            "CREATE INDEX IF NOT EXISTS idx_inv_centro_categoria "
+            "ON inventario(centro, categoria)",
+            "CREATE INDEX IF NOT EXISTS idx_mov_inv_codigo_material "
+            "ON movimientos_inventario(codigo_material)",
+            "CREATE INDEX IF NOT EXISTS idx_mov_inv_numero_ot "
+            "ON movimientos_inventario(numero_ot)",
+        ]
+
+        for sql_indice in indices:
+            try:
+                cursor.execute(sql_indice)
+            except Exception as e:
+                _log_inventario_warning(
+                    f"Creando índice: {sql_indice}",
+                    e
                 )
 
-            for item in alertas["proximo"]:
-                st.warning(
-                    f"🟠 Próximo: "
-                    f"{item['tipo']} · "
-                    f"{item['empresa']} · "
-                    f"{item['centro']} · "
-                    f"{item['fecha']}"
-                )
+        conn.commit()
 
     except Exception as e:
-        print(
-            f"[INVENTARIO WARNING] "
-            f"No se pudieron cargar alertas externas: "
-            f"{type(e).__name__}: {e}"
+        conn.rollback()
+        _log_inventario_warning(
+            "Asegurando estructura de inventario",
+            e
         )
-
-    operario = st.session_state.get("operario_activo", "")
-
-    if operario == "Abel Vasquez":
-
-        tab_crear_material, tab_crear_pedido = st.tabs([
-            "➕ Crear material",
-            "📦 Crear pedido"
-        ])
-
-        abrir_crear_material = st.session_state.pop(
-            "inventario_abrir_crear_material",
-            False
-        )
-
-        with tab_crear_material:
-
-            if st.session_state.pop("inventario_material_creado_ok", False):
-                st.success("Material creado correctamente. Formulario limpio para crear otro.")
-
-            material = st.text_input(
-                "Nombre material",
-                key="crear_material_nombre",
-                placeholder="Ejemplo: cerradura taquilla, mesa patas metálicas, grifo lavabo...",
-            )
-
-            sugerencia_categoria = sugerir_categoria_material(material)
-
-            if material.strip():
-                motivos = sugerencia_categoria.get("motivos") or []
-                motivo_txt = ", ".join(motivos[:3]) if motivos else "sin coincidencia clara"
-
-                st.info(
-                    f"💡 Categoría sugerida: **{sugerencia_categoria['categoria']}** "
-                    f"· confianza {sugerencia_categoria['confianza']}% "
-                    f"· criterio: {motivo_txt}"
-                )
-
-                if st.button(
-                    "✨ Usar categoría sugerida",
-                    key="usar_categoria_sugerida_crear",
-                    use_container_width=True,
-                    on_click=_aplicar_categoria_sugerida_creacion,
-                ):
-                    pass
-
-            categoria_actual = _categoria_segura(
-                st.session_state.get(
-                    "crear_categoria_material",
-                    sugerencia_categoria["categoria"] if material.strip() else "Otros",
-                )
-            )
-
-            categoria = st.selectbox(
-                "Categoría",
-                CATEGORIAS_INVENTARIO_UI,
-                index=CATEGORIAS_INVENTARIO_UI.index(categoria_actual),
-                key="crear_categoria_material",
-                help="La app propone una categoría, pero Abel siempre puede corregirla.",
-            )
-
-            if material.strip():
-                st.caption(
-                    f"🏷️ Código nuevo previsto: "
-                    f"`{prefijo_codigo_categoria(categoria)}-###`"
-                )
-
-            unidad = st.text_input("Unidad", value="uds", key="crear_material_unidad")
-
-            exacto = None
-            parecidos = []
-
-            if material.strip():
-                try:
-                    exacto, parecidos = comprobar_material_antes_crear(
-                        material,
-                        categoria,
-                        unidad
-                    )
-                except Exception:
-                    exacto = None
-                    parecidos = []
-
-                if exacto:
-                    st.error(
-                        f"⚠️ Ya existe este material: "
-                        f"{exacto['material']} | Código: {exacto['codigo']} | "
-                        f"Stock: {exacto['stock_actual']}"
-                    )
-
-                elif parecidos:
-                    st.warning("🔎 Materiales parecidos encontrados. Revisa antes de crear uno nuevo:")
-
-                    for p in parecidos:
-                        st.write(
-                            f"- **{p['material']}** | "
-                            f"Código: `{p['codigo']}` | "
-                            f"Stock: {p['stock_actual']} | "
-                            f"Coincide: {p.get('coincidencias', '-')}"
-                        )
-
-            stock_actual = st.number_input(
-                "Stock inicial",
-                min_value=0.0,
-                step=1.0,
-                key="crear_material_stock_actual"
-            )
-
-            stock_minimo = st.number_input(
-                "Stock mínimo",
-                min_value=0.0,
-                step=1.0,
-                key="crear_material_stock_minimo"
-            )
-
-            st.markdown("#### 💶 Coste del material")
-
-            precio_unitario = st.number_input(
-                "Precio unitario (€)",
-                min_value=0.0,
-                step=0.01,
-                format="%.2f",
-                key="crear_material_precio_unitario"
-            )
-
-            coste_total = float(stock_actual) * float(precio_unitario)
-            st.info(f"Coste total inicial: {coste_total:.2f} €")
-
-            fecha_compra = st.text_input(
-                "Fecha compra / entrada",
-                placeholder="Ejemplo: 30/04/2026",
-                key="crear_material_fecha_compra"
-            )
-
-            referencia_factura = st.text_input(
-                "Referencia factura / albarán",
-                key="crear_material_referencia_factura"
-            )
-
-            observaciones_coste = st.text_area(
-                "Observaciones coste",
-                key="crear_material_observaciones_coste"
-            )
-
-            centro = st.selectbox("Centro", CENTROS, key="inv_mat_centro")
-            edificios = obtener_edificios(centro)
-
-            edificio = st.selectbox("Edificio", edificios, key="inv_mat_edificio")
-            espacios = obtener_espacios(edificio)
-
-            ubicacion = st.selectbox(
-                "Aula / Espacio / Ubicación",
-                espacios,
-                key="inv_mat_ubicacion"
-            )
-
-            proveedor = st.text_input("Proveedor", key="crear_material_proveedor")
-            observaciones = st.text_area("Observaciones", key="crear_material_observaciones")
-
-            foto_subida = st.file_uploader(
-                "Foto del material",
-                type=["jpg", "jpeg", "png"],
-                key="foto_material_mantenimiento"
-            )
-
-            ruta_foto = ""
-            foto_nombre = ""
-            foto_data = None
-
-            if foto_subida is not None:
-                if foto_subida.size > 5 * 1024 * 1024:
-                    st.warning("La foto supera 5 MB. Mejor sube una imagen más pequeña.")
-                else:
-                    foto_nombre = limpiar_nombre_archivo(
-                        f"{centro}_{edificio}_{ubicacion}_{material}_{foto_subida.name}"
-                    )
-
-                    foto_data = foto_subida.getvalue()
-
-                    st.image(bytes(foto_data), width=250)
-                    st.caption(f"📷 {foto_nombre}")
-
-            if st.button("Crear material", use_container_width=True):
-                if not material.strip():
-                    st.warning("Indica el nombre del material.")
-
-                elif exacto:
-                    st.error("No se puede crear porque ya existe un material igual.")
-
-                elif foto_subida is not None and foto_subida.size > 5 * 1024 * 1024:
-                    st.error("No se puede guardar. La foto supera 5 MB.")
-
-                else:
-                    codigo = generar_codigo_material(material, categoria)
-
-                    resultado = crear_material_inventario(
-                        codigo=codigo,
-                        material=material,
-                        categoria=categoria,
-                        unidad=unidad,
-                        stock_actual=stock_actual,
-                        stock_minimo=stock_minimo,
-                        centro=centro,
-                        edificio=edificio,
-                        ubicacion=ubicacion,
-                        proveedor=proveedor,
-                        observaciones=observaciones,
-                        foto=ruta_foto,
-                        foto_nombre=foto_nombre,
-                        foto_data=foto_data,
-                        precio_unitario=precio_unitario,
-                        coste_total=coste_total,
-                        fecha_compra=fecha_compra,
-                        referencia_factura=referencia_factura,
-                        observaciones_coste=observaciones_coste
-                    )
-
-                    if isinstance(resultado, tuple):
-                        ok, mensaje = resultado
-                    else:
-                        ok, mensaje = True, "Material creado correctamente"
-
-                    if ok:
-                        st.success(f"{mensaje}: {codigo}")
-                        limpiar_formulario_crear_material()
-                        st.rerun()
-                    else:
-                        st.error(mensaje)
-
-        with tab_crear_pedido:
-
-            st.subheader("📦 Crear pedido de material")
-
-            if st.session_state.pop("abel_pedido_creado_ok", False):
-                st.success("Pedido creado correctamente. Formulario limpio para crear otro.")
-
-            operario_destino = st.selectbox(
-                "Pedido para",
-                ["J.A. Almeda", "Luis Lozano", "Abel Vasquez", "Otro"],
-                key="abel_pedido_operario"
-            )
-
-            centro_pedido = st.selectbox(
-                "Centro",
-                CENTROS,
-                key="abel_pedido_centro"
-            )
-
-            material_pedido = st.text_input(
-                "Material solicitado",
-                key="abel_pedido_material"
-            )
-
-            cantidad_pedido = st.number_input(
-                "Cantidad",
-                min_value=1,
-                step=1,
-                key="abel_pedido_cantidad"
-            )
-
-            prioridad_pedido = st.selectbox(
-                "Prioridad",
-                ["Baja", "Media", "Alta", "Urgente"],
-                index=1,
-                key="abel_pedido_prioridad"
-            )
-
-            estado_pedido = st.selectbox(
-                "Estado inicial",
-                ["Pendiente", "Preparado", "Sin stock"],
-                key="abel_pedido_estado"
-            )
-
-            observaciones_pedido = st.text_area(
-                "Observaciones",
-                placeholder="Ejemplo: pedido recibido por teléfono",
-                key="abel_pedido_observaciones"
-            )
-
-            if st.button("💾 Crear pedido", use_container_width=True, key="abel_btn_crear_pedido"):
-
-                if not material_pedido.strip():
-                    st.warning("Indica el material solicitado.")
-
-                else:
-                    try:
-                        crear_pedido_material(
-                            operario=operario_destino,
-                            centro=centro_pedido,
-                            material=material_pedido,
-                            cantidad=cantidad_pedido,
-                            prioridad=prioridad_pedido,
-                            estado=estado_pedido,
-                            observaciones=observaciones_pedido,
-                            creado_por="Abel Vasquez"
-                        )
-                    except TypeError:
-                        crear_pedido_material(
-                            operario=operario_destino,
-                            centro=centro_pedido,
-                            material=material_pedido,
-                            cantidad=cantidad_pedido,
-                            prioridad=prioridad_pedido,
-                            observaciones=f"{observaciones_pedido} | Estado inicial: {estado_pedido} | Creado por: Abel Vasquez"
-                        )
-
-                    limpiar_formulario_pedido_abel()
-                    st.rerun()
-
-    st.markdown("### 🔎 Buscar material")
-
-    filtro_texto = st.text_input(
-        "Buscar material",
-        placeholder=(
-            "Prueba: ele, electricidad, cerradura, mesa, Pearson 22, proveedor..."
-        ),
-        help=(
-            "Busca por fragmentos y varias palabras en código, material, categoría, "
-            "centro, edificio, ubicación, proveedor y observaciones."
-        ),
-        key="filtro_texto_inventario"
-    )
-
-    f1, f2 = st.columns(2)
-
-    with f1:
-        filtro_centro = st.selectbox(
-            "Centro",
-            ["Todos"] + CENTROS,
-            key="filtro_centro_inventario"
-        )
-
-    with f2:
-        edificios_filtro = obtener_edificios(filtro_centro) if filtro_centro != "Todos" else []
-
-        filtro_edificio = st.selectbox(
-            "Edificio",
-            ["Todos"] + edificios_filtro,
-            key="filtro_edificio_inventario"
-        )
-
-    filtro_categoria = st.selectbox(
-        "Categoría",
-        ["Todas"] + CATEGORIAS_INVENTARIO_UI,
-        key="filtro_categoria_inventario"
-    )
-
-    solo_stock_bajo = st.checkbox(
-        "⚠️ Solo materiales con stock bajo",
-        value=False,
-        key="solo_stock_bajo_inventario"
-    )
-
-    ver_inactivos = False
-    if puede_borrar_inventario():
-        ver_inactivos = st.checkbox(
-            "Mostrar materiales desactivados",
-            key="ver_inactivos_inventario"
-        )
-
-    materiales = obtener_materiales_inventario_ligero(
-        filtro_texto=filtro_texto,
-        filtro_categoria=filtro_categoria,
-        filtro_centro=filtro_centro,
-        filtro_edificio=filtro_edificio,
-        incluir_inactivos=ver_inactivos
-    )
-
-    if solo_stock_bajo:
-        materiales = [
-            m for m in materiales
-            if float(m[5] or 0) <= float(m[6] or 0)
-        ]
-
-    if not materiales:
-        st.info("No hay materiales con esos filtros.")
         return
 
-    st.markdown(f"### 📋 Stock actual ({len(materiales)})")
+    finally:
+        conn.close()
 
-    for m in materiales:
-        columnas = [
-            "id",
-            "codigo",
-            "material",
-            "categoria",
-            "unidad",
-            "stock_actual",
-            "stock_minimo",
-            "centro",
-            "edificio",
-            "ubicacion",
-            "proveedor",
-            "observaciones",
-            "fecha_alta",
-            "foto",
-            "foto_nombre",
-            "foto_data",
-            "activo",
-            "precio_unitario",
-            "coste_total",
-            "fecha_compra",
-            "referencia_factura",
-            "observaciones_coste"
+    _COLUMNAS_INVENTARIO_ASEGURADAS = True
+
+
+def actualizar_materiales_normalizados():
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute("""
+            SELECT id, material
+            FROM inventario
+        """)
+
+        filas = cursor.fetchall()
+
+        for id_mat, material in filas:
+            material_norm = normalizar_texto_material(material)
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET material_normalizado = {p}
+                WHERE id = {p}
+            """, (material_norm, id_mat))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+
+    finally:
+        conn.close()
+
+
+# =====================================================
+# CÓDIGO MATERIAL
+# =====================================================
+
+def generar_codigo_material(material, categoria):
+    """
+    Nuevos códigos legibles y estables por categoría.
+
+    Ejemplos:
+        ELECTRICIDAD-001
+        CERRAJERIA-001
+        MOBILIARIO-001
+
+    No modifica códigos históricos existentes.
+    """
+    asegurar_columnas_inventario()
+
+    prefijo = prefijo_codigo_categoria(categoria)
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute(
+            f"""
+            SELECT codigo
+            FROM inventario
+            WHERE UPPER(COALESCE(codigo, '')) LIKE {p}
+            """,
+            (f"{prefijo}-%",)
+        )
+        existentes = [
+            str(fila[0] or "").strip().upper()
+            for fila in cursor.fetchall()
         ]
+    finally:
+        conn.close()
 
-        material_dict = dict(zip(columnas, m))
+    numeros = []
 
-        codigo = material_dict.get("codigo")
-        material = material_dict.get("material")
-        categoria = material_dict.get("categoria")
-        unidad = material_dict.get("unidad")
-
-        stock_actual = material_dict.get("stock_actual")
-        stock_minimo = material_dict.get("stock_minimo")
-
-        centro = material_dict.get("centro")
-        edificio = material_dict.get("edificio")
-        ubicacion = material_dict.get("ubicacion")
-
-        proveedor = material_dict.get("proveedor")
-        observaciones = material_dict.get("observaciones")
-
-        foto = material_dict.get("foto")
-        foto_nombre = material_dict.get("foto_nombre")
-        foto_data = material_dict.get("foto_data")
-
-        activo = material_dict.get("activo", 1)
-
-        precio_unitario = material_dict.get("precio_unitario", 0)
-        coste_total = material_dict.get("coste_total", 0)
-
-        fecha_compra = material_dict.get("fecha_compra", "")
-        referencia_factura = material_dict.get("referencia_factura", "")
-        observaciones_coste = material_dict.get("observaciones_coste", "")
-
+    for codigo in existentes:
         try:
-            precio_unitario = float(precio_unitario or 0)
+            numeros.append(int(codigo.rsplit("-", 1)[-1]))
         except Exception:
-            precio_unitario = 0
+            pass
 
+    siguiente = max(numeros) + 1 if numeros else 1
+    return f"{prefijo}-{siguiente:03d}"
+
+
+# =====================================================
+# CREAR MATERIAL
+# =====================================================
+
+def crear_material_inventario(
+    codigo,
+    material,
+    categoria,
+    unidad,
+    stock_actual,
+    stock_minimo,
+    centro,
+    edificio,
+    ubicacion,
+    proveedor,
+    observaciones,
+    foto="",
+    foto_nombre="",
+    foto_data=None,
+    precio_unitario=0,
+    coste_total=0,
+    fecha_compra="",
+    referencia_factura="",
+    observaciones_coste=""
+):
+    asegurar_columnas_inventario()
+
+    material = str(material or "").strip()
+    categoria = str(categoria or "").strip()
+    unidad = str(unidad or "").strip()
+
+    duplicado = buscar_material_duplicado_exacto(material, categoria, unidad)
+
+    if duplicado:
+        return False, (
+            f"Este material ya existe: "
+            f"{duplicado['material']} | Código: {duplicado['codigo']} | "
+            f"Stock actual: {duplicado['stock_actual']}"
+        )
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        material_normalizado = normalizar_texto_material(material)
+
+        cursor.execute(f"""
+            INSERT INTO inventario
+            (
+                codigo,
+                material,
+                categoria,
+                unidad,
+                stock_actual,
+                stock_minimo,
+                centro,
+                edificio,
+                ubicacion,
+                proveedor,
+                observaciones,
+                foto,
+                foto_nombre,
+                foto_data,
+                activo,
+                material_normalizado,
+                precio_unitario,
+                coste_total,
+                fecha_compra,
+                referencia_factura,
+                observaciones_coste
+            )
+            VALUES (
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}
+            )
+        """, (
+            codigo,
+            material,
+            categoria,
+            unidad,
+            float(stock_actual),
+            float(stock_minimo),
+            centro,
+            edificio,
+            str(ubicacion or "").strip(),
+            str(proveedor or "").strip(),
+            str(observaciones or "").strip(),
+            foto,
+            foto_nombre,
+            foto_data,
+            1,
+            material_normalizado,
+            float(precio_unitario or 0),
+            float(coste_total or 0),
+            str(fecha_compra or "").strip(),
+            str(referencia_factura or "").strip(),
+            str(observaciones_coste or "").strip()
+        ))
+
+        conn.commit()
+        return True, "Material creado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al crear material: {e}"
+
+    finally:
+        conn.close()
+
+
+# =====================================================
+# OBTENER MATERIALES
+# =====================================================
+
+def obtener_materiales_inventario(
+    filtro_texto="",
+    filtro_categoria="Todas",
+    filtro_centro="Todos",
+    filtro_edificio="Todos",
+    incluir_inactivos=False
+):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    sql = """
+        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
+        FROM inventario
+        WHERE 1=1
+    """
+
+    params = []
+
+    if not incluir_inactivos:
+        sql += " AND COALESCE(activo, 1) = 1"
+
+    if filtro_categoria != "Todas":
+        sql += f" AND categoria = {p}"
+        params.append(filtro_categoria)
+
+    if filtro_centro != "Todos":
+        sql += f" AND centro = {p}"
+        params.append(filtro_centro)
+
+    if filtro_edificio != "Todos":
+        sql += f" AND edificio = {p}"
+        params.append(filtro_edificio)
+
+    sql += " ORDER BY material ASC"
+
+    try:
+        cursor.execute(sql, params)
+        datos = cursor.fetchall()
+    finally:
+        conn.close()
+
+    if filtro_texto.strip():
+        datos = _filtrar_filas_inventario_por_texto(
+            datos,
+            filtro_texto,
+        )
+
+    return datos
+
+
+
+def obtener_materiales_inventario_ligero(
+    filtro_texto="",
+    filtro_categoria="Todas",
+    filtro_centro="Todos",
+    filtro_edificio="Todos",
+    incluir_inactivos=False
+):
+    """
+    Listado ligero: misma búsqueda inteligente, sin descargar foto_data.
+    """
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    sql = """
+        SELECT id, codigo, material, categoria, unidad,
+               stock_actual, stock_minimo,
+               centro, edificio, ubicacion, proveedor,
+               observaciones, fecha_alta,
+               foto, foto_nombre,
+               NULL AS foto_data,
+               activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
+        FROM inventario
+        WHERE 1=1
+    """
+
+    params = []
+
+    if not incluir_inactivos:
+        sql += " AND COALESCE(activo, 1) = 1"
+
+    if filtro_categoria != "Todas":
+        sql += f" AND categoria = {p}"
+        params.append(filtro_categoria)
+
+    if filtro_centro != "Todos":
+        sql += f" AND centro = {p}"
+        params.append(filtro_centro)
+
+    if filtro_edificio != "Todos":
+        sql += f" AND edificio = {p}"
+        params.append(filtro_edificio)
+
+    sql += " ORDER BY material ASC"
+
+    try:
+        cursor.execute(sql, params)
+        datos = cursor.fetchall()
+    finally:
+        conn.close()
+
+    if filtro_texto.strip():
+        datos = _filtrar_filas_inventario_por_texto(
+            datos,
+            filtro_texto,
+        )
+
+    return datos
+
+
+
+def obtener_foto_material(codigo):
+    """
+    Recupera la foto de un único material bajo demanda.
+
+    Devuelve:
+        {
+            "foto": str,
+            "foto_nombre": str,
+            "foto_data": bytes | None
+        }
+    """
+    asegurar_columnas_inventario()
+
+    codigo = str(codigo or "").strip()
+
+    if not codigo:
+        return {
+            "foto": "",
+            "foto_nombre": "",
+            "foto_data": None,
+        }
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute(f"""
+            SELECT foto, foto_nombre, foto_data
+            FROM inventario
+            WHERE codigo = {p}
+        """, (codigo,))
+
+        fila = cursor.fetchone()
+
+        if not fila:
+            return {
+                "foto": "",
+                "foto_nombre": "",
+                "foto_data": None,
+            }
+
+        return {
+            "foto": fila[0] or "",
+            "foto_nombre": fila[1] or "",
+            "foto_data": fila[2],
+        }
+
+    except Exception as e:
+        _log_inventario_warning(
+            f"Cargando foto del material {codigo}",
+            e
+        )
+
+        return {
+            "foto": "",
+            "foto_nombre": "",
+            "foto_data": None,
+        }
+
+    finally:
+        conn.close()
+
+def obtener_codigos_materiales():
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT codigo, material
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+        ORDER BY material ASC
+    """)
+
+    datos = cursor.fetchall()
+    conn.close()
+
+    return datos
+
+
+# =====================================================
+# MOVIMIENTOS
+# =====================================================
+
+def obtener_datos_ot_para_inventario(cursor, conn, numero_ot):
+    datos_ot = {
+        "descripcion_ot": "",
+        "centro_ot": "",
+        "edificio_ot": "",
+        "espacio_ot": "",
+        "area_ot": "",
+        "prioridad_ot": "",
+        "estado_ot": "",
+        "fecha_creacion_ot": "",
+        "origen_ot": "",
+    }
+
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return datos_ot
+
+    p = _ph(conn)
+
+    consultas = [
+        """
+        SELECT descripcion, centro, edificio, espacio, area, prioridad, estado, fecha_creacion, origen
+        FROM ordenes_trabajo
+        WHERE numero_ot = {p}
+        """,
+        """
+        SELECT descripcion, centro, edificio, espacio, area, prioridad, estado, fecha_creacion, origen
+        FROM historico_ordenes
+        WHERE numero_ot = {p}
+        """
+    ]
+
+    for consulta in consultas:
         try:
-            coste_total = float(coste_total or 0)
-        except Exception:
-            coste_total = 0
+            cursor.execute(consulta.format(p=p), (numero_ot,))
+            fila = cursor.fetchone()
 
-        try:
-            stock_actual_num = float(stock_actual or 0)
-            stock_minimo_num = float(stock_minimo or 0)
-        except Exception:
-            stock_actual_num = 0
-            stock_minimo_num = 0
-
-        if activo == 0:
-            icono = "⛔"
-        elif stock_actual_num <= stock_minimo_num:
-            icono = "⚠️"
-        else:
-            icono = "✅"
-
-        titulo = f"{icono} {codigo} | {material} | Stock: {stock_actual} {unidad}"
-
-        with st.expander(titulo, expanded=False):
-
-            if activo == 0:
-                st.warning(f"⛔ Material desactivado: {material}")
-            elif stock_actual_num <= stock_minimo_num:
-                st.warning(f"⚠️ Stock bajo: {material} ({stock_actual} {unidad})")
-
-            st.markdown(f"### **{codigo}** · {material}")
-            st.markdown(f"**Categoría:** {categoria or '-'}")
-            st.markdown(f"**Stock:** {stock_actual} {unidad} · **Mínimo:** {stock_minimo} {unidad}")
-            st.markdown(f"**Precio unitario:** {precio_unitario:.2f} € · **Coste inicial:** {coste_total:.2f} €")
-            st.caption(f"🏢 {centro or '-'} · {edificio or '-'} · {ubicacion or '-'}")
-
-            if proveedor:
-                st.caption(f"Proveedor: {proveedor}")
-
-            if fecha_compra:
-                st.caption(f"Fecha compra / entrada: {fecha_compra}")
-
-            if referencia_factura:
-                st.caption(f"Factura / albarán: {referencia_factura}")
-
-            if observaciones:
-                st.info(observaciones)
-
-            if observaciones_coste:
-                st.info(f"💶 {observaciones_coste}")
-
-            # =====================================================
-            # FOTO MATERIAL · CARGA REAL BAJO DEMANDA
-            # =====================================================
-            clave_foto_inv = "inventario_foto_abierta"
-            foto_abierta = st.session_state.get(
-                clave_foto_inv
+            if fila:
+                datos_ot["descripcion_ot"] = fila[0] or ""
+                datos_ot["centro_ot"] = fila[1] or ""
+                datos_ot["edificio_ot"] = fila[2] or ""
+                datos_ot["espacio_ot"] = fila[3] or ""
+                datos_ot["area_ot"] = fila[4] or ""
+                datos_ot["prioridad_ot"] = fila[5] or ""
+                datos_ot["estado_ot"] = fila[6] or ""
+                datos_ot["fecha_creacion_ot"] = str(fila[7] or "")
+                datos_ot["origen_ot"] = fila[8] or ""
+                return datos_ot
+        except Exception as e:
+            _log_inventario_warning(
+                f"Consultando datos de OT {numero_ot}",
+                e
             )
 
-            if foto_abierta == codigo:
+    return datos_ot
 
-                if st.button(
-                    "🙈 Ocultar foto",
-                    key=f"ocultar_foto_inv_{codigo}",
-                ):
-                    st.session_state.pop(
-                        clave_foto_inv,
-                        None,
-                    )
-                    st.rerun()
 
-                foto_material = obtener_foto_material(
-                    codigo
-                )
+def registrar_movimiento_inventario(
+    codigo_material,
+    tipo_movimiento,
+    cantidad,
+    motivo,
+    numero_ot,
+    operario
+):
+    asegurar_columnas_inventario()
 
-                foto_data_real = foto_material.get(
-                    "foto_data"
-                )
-                foto_real = foto_material.get(
-                    "foto",
-                    ""
-                )
-                foto_nombre_real = foto_material.get(
-                    "foto_nombre",
-                    ""
-                )
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
 
-                if foto_data_real:
-                    try:
-                        st.image(
-                            bytes(foto_data_real),
-                            width=220
-                        )
+    try:
+        cursor.execute(f"""
+            SELECT material, stock_actual
+            FROM inventario
+            WHERE codigo = {p}
+        """, (codigo_material,))
 
-                        if foto_nombre_real:
-                            st.caption(
-                                f"📷 {foto_nombre_real}"
-                            )
+        fila = cursor.fetchone()
 
-                    except Exception as e:
-                        st.caption(
-                            f"Foto no disponible: {e}"
-                        )
+        if not fila:
+            conn.close()
+            return False, "No existe el material."
 
-                elif foto_real:
-                    try:
-                        st.image(
-                            foto_real,
-                            width=220
-                        )
+        material, stock_actual = fila
+        cantidad = float(cantidad)
+        stock_actual = float(stock_actual)
 
-                        if foto_nombre_real:
-                            st.caption(
-                                f"📷 {foto_nombre_real}"
-                            )
+        nuevo_stock = stock_actual
 
-                    except Exception:
-                        st.caption(
-                            "Foto no disponible."
-                        )
+        if tipo_movimiento == "Entrada":
+            nuevo_stock = stock_actual + cantidad
 
-                else:
-                    st.info(
-                        "Este material no tiene foto."
-                    )
+        elif tipo_movimiento == "Salida":
+            if stock_actual < cantidad:
+                conn.close()
+                return False, f"Stock insuficiente. Disponible: {stock_actual}"
 
-            else:
+            nuevo_stock = stock_actual - cantidad
 
-                if st.button(
-                    "📷 Ver foto",
-                    key=f"ver_foto_inv_{codigo}",
-                ):
-                    st.session_state[
-                        clave_foto_inv
-                    ] = codigo
+        elif tipo_movimiento == "Ajuste":
+            nuevo_stock = cantidad
 
-                    st.rerun()
+        datos_ot = obtener_datos_ot_para_inventario(cursor, conn, numero_ot)
 
-            with st.expander("✏️ Editar material"):
+        cursor.execute(f"""
+            UPDATE inventario
+            SET stock_actual = {p}
+            WHERE codigo = {p}
+        """, (nuevo_stock, codigo_material))
 
-                nuevo_material = st.text_input(
-                    "Material",
-                    value=str(material or ""),
-                    key=f"abel_edit_material_{codigo}"
-                )
+        cursor.execute(f"""
+            INSERT INTO movimientos_inventario
+            (
+                codigo_material,
+                material,
+                tipo_movimiento,
+                cantidad,
+                motivo,
+                numero_ot,
+                operario,
+                descripcion_ot,
+                centro_ot,
+                edificio_ot,
+                espacio_ot,
+                area_ot,
+                prioridad_ot,
+                estado_ot,
+                fecha_creacion_ot,
+                origen_ot
+            )
+            VALUES (
+                {p}, {p}, {p}, {p}, {p}, {p}, {p},
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}
+            )
+        """, (
+            codigo_material,
+            material,
+            tipo_movimiento,
+            cantidad,
+            str(motivo or "").strip(),
+            str(numero_ot or "").strip(),
+            str(operario or "").strip(),
+            datos_ot["descripcion_ot"],
+            datos_ot["centro_ot"],
+            datos_ot["edificio_ot"],
+            datos_ot["espacio_ot"],
+            datos_ot["area_ot"],
+            datos_ot["prioridad_ot"],
+            datos_ot["estado_ot"],
+            datos_ot["fecha_creacion_ot"],
+            datos_ot["origen_ot"]
+        ))
 
-                sugerencia_edicion = sugerir_categoria_material(nuevo_material)
+        conn.commit()
+        return True, "Movimiento registrado correctamente."
 
-                col_cat1, col_cat2 = st.columns([3, 1])
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al registrar movimiento: {e}"
 
-                with col_cat1:
-                    categoria_edicion_actual = _categoria_segura(
-                        st.session_state.get(
-                            f"abel_edit_categoria_{codigo}",
-                            categoria,
-                        )
-                    )
+    finally:
+        conn.close()
 
-                    nueva_categoria = st.selectbox(
-                        "Categoría",
-                        CATEGORIAS_INVENTARIO_UI,
-                        index=CATEGORIAS_INVENTARIO_UI.index(
-                            categoria_edicion_actual
-                        ),
-                        key=f"abel_edit_categoria_{codigo}",
-                    )
 
-                with col_cat2:
-                    st.caption(
-                        f"💡 {sugerencia_edicion['categoria']}"
-                    )
+def obtener_movimientos_inventario():
+    asegurar_columnas_inventario()
 
-                    if st.button(
-                        "✨ Aplicar",
-                        key=f"aplicar_cat_sugerida_{codigo}",
-                        use_container_width=True,
-                        on_click=_aplicar_categoria_sugerida_edicion,
-                        args=(codigo,),
-                    ):
-                        pass
+    conn = conectar()
+    cursor = conn.cursor()
 
-                if (
-                    sugerencia_edicion["categoria"] != nueva_categoria
-                    and sugerencia_edicion["confianza"] >= 70
-                ):
-                    st.caption(
-                        f"La app sugiere **{sugerencia_edicion['categoria']}** "
-                        f"({sugerencia_edicion['confianza']}%). "
-                        f"Se mantiene tu categoría hasta que pulses Aplicar."
-                    )
+    cursor.execute("""
+        SELECT id, codigo_material, material, tipo_movimiento, cantidad,
+               motivo, numero_ot, operario, fecha_movimiento,
+               descripcion_ot, centro_ot, edificio_ot, espacio_ot,
+               area_ot, prioridad_ot, estado_ot, fecha_creacion_ot, origen_ot
+        FROM movimientos_inventario
+        ORDER BY fecha_movimiento DESC, id DESC
+    """)
 
-                nueva_ubicacion = st.text_input(
-                    "Ubicación",
-                    value=str(ubicacion or ""),
-                    key=f"abel_edit_ubicacion_{codigo}"
-                )
+    datos = cursor.fetchall()
+    conn.close()
 
-                nuevo_proveedor = st.text_input(
-                    "Proveedor",
-                    value=str(proveedor or ""),
-                    key=f"abel_edit_proveedor_{codigo}"
-                )
+    return datos
 
-                nuevo_stock_minimo = st.number_input(
-                    "Stock mínimo",
-                    min_value=0.0,
-                    value=float(stock_minimo or 0),
-                    step=1.0,
-                    key=f"abel_edit_stock_minimo_{codigo}"
-                )
 
-                nuevo_precio_unitario = st.number_input(
-                    "Precio unitario €",
-                    min_value=0.0,
-                    value=float(precio_unitario or 0),
-                    step=0.10,
-                    key=f"abel_edit_precio_{codigo}"
-                )
+def obtener_movimientos_por_material(codigo_material):
+    asegurar_columnas_inventario()
 
-                nuevas_observaciones = st.text_area(
-                    "Observaciones",
-                    value=str(observaciones or ""),
-                    key=f"abel_edit_obs_{codigo}"
-                )
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
 
-                nueva_foto = st.file_uploader(
-                    "Cambiar foto",
-                    type=["jpg", "jpeg", "png"],
-                    key=f"abel_edit_foto_{codigo}"
-                )
+    cursor.execute(f"""
+        SELECT
+            tipo_movimiento,
+            cantidad,
+            motivo,
+            numero_ot,
+            operario,
+            fecha_movimiento,
+            descripcion_ot,
+            centro_ot,
+            edificio_ot,
+            espacio_ot,
+            area_ot,
+            prioridad_ot,
+            estado_ot,
+            fecha_creacion_ot,
+            origen_ot
+        FROM movimientos_inventario
+        WHERE codigo_material = {p}
+        ORDER BY fecha_movimiento DESC
+    """, (codigo_material,))
 
-                col_guardar, col_cancelar = st.columns(2)
+    datos = cursor.fetchall()
+    conn.close()
 
-                with col_guardar:
-                    if st.button("💾 Guardar cambios", key=f"abel_guardar_{codigo}"):
+    return datos
 
-                        foto_nombre_nueva = None
-                        foto_data_nueva = None
 
-                        if (
-                            nueva_foto is not None
-                            and nueva_foto.size > 5 * 1024 * 1024
-                        ):
-                            st.error(
-                                "No se puede guardar. "
-                                "La foto supera 5 MB."
-                            )
-                        else:
-                            if nueva_foto is not None:
-                                foto_nombre_nueva = limpiar_nombre_archivo(
-                                    nueva_foto.name
-                                )
-                                foto_data_nueva = nueva_foto.getvalue()
+# =====================================================
+# STOCK / SELECTS
+# =====================================================
 
-                            actualizar_material_abel(
-                                codigo=codigo,
-                                material=nuevo_material,
-                                categoria=nueva_categoria,
-                                ubicacion=nueva_ubicacion,
-                                proveedor=nuevo_proveedor,
-                                stock_minimo=nuevo_stock_minimo,
-                                precio_unitario=nuevo_precio_unitario,
-                                observaciones=nuevas_observaciones,
-                                foto_nombre=foto_nombre_nueva,
-                                foto_data=foto_data_nueva
-                            )
+def obtener_stock_bajo():
+    asegurar_columnas_inventario()
 
-                            st.success(
-                                "Material actualizado correctamente."
-                            )
-                            st.rerun()
+    conn = conectar()
+    cursor = conn.cursor()
 
-            if puede_borrar_inventario():
-                if activo == 1:
-                    confirmar = st.checkbox(
-                        f"Confirmo que quiero desactivar {codigo}",
-                        key=f"confirmar_desactivar_{codigo}"
-                    )
+    cursor.execute("""
+        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
+        FROM inventario
+        WHERE stock_actual <= stock_minimo
+          AND COALESCE(activo, 1) = 1
+        ORDER BY stock_actual ASC, material ASC
+    """)
 
-                    if confirmar:
-                        if st.button(f"⛔ Desactivar {codigo}", key=f"desactivar_{codigo}", use_container_width=True):
-                            ok, mensaje = desactivar_material(codigo)
-                            if ok:
-                                st.success(mensaje)
-                                st.rerun()
-                            else:
-                                st.error(mensaje)
-                else:
-                    confirmar_activar = st.checkbox(
-                        f"Confirmo que quiero reactivar {codigo}",
-                        key=f"confirmar_activar_{codigo}"
-                    )
+    datos = cursor.fetchall()
+    conn.close()
 
-                    if confirmar_activar:
-                        if st.button(f"✅ Activar {codigo}", key=f"activar_{codigo}", use_container_width=True):
-                            ok, mensaje = activar_material(codigo)
-                            if ok:
-                                st.success(mensaje)
-                                st.rerun()
-                            else:
-                                st.error(mensaje)
+    return datos
 
-            with st.expander(f"📊 Historial {codigo}"):
-                mostrar_historial_material(codigo)
 
-            if activo == 1:
-                c1, c2 = st.columns(2)
+def obtener_materiales_para_select():
+    asegurar_columnas_inventario()
 
-                with c1:
-                    entrada = st.number_input(
-                        f"Entrada {codigo}",
-                        min_value=0.0,
-                        step=1.0,
-                        key=f"entrada_{codigo}"
-                    )
+    conn = conectar()
+    cursor = conn.cursor()
 
-                    if st.button(f"➕ Añadir {codigo}", key=f"btn_entrada_{codigo}"):
-                        if entrada > 0:
-                            ok, mensaje = registrar_movimiento_inventario(
-                                codigo_material=codigo,
-                                tipo_movimiento="Entrada",
-                                cantidad=entrada,
-                                motivo="Entrada manual",
-                                numero_ot="",
-                                operario=operario
-                            )
+    cursor.execute("""
+        SELECT codigo, material, stock_actual, unidad
+        FROM inventario
+        WHERE COALESCE(activo, 1) = 1
+        ORDER BY material ASC
+    """)
 
-                            if ok:
-                                st.success(mensaje)
-                                st.rerun()
-                            else:
-                                st.error(mensaje)
+    datos = cursor.fetchall()
+    conn.close()
 
-                with c2:
-                    salida = st.number_input(
-                        f"Salida {codigo}",
-                        min_value=0.0,
-                        step=1.0,
-                        key=f"salida_{codigo}"
-                    )
+    return datos
 
-                    if st.button(f"➖ Quitar {codigo}", key=f"btn_salida_{codigo}"):
-                        if salida > 0:
-                            ok, mensaje = registrar_movimiento_inventario(
-                                codigo_material=codigo,
-                                tipo_movimiento="Salida",
-                                cantidad=salida,
-                                motivo="Salida manual",
-                                numero_ot="",
-                                operario=operario
-                            )
 
-                            if ok:
-                                st.success(mensaje)
-                                st.rerun()
-                            else:
-                                st.error(mensaje)
-            else:
-                st.info("Material desactivado: no permite entradas ni salidas.")
+def obtener_material_por_codigo(codigo):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    cursor.execute(f"""
+        SELECT id, codigo, material, categoria, unidad, stock_actual, stock_minimo,
+               centro, edificio, ubicacion, proveedor, observaciones, fecha_alta,
+               foto, foto_nombre, foto_data, activo,
+               precio_unitario, coste_total, fecha_compra,
+               referencia_factura, observaciones_coste
+        FROM inventario
+        WHERE codigo = {p}
+    """, (codigo,))
+
+    columnas = [desc[0] for desc in cursor.description]
+    fila = cursor.fetchone()
+    conn.close()
+
+    if fila:
+        return dict(zip(columnas, fila))
+
+    return None
+
+
+# =====================================================
+# ACTIVAR / DESACTIVAR
+# =====================================================
+
+def desactivar_material(codigo):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    cursor.execute(f"""
+        UPDATE inventario
+        SET activo = 0
+        WHERE codigo = {p}
+    """, (codigo,))
+
+    conn.commit()
+    conn.close()
+
+    return True, "Material desactivado correctamente."
+
+
+def activar_material(codigo):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    cursor.execute(f"""
+        UPDATE inventario
+        SET activo = 1
+        WHERE codigo = {p}
+    """, (codigo,))
+
+    conn.commit()
+    conn.close()
+
+    return True, "Material activado correctamente."
+
+
+def actualizar_material_abel(
+    codigo,
+    material,
+    categoria,
+    ubicacion,
+    proveedor,
+    stock_minimo,
+    precio_unitario,
+    observaciones,
+    foto_nombre=None,
+    foto_data=None
+):
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+
+        if foto_data is not None:
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET
+                    material = {p},
+                    material_normalizado = {p},
+                    categoria = {p},
+                    ubicacion = {p},
+                    proveedor = {p},
+                    stock_minimo = {p},
+                    precio_unitario = {p},
+                    observaciones = {p},
+                    foto_nombre = {p},
+                    foto_data = {p}
+                WHERE codigo = {p}
+            """, (
+                material,
+                normalizar_texto_material(material),
+                categoria,
+                ubicacion,
+                proveedor,
+                float(stock_minimo or 0),
+                float(precio_unitario or 0),
+                observaciones,
+                foto_nombre,
+                foto_data,
+                codigo
+            ))
+
+        else:
+
+            cursor.execute(f"""
+                UPDATE inventario
+                SET
+                    material = {p},
+                    material_normalizado = {p},
+                    categoria = {p},
+                    ubicacion = {p},
+                    proveedor = {p},
+                    stock_minimo = {p},
+                    precio_unitario = {p},
+                    observaciones = {p}
+                WHERE codigo = {p}
+            """, (
+                material,
+                normalizar_texto_material(material),
+                categoria,
+                ubicacion,
+                proveedor,
+                float(stock_minimo or 0),
+                float(precio_unitario or 0),
+                observaciones,
+                codigo
+            ))
+
+        conn.commit()
+        return True, "Material actualizado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+
+    finally:
+        conn.close()
