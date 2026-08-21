@@ -1,4 +1,9 @@
 import streamlit as st
+
+try:
+    from st_keyup import st_keyup
+except Exception:
+    st_keyup = None
 from modules.ordenes import (
     actualizar_estado,
     actualizar_observaciones_estado,
@@ -232,7 +237,16 @@ def guardar_fotos_cierre_ot(
 
 
 def normalizar_txt(valor):
-    return str(valor or "").strip().lower()
+    import unicodedata
+
+    texto = str(valor or "").strip().lower()
+    texto = unicodedata.normalize("NFKD", texto)
+
+    return "".join(
+        caracter
+        for caracter in texto
+        if not unicodedata.combining(caracter)
+    )
 
 
 def normalizar_operario_nombre(nombre):
@@ -591,6 +605,7 @@ def mostrar_correccion_ubicacion_ot(id_orden, modo):
 # =====================================================
 
 CATEGORIAS_MATERIAL_POR_PREFIJO = {
+    # Códigos antiguos
     "FON": "Fontanería",
     "ELE": "Electricidad",
     "FER": "Ferretería",
@@ -604,6 +619,21 @@ CATEGORIAS_MATERIAL_POR_PREFIJO = {
     "LEG": "Legionella",
     "EQU": "Equipamiento",
     "OTR": "Otros",
+
+    # Códigos nuevos legibles
+    "FONTANERIA": "Fontanería",
+    "ELECTRICIDAD": "Electricidad",
+    "FERRETERIA": "Ferretería",
+    "CLIMATIZACION": "Climatización",
+    "PINTURA": "Pintura",
+    "LIMPIEZA": "Limpieza",
+    "SEGURIDAD": "Seguridad",
+    "JARDINERIA": "Jardinería",
+    "LEGIONELLA": "Legionella",
+    "CERRAJERIA": "Cerrajería",
+    "MOBILIARIO": "Mobiliario",
+    "ALBANILERIA": "Albañilería",
+    "OTROS": "Otros",
 }
 
 
@@ -621,6 +651,9 @@ ICONOS_CATEGORIA_MATERIAL = {
     "ACS": "🌡️",
     "Legionella": "💧",
     "Equipamiento": "🪑",
+    "Cerrajería": "🔐",
+    "Mobiliario": "🪑",
+    "Albañilería": "🧱",
     "Otros": "📦",
 }
 
@@ -789,13 +822,15 @@ def selector_material_inteligente(
     modo="operario",
 ):
     """
-    Selector reutilizable de un material.
+    Selector de recambios/materiales para la OT.
 
-    Flujo:
-        1. Categoría
-        2. Búsqueda por nombre o código
-        3. Selección del material
-        4. Ficha y cantidad
+    - Busca mientras se escribe, sin Enter, si streamlit-keyup está instalado.
+    - Admite fragmentos y varias palabras: "cerr taq", "rac 25", "sil neg".
+    - Ignora mayúsculas/minúsculas y acentos.
+    - Busca en nombre, código, categoría y unidad.
+    - La búsqueda escrita tiene prioridad sobre una categoría que haya quedado
+      seleccionada previamente.
+    - Muestra primero materiales con stock disponible.
     """
     if not materiales:
         st.info("No hay materiales disponibles.")
@@ -821,55 +856,91 @@ def selector_material_inteligente(
         ),
     )
 
-    texto_busqueda = st.text_input(
-        "Buscar por nombre o código",
-        placeholder=(
-            "Ejemplo: Presto, pistón, conector, FON..."
-        ),
-        key=(
-            f"{modo}_buscar_material_"
-            f"{id_orden}_{indice}"
-        ),
+    clave_busqueda = (
+        f"{modo}_buscar_material_"
+        f"{id_orden}_{indice}"
     )
 
-    materiales_filtrados = materiales
+    if st_keyup is not None:
+        texto_busqueda = st_keyup(
+            "🔎 Buscar recambio",
+            key=clave_busqueda,
+            placeholder=(
+                "Ej.: gri · cerr taq · rac 25 · sil neg · down..."
+            ),
+            debounce=350,
+        )
+    else:
+        texto_busqueda = st.text_input(
+            "🔎 Buscar recambio",
+            key=clave_busqueda,
+            placeholder=(
+                "Ej.: gri · cerr taq · rac 25 · sil neg · down..."
+            ),
+        )
 
-    if categoria_sel != "Todas":
+    buscar_txt = normalizar_txt(texto_busqueda)
+    terminos = [
+        termino
+        for termino in buscar_txt.split()
+        if termino
+    ]
+
+    materiales_filtrados = list(materiales)
+
+    # Si el operario está escribiendo, la búsqueda manda.
+    # Así una categoría olvidada no oculta un recambio válido.
+    if not terminos and categoria_sel != "Todas":
         materiales_filtrados = [
             material
             for material in materiales_filtrados
             if material["categoria"] == categoria_sel
         ]
 
-    buscar_txt = normalizar_txt(texto_busqueda)
+    if terminos:
+        encontrados = []
 
-    if buscar_txt:
-        materiales_filtrados = [
-            material
-            for material in materiales_filtrados
-            if (
-                buscar_txt
-                in normalizar_txt(material["nombre"])
-                or buscar_txt
-                in normalizar_txt(material["codigo"])
+        for material in materiales_filtrados:
+            texto_material = normalizar_txt(
+                " ".join([
+                    str(material.get("nombre") or ""),
+                    str(material.get("codigo") or ""),
+                    str(material.get("categoria") or ""),
+                    str(material.get("unidad") or ""),
+                ])
             )
-        ]
 
+            if all(
+                termino in texto_material
+                for termino in terminos
+            ):
+                encontrados.append(material)
+
+        materiales_filtrados = encontrados
+
+    # Primero lo que realmente se puede usar; después orden alfabético.
     materiales_filtrados = sorted(
         materiales_filtrados,
         key=lambda material: (
+            0 if float(material.get("stock") or 0) > 0 else 1,
             normalizar_txt(material["nombre"]),
             normalizar_txt(material["codigo"]),
         )
     )
 
-    st.caption(
-        f"{len(materiales_filtrados)} materiales encontrados."
-    )
+    if terminos:
+        st.caption(
+            f"🔎 {len(materiales_filtrados)} coincidencia(s). "
+            "La búsqueda está mirando todos los materiales."
+        )
+    else:
+        st.caption(
+            f"{len(materiales_filtrados)} materiales disponibles con estos filtros."
+        )
 
     if not materiales_filtrados:
         st.warning(
-            "No se encontraron materiales con estos filtros."
+            "No se encontraron recambios/materiales con esa búsqueda."
         )
         return None
 
@@ -887,9 +958,10 @@ def selector_material_inteligente(
         "Material",
         codigos_filtrados,
         format_func=lambda codigo: (
+            f"{'✅' if materiales_por_codigo[codigo]['stock'] > 0 else '⚠️'} "
             f"{materiales_por_codigo[codigo]['nombre']} · "
-            f"Stock: "
-            f"{materiales_por_codigo[codigo]['stock']:g} "
+            f"{materiales_por_codigo[codigo]['categoria']} · "
+            f"Stock: {materiales_por_codigo[codigo]['stock']:g} "
             f"{materiales_por_codigo[codigo]['unidad']}"
         ),
         key=(
@@ -904,20 +976,32 @@ def selector_material_inteligente(
         material_sel
     )
 
+    stock_disponible = float(
+        material_sel.get("stock") or 0
+    ) if material_sel else 0.0
+
     cantidad_material = st.number_input(
         "Cantidad usada",
         min_value=0.0,
+        max_value=max(stock_disponible, 0.0) if stock_disponible > 0 else 0.0,
         step=1.0,
+        disabled=stock_disponible <= 0,
         key=(
             f"{modo}_cantidad_material_ot_"
             f"{id_orden}_{indice}"
         ),
     )
 
+    if stock_disponible <= 0:
+        st.caption(
+            "⛔ Sin stock: no se puede descontar este material."
+        )
+
     return {
         "codigo": codigo_sel,
         "cantidad": cantidad_material,
     }
+
 
 
 def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
