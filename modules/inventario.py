@@ -58,6 +58,316 @@ PALABRAS_IGNORAR_MATERIAL = {
 }
 
 
+CATEGORIAS_INVENTARIO_INTELIGENTE = [
+    "Electricidad",
+    "Fontanería",
+    "Climatización",
+    "Cerrajería",
+    "Mobiliario",
+    "Ferretería",
+    "Albañilería",
+    "Pintura",
+    "Limpieza",
+    "Jardinería",
+    "Seguridad",
+    "Legionella",
+    "Otros",
+]
+
+
+def categorias_inventario_disponibles():
+    return list(CATEGORIAS_INVENTARIO_INTELIGENTE)
+
+
+# Palabras con peso. Las palabras que identifican el TIPO de objeto
+# tienen más peso que palabras de composición como hierro, acero o plástico.
+_REGLAS_CATEGORIA_MATERIAL = {
+    "Electricidad": {
+        "downlight": 18,
+        "foco": 14,
+        "lampara": 14,
+        "bombilla": 14,
+        "led": 10,
+        "interruptor": 18,
+        "enchufe": 18,
+        "base enchufe": 20,
+        "magnetotermico": 20,
+        "diferencial": 20,
+        "contactor": 18,
+        "rele": 16,
+        "cable": 12,
+        "manguera electrica": 16,
+        "regleta": 14,
+        "fluorescente": 16,
+        "driver": 15,
+        "fuente alimentacion": 16,
+        "transformador": 18,
+        "sensor movimiento": 15,
+    },
+    "Fontanería": {
+        "grifo": 20,
+        "sifon": 20,
+        "latiguillo": 20,
+        "racor": 18,
+        "tuberia": 18,
+        "tubo agua": 18,
+        "manguito": 16,
+        "codo": 12,
+        "te fontaneria": 16,
+        "valvula": 13,
+        "llave paso": 20,
+        "fluxor": 20,
+        "cisterna": 18,
+        "desague": 18,
+        "sumidero": 18,
+        "junta grifo": 18,
+        "aireador": 16,
+    },
+    "Climatización": {
+        "aire acondicionado": 24,
+        "split": 20,
+        "fancoil": 20,
+        "fan coil": 20,
+        "termostato": 16,
+        "filtro aire": 18,
+        "conducto": 14,
+        "rejilla climatizacion": 18,
+        "compresor": 16,
+        "gas refrigerante": 20,
+        "bomba condensados": 20,
+    },
+    "Cerrajería": {
+        "cerradura": 25,
+        "bombin": 24,
+        "cilindro cerradura": 25,
+        "cerrojo": 24,
+        "candado": 22,
+        "bisagra": 20,
+        "manilla": 20,
+        "pomo": 16,
+        "picaporte": 22,
+        "pasador": 18,
+        "muelle puerta": 18,
+        "cierrapuertas": 22,
+        "llave cerradura": 22,
+    },
+    "Mobiliario": {
+        "mesa": 25,
+        "silla": 25,
+        "pupitre": 25,
+        "armario": 24,
+        "estanteria": 24,
+        "taquilla": 22,
+        "mueble": 22,
+        "cajonera": 22,
+        "banco": 16,
+        "perchero": 20,
+        "pizarra": 18,
+        "papelera": 15,
+        "taburete": 20,
+    },
+    "Ferretería": {
+        "tornillo": 24,
+        "tuerca": 24,
+        "arandela": 24,
+        "taco": 22,
+        "broca": 22,
+        "remache": 22,
+        "brida": 18,
+        "silicona": 18,
+        "sellador": 18,
+        "adhesivo": 14,
+        "cinta americana": 18,
+        "cinta aislante": 16,
+        "abrazadera": 18,
+        "muelle": 10,
+        "cadena": 12,
+    },
+    "Albañilería": {
+        "mortero": 24,
+        "cemento": 24,
+        "yeso": 22,
+        "ladrillo": 22,
+        "bloque hormigon": 22,
+        "hormigon": 20,
+        "rachola": 22,
+        "baldosa": 22,
+        "azulejo": 22,
+        "masilla pared": 18,
+        "lechada": 18,
+        "arena": 12,
+    },
+    "Pintura": {
+        "pintura": 25,
+        "esmalte": 22,
+        "imprimacion": 22,
+        "rodillo": 20,
+        "brocha": 20,
+        "pincel": 18,
+        "disolvente": 18,
+        "aguarras": 18,
+        "barniz": 20,
+        "cubeta pintura": 16,
+    },
+    "Limpieza": {
+        "detergente": 22,
+        "desengrasante": 22,
+        "lejia": 22,
+        "limpiador": 18,
+        "fregona": 20,
+        "escoba": 20,
+        "recogedor": 18,
+        "bayeta": 18,
+        "guante limpieza": 18,
+        "bolsa basura": 20,
+    },
+    "Jardinería": {
+        "manguera riego": 22,
+        "aspersor": 22,
+        "gotero": 20,
+        "abono": 20,
+        "tierra vegetal": 20,
+        "pala jardin": 18,
+        "tijera podar": 20,
+        "semilla": 18,
+        "maceta": 16,
+    },
+    "Seguridad": {
+        "extintor": 25,
+        "senal emergencia": 22,
+        "señal emergencia": 22,
+        "detector humo": 24,
+        "pulsador alarma": 22,
+        "sirena": 20,
+        "botiquin": 20,
+        "baliza": 16,
+        "cinta balizamiento": 18,
+    },
+    "Legionella": {
+        "reactivo dpd": 25,
+        "dpd": 22,
+        "fotometro": 22,
+        "medidor cloro": 24,
+        "cloro residual": 22,
+        "termometro legionella": 25,
+        "bote muestra": 18,
+        "frasco muestra": 18,
+    },
+}
+
+
+def sugerir_categoria_material(material, observaciones=""):
+    """
+    Sugiere una categoría sin imponerla.
+
+    Devuelve:
+        {
+            "categoria": "Mobiliario",
+            "confianza": 92,
+            "motivos": ["mesa"],
+            "puntuaciones": {...}
+        }
+
+    Filosofía:
+    - pesa más el tipo de objeto que su material/composición;
+    - 'mesa patas hierro' => Mobiliario, no Cerrajería;
+    - 'cerradura taquilla' => Cerrajería, aunque aparezca 'taquilla';
+    - si no hay evidencia suficiente => Otros.
+    """
+    texto = normalizar_texto_material(
+        f"{material or ''} {observaciones or ''}"
+    )
+
+    if not texto:
+        return {
+            "categoria": "Otros",
+            "confianza": 0,
+            "motivos": [],
+            "puntuaciones": {},
+        }
+
+    puntuaciones = {}
+    motivos_por_categoria = {}
+
+    for categoria, reglas in _REGLAS_CATEGORIA_MATERIAL.items():
+        puntos = 0
+        motivos = []
+
+        for termino, peso in reglas.items():
+            termino_norm = normalizar_texto_material(termino)
+
+            if termino_norm and termino_norm in texto:
+                puntos += int(peso)
+                motivos.append(termino)
+
+        if puntos > 0:
+            puntuaciones[categoria] = puntos
+            motivos_por_categoria[categoria] = motivos
+
+    if not puntuaciones:
+        return {
+            "categoria": "Otros",
+            "confianza": 20,
+            "motivos": [],
+            "puntuaciones": {},
+        }
+
+    ordenadas = sorted(
+        puntuaciones.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+
+    categoria_ganadora, puntos_ganador = ordenadas[0]
+    segundo = ordenadas[1][1] if len(ordenadas) > 1 else 0
+
+    # Confianza orientativa: combina fuerza y distancia al segundo.
+    margen = max(puntos_ganador - segundo, 0)
+    confianza = min(
+        99,
+        55 + min(puntos_ganador, 30) + min(margen, 14)
+    )
+
+    return {
+        "categoria": categoria_ganadora,
+        "confianza": int(confianza),
+        "motivos": motivos_por_categoria.get(categoria_ganadora, []),
+        "puntuaciones": puntuaciones,
+    }
+
+
+def prefijo_codigo_categoria(categoria):
+    categoria_norm = normalizar_texto_material(categoria)
+
+    equivalencias = {
+        "electricidad": "ELECTRICIDAD",
+        "fontaneria": "FONTANERIA",
+        "climatizacion": "CLIMATIZACION",
+        "cerrajeria": "CERRAJERIA",
+        "mobiliario": "MOBILIARIO",
+        "ferreteria": "FERRETERIA",
+        "albanileria": "ALBANILERIA",
+        "pintura": "PINTURA",
+        "limpieza": "LIMPIEZA",
+        "jardineria": "JARDINERIA",
+        "seguridad": "SEGURIDAD",
+        "legionella": "LEGIONELLA",
+        "otros": "OTROS",
+        "otro": "OTROS",
+    }
+
+    if categoria_norm in equivalencias:
+        return equivalencias[categoria_norm]
+
+    limpio = re.sub(
+        r"[^A-Z0-9]+",
+        "_",
+        categoria_norm.upper(),
+    ).strip("_")
+
+    return limpio or "OTROS"
+
+
 def normalizar_texto_material(texto):
     texto = str(texto or "").strip().lower()
 
@@ -88,39 +398,26 @@ def palabras_clave_material(texto):
     return list(dict.fromkeys(palabras))
 
 
+
 def terminos_busqueda_material(texto):
     """
-    Prepara una búsqueda tipo Google.
-
-    - Ignora mayúsculas/minúsculas.
-    - Ignora acentos.
-    - Admite fragmentos cortos: "ele", "font", "gr".
-    - Si se escriben varias palabras, deben aparecer todas en algún
-      campo del material, aunque estén repartidas entre distintos campos.
+    Búsqueda flexible: admite fragmentos, varias palabras, mayúsculas
+    y acentos sin depender de LIKE/ILIKE de la base de datos.
     """
     texto_norm = normalizar_texto_material(texto)
 
     if not texto_norm:
         return []
 
-    terminos = [
+    return list(dict.fromkeys(
         termino
         for termino in texto_norm.split()
         if termino
-    ]
-
-    return list(dict.fromkeys(terminos))
+    ))
 
 
 def _texto_busqueda_fila_inventario(fila):
-    """
-    Construye un texto normalizado con todos los campos útiles
-    de una fila del inventario.
-
-    Índices compatibles con obtener_materiales_inventario() y
-    obtener_materiales_inventario_ligero().
-    """
-    indices_busqueda = [
+    indices = [
         1,   # codigo
         2,   # material
         3,   # categoria
@@ -130,7 +427,6 @@ def _texto_busqueda_fila_inventario(fila):
         9,   # ubicacion
         10,  # proveedor
         11,  # observaciones
-        18,  # coste_total
         19,  # fecha_compra
         20,  # referencia_factura
         21,  # observaciones_coste
@@ -138,7 +434,7 @@ def _texto_busqueda_fila_inventario(fila):
 
     valores = []
 
-    for indice in indices_busqueda:
+    for indice in indices:
         try:
             valores.append(str(fila[indice] or ""))
         except Exception:
@@ -148,11 +444,6 @@ def _texto_busqueda_fila_inventario(fila):
 
 
 def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
-    """
-    Filtro en Python deliberadamente independiente de PostgreSQL/SQLite.
-
-    Esto evita diferencias de LIKE/ILIKE, mayúsculas y acentos.
-    """
     terminos = terminos_busqueda_material(filtro_texto)
 
     if not terminos:
@@ -167,43 +458,6 @@ def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
             resultado.append(fila)
 
     return resultado
-
-
-def _codigo_categoria_legible(categoria):
-    """
-    Convierte la categoría en un prefijo de código humano y estable.
-
-    Ejemplos:
-        Electricidad   -> ELECTRICIDAD
-        Fontanería     -> FONTANERIA
-        Climatización  -> CLIMATIZACION
-    """
-    categoria_norm = normalizar_texto_material(categoria)
-
-    if not categoria_norm:
-        return "OTROS"
-
-    equivalencias = {
-        "electricidad": "ELECTRICIDAD",
-        "fontaneria": "FONTANERIA",
-        "climatizacion": "CLIMATIZACION",
-        "legionella": "LEGIONELLA",
-        "albanileria": "ALBANILERIA",
-        "pintura": "PINTURA",
-        "cerrajeria": "CERRAJERIA",
-        "limpieza": "LIMPIEZA",
-        "ferreteria": "FERRETERIA",
-        "jardineria": "JARDINERIA",
-        "seguridad": "SEGURIDAD",
-        "otros": "OTROS",
-        "otro": "OTROS",
-    }
-
-    if categoria_norm in equivalencias:
-        return equivalencias[categoria_norm]
-
-    prefijo = re.sub(r"[^A-Z0-9]+", "_", categoria_norm.upper()).strip("_")
-    return prefijo or "OTROS"
 
 
 def buscar_material_duplicado_exacto(material, categoria="", unidad=""):
@@ -435,21 +689,18 @@ def actualizar_materiales_normalizados():
 
 def generar_codigo_material(material, categoria):
     """
-    Genera códigos nuevos con la categoría completa y legible.
+    Nuevos códigos legibles y estables por categoría.
 
     Ejemplos:
         ELECTRICIDAD-001
-        FONTANERIA-001
-        CLIMATIZACION-001
+        CERRAJERIA-001
+        MOBILIARIO-001
 
-    Importante:
-    - No modifica códigos antiguos.
-    - No depende del nombre del material.
-    - Mantiene numeración independiente por categoría.
+    No modifica códigos históricos existentes.
     """
     asegurar_columnas_inventario()
 
-    prefijo = _codigo_categoria_legible(categoria)
+    prefijo = prefijo_codigo_categoria(categoria)
 
     conn = conectar()
     cursor = conn.cursor()
@@ -464,12 +715,10 @@ def generar_codigo_material(material, categoria):
             """,
             (f"{prefijo}-%",)
         )
-
         existentes = [
             str(fila[0] or "").strip().upper()
             for fila in cursor.fetchall()
         ]
-
     finally:
         conn.close()
 
@@ -477,13 +726,11 @@ def generar_codigo_material(material, categoria):
 
     for codigo in existentes:
         try:
-            parte_numero = codigo.rsplit("-", 1)[-1]
-            numeros.append(int(parte_numero))
+            numeros.append(int(codigo.rsplit("-", 1)[-1]))
         except Exception:
             pass
 
     siguiente = max(numeros) + 1 if numeros else 1
-
     return f"{prefijo}-{siguiente:03d}"
 
 
@@ -610,16 +857,6 @@ def obtener_materiales_inventario(
     filtro_edificio="Todos",
     incluir_inactivos=False
 ):
-    """
-    Obtiene materiales con filtros estructurales en SQL y búsqueda textual
-    normalizada en Python.
-
-    La búsqueda textual funciona como un buscador tipo Google:
-    - "ele" encuentra Electricidad.
-    - "electricidad" encuentra categoría/código/material relacionado.
-    - "grifo p22" puede combinar palabras repartidas en distintos campos.
-    - ignora mayúsculas, minúsculas y acentos.
-    """
     asegurar_columnas_inventario()
 
     conn = conectar()
@@ -662,7 +899,10 @@ def obtener_materiales_inventario(
         conn.close()
 
     if filtro_texto.strip():
-        datos = _filtrar_filas_inventario_por_texto(datos, filtro_texto)
+        datos = _filtrar_filas_inventario_por_texto(
+            datos,
+            filtro_texto,
+        )
 
     return datos
 
@@ -676,13 +916,7 @@ def obtener_materiales_inventario_ligero(
     incluir_inactivos=False
 ):
     """
-    Versión ligera para listados de pantalla.
-
-    Mantiene exactamente el mismo orden de columnas que
-    obtener_materiales_inventario(), pero no descarga foto_data.
-
-    El buscador textual usa la misma lógica tipo Google que la versión
-    completa, por lo que Administración y Abel obtienen el mismo resultado.
+    Listado ligero: misma búsqueda inteligente, sin descargar foto_data.
     """
     asegurar_columnas_inventario()
 
@@ -730,7 +964,10 @@ def obtener_materiales_inventario_ligero(
         conn.close()
 
     if filtro_texto.strip():
-        datos = _filtrar_filas_inventario_por_texto(datos, filtro_texto)
+        datos = _filtrar_filas_inventario_por_texto(
+            datos,
+            filtro_texto,
+        )
 
     return datos
 
