@@ -88,6 +88,124 @@ def palabras_clave_material(texto):
     return list(dict.fromkeys(palabras))
 
 
+def terminos_busqueda_material(texto):
+    """
+    Prepara una búsqueda tipo Google.
+
+    - Ignora mayúsculas/minúsculas.
+    - Ignora acentos.
+    - Admite fragmentos cortos: "ele", "font", "gr".
+    - Si se escriben varias palabras, deben aparecer todas en algún
+      campo del material, aunque estén repartidas entre distintos campos.
+    """
+    texto_norm = normalizar_texto_material(texto)
+
+    if not texto_norm:
+        return []
+
+    terminos = [
+        termino
+        for termino in texto_norm.split()
+        if termino
+    ]
+
+    return list(dict.fromkeys(terminos))
+
+
+def _texto_busqueda_fila_inventario(fila):
+    """
+    Construye un texto normalizado con todos los campos útiles
+    de una fila del inventario.
+
+    Índices compatibles con obtener_materiales_inventario() y
+    obtener_materiales_inventario_ligero().
+    """
+    indices_busqueda = [
+        1,   # codigo
+        2,   # material
+        3,   # categoria
+        4,   # unidad
+        7,   # centro
+        8,   # edificio
+        9,   # ubicacion
+        10,  # proveedor
+        11,  # observaciones
+        18,  # coste_total
+        19,  # fecha_compra
+        20,  # referencia_factura
+        21,  # observaciones_coste
+    ]
+
+    valores = []
+
+    for indice in indices_busqueda:
+        try:
+            valores.append(str(fila[indice] or ""))
+        except Exception:
+            pass
+
+    return normalizar_texto_material(" ".join(valores))
+
+
+def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
+    """
+    Filtro en Python deliberadamente independiente de PostgreSQL/SQLite.
+
+    Esto evita diferencias de LIKE/ILIKE, mayúsculas y acentos.
+    """
+    terminos = terminos_busqueda_material(filtro_texto)
+
+    if not terminos:
+        return list(filas)
+
+    resultado = []
+
+    for fila in filas:
+        texto_fila = _texto_busqueda_fila_inventario(fila)
+
+        if all(termino in texto_fila for termino in terminos):
+            resultado.append(fila)
+
+    return resultado
+
+
+def _codigo_categoria_legible(categoria):
+    """
+    Convierte la categoría en un prefijo de código humano y estable.
+
+    Ejemplos:
+        Electricidad   -> ELECTRICIDAD
+        Fontanería     -> FONTANERIA
+        Climatización  -> CLIMATIZACION
+    """
+    categoria_norm = normalizar_texto_material(categoria)
+
+    if not categoria_norm:
+        return "OTROS"
+
+    equivalencias = {
+        "electricidad": "ELECTRICIDAD",
+        "fontaneria": "FONTANERIA",
+        "climatizacion": "CLIMATIZACION",
+        "legionella": "LEGIONELLA",
+        "albanileria": "ALBANILERIA",
+        "pintura": "PINTURA",
+        "cerrajeria": "CERRAJERIA",
+        "limpieza": "LIMPIEZA",
+        "ferreteria": "FERRETERIA",
+        "jardineria": "JARDINERIA",
+        "seguridad": "SEGURIDAD",
+        "otros": "OTROS",
+        "otro": "OTROS",
+    }
+
+    if categoria_norm in equivalencias:
+        return equivalencias[categoria_norm]
+
+    prefijo = re.sub(r"[^A-Z0-9]+", "_", categoria_norm.upper()).strip("_")
+    return prefijo or "OTROS"
+
+
 def buscar_material_duplicado_exacto(material, categoria="", unidad=""):
     asegurar_columnas_inventario()
 
@@ -316,41 +434,56 @@ def actualizar_materiales_normalizados():
 # =====================================================
 
 def generar_codigo_material(material, categoria):
+    """
+    Genera códigos nuevos con la categoría completa y legible.
+
+    Ejemplos:
+        ELECTRICIDAD-001
+        FONTANERIA-001
+        CLIMATIZACION-001
+
+    Importante:
+    - No modifica códigos antiguos.
+    - No depende del nombre del material.
+    - Mantiene numeración independiente por categoría.
+    """
+    asegurar_columnas_inventario()
+
+    prefijo = _codigo_categoria_legible(categoria)
+
     conn = conectar()
     cursor = conn.cursor()
     p = _ph(conn)
 
-    texto_material = "".join(c for c in material.upper() if c.isalnum() or c == " ")
-    partes = [x for x in texto_material.split() if x]
-    base_material = "".join(x[:2] for x in partes[:2])[:4]
+    try:
+        cursor.execute(
+            f"""
+            SELECT codigo
+            FROM inventario
+            WHERE UPPER(COALESCE(codigo, '')) LIKE {p}
+            """,
+            (f"{prefijo}-%",)
+        )
 
-    if len(base_material) < 4:
-        base_material = (base_material + "XXXX")[:4]
+        existentes = [
+            str(fila[0] or "").strip().upper()
+            for fila in cursor.fetchall()
+        ]
 
-    base_categoria = "".join(c for c in categoria.upper() if c.isalpha())[:3]
-
-    if len(base_categoria) < 3:
-        base_categoria = (base_categoria + "XXX")[:3]
-
-    prefijo = f"{base_categoria}-{base_material}"
-
-    cursor.execute(
-        f"SELECT codigo FROM inventario WHERE codigo LIKE {p}",
-        (f"{prefijo}-%",)
-    )
-
-    existentes = [fila[0] for fila in cursor.fetchall()]
-    conn.close()
+    finally:
+        conn.close()
 
     numeros = []
 
-    for cod in existentes:
+    for codigo in existentes:
         try:
-            numeros.append(int(cod.split("-")[-1]))
+            parte_numero = codigo.rsplit("-", 1)[-1]
+            numeros.append(int(parte_numero))
         except Exception:
             pass
 
     siguiente = max(numeros) + 1 if numeros else 1
+
     return f"{prefijo}-{siguiente:03d}"
 
 
@@ -477,6 +610,16 @@ def obtener_materiales_inventario(
     filtro_edificio="Todos",
     incluir_inactivos=False
 ):
+    """
+    Obtiene materiales con filtros estructurales en SQL y búsqueda textual
+    normalizada en Python.
+
+    La búsqueda textual funciona como un buscador tipo Google:
+    - "ele" encuentra Electricidad.
+    - "electricidad" encuentra categoría/código/material relacionado.
+    - "grifo p22" puede combinar palabras repartidas en distintos campos.
+    - ignora mayúsculas, minúsculas y acentos.
+    """
     asegurar_columnas_inventario()
 
     conn = conectar()
@@ -498,11 +641,6 @@ def obtener_materiales_inventario(
     if not incluir_inactivos:
         sql += " AND COALESCE(activo, 1) = 1"
 
-    if filtro_texto.strip():
-        sql += f" AND (codigo LIKE {p} OR material LIKE {p} OR ubicacion LIKE {p} OR proveedor LIKE {p})"
-        txt = f"%{filtro_texto.strip()}%"
-        params.extend([txt, txt, txt, txt])
-
     if filtro_categoria != "Todas":
         sql += f" AND categoria = {p}"
         params.append(filtro_categoria)
@@ -517,9 +655,14 @@ def obtener_materiales_inventario(
 
     sql += " ORDER BY material ASC"
 
-    cursor.execute(sql, params)
-    datos = cursor.fetchall()
-    conn.close()
+    try:
+        cursor.execute(sql, params)
+        datos = cursor.fetchall()
+    finally:
+        conn.close()
+
+    if filtro_texto.strip():
+        datos = _filtrar_filas_inventario_por_texto(datos, filtro_texto)
 
     return datos
 
@@ -537,8 +680,9 @@ def obtener_materiales_inventario_ligero(
 
     Mantiene exactamente el mismo orden de columnas que
     obtener_materiales_inventario(), pero no descarga foto_data.
-    En su posición devuelve NULL para conservar compatibilidad
-    con el desempaquetado existente.
+
+    El buscador textual usa la misma lógica tipo Google que la versión
+    completa, por lo que Administración y Abel obtienen el mismo resultado.
     """
     asegurar_columnas_inventario()
 
@@ -565,16 +709,6 @@ def obtener_materiales_inventario_ligero(
     if not incluir_inactivos:
         sql += " AND COALESCE(activo, 1) = 1"
 
-    if filtro_texto.strip():
-        sql += (
-            f" AND (codigo LIKE {p} "
-            f"OR material LIKE {p} "
-            f"OR ubicacion LIKE {p} "
-            f"OR proveedor LIKE {p})"
-        )
-        txt = f"%{filtro_texto.strip()}%"
-        params.extend([txt, txt, txt, txt])
-
     if filtro_categoria != "Todas":
         sql += f" AND categoria = {p}"
         params.append(filtro_categoria)
@@ -591,10 +725,15 @@ def obtener_materiales_inventario_ligero(
 
     try:
         cursor.execute(sql, params)
-        return cursor.fetchall()
-
+        datos = cursor.fetchall()
     finally:
         conn.close()
+
+    if filtro_texto.strip():
+        datos = _filtrar_filas_inventario_por_texto(datos, filtro_texto)
+
+    return datos
+
 
 
 def obtener_foto_material(codigo):
@@ -1047,6 +1186,7 @@ def actualizar_material_abel(
                 UPDATE inventario
                 SET
                     material = {p},
+                    material_normalizado = {p},
                     categoria = {p},
                     ubicacion = {p},
                     proveedor = {p},
@@ -1058,6 +1198,7 @@ def actualizar_material_abel(
                 WHERE codigo = {p}
             """, (
                 material,
+                normalizar_texto_material(material),
                 categoria,
                 ubicacion,
                 proveedor,
@@ -1075,6 +1216,7 @@ def actualizar_material_abel(
                 UPDATE inventario
                 SET
                     material = {p},
+                    material_normalizado = {p},
                     categoria = {p},
                     ubicacion = {p},
                     proveedor = {p},
@@ -1084,6 +1226,7 @@ def actualizar_material_abel(
                 WHERE codigo = {p}
             """, (
                 material,
+                normalizar_texto_material(material),
                 categoria,
                 ubicacion,
                 proveedor,
