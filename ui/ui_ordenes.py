@@ -1606,6 +1606,11 @@ def pantalla_ordenes():
             else:
                 st.info("No hay órdenes finalizadas")
         else:
+            # Selección múltiple de históricos visibles en la página actual.
+            # Incluye incidencias normales, preventivos, externas y OT de Legionella.
+            # Solo se borra la OT histórica; no se toca la planificación técnica.
+            historicos_seleccionados = []
+
             for h in historico:
                 observaciones_estado = ""
 
@@ -1845,15 +1850,84 @@ def pantalla_ordenes():
 
                     with c2:
                         if es_admin() or es_gerencia():
-                            confirmar_hist = st.checkbox("Confirmar", key=f"conf_admin_hist_{id_orden}")
+                            seleccionar_hist = st.checkbox(
+                                "Seleccionar",
+                                key=f"sel_admin_hist_{id_orden}",
+                                help="Marca esta OT para borrarla junto con otras seleccionadas.",
+                            )
 
-                            if st.button(f"🗑️ Borrar {numero_ot}", key=f"del_admin_hist_{id_orden}"):
-                                if confirmar_hist:
-                                    borrar_orden_historico(id_orden)
-                                    limpiar_cache_streamlit()
-                                    st.warning(f"{numero_ot} eliminada del histórico")
-                                    st.rerun()
-                                else:
-                                    st.error("Debes marcar la confirmación antes de borrar")
+                            if seleccionar_hist:
+                                historicos_seleccionados.append(
+                                    (id_orden, numero_ot, origen)
+                                )
 
                     st.markdown("---")
+
+            # =====================================================
+            # BORRADO MÚLTIPLE · HISTÓRICO
+            # =====================================================
+            if (es_admin() or es_gerencia()) and historicos_seleccionados:
+                cantidad_sel = len(historicos_seleccionados)
+
+                st.warning(
+                    f"Has seleccionado **{cantidad_sel} OT** de esta página para borrar."
+                )
+
+                contiene_legionella = any(
+                    str(origen_sel or "").strip().upper() == "LEGIONELLA"
+                    for _, _, origen_sel in historicos_seleccionados
+                )
+
+                if contiene_legionella:
+                    st.info(
+                        "💧 Hay OT de Legionella seleccionadas. "
+                        "Se eliminará únicamente la OT del histórico. "
+                        "No se borran puntos, planificación ni registros técnicos de Legionella."
+                    )
+
+                confirmar_lote = st.checkbox(
+                    f"Confirmo el borrado definitivo de {cantidad_sel} OT",
+                    key=f"confirmar_borrado_hist_lote_{int(pagina_actual)}",
+                )
+
+                if st.button(
+                    f"🗑️ Borrar seleccionadas ({cantidad_sel})",
+                    key=f"borrar_hist_lote_{int(pagina_actual)}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    if not confirmar_lote:
+                        st.error(
+                            "Marca primero la confirmación del borrado múltiple."
+                        )
+                    else:
+                        errores = []
+                        borradas = 0
+
+                        for id_sel, numero_sel, _ in historicos_seleccionados:
+                            try:
+                                borrar_orden_historico(id_sel)
+                                borradas += 1
+                            except Exception as e:
+                                errores.append(f"{numero_sel}: {e}")
+
+                        limpiar_cache_streamlit()
+
+                        if errores:
+                            st.error(
+                                "Se borraron "
+                                f"{borradas} OT, pero hubo errores en: "
+                                + " | ".join(errores[:5])
+                            )
+                        else:
+                            st.success(
+                                f"Se han eliminado {borradas} OT del histórico."
+                            )
+
+                        for id_sel, _, _ in historicos_seleccionados:
+                            st.session_state.pop(
+                                f"sel_admin_hist_{id_sel}",
+                                None,
+                            )
+
+                        st.rerun()
