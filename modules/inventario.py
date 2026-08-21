@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from difflib import SequenceMatcher
 
 from database.db import conectar
 _COLUMNAS_INVENTARIO_ASEGURADAS = False
@@ -400,63 +401,77 @@ def palabras_clave_material(texto):
 
 
 def terminos_busqueda_material(texto):
-    """
-    Búsqueda flexible: admite fragmentos, varias palabras, mayúsculas
-    y acentos sin depender de LIKE/ILIKE de la base de datos.
-    """
+    """Normaliza la consulta y expande alias habituales del colegio."""
     texto_norm = normalizar_texto_material(texto)
-
     if not texto_norm:
         return []
 
-    return list(dict.fromkeys(
-        termino
-        for termino in texto_norm.split()
-        if termino
-    ))
+    alias = {
+        "p22": ["pearson", "22"],
+        "p9": ["pearson", "9"],
+    }
+
+    terminos = []
+    for termino in texto_norm.split():
+        terminos.extend(alias.get(termino, [termino]))
+
+    return list(dict.fromkeys(t for t in terminos if t))
 
 
 def _texto_busqueda_fila_inventario(fila):
-    indices = [
-        1,   # codigo
-        2,   # material
-        3,   # categoria
-        4,   # unidad
-        7,   # centro
-        8,   # edificio
-        9,   # ubicacion
-        10,  # proveedor
-        11,  # observaciones
-        19,  # fecha_compra
-        20,  # referencia_factura
-        21,  # observaciones_coste
-    ]
-
+    """Une y normaliza todos los campos útiles para buscar."""
+    indices = [1, 2, 3, 4, 7, 8, 9, 10, 11, 19, 20, 21]
     valores = []
-
     for indice in indices:
         try:
             valores.append(str(fila[indice] or ""))
         except Exception:
             pass
-
     return normalizar_texto_material(" ".join(valores))
 
 
-def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
-    terminos = terminos_busqueda_material(filtro_texto)
+def _termino_coincide_busqueda(termino, texto_fila):
+    """Substring, prefijo y pequeño error tipográfico."""
+    termino = normalizar_texto_material(termino)
+    texto_fila = normalizar_texto_material(texto_fila)
+    if not termino:
+        return True
 
+    if termino in texto_fila:
+        return True
+
+    tokens = [t for t in texto_fila.split() if t]
+
+    for token in tokens:
+        if len(termino) >= 2 and token.startswith(termino):
+            return True
+
+    if len(termino) >= 4:
+        for token in tokens:
+            if len(token) < 4 or token[0] != termino[0]:
+                continue
+            ratio = SequenceMatcher(None, termino, token).ratio()
+            umbral = 0.78 if len(termino) >= 6 else 0.82
+            if ratio >= umbral:
+                return True
+
+    return False
+
+
+def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
+    """
+    Todas las palabras deben coincidir, pero pueden estar repartidas entre
+    material, código, categoría, centro, edificio, ubicación, proveedor y notas.
+    """
+    terminos = terminos_busqueda_material(filtro_texto)
     if not terminos:
         return list(filas)
 
     resultado = []
-
     for fila in filas:
         texto_fila = _texto_busqueda_fila_inventario(fila)
-
-        if all(termino in texto_fila for termino in terminos):
+        if all(_termino_coincide_busqueda(t, texto_fila) for t in terminos):
             resultado.append(fila)
-
     return resultado
 
 
