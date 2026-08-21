@@ -11,11 +11,36 @@ from modules.inventario import (
     activar_material,
     comprobar_material_antes_crear,
     actualizar_material_abel,
+    categorias_inventario_disponibles,
+    sugerir_categoria_material,
+    prefijo_codigo_categoria,
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
 from modules.alertas_empresas import obtener_alertas_empresas_externas
 from modules.pedidos_material import crear_pedido_material
+
+
+CATEGORIAS_INVENTARIO_UI = categorias_inventario_disponibles()
+
+
+def _categoria_segura(valor):
+    valor = str(valor or "").strip()
+    if valor in CATEGORIAS_INVENTARIO_UI:
+        return valor
+    return "Otros"
+
+
+def _aplicar_categoria_sugerida_creacion():
+    material = st.session_state.get("crear_material_nombre", "")
+    sugerencia = sugerir_categoria_material(material)
+    st.session_state["crear_categoria_material"] = sugerencia["categoria"]
+
+
+def _aplicar_categoria_sugerida_edicion(codigo):
+    material = st.session_state.get(f"abel_edit_material_{codigo}", "")
+    sugerencia = sugerir_categoria_material(material)
+    st.session_state[f"abel_edit_categoria_{codigo}"] = sugerencia["categoria"]
 
 
 def rol_actual():
@@ -273,13 +298,52 @@ def pantalla_inventario():
             if st.session_state.pop("inventario_material_creado_ok", False):
                 st.success("Material creado correctamente. Formulario limpio para crear otro.")
 
-            material = st.text_input("Nombre material", key="crear_material_nombre")
+            material = st.text_input(
+                "Nombre material",
+                key="crear_material_nombre",
+                placeholder="Ejemplo: cerradura taquilla, mesa patas metálicas, grifo lavabo...",
+            )
+
+            sugerencia_categoria = sugerir_categoria_material(material)
+
+            if material.strip():
+                motivos = sugerencia_categoria.get("motivos") or []
+                motivo_txt = ", ".join(motivos[:3]) if motivos else "sin coincidencia clara"
+
+                st.info(
+                    f"💡 Categoría sugerida: **{sugerencia_categoria['categoria']}** "
+                    f"· confianza {sugerencia_categoria['confianza']}% "
+                    f"· criterio: {motivo_txt}"
+                )
+
+                if st.button(
+                    "✨ Usar categoría sugerida",
+                    key="usar_categoria_sugerida_crear",
+                    use_container_width=True,
+                    on_click=_aplicar_categoria_sugerida_creacion,
+                ):
+                    pass
+
+            categoria_actual = _categoria_segura(
+                st.session_state.get(
+                    "crear_categoria_material",
+                    sugerencia_categoria["categoria"] if material.strip() else "Otros",
+                )
+            )
 
             categoria = st.selectbox(
                 "Categoría",
-                ["Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"],
-                key="crear_categoria_material"
+                CATEGORIAS_INVENTARIO_UI,
+                index=CATEGORIAS_INVENTARIO_UI.index(categoria_actual),
+                key="crear_categoria_material",
+                help="La app propone una categoría, pero Abel siempre puede corregirla.",
             )
+
+            if material.strip():
+                st.caption(
+                    f"🏷️ Código nuevo previsto: "
+                    f"`{prefijo_codigo_categoria(categoria)}-###`"
+                )
 
             unidad = st.text_input("Unidad", value="uds", key="crear_material_unidad")
 
@@ -526,7 +590,14 @@ def pantalla_inventario():
     st.markdown("### 🔎 Buscar material")
 
     filtro_texto = st.text_input(
-        "Buscar por código, material, ubicación o proveedor",
+        "Buscar material",
+        placeholder=(
+            "Prueba: ele, electricidad, cerradura, mesa, Pearson 22, proveedor..."
+        ),
+        help=(
+            "Busca por fragmentos y varias palabras en código, material, categoría, "
+            "centro, edificio, ubicación, proveedor y observaciones."
+        ),
         key="filtro_texto_inventario"
     )
 
@@ -550,7 +621,7 @@ def pantalla_inventario():
 
     filtro_categoria = st.selectbox(
         "Categoría",
-        ["Todas", "Electricidad", "Fontanería", "Climatización", "Ferretería", "Pintura", "Limpieza", "Otros"],
+        ["Todas"] + CATEGORIAS_INVENTARIO_UI,
         key="filtro_categoria_inventario"
     )
 
@@ -792,11 +863,50 @@ def pantalla_inventario():
                     key=f"abel_edit_material_{codigo}"
                 )
 
-                nueva_categoria = st.text_input(
-                    "Categoría",
-                    value=str(categoria or ""),
-                    key=f"abel_edit_categoria_{codigo}"
-                )
+                sugerencia_edicion = sugerir_categoria_material(nuevo_material)
+
+                col_cat1, col_cat2 = st.columns([3, 1])
+
+                with col_cat1:
+                    categoria_edicion_actual = _categoria_segura(
+                        st.session_state.get(
+                            f"abel_edit_categoria_{codigo}",
+                            categoria,
+                        )
+                    )
+
+                    nueva_categoria = st.selectbox(
+                        "Categoría",
+                        CATEGORIAS_INVENTARIO_UI,
+                        index=CATEGORIAS_INVENTARIO_UI.index(
+                            categoria_edicion_actual
+                        ),
+                        key=f"abel_edit_categoria_{codigo}",
+                    )
+
+                with col_cat2:
+                    st.caption(
+                        f"💡 {sugerencia_edicion['categoria']}"
+                    )
+
+                    if st.button(
+                        "✨ Aplicar",
+                        key=f"aplicar_cat_sugerida_{codigo}",
+                        use_container_width=True,
+                        on_click=_aplicar_categoria_sugerida_edicion,
+                        args=(codigo,),
+                    ):
+                        pass
+
+                if (
+                    sugerencia_edicion["categoria"] != nueva_categoria
+                    and sugerencia_edicion["confianza"] >= 70
+                ):
+                    st.caption(
+                        f"La app sugiere **{sugerencia_edicion['categoria']}** "
+                        f"({sugerencia_edicion['confianza']}%). "
+                        f"Se mantiene tu categoría hasta que pulses Aplicar."
+                    )
 
                 nueva_ubicacion = st.text_input(
                     "Ubicación",
