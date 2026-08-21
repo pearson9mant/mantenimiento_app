@@ -5441,7 +5441,7 @@ def pantalla_legionella():
 
     with tab7:
         st.markdown("### Incidencias Legionella")
-
+    
         df = leer_df("""
             SELECT id, fecha_apertura, centro, edificio, punto, tarea, descripcion,
                    estado, prioridad, operario, fecha_cierre, observaciones_cierre
@@ -5452,25 +5452,161 @@ def pantalla_legionella():
               AND tarea IS NOT NULL
             ORDER BY fecha_apertura DESC, id DESC
         """)
-
+    
         if df.empty:
             st.success("No hay incidencias de Legionella.")
+    
         else:
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
+            # =====================================================
+            # SELECCIÓN MÚLTIPLE PARA BORRADO
+            # =====================================================
+            st.markdown("#### 🗂️ Listado de incidencias")
+    
+            df_editor = df.copy()
+            df_editor.insert(0, "Seleccionar", False)
+    
+            columnas_editor = [
+                "Seleccionar",
+                "id",
+                "fecha_apertura",
+                "centro",
+                "edificio",
+                "punto",
+                "tarea",
+                "descripcion",
+                "estado",
+                "prioridad",
+                "operario",
+                "fecha_cierre",
+                "observaciones_cierre",
+            ]
+    
+            editado = st.data_editor(
+                df_editor[columnas_editor],
+                use_container_width=True,
+                hide_index=True,
+                disabled=[
+                    "id",
+                    "fecha_apertura",
+                    "centro",
+                    "edificio",
+                    "punto",
+                    "tarea",
+                    "descripcion",
+                    "estado",
+                    "prioridad",
+                    "operario",
+                    "fecha_cierre",
+                    "observaciones_cierre",
+                ],
+                column_config={
+                    "Seleccionar": st.column_config.CheckboxColumn(
+                        "✓",
+                        help="Marca las incidencias de Legionella que quieras borrar.",
+                        default=False,
+                    )
+                },
+                key="editor_incidencias_legionella",
+            )
+    
+            seleccionadas = editado[
+                editado["Seleccionar"] == True
+            ].copy()
+    
+            ids_seleccionados = (
+                seleccionadas["id"]
+                .dropna()
+                .astype(int)
+                .tolist()
+            )
+    
+            if ids_seleccionados:
+                cantidad = len(ids_seleccionados)
+    
+                st.warning(
+                    f"Has seleccionado **{cantidad} incidencia(s) de Legionella**."
+                )
+    
+                st.info(
+                    "Este borrado elimina únicamente las incidencias seleccionadas. "
+                    "No modifica puntos, planificación, controles registrados ni OT."
+                )
+    
+                confirmar_borrado_leg = st.checkbox(
+                    f"Confirmo borrar definitivamente {cantidad} incidencia(s)",
+                    key="confirmar_borrado_incidencias_legionella",
+                )
+    
+                if st.button(
+                    f"🗑️ Borrar seleccionadas ({cantidad})",
+                    use_container_width=True,
+                    type="primary",
+                    key="borrar_incidencias_legionella_seleccionadas",
+                ):
+                    if not confirmar_borrado_leg:
+                        st.error(
+                            "Marca primero la casilla de confirmación."
+                        )
+                    else:
+                        try:
+                            conn = conectar()
+                            cur = conn.cursor()
+    
+                            for incidencia_id in ids_seleccionados:
+                                cur.execute(
+                                    adaptar_sql("""
+                                        DELETE FROM legionella_incidencias
+                                        WHERE id = ?
+                                    """),
+                                    (int(incidencia_id),),
+                                )
+    
+                            conn.commit()
+                            conn.close()
+    
+                            st.cache_data.clear()
+    
+                            st.success(
+                                f"Se han eliminado {cantidad} incidencia(s) de Legionella."
+                            )
+                            st.rerun()
+    
+                        except Exception as e:
+                            try:
+                                conn.rollback()
+                                conn.close()
+                            except Exception:
+                                pass
+    
+                            st.error(
+                                f"Error al borrar incidencias de Legionella: {e}"
+                            )
+    
+            st.markdown("---")
+    
+            # =====================================================
+            # CIERRE DE INCIDENCIAS ABIERTAS
+            # =====================================================
             abiertas = df[df["estado"] == "Abierta"]
-
+    
             if not abiertas.empty:
                 st.markdown("### Cerrar incidencia")
-
+    
                 incidencia_id = st.selectbox(
                     "Incidencia abierta",
-                    abiertas["id"].tolist()
+                    abiertas["id"].tolist(),
+                    key="cerrar_incidencia_legionella_id",
                 )
-
-                obs_cierre = st.text_area("Observaciones de cierre")
-
-                if st.button("Cerrar incidencia"):
+    
+                obs_cierre = st.text_area(
+                    "Observaciones de cierre",
+                    key="cerrar_incidencia_legionella_obs",
+                )
+    
+                if st.button(
+                    "Cerrar incidencia",
+                    key="cerrar_incidencia_legionella_boton",
+                ):
                     ejecutar(
                         """
                         UPDATE legionella_incidencias
@@ -5485,6 +5621,7 @@ def pantalla_legionella():
                             int(incidencia_id),
                         ),
                     )
+    
                     st.success("Incidencia cerrada.")
                     st.rerun()
 
