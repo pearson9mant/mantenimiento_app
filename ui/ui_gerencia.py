@@ -3069,10 +3069,38 @@ def mostrar_panel_planta_cv(df):
         else:
             st.success("Planta sin incidencias activas.")
     else:
-        columnas = ["numero_ot", "descripcion", "area", "prioridad", "estado"]
-        vista = activas.sort_values("fecha_dt", ascending=True, na_position="last").head(6)[columnas].copy()
-        vista.columns = ["OT", "Descripción", "Área", "Prioridad", "Estado"]
-        st.dataframe(vista, use_container_width=True, hide_index=True, height=238)
+        columnas = [
+            "numero_ot",
+            "descripcion",
+            "area",
+            "prioridad",
+            "estado",
+        ]
+        
+        vista = (
+            activas
+            .sort_values(
+                "fecha_dt",
+                ascending=False,
+                na_position="last",
+            )[columnas]
+            .copy()
+        )
+        
+        vista.columns = [
+            "OT",
+            "Descripción",
+            "Área",
+            "Prioridad",
+            "Estado",
+        ]
+        
+        st.dataframe(
+            vista,
+            use_container_width=True,
+            hide_index=True,
+            height=238,
+        )
 
 
 def _cumplimiento_simple(df, centro, palabra):
