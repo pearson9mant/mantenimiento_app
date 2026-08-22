@@ -1044,8 +1044,6 @@ def pantalla_colegio_vivo_operario():
     if _mostrar_planta_seleccionada():
         return
 
-    if _mostrar_planta_seleccionada():
-        return
 
     operario = str(
         st.session_state.get("operario_activo")
