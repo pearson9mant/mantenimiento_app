@@ -8,24 +8,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Instalar PostgreSQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Crear copia de seguridad
+      - name: Crear copia de seguridad PostgreSQL 18
         env:
           DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
         run: |
           FECHA=$(date -u +"%Y-%m-%d_%H-%M-%S")
           ARCHIVO="mantenimiento_db_${FECHA}.backup"
 
-          pg_dump \
-            --dbname="$DATABASE_URL" \
-            --format=custom \
-            --no-owner \
-            --no-privileges \
-            --file="$ARCHIVO"
+          docker run --rm \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -v "$PWD:/backup" \
+            postgres:18 \
+            sh -c 'pg_dump \
+              --dbname="$DATABASE_URL" \
+              --format=custom \
+              --no-owner \
+              --no-privileges \
+              --file="/backup/'"$ARCHIVO"'"'
 
           test -s "$ARCHIVO"
 
