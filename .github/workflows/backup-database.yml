@@ -1,0 +1,40 @@
+name: Backup base de datos
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Instalar PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Crear copia de seguridad
+        env:
+          DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          FECHA=$(date -u +"%Y-%m-%d_%H-%M-%S")
+          ARCHIVO="mantenimiento_db_${FECHA}.backup"
+
+          pg_dump \
+            --dbname="$DATABASE_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file="$ARCHIVO"
+
+          test -s "$ARCHIVO"
+
+          echo "BACKUP_FILE=$ARCHIVO" >> "$GITHUB_ENV"
+
+      - name: Guardar copia
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-mantenimiento-${{ github.run_number }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
