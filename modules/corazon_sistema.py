@@ -1124,6 +1124,95 @@ def clasificar_capa_decision_corazon(item):
     }
 
 
+
+def _peso_prioridad_declarada_corazon(valor):
+    prioridad = normalizar(valor)
+
+    if prioridad == "urgente":
+        return 4
+    if prioridad == "alta":
+        return 3
+    if prioridad == "media":
+        return 2
+    if prioridad in ["normal", "baja"]:
+        return 1
+
+    return 0
+
+
+def _peso_tipo_prioridad_corazon(valor):
+    tipo = str(valor or "").strip()
+
+    if tipo == "Sanitaria":
+        return 4
+    if tipo == "Urgente":
+        return 3
+    if tipo == "Alta":
+        return 2
+    if tipo == "Preventiva":
+        return 1
+
+    return 0
+
+
+def _clave_decision_prioridades_corazon(item):
+    """
+    Evita que varias OT empatadas visualmente a 100 pierdan matices.
+    Mantiene el score visible 0-100, pero ordena con más información.
+    """
+    historial = item.get("historial_espacio", {}) or {}
+
+    try:
+        misma_area = int(historial.get("misma_area", 0) or 0)
+    except (TypeError, ValueError):
+        misma_area = 0
+
+    try:
+        total_historial = int(historial.get("total", 0) or 0)
+    except (TypeError, ValueError):
+        total_historial = 0
+
+    recurrencia = max(
+        1 if historial.get("es_recurrente") else 0,
+        min(3, misma_area),
+        1 if total_historial >= 3 else 0,
+    )
+
+    try:
+        dias = max(0, int(item.get("dias_abierta") or 0))
+    except (TypeError, ValueError):
+        dias = 0
+
+    return (
+        1 if str(item.get("tipo_prioridad") or "").strip() == "Sanitaria" else 0,
+        1 if bool(item.get("riesgo_operativo_critico")) else 0,
+        _peso_tipo_prioridad_corazon(item.get("tipo_prioridad")),
+        _peso_prioridad_declarada_corazon(item.get("prioridad")),
+        int(item.get("score", 0) or 0),
+        dias,
+        recurrencia,
+        int(item.get("concentracion_planta_ejecutable", 0) or 0),
+        int(item.get("bonus_ubicacion", 0) or 0),
+    )
+
+
+def _puede_recibir_bonus_logistico_corazon(item):
+    """
+    Zona y proximidad ayudan a ordenar trabajos comparables.
+    No convierten una OT normal en una falsa emergencia.
+    """
+    tipo = str(item.get("tipo_prioridad") or "").strip()
+    prioridad = normalizar(item.get("prioridad"))
+
+    if tipo == "Sanitaria":
+        return False
+    if prioridad == "urgente":
+        return False
+    if bool(item.get("riesgo_operativo_critico")):
+        return False
+
+    return True
+
 def construir_prioridades_globales(
     centro=None,
     operario=None,
@@ -1275,21 +1364,30 @@ def construir_prioridades_globales(
 
     # =================================================
     # BONUS DE CONCENTRACIÓN POR PLANTA
+    # SOLO CUENTA OT REALMENTE EJECUTABLES
     # =================================================
-    # A igualdad razonable de riesgo, el Corazón favorece terminar
-    # varias actuaciones cercanas y evita desplazamientos innecesarios.
-    concentracion = {}
+    concentracion_ejecutable = {}
 
     for prioridad_item in prioridades:
+        ejecucion = evaluar_ejecutabilidad_corazon(prioridad_item)
+
+        prioridad_item["ejecutable_corazon_base"] = bool(
+            ejecucion.get("ejecutable")
+        )
+
         clave_zona = (
             prioridad_item.get("centro", "") or "",
             prioridad_item.get("edificio", "") or "",
             prioridad_item.get("planta", "") or "",
         )
 
-        if clave_zona[2] and clave_zona[2] != "Sin planta":
-            concentracion[clave_zona] = (
-                concentracion.get(clave_zona, 0) + 1
+        if (
+            prioridad_item["ejecutable_corazon_base"]
+            and clave_zona[2]
+            and clave_zona[2] != "Sin planta"
+        ):
+            concentracion_ejecutable[clave_zona] = (
+                concentracion_ejecutable.get(clave_zona, 0) + 1
             )
 
     for prioridad_item in prioridades:
@@ -1299,7 +1397,10 @@ def construir_prioridades_globales(
             prioridad_item.get("planta", "") or "",
         )
 
-        cantidad_zona = concentracion.get(clave_zona, 0)
+        cantidad_zona = concentracion_ejecutable.get(clave_zona, 0)
+
+        prioridad_item["concentracion_planta_ejecutable"] = cantidad_zona
+        prioridad_item["concentracion_planta"] = cantidad_zona
 
         if cantidad_zona >= 5:
             bonus_zona = 8
@@ -1310,22 +1411,19 @@ def construir_prioridades_globales(
         else:
             bonus_zona = 0
 
-        if bonus_zona:
+        if (
+            bonus_zona
+            and prioridad_item["ejecutable_corazon_base"]
+            and _puede_recibir_bonus_logistico_corazon(prioridad_item)
+        ):
             prioridad_item["score"] = min(
                 100,
                 int(prioridad_item.get("score", 0) or 0) + bonus_zona,
             )
 
-            prioridad_item.setdefault(
-                "motivos",
-                [],
-            ).append(
+            prioridad_item.setdefault("motivos", []).append(
                 f"Hay {cantidad_zona} actuaciones ejecutables en esta planta."
             )
-
-            prioridad_item["concentracion_planta"] = cantidad_zona
-        else:
-            prioridad_item["concentracion_planta"] = cantidad_zona
 
     # =================================================
     # CONTINUIDAD DE UBICACIÓN
@@ -1340,7 +1438,11 @@ def construir_prioridades_globales(
             )
         )
 
-        if bonus_ubicacion:
+        if (
+            bonus_ubicacion
+            and bool(prioridad_item.get("ejecutable_corazon_base", True))
+            and _puede_recibir_bonus_logistico_corazon(prioridad_item)
+        ):
             prioridad_item["score"] = min(
                 100,
                 int(prioridad_item.get("score", 0) or 0)
@@ -1357,12 +1459,7 @@ def construir_prioridades_globales(
             prioridad_item["bonus_ubicacion"] = 0
 
     prioridades.sort(
-        key=lambda x: (
-            x.get("score", 0),
-            1 if normalizar(x.get("prioridad")) == "urgente" else 0,
-            x.get("concentracion_planta", 0),
-            x.get("dias_abierta") or 0,
-        ),
+        key=_clave_decision_prioridades_corazon,
         reverse=True,
     )
 
@@ -1908,6 +2005,11 @@ def _evaluar_interrupcion_corazon(
     )
 
     for candidata in prioridades:
+        ejecucion = evaluar_ejecutabilidad_corazon(candidata)
+
+        if not ejecucion.get("ejecutable"):
+            continue
+
         if (
             bool(candidata.get("riesgo_operativo_critico"))
             or str(candidata.get("tipo_prioridad") or "").strip() == "Sanitaria"
