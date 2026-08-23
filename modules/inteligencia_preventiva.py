@@ -778,6 +778,227 @@ def _cargar_correctivos_abiertos(centro, desde):
     return pd.DataFrame(registros)
 
 
+def _cargar_preventivos_periodo(centro, desde):
+    """
+    Lee actuaciones preventivas del periodo sin modificar nada.
+
+    Combina:
+    - preventivos ya archivados en historico_ordenes;
+    - preventivos todavía abiertos en ordenes_trabajo.
+
+    El objetivo es medir actividad preventiva real del mismo periodo
+    usado para analizar incidencias correctivas.
+    """
+    registros = []
+
+    for tabla, origen_dato in [
+        ("historico_ordenes", "historico"),
+        ("ordenes_trabajo", "abierta"),
+    ]:
+        df = _leer_df(
+            f"""
+            SELECT *
+            FROM {tabla}
+            WHERE centro = ?
+              AND UPPER(COALESCE(origen, '')) = 'PREVENTIVO'
+            """,
+            (centro,),
+        )
+
+        if df.empty:
+            continue
+
+        for _, fila in df.iterrows():
+            estado = _normalizar(
+                fila.get("estado", "")
+            )
+
+            if "cancelad" in estado:
+                continue
+
+            fecha = _obtener_fecha_fila(
+                fila
+            )
+
+            if not fecha:
+                continue
+
+            if fecha < desde:
+                continue
+
+            registro = fila.to_dict()
+            registro["_fecha_inteligencia"] = fecha
+            registro["_origen_dato"] = origen_dato
+
+            registros.append(
+                registro
+            )
+
+    if not registros:
+        return pd.DataFrame()
+
+    return pd.DataFrame(
+        registros
+    )
+
+
+def _construir_balance_areas(
+    correctivos,
+    preventivos_periodo,
+    preventivos_activos,
+):
+    """
+    Compara actividad correctiva y preventiva por área.
+
+    Importante:
+    - El balance NO crea por sí mismo una recomendación.
+    - Tener mucha correctiva no significa que exista un patrón técnico.
+    - La creación de preventivos sigue dependiendo del motor de patrones.
+    """
+    areas = set()
+
+    def _areas_df(df):
+        if df is None or df.empty or "area" not in df.columns:
+            return set()
+
+        return {
+            str(valor or "").strip()
+            for valor in df["area"].tolist()
+            if str(valor or "").strip()
+        }
+
+    areas |= _areas_df(
+        correctivos
+    )
+    areas |= _areas_df(
+        preventivos_periodo
+    )
+    areas |= _areas_df(
+        preventivos_activos
+    )
+
+    resultado = []
+
+    for area in sorted(
+        areas,
+        key=lambda x: _normalizar_clave(x),
+    ):
+        area_clave = _normalizar_clave(
+            area
+        )
+
+        def _contar(df):
+            if (
+                df is None
+                or df.empty
+                or "area" not in df.columns
+            ):
+                return 0
+
+            return int(
+                sum(
+                    1
+                    for valor in df["area"].tolist()
+                    if _normalizar_clave(valor)
+                    == area_clave
+                )
+            )
+
+        correctivos_n = _contar(
+            correctivos
+        )
+
+        preventivos_n = _contar(
+            preventivos_periodo
+        )
+
+        activos_n = _contar(
+            preventivos_activos
+        )
+
+        if correctivos_n == 0 and preventivos_n > 0:
+            estado = "Preventivo domina"
+            color = "verde"
+            lectura = (
+                "Hay actividad preventiva y no aparecen correctivos "
+                "en el periodo analizado."
+            )
+
+        elif correctivos_n == 0 and preventivos_n == 0:
+            estado = "Sin actividad"
+            color = "gris"
+            lectura = (
+                "No hay actividad suficiente para valorar esta área."
+            )
+
+        elif preventivos_n == 0:
+            estado = "Correctivo sin cobertura"
+            color = "rojo" if correctivos_n >= 3 else "amarillo"
+            lectura = (
+                "Hay correctivos pero no constan actuaciones preventivas "
+                "en el mismo periodo. Esto no implica por sí solo que haya "
+                "que crear un preventivo: debe existir patrón técnico."
+            )
+
+        else:
+            ratio = correctivos_n / preventivos_n
+
+            if ratio <= 1:
+                estado = "Equilibrado"
+                color = "verde"
+                lectura = (
+                    "La actividad preventiva iguala o supera a la correctiva."
+                )
+
+            elif ratio <= 2:
+                estado = "Vigilar"
+                color = "amarillo"
+                lectura = (
+                    "La correctiva supera moderadamente a la preventiva. "
+                    "Conviene observar si hay patrones repetidos."
+                )
+
+            else:
+                estado = "Correctivo domina"
+                color = "rojo"
+                lectura = (
+                    "La correctiva supera claramente a la preventiva. "
+                    "Priorizar el análisis de patrones antes de aumentar tareas."
+                )
+
+        ratio_cp = (
+            round(
+                correctivos_n / preventivos_n,
+                2,
+            )
+            if preventivos_n > 0
+            else None
+        )
+
+        resultado.append(
+            {
+                "area": area,
+                "correctivos": correctivos_n,
+                "preventivos_periodo": preventivos_n,
+                "preventivos_activos": activos_n,
+                "ratio_correctivo_preventivo": ratio_cp,
+                "estado": estado,
+                "color": color,
+                "lectura": lectura,
+            }
+        )
+
+    resultado.sort(
+        key=lambda x: (
+            -x["correctivos"],
+            x["area"],
+        )
+    )
+
+    return resultado
+
+
+
 def _cargar_preventivos(centro):
     return _leer_df(
         """
@@ -1080,6 +1301,8 @@ def analizar_inteligencia_preventiva(
             "patrones_confirmados": 0,
             "patrones_con_preventivo": 0,
             "patrones_sin_preventivo": 0,
+            "total_preventivos_periodo": 0,
+            "balance_areas": [],
             "grupos_analizados": 0,
             "recomendaciones": [],
         }
@@ -1121,12 +1344,29 @@ def analizar_inteligencia_preventiva(
             "patrones_confirmados": 0,
             "patrones_con_preventivo": 0,
             "patrones_sin_preventivo": 0,
+            "total_preventivos_periodo": 0,
+            "balance_areas": [],
             "grupos_analizados": 0,
             "recomendaciones": [],
         }
 
     preventivos = _cargar_preventivos(
         centro
+    )
+
+    preventivos_periodo = (
+        _cargar_preventivos_periodo(
+            centro,
+            desde,
+        )
+    )
+
+    balance_areas = (
+        _construir_balance_areas(
+            correctivos=df,
+            preventivos_periodo=preventivos_periodo,
+            preventivos_activos=preventivos,
+        )
     )
 
     mapa_plantas = _cargar_plantas(
@@ -1531,6 +1771,13 @@ def analizar_inteligencia_preventiva(
         "patrones_sin_preventivo": len(
             patrones_sin_preventivo
         ),
+        "total_preventivos_periodo": (
+            len(preventivos_periodo)
+            if preventivos_periodo is not None
+            and not preventivos_periodo.empty
+            else 0
+        ),
+        "balance_areas": balance_areas,
         "grupos_analizados": len(
             agrupado
         ),
