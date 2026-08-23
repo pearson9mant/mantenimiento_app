@@ -887,25 +887,30 @@ def _resumen_simple_gerencia(df, centro):
 
 
 def mostrar_cabecera_simple_gerencia(df, centro):
-    resumen = _resumen_simple_gerencia(df, centro)
+    """
+    Cabecera ejecutiva compacta para Gerencia.
 
-    st.markdown(
-        """
-        <div class="gerencia-ejecutivo-simple">
-            <div class="gerencia-ejecutivo-title">
-                🏫 Estado del mantenimiento
-            </div>
-            <div class="gerencia-ejecutivo-subtitle">
-                Resumen ejecutivo · Solo lo que Gerencia necesita saber
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    Conserva:
+    - estado sencillo;
+    - propuestas pendientes;
+    - actividad esencial;
+    - correctivo/preventivo para demostrar evolución futura.
+
+    El detalle técnico queda debajo, junto a Colegio Vivo.
+    """
+    resumen = _resumen_simple_gerencia(df, centro)
+    diagnostico = _diagnostico_ejecutivo_centro(df, centro)
+
+    total_mes = int(diagnostico.get("total_mes", 0) or 0)
+    preventivas_mes = int(diagnostico.get("preventivas_mes", 0) or 0)
+    correctivas_mes = max(total_mes - preventivas_mes, 0)
+
+    st.markdown("## 🏫 Estado del mantenimiento")
 
     cabecera = (
-        f"**{resumen['icono']} {resumen['estado']}**\n\n"
-        f"{resumen['mensaje']}"
+        f"**{resumen['icono']} {resumen['estado']}**  \n"
+        f"{resumen['mensaje']}  \n"
+        "**No hay propuestas pendientes de aprobación registradas.**"
     )
 
     if resumen["icono"] == "🔴":
@@ -915,41 +920,63 @@ def mostrar_cabecera_simple_gerencia(df, centro):
     else:
         st.success(cabecera)
 
-    st.markdown("### 📌 Propuestas de Mantenimiento")
-    st.info(
-        "No hay propuestas pendientes de aprobación registradas. "
-        "Cuando Mantenimiento considere necesaria una inversión, "
-        "sustitución o actuación externa, aparecerá aquí."
-    )
-
-    st.markdown("### ⚠️ Situación a conocer")
-
-    for linea in resumen["situaciones"]:
-        st.markdown(f"- {linea}")
-
-    st.markdown("### ✅ Actividad de Mantenimiento")
-
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
 
     c1.metric(
-        "Resueltas este mes",
-        resumen["cerradas_mes"],
-    )
-
-    c2.metric(
-        "Abiertas ahora",
+        "Abiertas",
         resumen["abiertas"],
     )
-
+    c2.metric(
+        "Prioritarias",
+        resumen["criticas"],
+    )
     c3.metric(
         "Pendiente material",
         resumen["material"],
     )
-
-    st.caption(
-        "El detalle técnico y operativo continúa disponible "
-        "en los edificios y plantas de Colegio Vivo."
+    c4.metric(
+        "Espacios reincidentes",
+        resumen["reincidencias"],
     )
+
+    st.markdown("### 🛡️ Correctivo frente a preventivo")
+
+    p1, p2, p3 = st.columns(3)
+
+    p1.metric(
+        "Incidencias este mes",
+        correctivas_mes,
+    )
+    p2.metric(
+        "Preventivos este mes",
+        preventivas_mes,
+    )
+
+    if total_mes > 0:
+        porcentaje_preventivo = round(
+            preventivas_mes / total_mes * 100
+        )
+        lectura = f"{porcentaje_preventivo}%"
+    else:
+        lectura = "—"
+
+    p3.metric(
+        "Peso preventivo",
+        lectura,
+    )
+
+    if preventivas_mes == 0:
+        st.caption(
+            "El preventivo todavía no ha empezado a generar histórico real. "
+            "Cuando se ejecute durante el curso, esta comparación permitirá "
+            "ver si las incidencias correctivas van disminuyendo."
+        )
+    else:
+        st.caption(
+            "Este bloque compara la actividad correctiva y preventiva del mes. "
+            "Con histórico suficiente permitirá comprobar si el preventivo "
+            "reduce incidencias."
+        )
 
 
 def _serie_mensual_base():
