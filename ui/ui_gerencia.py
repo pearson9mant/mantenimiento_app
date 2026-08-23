@@ -71,6 +71,26 @@ def aplicar_estilo_gerencia():
         font-size: 14px;
         font-weight: 600;
     }
+    .gerencia-ejecutivo-simple {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 18px 20px;
+        margin: 14px 0 18px 0;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+    .gerencia-ejecutivo-title {
+        font-size: 22px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .gerencia-ejecutivo-subtitle {
+        font-size: 13px;
+        font-weight: 650;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
     div.stButton > button {
         min-height: 86px; border-radius: 20px; border: 1px solid #e5e7eb;
         background: #ffffff; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
@@ -751,6 +771,185 @@ def mostrar_resumen_ejecutivo(df, centro):
         "La prioridad diaria de ejecución la determina el ❤️ Corazón."
     )
 
+
+
+
+def _cerradas_mes_actual_gerencia(df, centro):
+    datos = _datos_centro_ejecutivo(df, centro)
+
+    if datos.empty:
+        return pd.DataFrame()
+
+    cerradas = datos[es_cerrada(datos)].copy()
+
+    if cerradas.empty:
+        return cerradas
+
+    fecha_ref = cerradas["fecha_cierre_dt"].copy()
+    fecha_ref = fecha_ref.where(
+        fecha_ref.notna(),
+        cerradas["fecha_dt"],
+    )
+
+    hoy = pd.Timestamp.today()
+
+    return cerradas[
+        fecha_ref.notna()
+        & (fecha_ref.dt.month == hoy.month)
+        & (fecha_ref.dt.year == hoy.year)
+    ].copy()
+
+
+def _resumen_simple_gerencia(df, centro):
+    diagnostico = _diagnostico_ejecutivo_centro(df, centro)
+
+    cerradas_mes = _cerradas_mes_actual_gerencia(
+        df,
+        centro,
+    )
+
+    abiertas = int(diagnostico.get("abiertas", 0) or 0)
+    criticas = int(diagnostico.get("criticas", 0) or 0)
+    material = int(diagnostico.get("material", 0) or 0)
+
+    reincidencias = diagnostico.get("reincidencias")
+    n_reincidencias = (
+        len(reincidencias)
+        if reincidencias is not None
+        and not reincidencias.empty
+        else 0
+    )
+
+    cerradas = len(cerradas_mes)
+
+    if diagnostico.get("color") == "rojo":
+        estado = "Requiere atención"
+        icono = "🔴"
+        mensaje = (
+            "Hay asuntos que Mantenimiento está siguiendo "
+            "con prioridad."
+        )
+    elif diagnostico.get("color") == "amarillo":
+        estado = "En seguimiento"
+        icono = "🟡"
+        mensaje = (
+            "Mantenimiento está gestionando la actividad "
+            "y mantiene algunos puntos en seguimiento."
+        )
+    else:
+        estado = "Situación controlada"
+        icono = "🟢"
+        mensaje = (
+            "Mantenimiento está gestionando la actividad "
+            "ordinaria sin incidencias relevantes para Gerencia."
+        )
+
+    situaciones = []
+
+    if criticas > 0:
+        situaciones.append(
+            f"{criticas} actuación"
+            f"{' prioritaria' if criticas == 1 else 'es prioritarias'} "
+            "en seguimiento por Mantenimiento."
+        )
+
+    if material > 0:
+        situaciones.append(
+            f"{material} actuación"
+            f"{' está' if material == 1 else 'es están'} "
+            "pendiente de material."
+        )
+
+    if n_reincidencias > 0:
+        situaciones.append(
+            f"{n_reincidencias} espacio"
+            f"{' presenta' if n_reincidencias == 1 else 's presentan'} "
+            "incidencias repetidas y se mantiene seguimiento."
+        )
+
+    if not situaciones:
+        situaciones.append(
+            "No hay ningún asunto relevante que Gerencia "
+            "necesite conocer en este momento."
+        )
+
+    return {
+        "estado": estado,
+        "icono": icono,
+        "mensaje": mensaje,
+        "abiertas": abiertas,
+        "criticas": criticas,
+        "material": material,
+        "reincidencias": n_reincidencias,
+        "cerradas_mes": cerradas,
+        "situaciones": situaciones[:3],
+    }
+
+
+def mostrar_cabecera_simple_gerencia(df, centro):
+    resumen = _resumen_simple_gerencia(df, centro)
+
+    st.markdown(
+        """
+        <div class="gerencia-ejecutivo-simple">
+            <div class="gerencia-ejecutivo-title">
+                🏫 Estado del mantenimiento
+            </div>
+            <div class="gerencia-ejecutivo-subtitle">
+                Resumen ejecutivo · Solo lo que Gerencia necesita saber
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    cabecera = (
+        f"**{resumen['icono']} {resumen['estado']}**\n\n"
+        f"{resumen['mensaje']}"
+    )
+
+    if resumen["icono"] == "🔴":
+        st.error(cabecera)
+    elif resumen["icono"] == "🟡":
+        st.warning(cabecera)
+    else:
+        st.success(cabecera)
+
+    st.markdown("### 📌 Propuestas de Mantenimiento")
+    st.info(
+        "No hay propuestas pendientes de aprobación registradas. "
+        "Cuando Mantenimiento considere necesaria una inversión, "
+        "sustitución o actuación externa, aparecerá aquí."
+    )
+
+    st.markdown("### ⚠️ Situación a conocer")
+
+    for linea in resumen["situaciones"]:
+        st.markdown(f"- {linea}")
+
+    st.markdown("### ✅ Actividad de Mantenimiento")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "Resueltas este mes",
+        resumen["cerradas_mes"],
+    )
+
+    c2.metric(
+        "Abiertas ahora",
+        resumen["abiertas"],
+    )
+
+    c3.metric(
+        "Pendiente material",
+        resumen["material"],
+    )
+
+    st.caption(
+        "El detalle técnico y operativo continúa disponible "
+        "en los edificios y plantas de Colegio Vivo."
+    )
 
 
 def _serie_mensual_base():
@@ -3143,144 +3342,6 @@ def mostrar_resumen_inferior_cv(df):
                 unsafe_allow_html=True,
             )
 
-def mostrar_comparativa_centros_gerencia(df):
-    """
-    Comparativa ejecutiva P22 ↔ P9.
-
-    Utiliza el diagnóstico que Gerencia ya calcula.
-    No hace nuevas consultas a la base de datos.
-    """
-
-    d22 = _diagnostico_ejecutivo_centro(
-        df,
-        "Pearson 22",
-    )
-
-    d9 = _diagnostico_ejecutivo_centro(
-        df,
-        "Pearson 9",
-    )
-
-    st.markdown("### 🧭 Comparativa de centros")
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        with st.container(border=True):
-            st.markdown("### 🏫 Pearson 22")
-
-            st.metric(
-                "Índice operativo",
-                f"{d22['indice']}%",
-            )
-
-            st.caption(
-                f"{d22['estado']} · "
-                f"Tendencia {d22['tendencia']}"
-            )
-
-            a1, a2, a3 = st.columns(3)
-
-            a1.metric(
-                "Abiertas",
-                d22["abiertas"],
-            )
-
-            a2.metric(
-                "Críticas",
-                d22["criticas"],
-            )
-
-            a3.metric(
-                "Reincidencias",
-                len(d22["reincidencias"]),
-            )
-
-    with c2:
-        with st.container(border=True):
-            st.markdown("### 🏫 Pearson 9")
-
-            st.metric(
-                "Índice operativo",
-                f"{d9['indice']}%",
-            )
-
-            st.caption(
-                f"{d9['estado']} · "
-                f"Tendencia {d9['tendencia']}"
-            )
-
-            b1, b2, b3 = st.columns(3)
-
-            b1.metric(
-                "Abiertas",
-                d9["abiertas"],
-            )
-
-            b2.metric(
-                "Críticas",
-                d9["criticas"],
-            )
-
-            b3.metric(
-                "Reincidencias",
-                len(d9["reincidencias"]),
-            )
-
-    # ==============================================
-    # LECTURA EJECUTIVA
-    # ==============================================
-
-    if d22["indice"] < d9["indice"]:
-        centro_atencion = "Pearson 22"
-        diferencia = d9["indice"] - d22["indice"]
-
-    elif d9["indice"] < d22["indice"]:
-        centro_atencion = "Pearson 9"
-        diferencia = d22["indice"] - d9["indice"]
-
-    else:
-        centro_atencion = ""
-        diferencia = 0
-
-    if centro_atencion:
-        st.info(
-            f"📌 **Centro que requiere más seguimiento: "
-            f"{centro_atencion}.** "
-            f"La diferencia actual entre ambos centros es de "
-            f"{diferencia} puntos."
-        )
-    else:
-        st.success(
-            "🟢 Ambos centros presentan actualmente "
-            "el mismo índice operativo."
-        )
-
-    # ==============================================
-    # MEJOR / PEOR TENDENCIA
-    # ==============================================
-
-    diferencias = {
-        "Pearson 22": d22["diferencia"],
-        "Pearson 9": d9["diferencia"],
-    }
-
-    mejor = min(
-        diferencias,
-        key=diferencias.get,
-    )
-
-    peor = max(
-        diferencias,
-        key=diferencias.get,
-    )
-
-    if diferencias[mejor] < diferencias[peor]:
-        st.caption(
-            f"📉 Mejor evolución mensual: **{mejor}** · "
-            f"📈 Mayor presión de incidencias: **{peor}**."
-        )
-
 
 def mostrar_colegio_vivo_gerencia(
     df,
@@ -3325,6 +3386,11 @@ def mostrar_colegio_vivo_gerencia(
             f"{icono_centro} **{centro_objetivo} · "
             f"{estado_centro}** · "
             f"{total_centro} actuaciones activas"
+        )
+
+        mostrar_cabecera_simple_gerencia(
+            df,
+            centro_objetivo,
         )
 
         izquierda, derecha = st.columns(
