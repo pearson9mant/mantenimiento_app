@@ -39,6 +39,61 @@ ESTADOS_CERRADOS = {
 
 
 # =========================================================
+# TIEMPOS ORIENTATIVOS DE PREVENTIVO
+# =========================================================
+# Sirven para dimensionar carga de trabajo. No sustituyen
+# una medición real de tiempos ni una obligación normativa.
+
+TIEMPOS_BASE_PREVENTIVO_MIN = {
+    "cisterna / fluxor": 20,
+    "grifo": 15,
+    "fuga de agua": 25,
+    "desagüe / atasco": 25,
+    "tubería / racor": 30,
+    "enchufe / toma": 20,
+    "interruptor / pulsador": 15,
+    "cuadro / protección": 30,
+    "cableado": 30,
+    "filtros": 25,
+    "condensados / desagüe": 30,
+    "temperatura / rendimiento": 25,
+    "unidad interior": 30,
+    "unidad exterior": 40,
+    "luminaria / lámpara": 15,
+    "emergencia": 20,
+    "puerta / maneta": 20,
+    "ventana / persiana": 25,
+    "mesa / silla": 15,
+    "pizarra": 15,
+    "pantalla / proyector": 20,
+    "ordenador": 20,
+    "red / conectividad": 25,
+    "audio": 20,
+    "acumulador": 35,
+    "retorno / recirculación": 35,
+    "temperatura": 20,
+    "válvula": 25,
+    "puerta de emergencia": 30,
+    "cierre / acceso": 20,
+    "señalización": 15,
+    "riego": 30,
+    "árbol / rama": 30,
+}
+
+TIEMPO_BASE_AREA_MIN = {
+    "fontaneria": 25,
+    "electricidad": 25,
+    "climatizacion": 30,
+    "iluminacion": 20,
+    "equipamiento": 20,
+    "informatica": 25,
+    "acs": 30,
+    "seguridad": 25,
+    "jardineria": 30,
+}
+
+
+# =========================================================
 # PATRONES DE AVERÍA
 # =========================================================
 #
@@ -489,6 +544,97 @@ def _dias_a_frecuencia(dias):
     return "Anual"
 
 
+
+def _dias_frecuencia_recomendada(intervalo_medio):
+    """
+    Adelanta la revisión aproximadamente un 30% respecto
+    al intervalo medio observado entre fallos.
+    """
+    if intervalo_medio is None:
+        return 30
+
+    try:
+        intervalo = int(intervalo_medio)
+    except Exception:
+        return 30
+
+    return max(7, round(intervalo * 0.70))
+
+
+def _estimar_tiempo_preventivo_min(
+    patron,
+    area,
+    repeticiones,
+    cantidad,
+):
+    """
+    Estimación prudente del tiempo de una revisión preventiva.
+    """
+    patron_txt = str(patron or "").strip()
+    area_clave = _normalizar_clave(area)
+
+    minutos = TIEMPOS_BASE_PREVENTIVO_MIN.get(
+        patron_txt,
+        TIEMPO_BASE_AREA_MIN.get(area_clave, 20),
+    )
+
+    try:
+        repeticiones = int(repeticiones or 0)
+    except Exception:
+        repeticiones = 0
+
+    try:
+        cantidad = int(cantidad or 0)
+    except Exception:
+        cantidad = 0
+
+    if repeticiones >= 5:
+        minutos += 10
+    elif repeticiones >= 3:
+        minutos += 5
+
+    if cantidad >= 8:
+        minutos += 5
+
+    return max(10, min(60, int(minutos)))
+
+
+def _calcular_carga_preventiva_anual(
+    dias_frecuencia,
+    minutos_revision,
+):
+    try:
+        dias = max(1, int(dias_frecuencia))
+    except Exception:
+        dias = 30
+
+    try:
+        minutos = max(1, int(minutos_revision))
+    except Exception:
+        minutos = 20
+
+    revisiones_anuales = max(1, round(365 / dias))
+    horas_anuales = round(
+        (revisiones_anuales * minutos) / 60,
+        1,
+    )
+
+    return revisiones_anuales, horas_anuales
+
+
+def _evaluar_cobertura_preventiva(
+    patron_detectado,
+    preventivo,
+):
+    if not patron_detectado:
+        return "Sin patrón"
+
+    if preventivo is None:
+        return "Sin preventivo"
+
+    return "Con preventivo"
+
+
 # =========================================================
 # DATOS
 # =========================================================
@@ -877,13 +1023,8 @@ def _nivel_recomendacion(score):
 
 
 def _frecuencia_recomendada(intervalo_medio):
-    if intervalo_medio is None:
-        return "Mensual"
-
-    # La revisión debe adelantarse respecto al fallo medio.
-    objetivo = max(
-        7,
-        round(intervalo_medio * 0.70),
+    objetivo = _dias_frecuencia_recomendada(
+        intervalo_medio
     )
 
     return _dias_a_frecuencia(
@@ -935,6 +1076,10 @@ def analizar_inteligencia_preventiva(
             "dias": dias,
             "desde": str(desde),
             "total_correctivos": 0,
+            "preventivos_activos": 0,
+            "patrones_confirmados": 0,
+            "patrones_con_preventivo": 0,
+            "patrones_sin_preventivo": 0,
             "grupos_analizados": 0,
             "recomendaciones": [],
         }
@@ -972,6 +1117,10 @@ def analizar_inteligencia_preventiva(
             "dias": dias,
             "desde": str(desde),
             "total_correctivos": 0,
+            "preventivos_activos": 0,
+            "patrones_confirmados": 0,
+            "patrones_con_preventivo": 0,
+            "patrones_sin_preventivo": 0,
             "grupos_analizados": 0,
             "recomendaciones": [],
         }
@@ -1091,6 +1240,42 @@ def analizar_inteligencia_preventiva(
         frecuencia_sugerida = (
             _frecuencia_recomendada(
                 intervalo_medio
+            )
+        )
+
+        dias_frecuencia_sugerida = (
+            _dias_frecuencia_recomendada(
+                intervalo_medio
+            )
+        )
+
+        tiempo_preventivo_min = (
+            _estimar_tiempo_preventivo_min(
+                patron=patron_detectado,
+                area=area,
+                repeticiones=repeticiones_patron,
+                cantidad=cantidad,
+            )
+            if patron_detectado
+            else 0
+        )
+
+        (
+            revisiones_anuales_sugeridas,
+            horas_preventivo_anuales,
+        ) = (
+            _calcular_carga_preventiva_anual(
+                dias_frecuencia_sugerida,
+                tiempo_preventivo_min,
+            )
+            if patron_detectado
+            else (0, 0)
+        )
+
+        cobertura_preventiva = (
+            _evaluar_cobertura_preventiva(
+                patron_detectado,
+                preventivo,
             )
         )
 
@@ -1270,6 +1455,23 @@ def analizar_inteligencia_preventiva(
             "frecuencia_sugerida": (
                 frecuencia_sugerida
             ),
+            "dias_frecuencia_sugerida": (
+                dias_frecuencia_sugerida
+                if patron_detectado
+                else 0
+            ),
+            "tiempo_preventivo_min": (
+                tiempo_preventivo_min
+            ),
+            "revisiones_anuales_sugeridas": (
+                revisiones_anuales_sugeridas
+            ),
+            "horas_preventivo_anuales": (
+                horas_preventivo_anuales
+            ),
+            "cobertura_preventiva": (
+                cobertura_preventiva
+            ),
             "preventivo_id": (
                 preventivo_id
             ),
@@ -1287,11 +1489,48 @@ def analizar_inteligencia_preventiva(
         )
     )
 
+    patrones_confirmados = [
+        item
+        for item in recomendaciones
+        if str(
+            item.get("patron_detectado") or ""
+        ).strip()
+    ]
+
+    patrones_con_preventivo = [
+        item
+        for item in patrones_confirmados
+        if item.get("cobertura_preventiva")
+        == "Con preventivo"
+    ]
+
+    patrones_sin_preventivo = [
+        item
+        for item in patrones_confirmados
+        if item.get("cobertura_preventiva")
+        == "Sin preventivo"
+    ]
+
     return {
         "centro": centro,
         "dias": dias,
         "desde": str(desde),
         "total_correctivos": len(df),
+        "preventivos_activos": (
+            len(preventivos)
+            if preventivos is not None
+            and not preventivos.empty
+            else 0
+        ),
+        "patrones_confirmados": len(
+            patrones_confirmados
+        ),
+        "patrones_con_preventivo": len(
+            patrones_con_preventivo
+        ),
+        "patrones_sin_preventivo": len(
+            patrones_sin_preventivo
+        ),
         "grupos_analizados": len(
             agrupado
         ),
