@@ -890,20 +890,16 @@ def mostrar_cabecera_simple_gerencia(df, centro):
     """
     Cabecera ejecutiva compacta para Gerencia.
 
-    Conserva:
+    Arriba:
     - estado sencillo;
-    - propuestas pendientes;
-    - actividad esencial;
-    - correctivo/preventivo para demostrar evolución futura.
+    - carga actual;
+    - gráfico compacto de incidencias vs preventivos.
 
-    El detalle técnico queda debajo, junto a Colegio Vivo.
+    El objetivo es que Gerencia pueda ver con el tiempo si el
+    mantenimiento preventivo se acompaña de una reducción de averías.
     """
     resumen = _resumen_simple_gerencia(df, centro)
     diagnostico = _diagnostico_ejecutivo_centro(df, centro)
-
-    total_mes = int(diagnostico.get("total_mes", 0) or 0)
-    preventivas_mes = int(diagnostico.get("preventivas_mes", 0) or 0)
-    correctivas_mes = max(total_mes - preventivas_mes, 0)
 
     st.markdown("## 🏫 Estado del mantenimiento")
 
@@ -922,61 +918,122 @@ def mostrar_cabecera_simple_gerencia(df, centro):
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric(
-        "Abiertas",
-        resumen["abiertas"],
-    )
-    c2.metric(
-        "Prioritarias",
-        resumen["criticas"],
-    )
-    c3.metric(
-        "Pendiente material",
-        resumen["material"],
-    )
-    c4.metric(
-        "Espacios reincidentes",
-        resumen["reincidencias"],
+    c1.metric("Abiertas", resumen["abiertas"])
+    c2.metric("Prioritarias", resumen["criticas"])
+    c3.metric("Pendiente material", resumen["material"])
+    c4.metric("Espacios reincidentes", resumen["reincidencias"])
+
+    st.markdown("### 🛡️ Efecto del mantenimiento preventivo")
+
+    incidencias_mes = int(
+        diagnostico.get("incidencias_mes", 0) or 0
     )
 
-    st.markdown("### 🛡️ Correctivo frente a preventivo")
-
-    p1, p2, p3 = st.columns(3)
-
-    p1.metric(
-        "Incidencias este mes",
-        correctivas_mes,
-    )
-    p2.metric(
-        "Preventivos este mes",
-        preventivas_mes,
+    _, preventivos_mes, _ = _salud_preventivo_correctivo(
+        df,
+        centro,
     )
 
-    if total_mes > 0:
-        porcentaje_preventivo = round(
-            preventivas_mes / total_mes * 100
-        )
-        lectura = f"{porcentaje_preventivo}%"
-    else:
-        lectura = "—"
-
-    p3.metric(
-        "Peso preventivo",
-        lectura,
+    st.caption(
+        f"Este mes · {incidencias_mes} incidencias · "
+        f"{preventivos_mes} preventivos realizados"
     )
 
-    if preventivas_mes == 0:
-        st.caption(
-            "El preventivo todavía no ha empezado a generar histórico real. "
-            "Cuando se ejecute durante el curso, esta comparación permitirá "
-            "ver si las incidencias correctivas van disminuyendo."
+    evolucion = obtener_evolucion_mensual(df, centro)
+
+    con_datos = evolucion[
+        (evolucion["Preventivos realizados"] > 0)
+        | (evolucion["Incidencias creadas"] > 0)
+    ].copy()
+
+    if con_datos.empty:
+        grafico = (
+            evolucion
+            .head(6)
+            .set_index("mes")[
+                [
+                    "Incidencias creadas",
+                    "Preventivos realizados",
+                ]
+            ]
         )
     else:
-        st.caption(
-            "Este bloque compara la actividad correctiva y preventiva del mes. "
-            "Con histórico suficiente permitirá comprobar si el preventivo "
-            "reduce incidencias."
+        ultimo_indice = int(con_datos.index.max())
+        primer_indice = max(0, ultimo_indice - 5)
+
+        grafico = (
+            evolucion
+            .loc[primer_indice:ultimo_indice]
+            .set_index("mes")[
+                [
+                    "Incidencias creadas",
+                    "Preventivos realizados",
+                ]
+            ]
         )
+
+    st.line_chart(
+        grafico,
+        use_container_width=True,
+        height=240,
+    )
+
+    if con_datos.empty:
+        st.info(
+            "Efecto del preventivo: pendiente de histórico. "
+            "La comparación empezará a ser útil cuando se ejecuten "
+            "los preventivos del curso."
+        )
+
+    elif len(con_datos) == 1:
+        st.info(
+            "Todavía hay un solo mes con datos. "
+            "La tendencia será más fiable cuando existan varios "
+            "meses consecutivos."
+        )
+
+    else:
+        actual = con_datos.iloc[-1]
+        anterior = con_datos.iloc[-2]
+
+        inc_actual = int(actual["Incidencias creadas"])
+        inc_anterior = int(anterior["Incidencias creadas"])
+        prev_actual = int(actual["Preventivos realizados"])
+        prev_anterior = int(anterior["Preventivos realizados"])
+
+        if prev_actual >= prev_anterior and inc_actual < inc_anterior:
+            reduccion = (
+                round(
+                    ((inc_anterior - inc_actual) / inc_anterior) * 100
+                )
+                if inc_anterior > 0
+                else 0
+            )
+
+            st.success(
+                "Tendencia favorable: el mantenimiento preventivo "
+                "se mantiene o aumenta mientras las incidencias "
+                f"disminuyen un {reduccion}% respecto al mes anterior."
+            )
+
+        elif prev_actual > prev_anterior and inc_actual >= inc_anterior:
+            st.warning(
+                "Todavía no se observa una reducción clara de incidencias "
+                "aunque ha aumentado la actividad preventiva. "
+                "Conviene seguir acumulando histórico."
+            )
+
+        elif inc_actual < inc_anterior:
+            st.success(
+                "Las incidencias están disminuyendo respecto al mes anterior. "
+                "Se seguirá observando su relación con el preventivo."
+            )
+
+        else:
+            st.info(
+                "Aún no hay una tendencia suficiente para atribuir "
+                "cambios en las incidencias al mantenimiento preventivo."
+            )
 
 
 def _serie_mensual_base():
