@@ -667,6 +667,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Gerencia"
             st.rerun()
 
+        if st.button(
+            "🧠\nInteligencia mantenimiento",
+            key="btn_inteligencia_mantenimiento",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Inteligencia mantenimiento"
+            st.rerun()
+
         if st.button("👷\nOperarios", key="btn_ops", use_container_width=True):
             st.session_state["seccion_actual"] = "Operarios"
             st.rerun()
