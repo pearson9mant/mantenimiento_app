@@ -73,6 +73,7 @@ from ui.ui_colegio_vivo_operario import pantalla_colegio_vivo_operario
 from ui.ui_historicos import pantalla_historicos
 from ui.ui_evolucion import pantalla_evolucion
 from ui.ui_activos_colegio import pantalla_activos_colegio
+from ui.ui_inteligencia_mantenimiento import pantalla_inteligencia_mantenimiento
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
