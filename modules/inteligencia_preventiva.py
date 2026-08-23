@@ -850,10 +850,13 @@ def _construir_balance_areas(
     """
     Compara actividad correctiva y preventiva por área.
 
-    Importante:
-    - El balance NO crea por sí mismo una recomendación.
-    - Tener mucha correctiva no significa que exista un patrón técnico.
-    - La creación de preventivos sigue dependiendo del motor de patrones.
+    IMPORTANTE:
+    - Este bloque NO decide si hay que crear un preventivo.
+    - Muchas incidencias no equivalen a patrón repetitivo.
+    - La falta de preventivos ejecutados detectados tampoco significa,
+      por sí sola, que exista "falta de cobertura".
+    - El color rojo se reserva para patrones técnicos confirmados
+      sin preventivo o para frecuencias claramente insuficientes.
     """
     areas = set()
 
@@ -867,15 +870,9 @@ def _construir_balance_areas(
             if str(valor or "").strip()
         }
 
-    areas |= _areas_df(
-        correctivos
-    )
-    areas |= _areas_df(
-        preventivos_periodo
-    )
-    areas |= _areas_df(
-        preventivos_activos
-    )
+    areas |= _areas_df(correctivos)
+    areas |= _areas_df(preventivos_periodo)
+    areas |= _areas_df(preventivos_activos)
 
     resultado = []
 
@@ -883,9 +880,7 @@ def _construir_balance_areas(
         areas,
         key=lambda x: _normalizar_clave(x),
     ):
-        area_clave = _normalizar_clave(
-            area
-        )
+        area_clave = _normalizar_clave(area)
 
         def _contar(df):
             if (
@@ -899,81 +894,88 @@ def _construir_balance_areas(
                 sum(
                     1
                     for valor in df["area"].tolist()
-                    if _normalizar_clave(valor)
-                    == area_clave
+                    if _normalizar_clave(valor) == area_clave
                 )
             )
 
-        correctivos_n = _contar(
-            correctivos
-        )
-
-        preventivos_n = _contar(
-            preventivos_periodo
-        )
-
-        activos_n = _contar(
-            preventivos_activos
-        )
-
-        if correctivos_n == 0 and preventivos_n > 0:
-            estado = "Preventivo domina"
-            color = "verde"
-            lectura = (
-                "Hay actividad preventiva y no aparecen correctivos "
-                "en el periodo analizado."
-            )
-
-        elif correctivos_n == 0 and preventivos_n == 0:
-            estado = "Sin actividad"
-            color = "gris"
-            lectura = (
-                "No hay actividad suficiente para valorar esta área."
-            )
-
-        elif preventivos_n == 0:
-            estado = "Correctivo sin cobertura"
-            color = "rojo" if correctivos_n >= 3 else "amarillo"
-            lectura = (
-                "Hay correctivos pero no constan actuaciones preventivas "
-                "en el mismo periodo. Esto no implica por sí solo que haya "
-                "que crear un preventivo: debe existir patrón técnico."
-            )
-
-        else:
-            ratio = correctivos_n / preventivos_n
-
-            if ratio <= 1:
-                estado = "Equilibrado"
-                color = "verde"
-                lectura = (
-                    "La actividad preventiva iguala o supera a la correctiva."
-                )
-
-            elif ratio <= 2:
-                estado = "Vigilar"
-                color = "amarillo"
-                lectura = (
-                    "La correctiva supera moderadamente a la preventiva. "
-                    "Conviene observar si hay patrones repetidos."
-                )
-
-            else:
-                estado = "Correctivo domina"
-                color = "rojo"
-                lectura = (
-                    "La correctiva supera claramente a la preventiva. "
-                    "Priorizar el análisis de patrones antes de aumentar tareas."
-                )
+        correctivos_n = _contar(correctivos)
+        preventivos_n = _contar(preventivos_periodo)
+        activos_n = _contar(preventivos_activos)
 
         ratio_cp = (
-            round(
-                correctivos_n / preventivos_n,
-                2,
-            )
+            round(correctivos_n / preventivos_n, 2)
             if preventivos_n > 0
             else None
         )
+
+        # -------------------------------------------------
+        # Lectura base: prudente y descriptiva
+        # -------------------------------------------------
+        if correctivos_n == 0 and preventivos_n > 0:
+            estado = "Actividad preventiva"
+            color = "verde"
+            lectura = (
+                "Hay actividad preventiva detectada y no aparecen "
+                "correctivos en el periodo analizado."
+            )
+
+        elif correctivos_n == 0 and preventivos_n == 0:
+            if activos_n > 0:
+                estado = "Plan activo sin correctivos"
+                color = "verde"
+                lectura = (
+                    "Hay planificación preventiva activa y no aparecen "
+                    "correctivos en el periodo."
+                )
+            else:
+                estado = "Sin actividad relevante"
+                color = "gris"
+                lectura = (
+                    "No hay actividad suficiente para valorar esta área."
+                )
+
+        elif preventivos_n == 0:
+            if activos_n > 0:
+                estado = "Correctiva con plan activo"
+                color = "amarillo"
+                lectura = (
+                    "Hay correctivos y existen planes preventivos activos, "
+                    "pero no se han localizado ejecuciones preventivas en las "
+                    "fuentes consultadas para este periodo. Conviene revisar "
+                    "patrones antes de cambiar frecuencias."
+                )
+            else:
+                estado = "Actividad correctiva"
+                color = "amarillo"
+                lectura = (
+                    "Hay actividad correctiva, pero todavía no puede afirmarse "
+                    "que falte un preventivo. Primero debe existir un patrón "
+                    "técnico repetido."
+                )
+
+        else:
+            if ratio_cp <= 1:
+                estado = "Equilibrio favorable"
+                color = "verde"
+                lectura = (
+                    "La actividad preventiva detectada iguala o supera "
+                    "a la correctiva."
+                )
+            elif ratio_cp <= 2:
+                estado = "Correctiva moderada"
+                color = "amarillo"
+                lectura = (
+                    "La correctiva supera moderadamente a la preventiva. "
+                    "Conviene observar si existe patrón técnico."
+                )
+            else:
+                estado = "Correctiva elevada"
+                color = "amarillo"
+                lectura = (
+                    "La correctiva supera claramente a la preventiva, "
+                    "pero no se recomienda actuar hasta confirmar qué averías "
+                    "se repiten realmente."
+                )
 
         resultado.append(
             {
@@ -985,6 +987,9 @@ def _construir_balance_areas(
                 "estado": estado,
                 "color": color,
                 "lectura": lectura,
+                "patrones_confirmados": 0,
+                "patrones_sin_preventivo": 0,
+                "patrones_revisar_frecuencia": 0,
             }
         )
 
@@ -997,6 +1002,91 @@ def _construir_balance_areas(
 
     return resultado
 
+
+def _aplicar_patrones_al_balance(
+    balance_areas,
+    recomendaciones,
+):
+    """
+    Refina el balance usando evidencia técnica ya confirmada.
+
+    Solo aquí puede aparecer una lectura roja:
+    - patrón confirmado sin preventivo;
+    - o varios patrones que exigen revisar frecuencia.
+    """
+    if not balance_areas:
+        return balance_areas
+
+    mapa = {
+        _normalizar_clave(item.get("area", "")): item
+        for item in balance_areas
+    }
+
+    for rec in recomendaciones or []:
+        patron = str(
+            rec.get("patron_detectado") or ""
+        ).strip()
+
+        if not patron:
+            continue
+
+        clave = _normalizar_clave(
+            rec.get("area", "")
+        )
+
+        if clave not in mapa:
+            continue
+
+        item = mapa[clave]
+        item["patrones_confirmados"] += 1
+
+        accion = str(
+            rec.get("accion") or ""
+        ).strip()
+
+        if accion == "Crear preventivo":
+            item["patrones_sin_preventivo"] += 1
+
+        elif accion == "Revisar frecuencia":
+            item["patrones_revisar_frecuencia"] += 1
+
+    for item in balance_areas:
+        sin_prev = int(
+            item.get("patrones_sin_preventivo", 0) or 0
+        )
+        revisar = int(
+            item.get("patrones_revisar_frecuencia", 0) or 0
+        )
+        confirmados = int(
+            item.get("patrones_confirmados", 0) or 0
+        )
+
+        if sin_prev > 0:
+            item["estado"] = "Patrón sin preventivo"
+            item["color"] = "rojo"
+            item["lectura"] = (
+                f"Hay {sin_prev} patrón(es) técnico(s) confirmado(s) "
+                "sin preventivo específico. Este sí es un candidato real "
+                "a actuación preventiva."
+            )
+
+        elif revisar > 0:
+            item["estado"] = "Revisar frecuencia"
+            item["color"] = "amarillo"
+            item["lectura"] = (
+                f"Hay {revisar} patrón(es) confirmado(s) con preventivo "
+                "existente cuya frecuencia conviene revisar."
+            )
+
+        elif confirmados > 0:
+            item["estado"] = "Patrón cubierto / vigilar"
+            item["color"] = "amarillo"
+            item["lectura"] = (
+                f"Hay {confirmados} patrón(es) técnico(s) confirmado(s), "
+                "pero no se recomienda crear un nuevo preventivo ahora."
+            )
+
+    return balance_areas
 
 
 def _cargar_preventivos(centro):
@@ -1727,6 +1817,11 @@ def analizar_inteligencia_preventiva(
             x["edificio"],
             x["espacio"],
         )
+    )
+
+    balance_areas = _aplicar_patrones_al_balance(
+        balance_areas,
+        recomendaciones,
     )
 
     patrones_confirmados = [
