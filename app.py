@@ -1169,6 +1169,11 @@ if perfil == "admin":
     elif seccion == "Corazón sistema":
         st.info("🚧 Corazón en desarrollo")
 
+    elif seccion == "Inteligencia mantenimiento":
+        pantalla_inteligencia_mantenimiento()
+
+    
+
     
         
 
