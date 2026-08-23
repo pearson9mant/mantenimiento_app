@@ -363,8 +363,8 @@ def _mostrar_balance_incidencias_preventivo(resultado):
     )
 
     st.caption(
-        "Compara la actividad correctiva y preventiva del mismo periodo. "
-        "Este balance orienta, pero nunca crea un preventivo por sí solo."
+        "Compara la actividad correctiva y la preventiva detectada en el mismo periodo. "
+        "Solo un patrón técnico confirmado puede convertir una zona en candidata real a preventivo."
     )
 
     total_correctivos = int(
@@ -401,7 +401,7 @@ def _mostrar_balance_incidencias_preventivo(resultado):
     )
 
     c2.metric(
-        "Preventivos del periodo",
+        "Ejecuciones preventivas detectadas",
         total_preventivos,
     )
 
@@ -417,10 +417,11 @@ def _mostrar_balance_incidencias_preventivo(resultado):
         return
 
     if total_preventivos == 0 and total_correctivos > 0:
-        st.warning(
-            "La actividad del periodo es principalmente correctiva. "
-            "Antes de aumentar preventivos, la inteligencia debe confirmar "
-            "qué averías se repiten realmente."
+        st.info(
+            "Se han detectado correctivos en el periodo, pero no ejecuciones "
+            "preventivas en las fuentes consultadas. Esto no significa por sí "
+            "solo que falten preventivos: la decisión depende de los patrones "
+            "técnicos confirmados."
         )
 
     elif total_preventivos > 0:
@@ -431,21 +432,21 @@ def _mostrar_balance_incidencias_preventivo(resultado):
 
         if ratio <= 1:
             st.success(
-                f"Relación correctivo/preventivo: **{ratio}**. "
-                "La actividad preventiva iguala o supera a la correctiva."
+                f"Relación correctivo/preventivo detectada: **{ratio}**. "
+                "El balance de actividad es favorable."
             )
 
         elif ratio <= 2:
-            st.warning(
-                f"Relación correctivo/preventivo: **{ratio}**. "
-                "La correctiva supera moderadamente a la preventiva."
+            st.info(
+                f"Relación correctivo/preventivo detectada: **{ratio}**. "
+                "La correctiva es algo superior; conviene mirar los patrones."
             )
 
         else:
-            st.error(
-                f"Relación correctivo/preventivo: **{ratio}**. "
-                "La correctiva domina claramente. Hay que estudiar los patrones, "
-                "no aumentar preventivos de forma indiscriminada."
+            st.warning(
+                f"Relación correctivo/preventivo detectada: **{ratio}**. "
+                "La correctiva es elevada, pero la inteligencia no recomendará "
+                "un preventivo sin patrón técnico confirmado."
             )
 
     if not balance:
@@ -501,12 +502,16 @@ def _mostrar_balance_incidencias_preventivo(resultado):
                     "correctivos",
                     0,
                 ),
-                "Preventivos periodo": item.get(
+                "Preventivos detectados": item.get(
                     "preventivos_periodo",
                     0,
                 ),
                 "Planes activos": item.get(
                     "preventivos_activos",
+                    0,
+                ),
+                "Patrones confirmados": item.get(
+                    "patrones_confirmados",
                     0,
                 ),
                 "Relación C/P": (
@@ -983,7 +988,7 @@ def pantalla_inteligencia_preventiva():
     )
 
     c2.metric(
-        "Preventivos periodo",
+        "Preventivos detectados",
         resultado.get(
             "total_preventivos_periodo",
             0,
