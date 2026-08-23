@@ -341,6 +341,199 @@ def _mostrar_mapa_resumen(recomendaciones):
     )
 
 
+
+def _icono_balance(color):
+    if color == "rojo":
+        return "🔴"
+    if color == "amarillo":
+        return "🟠"
+    if color == "verde":
+        return "🟢"
+    return "⚪"
+
+
+def _mostrar_balance_incidencias_preventivo(resultado):
+    balance = resultado.get(
+        "balance_areas",
+        [],
+    )
+
+    st.markdown(
+        "## ⚖️ Balance Incidencias - Preventivo"
+    )
+
+    st.caption(
+        "Compara la actividad correctiva y preventiva del mismo periodo. "
+        "Este balance orienta, pero nunca crea un preventivo por sí solo."
+    )
+
+    total_correctivos = int(
+        resultado.get(
+            "total_correctivos",
+            0,
+        )
+        or 0
+    )
+
+    total_preventivos = int(
+        resultado.get(
+            "total_preventivos_periodo",
+            0,
+        )
+        or 0
+    )
+
+    preventivos_activos = int(
+        resultado.get(
+            "preventivos_activos",
+            0,
+        )
+        or 0
+    )
+
+    c1, c2, c3 = st.columns(
+        3
+    )
+
+    c1.metric(
+        "Incidencias correctivas",
+        total_correctivos,
+    )
+
+    c2.metric(
+        "Preventivos del periodo",
+        total_preventivos,
+    )
+
+    c3.metric(
+        "Planes preventivos activos",
+        preventivos_activos,
+    )
+
+    if total_correctivos == 0 and total_preventivos == 0:
+        st.info(
+            "No hay actividad suficiente en este periodo para comparar."
+        )
+        return
+
+    if total_preventivos == 0 and total_correctivos > 0:
+        st.warning(
+            "La actividad del periodo es principalmente correctiva. "
+            "Antes de aumentar preventivos, la inteligencia debe confirmar "
+            "qué averías se repiten realmente."
+        )
+
+    elif total_preventivos > 0:
+        ratio = round(
+            total_correctivos / total_preventivos,
+            2,
+        )
+
+        if ratio <= 1:
+            st.success(
+                f"Relación correctivo/preventivo: **{ratio}**. "
+                "La actividad preventiva iguala o supera a la correctiva."
+            )
+
+        elif ratio <= 2:
+            st.warning(
+                f"Relación correctivo/preventivo: **{ratio}**. "
+                "La correctiva supera moderadamente a la preventiva."
+            )
+
+        else:
+            st.error(
+                f"Relación correctivo/preventivo: **{ratio}**. "
+                "La correctiva domina claramente. Hay que estudiar los patrones, "
+                "no aumentar preventivos de forma indiscriminada."
+            )
+
+    if not balance:
+        return
+
+    grafico = pd.DataFrame(
+        [
+            {
+                "Área": item.get(
+                    "area",
+                    "Sin área",
+                ),
+                "Correctivos": int(
+                    item.get(
+                        "correctivos",
+                        0,
+                    )
+                    or 0
+                ),
+                "Preventivos": int(
+                    item.get(
+                        "preventivos_periodo",
+                        0,
+                    )
+                    or 0
+                ),
+            }
+            for item in balance
+        ]
+    ).set_index("Área")
+
+    st.markdown(
+        "### 📊 Correctivo frente a preventivo por área"
+    )
+
+    st.bar_chart(
+        grafico,
+        y=[
+            "Correctivos",
+            "Preventivos",
+        ],
+        use_container_width=True,
+    )
+
+    tabla = pd.DataFrame(
+        [
+            {
+                "Área": item.get(
+                    "area",
+                    "Sin área",
+                ),
+                "Correctivos": item.get(
+                    "correctivos",
+                    0,
+                ),
+                "Preventivos periodo": item.get(
+                    "preventivos_periodo",
+                    0,
+                ),
+                "Planes activos": item.get(
+                    "preventivos_activos",
+                    0,
+                ),
+                "Relación C/P": (
+                    item.get(
+                        "ratio_correctivo_preventivo"
+                    )
+                    if item.get(
+                        "ratio_correctivo_preventivo"
+                    ) is not None
+                    else "-"
+                ),
+                "Lectura": (
+                    f"{_icono_balance(item.get('color'))} "
+                    f"{item.get('estado', '')}"
+                ),
+            }
+            for item in balance
+        ]
+    )
+
+    st.dataframe(
+        tabla,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 def _mostrar_recomendacion(
     recomendacion,
     indice,
@@ -572,6 +765,35 @@ def _mostrar_recomendacion(
                 f"{frecuencia_sugerida}"
             )
 
+            tiempo_min = int(
+                recomendacion.get(
+                    "tiempo_preventivo_min",
+                    0,
+                )
+                or 0
+            )
+
+            revisiones_anuales = int(
+                recomendacion.get(
+                    "revisiones_anuales_sugeridas",
+                    0,
+                )
+                or 0
+            )
+
+            horas_anuales = recomendacion.get(
+                "horas_preventivo_anuales",
+                0,
+            )
+
+            if tiempo_min > 0:
+                st.caption(
+                    f"Tiempo orientativo por revisión: "
+                    f"{tiempo_min} min · "
+                    f"{revisiones_anuales} revisiones/año · "
+                    f"{horas_anuales} h/año aproximadas."
+                )
+
         if descripcion:
             with st.expander(
                 "Ver última incidencia relacionada",
@@ -748,8 +970,8 @@ def pantalla_inteligencia_preventiva():
     # ==================================================
     # KPIs
     # ==================================================
-    c1, c2, c3, c4 = st.columns(
-        4
+    c1, c2, c3, c4, c5 = st.columns(
+        5
     )
 
     c1.metric(
@@ -761,23 +983,38 @@ def pantalla_inteligencia_preventiva():
     )
 
     c2.metric(
+        "Preventivos periodo",
+        resultado.get(
+            "total_preventivos_periodo",
+            0,
+        ),
+    )
+
+    c3.metric(
         "Patrones confirmados",
         len(
             patrones_confirmados
         ),
     )
 
-    c3.metric(
-        "Crear / ajustar preventivo",
+    c4.metric(
+        "Crear / ajustar",
         (
             resumen_decisiones["crear"]
             + resumen_decisiones["revisar"]
         ),
     )
 
-    c4.metric(
+    c5.metric(
         "Atención alta",
         altas,
+    )
+
+    # ==================================================
+    # BALANCE INCIDENCIAS - PREVENTIVO
+    # ==================================================
+    _mostrar_balance_incidencias_preventivo(
+        resultado
     )
 
     # ==================================================
