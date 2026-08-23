@@ -3143,6 +3143,144 @@ def mostrar_resumen_inferior_cv(df):
                 unsafe_allow_html=True,
             )
 
+def mostrar_comparativa_centros_gerencia(df):
+    """
+    Comparativa ejecutiva P22 ↔ P9.
+
+    Utiliza el diagnóstico que Gerencia ya calcula.
+    No hace nuevas consultas a la base de datos.
+    """
+
+    d22 = _diagnostico_ejecutivo_centro(
+        df,
+        "Pearson 22",
+    )
+
+    d9 = _diagnostico_ejecutivo_centro(
+        df,
+        "Pearson 9",
+    )
+
+    st.markdown("### 🧭 Comparativa de centros")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        with st.container(border=True):
+            st.markdown("### 🏫 Pearson 22")
+
+            st.metric(
+                "Índice operativo",
+                f"{d22['indice']}%",
+            )
+
+            st.caption(
+                f"{d22['estado']} · "
+                f"Tendencia {d22['tendencia']}"
+            )
+
+            a1, a2, a3 = st.columns(3)
+
+            a1.metric(
+                "Abiertas",
+                d22["abiertas"],
+            )
+
+            a2.metric(
+                "Críticas",
+                d22["criticas"],
+            )
+
+            a3.metric(
+                "Reincidencias",
+                len(d22["reincidencias"]),
+            )
+
+    with c2:
+        with st.container(border=True):
+            st.markdown("### 🏫 Pearson 9")
+
+            st.metric(
+                "Índice operativo",
+                f"{d9['indice']}%",
+            )
+
+            st.caption(
+                f"{d9['estado']} · "
+                f"Tendencia {d9['tendencia']}"
+            )
+
+            b1, b2, b3 = st.columns(3)
+
+            b1.metric(
+                "Abiertas",
+                d9["abiertas"],
+            )
+
+            b2.metric(
+                "Críticas",
+                d9["criticas"],
+            )
+
+            b3.metric(
+                "Reincidencias",
+                len(d9["reincidencias"]),
+            )
+
+    # ==============================================
+    # LECTURA EJECUTIVA
+    # ==============================================
+
+    if d22["indice"] < d9["indice"]:
+        centro_atencion = "Pearson 22"
+        diferencia = d9["indice"] - d22["indice"]
+
+    elif d9["indice"] < d22["indice"]:
+        centro_atencion = "Pearson 9"
+        diferencia = d22["indice"] - d9["indice"]
+
+    else:
+        centro_atencion = ""
+        diferencia = 0
+
+    if centro_atencion:
+        st.info(
+            f"📌 **Centro que requiere más seguimiento: "
+            f"{centro_atencion}.** "
+            f"La diferencia actual entre ambos centros es de "
+            f"{diferencia} puntos."
+        )
+    else:
+        st.success(
+            "🟢 Ambos centros presentan actualmente "
+            "el mismo índice operativo."
+        )
+
+    # ==============================================
+    # MEJOR / PEOR TENDENCIA
+    # ==============================================
+
+    diferencias = {
+        "Pearson 22": d22["diferencia"],
+        "Pearson 9": d9["diferencia"],
+    }
+
+    mejor = min(
+        diferencias,
+        key=diferencias.get,
+    )
+
+    peor = max(
+        diferencias,
+        key=diferencias.get,
+    )
+
+    if diferencias[mejor] < diferencias[peor]:
+        st.caption(
+            f"📉 Mejor evolución mensual: **{mejor}** · "
+            f"📈 Mayor presión de incidencias: **{peor}**."
+        )
+
 
 def mostrar_colegio_vivo_gerencia(
     df,
