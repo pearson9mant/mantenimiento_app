@@ -1,6 +1,10 @@
 from database.db import conectar, _sql
 
 
+_ESTRUCTURA_ESPACIOS_ASEGURADA = False
+_ESTRUCTURA_PLANTAS_ASEGURADA = False
+
+
 
 PLANTAS_BASE = {
     "Pearson 22": {
@@ -69,39 +73,67 @@ def normalizar_comparacion(texto):
 # =====================================================
 
 def crear_tabla_plantas_config():
+    """
+    Asegura la estructura de plantas una sola vez por proceso.
+    Evita repetir CREATE + sembrado en cada lectura del catálogo.
+    """
+    global _ESTRUCTURA_PLANTAS_ASEGURADA
+
+    if _ESTRUCTURA_PLANTAS_ASEGURADA:
+        return
+
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        CREATE TABLE IF NOT EXISTS plantas_config (
-            id SERIAL PRIMARY KEY,
-            centro TEXT,
-            edificio TEXT,
-            planta TEXT,
-            visible INTEGER DEFAULT 1
-        )
-    """))
+    try:
+        cur.execute(_sql("""
+            CREATE TABLE IF NOT EXISTS plantas_config (
+                id SERIAL PRIMARY KEY,
+                centro TEXT,
+                edificio TEXT,
+                planta TEXT,
+                visible INTEGER DEFAULT 1
+            )
+        """))
 
-    conn.commit()
+        conn.commit()
 
-    for centro, edificios in PLANTAS_BASE.items():
-        for edificio, plantas in edificios.items():
-            for planta in plantas:
-                cur.execute(_sql("""
-                    SELECT COUNT(*)
-                    FROM plantas_config
-                    WHERE centro = ? AND edificio = ? AND planta = ?
-                """), (centro, edificio, planta))
-
-                if int(cur.fetchone()[0] or 0) == 0:
+        for centro, edificios in PLANTAS_BASE.items():
+            for edificio, plantas in edificios.items():
+                for planta in plantas:
                     cur.execute(_sql("""
-                        INSERT INTO plantas_config
-                        (centro, edificio, planta, visible)
-                        VALUES (?, ?, ?, 1)
-                    """), (centro, edificio, planta))
+                        SELECT COUNT(*)
+                        FROM plantas_config
+                        WHERE centro = ?
+                          AND edificio = ?
+                          AND planta = ?
+                    """), (
+                        centro,
+                        edificio,
+                        planta,
+                    ))
 
-    conn.commit()
-    conn.close()
+                    if int(cur.fetchone()[0] or 0) == 0:
+                        cur.execute(_sql("""
+                            INSERT INTO plantas_config
+                            (centro, edificio, planta, visible)
+                            VALUES (?, ?, ?, 1)
+                        """), (
+                            centro,
+                            edificio,
+                            planta,
+                        ))
+
+        conn.commit()
+        _ESTRUCTURA_PLANTAS_ASEGURADA = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 
 def obtener_plantas_config():
@@ -215,32 +247,56 @@ def obtener_plantas_config_ubicacion(
     solo_visibles=False,
 ):
     """
-    Devuelve plantas configuradas para un centro y edificio.
+    Devuelve plantas configuradas para una ubicación concreta.
+    Consulta solo las filas necesarias.
     """
     crear_tabla_plantas_config()
 
-    centro_buscado = normalizar_comparacion(centro)
-    edificio_buscado = normalizar_comparacion(edificio)
+    conn = conectar()
+    cur = conn.cursor()
 
-    datos = obtener_plantas_config()
-    resultado = []
+    try:
+        if solo_visibles:
+            cur.execute(_sql("""
+                SELECT planta
+                FROM plantas_config
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND visible = 1
+                  AND planta IS NOT NULL
+                  AND planta <> ''
+                ORDER BY id
+            """), (
+                centro,
+                edificio,
+            ))
+        else:
+            cur.execute(_sql("""
+                SELECT planta
+                FROM plantas_config
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND planta IS NOT NULL
+                  AND planta <> ''
+                ORDER BY id
+            """), (
+                centro,
+                edificio,
+            ))
 
-    for _id, centro_db, edificio_db, planta_db, visible in datos:
-        if normalizar_comparacion(centro_db) != centro_buscado:
-            continue
+        resultado = []
 
-        if normalizar_comparacion(edificio_db) != edificio_buscado:
-            continue
+        for fila in cur.fetchall():
+            planta_txt = normalizar_texto(fila[0])
 
-        if solo_visibles and not bool(visible):
-            continue
+            if planta_txt and planta_txt not in resultado:
+                resultado.append(planta_txt)
 
-        planta_txt = normalizar_texto(planta_db)
+        return resultado
 
-        if planta_txt and planta_txt not in resultado:
-            resultado.append(planta_txt)
+    finally:
+        conn.close()
 
-    return resultado
 
 
 def planta_visible(centro, edificio, planta):
@@ -270,41 +326,61 @@ def planta_visible(centro, edificio, planta):
 # =====================================================
 
 def crear_tabla_espacios():
+    """
+    Asegura la estructura de espacios una sola vez por proceso.
+    """
+    global _ESTRUCTURA_ESPACIOS_ASEGURADA
+
+    if _ESTRUCTURA_ESPACIOS_ASEGURADA:
+        return
+
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        CREATE TABLE IF NOT EXISTS espacios (
-            id SERIAL PRIMARY KEY,
-            centro TEXT,
-            edificio TEXT,
-            planta TEXT,
-            espacio TEXT,
-            tipo TEXT,
-            activo INTEGER DEFAULT 1
-        )
-    """))
+    try:
+        cur.execute(_sql("""
+            CREATE TABLE IF NOT EXISTS espacios (
+                id SERIAL PRIMARY KEY,
+                centro TEXT,
+                edificio TEXT,
+                planta TEXT,
+                espacio TEXT,
+                tipo TEXT,
+                activo INTEGER DEFAULT 1
+            )
+        """))
 
-    for columna, tipo in [
-        ("centro", "TEXT"),
-        ("edificio", "TEXT"),
-        ("planta", "TEXT"),
-        ("espacio", "TEXT"),
-        ("tipo", "TEXT"),
-        ("activo", "INTEGER DEFAULT 1"),
-        ("codigo", "TEXT"),
-        ("qr_habilitado", "INTEGER DEFAULT 0"),
-    ]:
-        try:
-            cur.execute(_sql(f"""
-                ALTER TABLE espacios
-                ADD COLUMN IF NOT EXISTS {columna} {tipo}
-            """))
-        except Exception:
-            pass
+        for columna, tipo in [
+            ("centro", "TEXT"),
+            ("edificio", "TEXT"),
+            ("planta", "TEXT"),
+            ("espacio", "TEXT"),
+            ("tipo", "TEXT"),
+            ("activo", "INTEGER DEFAULT 1"),
+            ("codigo", "TEXT"),
+            ("qr_habilitado", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                cur.execute(_sql(f"""
+                    ALTER TABLE espacios
+                    ADD COLUMN IF NOT EXISTS {columna} {tipo}
+                """))
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        _ESTRUCTURA_ESPACIOS_ASEGURADA = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 
 def limpiar_plantas_guardadas_como_espacios():
@@ -713,163 +789,174 @@ def obtener_edificios_espacios(centro):
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        SELECT DISTINCT edificio
-        FROM espacios
-        WHERE activo = 1
-          AND centro = ?
-          AND edificio IS NOT NULL
-          AND edificio <> ''
-        ORDER BY edificio
-    """), (centro,))
+    try:
+        cur.execute(_sql("""
+            SELECT DISTINCT edificio
+            FROM espacios
+            WHERE activo = 1
+              AND centro = ?
+              AND edificio IS NOT NULL
+              AND edificio <> ''
+            ORDER BY edificio
+        """), (centro,))
 
-    datos = [fila[0] for fila in cur.fetchall()]
-    conn.close()
+        datos = [
+            fila[0]
+            for fila in cur.fetchall()
+            if fila and fila[0]
+        ]
+
+    finally:
+        conn.close()
+
+    # Conserva edificios base aunque todavía no tengan espacios creados.
+    for edificio_base in PLANTAS_BASE.get(centro, {}).keys():
+        if edificio_base not in datos:
+            datos.append(edificio_base)
+
     return datos
+
 
 
 def obtener_plantas_espacios(centro, edificio):
     """
-    Devuelve plantas visibles del edificio.
+    Devuelve plantas/zonas visibles con una lectura ligera.
 
-    Integra:
-    - plantas base;
-    - plantas creadas desde Configuración;
-    - plantas ya presentes en espacios activos.
+    No abre una conexión por cada planta y no recorre toda la tabla
+    de espacios en Python.
     """
     crear_tabla_espacios()
     crear_tabla_plantas_config()
 
-    centro_buscado = normalizar_comparacion(centro)
-    edificio_buscado = normalizar_comparacion(edificio)
-
     plantas = []
 
-    # Base histórica, respetando visibilidad.
-    for centro_base, edificios_base in PLANTAS_BASE.items():
-        if normalizar_comparacion(centro_base) != centro_buscado:
-            continue
-
-        for edificio_base, plantas_base in edificios_base.items():
-            if normalizar_comparacion(edificio_base) != edificio_buscado:
-                continue
-
-            for planta_base in plantas_base:
-                if (
-                    planta_visible(
-                        centro_base,
-                        edificio_base,
-                        planta_base,
-                    )
-                    and planta_base not in plantas
-                ):
-                    plantas.append(planta_base)
-
-    # Nuevas plantas o zonas creadas desde Configuración.
-    for planta_cfg in obtener_plantas_config_ubicacion(
-        centro,
-        edificio,
-        solo_visibles=True,
-    ):
-        if planta_cfg not in plantas:
-            plantas.append(planta_cfg)
-
-    # Compatibilidad con espacios ya creados.
+    # Leer de una vez toda la configuración de esta ubicación.
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        SELECT centro, edificio, planta
-        FROM espacios
-        WHERE activo = 1
-          AND planta IS NOT NULL
-          AND planta <> ''
-        ORDER BY planta
-    """))
+    try:
+        cur.execute(_sql("""
+            SELECT planta, visible
+            FROM plantas_config
+            WHERE centro = ?
+              AND edificio = ?
+            ORDER BY id
+        """), (
+            centro,
+            edificio,
+        ))
 
-    filas = cur.fetchall()
-    conn.close()
+        config = {
+            normalizar_texto(planta_db): bool(visible)
+            for planta_db, visible in cur.fetchall()
+            if normalizar_texto(planta_db)
+        }
 
-    for centro_db, edificio_db, planta_db in filas:
-        if normalizar_comparacion(centro_db) != centro_buscado:
-            continue
-
-        if normalizar_comparacion(edificio_db) != edificio_buscado:
-            continue
-
-        planta_txt = normalizar_texto(planta_db)
-
-        if not planta_txt:
-            continue
-
-        if not planta_visible(
-            centro_db,
-            edificio_db,
-            planta_txt,
+        # Base histórica, respetando la visibilidad leída arriba.
+        for planta_base in PLANTAS_BASE.get(
+            centro,
+            {},
+        ).get(
+            edificio,
+            [],
         ):
-            continue
+            if config.get(planta_base, True) and planta_base not in plantas:
+                plantas.append(planta_base)
 
-        if planta_txt not in plantas:
-            plantas.append(planta_txt)
+        # Plantas configuradas nuevas.
+        for planta_cfg, visible_cfg in config.items():
+            if visible_cfg and planta_cfg not in plantas:
+                plantas.append(planta_cfg)
 
-    return plantas
+        # Espacios activos de esta ubicación, filtrados ya en SQL.
+        cur.execute(_sql("""
+            SELECT DISTINCT planta
+            FROM espacios
+            WHERE activo = 1
+              AND centro = ?
+              AND edificio = ?
+              AND planta IS NOT NULL
+              AND planta <> ''
+            ORDER BY planta
+        """), (
+            centro,
+            edificio,
+        ))
+
+        for fila in cur.fetchall():
+            planta_txt = normalizar_texto(
+                fila[0] if fila else ""
+            )
+
+            if not planta_txt:
+                continue
+
+            if not config.get(planta_txt, True):
+                continue
+
+            if planta_txt not in plantas:
+                plantas.append(planta_txt)
+
+        return plantas
+
+    finally:
+        conn.close()
+
 
 
 def obtener_espacios_por_planta(centro, edificio, planta):
+    """
+    Devuelve solo los espacios de la ubicación solicitada.
+    """
     crear_tabla_espacios()
-
-    centro_buscado = normalizar_comparacion(centro)
-    edificio_buscado = normalizar_comparacion(edificio)
-    planta_buscada = normalizar_comparacion(planta)
 
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        SELECT centro, edificio, planta, espacio, tipo
-        FROM espacios
-        WHERE activo = 1
-          AND espacio IS NOT NULL
-          AND espacio <> ''
-        ORDER BY espacio
-    """))
+    try:
+        cur.execute(_sql("""
+            SELECT espacio, tipo
+            FROM espacios
+            WHERE activo = 1
+              AND centro = ?
+              AND edificio = ?
+              AND planta = ?
+              AND espacio IS NOT NULL
+              AND espacio <> ''
+            ORDER BY espacio
+        """), (
+            centro,
+            edificio,
+            planta,
+        ))
 
-    filas = cur.fetchall()
-    conn.close()
+        datos = []
+        vistos = set()
 
-    datos = []
+        for espacio_db, tipo_db in cur.fetchall():
+            espacio_txt = normalizar_texto(espacio_db)
+            tipo_txt = normalizar_texto(tipo_db)
 
-    for (
-        centro_db,
-        edificio_db,
-        planta_db,
-        espacio_db,
-        tipo_db,
-    ) in filas:
+            clave = normalizar_comparacion(
+                espacio_txt
+            )
 
-        if normalizar_comparacion(centro_db) != centro_buscado:
-            continue
+            if not espacio_txt or clave in vistos:
+                continue
 
-        if normalizar_comparacion(edificio_db) != edificio_buscado:
-            continue
+            vistos.add(clave)
+            datos.append(
+                (
+                    espacio_txt,
+                    tipo_txt,
+                )
+            )
 
-        if normalizar_comparacion(planta_db) != planta_buscada:
-            continue
+        return datos
 
-        espacio_txt = normalizar_texto(espacio_db)
-        tipo_txt = normalizar_texto(tipo_db)
+    finally:
+        conn.close()
 
-        if not espacio_txt:
-            continue
-
-        if not any(
-            normalizar_comparacion(fila[0])
-            == normalizar_comparacion(espacio_txt)
-            for fila in datos
-        ):
-            datos.append((espacio_txt, tipo_txt))
-
-    return datos
 
 
 def obtener_tipos_espacios():
