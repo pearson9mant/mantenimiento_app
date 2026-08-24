@@ -54,6 +54,67 @@ def limpiar_cache_streamlit():
         pass
 
 
+@st.cache_data(ttl=15, show_spinner=False)
+def obtener_edificios_ot_cache(centro):
+    """
+    Catálogo de edificios para crear/corregir OT.
+    Se cachea brevemente para evitar repetir consultas en cada rerun.
+    """
+    return obtener_edificios_espacios(
+        centro
+    )
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def obtener_plantas_ot_cache(
+    centro,
+    edificio,
+):
+    """
+    Plantas/zonas visibles del catálogo central.
+    """
+    return obtener_plantas_espacios(
+        centro,
+        edificio,
+    )
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def obtener_espacios_ot_cache(
+    centro,
+    edificio,
+    planta,
+):
+    """
+    Espacios de una planta/zona.
+
+    Devuelve nombres simples y evita volver a consultar la base
+    cada vez que Streamlit reconstruye las pestañas.
+    """
+    filas = obtener_espacios_por_planta(
+        centro,
+        edificio,
+        planta,
+    )
+
+    resultado = []
+
+    for fila in filas:
+        nombre = extraer_nombre_espacio(
+            fila
+        )
+
+        if (
+            nombre
+            and nombre not in resultado
+        ):
+            resultado.append(
+                nombre
+            )
+
+    return resultado
+
+
 # =====================================================
 # PERMISOS / FILTRO OBLIGATORIO POR OPERARIO
 # =====================================================
@@ -346,25 +407,20 @@ def obtener_planta_catalogo(
     if not centro or not edificio or not espacio:
         return ""
 
-    plantas = obtener_plantas_espacios(
+    plantas = obtener_plantas_ot_cache(
         centro,
         edificio,
     )
 
     for planta in plantas:
-        filas_espacios = obtener_espacios_por_planta(
+        espacios_planta = obtener_espacios_ot_cache(
             centro,
             edificio,
             planta,
         )
 
-        for fila_espacio in filas_espacios:
-            nombre_espacio = extraer_nombre_espacio(
-                fila_espacio
-            )
-
-            if nombre_espacio == espacio:
-                return str(planta or "").strip()
+        if espacio in espacios_planta:
+            return str(planta or "").strip()
 
     return ""
 
@@ -460,7 +516,7 @@ def mostrar_editor_ubicacion_ot_admin(
         key=f"corregir_centro_ot_{id_orden}",
     )
 
-    edificios = obtener_edificios_espacios(
+    edificios = obtener_edificios_ot_cache(
         centro_sel
     )
 
@@ -480,7 +536,7 @@ def mostrar_editor_ubicacion_ot_admin(
         key=f"corregir_edificio_ot_{id_orden}",
     )
 
-    plantas = obtener_plantas_espacios(
+    plantas = obtener_plantas_ot_cache(
         centro_sel,
         edificio_sel,
     )
@@ -507,24 +563,13 @@ def mostrar_editor_ubicacion_ot_admin(
         key=f"corregir_planta_ot_{id_orden}",
     )
 
-    filas_espacios = obtener_espacios_por_planta(
-        centro_sel,
-        edificio_sel,
-        planta_sel,
-    )
-
-    espacios = []
-
-    for fila_espacio in filas_espacios:
-        nombre_espacio = extraer_nombre_espacio(
-            fila_espacio
+    espacios = list(
+        obtener_espacios_ot_cache(
+            centro_sel,
+            edificio_sel,
+            planta_sel,
         )
-
-        if (
-            nombre_espacio
-            and nombre_espacio not in espacios
-        ):
-            espacios.append(nombre_espacio)
+    )
 
     if not espacios:
         st.warning(
@@ -615,7 +660,7 @@ def pantalla_ordenes():
                 centro = st.selectbox("Centro", CENTROS, key="orden_int_centro")
                 st.info("Número de OT interna: se asignará al crear la orden")
 
-                edificios_disponibles = obtener_edificios_espacios(
+                edificios_disponibles = obtener_edificios_ot_cache(
                     centro
                 )
 
@@ -631,7 +676,7 @@ def pantalla_ordenes():
                     key=f"orden_int_edificio_{centro}",
                 )
 
-                plantas_disponibles = obtener_plantas_espacios(
+                plantas_disponibles = obtener_plantas_ot_cache(
                     centro,
                     edificio,
                 )
@@ -645,26 +690,13 @@ def pantalla_ordenes():
                     key=f"orden_int_planta_{centro}_{edificio}",
                 )
 
-                filas_espacios = obtener_espacios_por_planta(
-                    centro,
-                    edificio,
-                    planta,
-                )
-
-                espacios_disponibles = []
-
-                for fila_espacio in filas_espacios:
-                    nombre_espacio = extraer_nombre_espacio(
-                        fila_espacio
+                espacios_disponibles = list(
+                    obtener_espacios_ot_cache(
+                        centro,
+                        edificio,
+                        planta,
                     )
-
-                    if (
-                        nombre_espacio
-                        and nombre_espacio not in espacios_disponibles
-                    ):
-                        espacios_disponibles.append(
-                            nombre_espacio
-                        )
+                )
 
                 # Conservamos las opciones históricas.
                 for opcion_extra in ["General", "Otro"]:
@@ -841,7 +873,7 @@ def pantalla_ordenes():
                 centro_ext = st.selectbox("Centro", CENTROS, key="orden_ext_centro")
                 st.info("Número de OT externa: se asignará al crear la orden")
 
-                edificios_disponibles_ext = obtener_edificios_espacios(
+                edificios_disponibles_ext = obtener_edificios_ot_cache(
                     centro_ext
                 )
 
@@ -857,7 +889,7 @@ def pantalla_ordenes():
                     key=f"orden_ext_edificio_{centro_ext}",
                 )
 
-                plantas_disponibles_ext = obtener_plantas_espacios(
+                plantas_disponibles_ext = obtener_plantas_ot_cache(
                     centro_ext,
                     edificio_ext,
                 )
@@ -871,26 +903,13 @@ def pantalla_ordenes():
                     key=f"orden_ext_planta_{centro_ext}_{edificio_ext}",
                 )
 
-                filas_espacios_ext = obtener_espacios_por_planta(
-                    centro_ext,
-                    edificio_ext,
-                    planta_ext,
-                )
-
-                espacios_disponibles_ext = []
-
-                for fila_espacio in filas_espacios_ext:
-                    nombre_espacio = extraer_nombre_espacio(
-                        fila_espacio
+                espacios_disponibles_ext = list(
+                    obtener_espacios_ot_cache(
+                        centro_ext,
+                        edificio_ext,
+                        planta_ext,
                     )
-
-                    if (
-                        nombre_espacio
-                        and nombre_espacio not in espacios_disponibles_ext
-                    ):
-                        espacios_disponibles_ext.append(
-                            nombre_espacio
-                        )
+                )
 
                 for opcion_extra in ["General", "Otro"]:
                     if opcion_extra not in espacios_disponibles_ext:
