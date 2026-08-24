@@ -24,6 +24,8 @@ from modules.espacios import (
     obtener_arbol_espacios,
     icono_tipo_espacio,
     obtener_plantas_config,
+    obtener_plantas_config_ubicacion,
+    crear_planta_configurable,
     actualizar_visible_planta,
     qr_habilitado_espacio,
     PLANTAS_BASE,
@@ -1351,6 +1353,49 @@ def mostrar_arbol_colegio():
 # CONFIGURACIÓN ESPACIOS
 # =====================================================
 
+ZONAS_ESPECIALES_P22 = [
+    "Exterior",
+    "Sala técnica / Instalaciones",
+]
+
+
+def obtener_plantas_catalogo_config(centro, edificio):
+    """
+    Plantas disponibles para Crear/Editar espacios.
+
+    Incluye:
+    - plantas base;
+    - plantas creadas desde Configuración;
+    - zonas especiales de Pearson 22.
+    """
+    plantas = []
+
+    for planta in PLANTAS_BASE.get(
+        centro,
+        {},
+    ).get(
+        edificio,
+        [],
+    ):
+        if planta not in plantas:
+            plantas.append(planta)
+
+    for planta in obtener_plantas_config_ubicacion(
+        centro,
+        edificio,
+        solo_visibles=True,
+    ):
+        if planta not in plantas:
+            plantas.append(planta)
+
+    if centro == "Pearson 22":
+        for zona in ZONAS_ESPECIALES_P22:
+            if zona not in plantas:
+                plantas.append(zona)
+
+    return plantas
+
+
 def pantalla_configuracion_espacios():
     crear_tabla_espacios()
 
@@ -1403,7 +1448,10 @@ def pantalla_configuracion_espacios():
             key="cfg_catalogo_edificio"
         )
 
-        plantas = PLANTAS_BASE.get(centro, {}).get(edificio, [])
+        plantas = obtener_plantas_catalogo_config(
+            centro,
+            edificio,
+        )
 
         planta = st.selectbox(
             "Planta",
@@ -1492,7 +1540,16 @@ def pantalla_configuracion_espacios():
                         key=f"edit_esp_edificio_{id_espacio}"
                     )
 
-                    nuevas_plantas = PLANTAS_BASE.get(nuevo_centro, {}).get(nuevo_edificio, [])
+                    nuevas_plantas = obtener_plantas_catalogo_config(
+                        nuevo_centro,
+                        nuevo_edificio,
+                    )
+
+                    if (
+                        planta
+                        and planta not in nuevas_plantas
+                    ):
+                        nuevas_plantas.append(planta)
 
                     nueva_planta = st.selectbox(
                         "Planta",
@@ -1567,7 +1624,70 @@ def pantalla_configuracion_espacios():
                             st.rerun()
 
     elif seccion_espacios == "📍 Plantas":
-        st.markdown("#### 📍 Plantas visibles")
+        st.markdown("#### ➕ Crear nueva planta / zona")
+
+        st.caption(
+            "La nueva planta quedará disponible para crear espacios "
+            "y para los módulos que utilizan el catálogo central."
+        )
+
+        col_p1, col_p2 = st.columns(2)
+
+        with col_p1:
+            centro_nueva_planta = st.selectbox(
+                "Centro",
+                list(PLANTAS_BASE.keys()),
+                key="cfg_nueva_planta_centro",
+            )
+
+        edificios_nueva_planta = list(
+            PLANTAS_BASE.get(
+                centro_nueva_planta,
+                {},
+            ).keys()
+        )
+
+        with col_p2:
+            edificio_nueva_planta = st.selectbox(
+                "Edificio",
+                edificios_nueva_planta,
+                key="cfg_nueva_planta_edificio",
+            )
+
+        nombre_nueva_planta = st.text_input(
+            "Nombre de la planta / zona",
+            placeholder=(
+                "Ejemplo: Planta 6, Sótano, Semisótano, Exterior..."
+            ),
+            key="cfg_nueva_planta_nombre",
+        )
+
+        nueva_planta_visible = st.checkbox(
+            "Visible desde el momento de crearla",
+            value=True,
+            key="cfg_nueva_planta_visible",
+        )
+
+        if st.button(
+            "💾 Crear planta / zona",
+            key="cfg_crear_nueva_planta",
+            use_container_width=True,
+        ):
+            ok, mensaje = crear_planta_configurable(
+                centro=centro_nueva_planta,
+                edificio=edificio_nueva_planta,
+                planta=nombre_nueva_planta,
+                visible=1 if nueva_planta_visible else 0,
+            )
+
+            if ok:
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.warning(mensaje)
+
+        st.markdown("---")
+        st.markdown("#### 📍 Plantas configuradas")
 
         plantas = obtener_plantas_config()
 
@@ -1580,7 +1700,8 @@ def pantalla_configuracion_espacios():
                 with col1:
                     estado = "✅ Visible" if visible else "❌ Oculta"
                     st.markdown(
-                        f"**{centro}** · {edificio} · {planta} · {estado}"
+                        f"**{centro}** · {edificio} · "
+                        f"{planta} · {estado}"
                     )
 
                 with col2:
@@ -1590,7 +1711,10 @@ def pantalla_configuracion_espacios():
                             key=f"ocultar_planta_{id_planta}",
                             use_container_width=True
                         ):
-                            actualizar_visible_planta(id_planta, 0)
+                            actualizar_visible_planta(
+                                id_planta,
+                                0,
+                            )
                             st.rerun()
                     else:
                         if st.button(
@@ -1598,7 +1722,10 @@ def pantalla_configuracion_espacios():
                             key=f"mostrar_planta_{id_planta}",
                             use_container_width=True
                         ):
-                            actualizar_visible_planta(id_planta, 1)
+                            actualizar_visible_planta(
+                                id_planta,
+                                1,
+                            )
                             st.rerun()
 
     elif seccion_espacios == "🌳 Árbol del colegio":
@@ -1845,6 +1972,7 @@ def pantalla_configuracion():
                     nuevo_estado,
                 )
                 st.rerun()
+
 
 
         
