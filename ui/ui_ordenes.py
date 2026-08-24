@@ -640,20 +640,39 @@ def pantalla_ordenes():
 
     tipos_solicitante_lista = obtener_tipos_solicitante_lista()
 
-    tab1, tab2, tab3 = st.tabs(["➕ Nueva orden", "📄 Activas", "🗂️ Histórico"])
+    seccion_ordenes = st.radio(
+        "Sección de órdenes",
+        [
+            "➕ Nueva orden",
+            "📄 Activas",
+            "🗂️ Histórico",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="ordenes_seccion_principal",
+    )
 
     # =====================================================
     # NUEVA ORDEN
     # =====================================================
 
-    with tab1:
-        tab_interna, tab_externa = st.tabs(["🔧 Interna", "🏢 Externa"])
+    if seccion_ordenes == "➕ Nueva orden":
+        tipo_nueva_orden = st.radio(
+            "Tipo de nueva orden",
+            [
+                "🔧 Interna",
+                "🏢 Externa",
+            ],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="ordenes_tipo_nueva",
+        )
 
         # =====================================================
         # NUEVA ORDEN INTERNA
         # =====================================================
 
-        with tab_interna:
+        if tipo_nueva_orden == "🔧 Interna":
             c1, c2 = st.columns(2)
 
             with c1:
@@ -866,7 +885,7 @@ def pantalla_ordenes():
         # NUEVA ORDEN EXTERNA
         # =====================================================
 
-        with tab_externa:
+        elif tipo_nueva_orden == "🏢 Externa":
             c1, c2 = st.columns(2)
 
             with c1:
@@ -1034,7 +1053,7 @@ def pantalla_ordenes():
     # ÓRDENES ACTIVAS
     # =====================================================
 
-    with tab2:
+    elif seccion_ordenes == "📄 Activas":
         ordenes = obtener_ordenes()
         ordenes = filtrar_por_operario_obligatorio(ordenes)
 
@@ -1671,7 +1690,7 @@ def pantalla_ordenes():
     # HISTÓRICO
     # =====================================================
 
-    with tab3:
+    elif seccion_ordenes == "🗂️ Histórico":
         historico = obtener_historico_reciente(
             limite=200
         )
