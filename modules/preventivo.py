@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from database.db import conectar, _sql
 from modules.ordenes import (
@@ -133,12 +134,51 @@ def normalizar_tarea(texto):
     return texto
 
 
+def normalizar_clave_checklist(texto):
+    """
+    Normaliza nombres equivalentes para que una misma plantilla
+    funcione aunque la tarea se llame WC, baño, baños, aseo o aseos.
+
+    No modifica el nombre real de la tarea almacenada.
+    Solo se usa para localizar el modelo de checklist.
+    """
+    texto = normalizar_tarea(texto)
+
+    texto = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        texto,
+    )
+
+    palabras = texto.split()
+
+    equivalencias = {
+        "wc": "bano",
+        "aseo": "bano",
+        "aseos": "bano",
+        "bano": "bano",
+        "banos": "bano",
+    }
+
+    palabras = [
+        equivalencias.get(palabra, palabra)
+        for palabra in palabras
+    ]
+
+    return " ".join(palabras)
+
+
 def obtener_items_checklist_configurado(tarea):
     """
     Primero intenta usar los modelos configurados en Configuración.
-    Si no encuentra coincidencia, devuelve lista vacía y se usará el checklist por defecto.
+
+    WC, baño y aseo se consideran la misma familia.
+    Si no encuentra coincidencia, devuelve lista vacía y se usará
+    el checklist por defecto.
+
+    Elimina duplicados conservando el orden.
     """
-    tarea_txt = normalizar_tarea(tarea)
+    tarea_txt = normalizar_clave_checklist(tarea)
 
     conn = conectar()
     cursor = conn.cursor()
@@ -151,18 +191,30 @@ def obtener_items_checklist_configurado(tarea):
             ORDER BY categoria, tarea_clave, id
         """)
         modelos = cursor.fetchall()
+
     except Exception:
         modelos = []
 
-    conn.close()
+    finally:
+        conn.close()
 
     items = []
 
     for tarea_clave, item in modelos:
-        clave = normalizar_tarea(tarea_clave)
+        clave = normalizar_clave_checklist(
+            tarea_clave
+        )
 
         if clave and clave in tarea_txt:
-            items.append(item)
+            item_txt = str(
+                item or ""
+            ).strip()
+
+            if (
+                item_txt
+                and item_txt not in items
+            ):
+                items.append(item_txt)
 
     return items
 
@@ -173,7 +225,7 @@ def obtener_items_checklist_por_tarea(tarea):
     if items_configurados:
         return items_configurados
 
-    tarea_txt = normalizar_tarea(tarea)
+    tarea_txt = normalizar_clave_checklist(tarea)
 
     if "cuadro" in tarea_txt and "electric" in tarea_txt:
         return [
