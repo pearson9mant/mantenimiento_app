@@ -137,6 +137,112 @@ def actualizar_visible_planta(id_planta, visible):
     conn.close()
 
 
+def crear_planta_configurable(centro, edificio, planta, visible=1):
+    """
+    Crea una nueva planta o zona en plantas_config.
+
+    No modifica PLANTAS_BASE y no duplica registros existentes.
+    Si ya existe pero estaba oculta, puede volver a activarse.
+    """
+    crear_tabla_plantas_config()
+
+    centro = normalizar_texto(centro)
+    edificio = normalizar_texto(edificio)
+    planta = normalizar_texto(planta)
+
+    if not centro or not edificio or not planta:
+        return False, "Centro, edificio y nombre de planta son obligatorios."
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT id, visible
+            FROM plantas_config
+            WHERE LOWER(COALESCE(centro, '')) = LOWER(?)
+              AND LOWER(COALESCE(edificio, '')) = LOWER(?)
+              AND LOWER(COALESCE(planta, '')) = LOWER(?)
+            LIMIT 1
+        """), (
+            centro,
+            edificio,
+            planta,
+        ))
+
+        fila = cur.fetchone()
+
+        if fila:
+            id_planta, visible_actual = fila
+
+            if int(visible or 0) == 1 and int(visible_actual or 0) == 0:
+                cur.execute(_sql("""
+                    UPDATE plantas_config
+                    SET visible = 1
+                    WHERE id = ?
+                """), (id_planta,))
+
+                conn.commit()
+                return True, "La planta ya existía y se ha vuelto a mostrar."
+
+            return False, "Esa planta o zona ya existe en este edificio."
+
+        cur.execute(_sql("""
+            INSERT INTO plantas_config
+            (centro, edificio, planta, visible)
+            VALUES (?, ?, ?, ?)
+        """), (
+            centro,
+            edificio,
+            planta,
+            1 if visible else 0,
+        ))
+
+        conn.commit()
+        return True, f"Planta creada: {planta}"
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo crear la planta: {e}"
+
+    finally:
+        conn.close()
+
+
+def obtener_plantas_config_ubicacion(
+    centro,
+    edificio,
+    solo_visibles=False,
+):
+    """
+    Devuelve plantas configuradas para un centro y edificio.
+    """
+    crear_tabla_plantas_config()
+
+    centro_buscado = normalizar_comparacion(centro)
+    edificio_buscado = normalizar_comparacion(edificio)
+
+    datos = obtener_plantas_config()
+    resultado = []
+
+    for _id, centro_db, edificio_db, planta_db, visible in datos:
+        if normalizar_comparacion(centro_db) != centro_buscado:
+            continue
+
+        if normalizar_comparacion(edificio_db) != edificio_buscado:
+            continue
+
+        if solo_visibles and not bool(visible):
+            continue
+
+        planta_txt = normalizar_texto(planta_db)
+
+        if planta_txt and planta_txt not in resultado:
+            resultado.append(planta_txt)
+
+    return resultado
+
+
 def planta_visible(centro, edificio, planta):
     crear_tabla_plantas_config()
 
@@ -512,6 +618,25 @@ def obtener_arbol_espacios():
                 if planta_visible(centro, edificio, planta):
                     arbol[centro][edificio][planta] = []
 
+    # Añadir plantas creadas desde Configuración aunque aún no tengan espacios.
+    for _id, centro_cfg, edificio_cfg, planta_cfg, visible_cfg in obtener_plantas_config():
+        if not bool(visible_cfg):
+            continue
+
+        centro_cfg = normalizar_texto(centro_cfg)
+        edificio_cfg = normalizar_texto(edificio_cfg)
+        planta_cfg = normalizar_texto(planta_cfg)
+
+        if not centro_cfg or not edificio_cfg or not planta_cfg:
+            continue
+
+        arbol.setdefault(centro_cfg, {})
+        arbol[centro_cfg].setdefault(edificio_cfg, {})
+        arbol[centro_cfg][edificio_cfg].setdefault(
+            planta_cfg,
+            [],
+        )
+
     datos = obtener_espacios(True)
 
     for fila in datos:
@@ -604,11 +729,52 @@ def obtener_edificios_espacios(centro):
 
 
 def obtener_plantas_espacios(centro, edificio):
+    """
+    Devuelve plantas visibles del edificio.
+
+    Integra:
+    - plantas base;
+    - plantas creadas desde Configuración;
+    - plantas ya presentes en espacios activos.
+    """
     crear_tabla_espacios()
+    crear_tabla_plantas_config()
 
     centro_buscado = normalizar_comparacion(centro)
     edificio_buscado = normalizar_comparacion(edificio)
 
+    plantas = []
+
+    # Base histórica, respetando visibilidad.
+    for centro_base, edificios_base in PLANTAS_BASE.items():
+        if normalizar_comparacion(centro_base) != centro_buscado:
+            continue
+
+        for edificio_base, plantas_base in edificios_base.items():
+            if normalizar_comparacion(edificio_base) != edificio_buscado:
+                continue
+
+            for planta_base in plantas_base:
+                if (
+                    planta_visible(
+                        centro_base,
+                        edificio_base,
+                        planta_base,
+                    )
+                    and planta_base not in plantas
+                ):
+                    plantas.append(planta_base)
+
+    # Nuevas plantas o zonas creadas desde Configuración.
+    for planta_cfg in obtener_plantas_config_ubicacion(
+        centro,
+        edificio,
+        solo_visibles=True,
+    ):
+        if planta_cfg not in plantas:
+            plantas.append(planta_cfg)
+
+    # Compatibilidad con espacios ya creados.
     conn = conectar()
     cur = conn.cursor()
 
@@ -624,8 +790,6 @@ def obtener_plantas_espacios(centro, edificio):
     filas = cur.fetchall()
     conn.close()
 
-    plantas = []
-
     for centro_db, edificio_db, planta_db in filas:
         if normalizar_comparacion(centro_db) != centro_buscado:
             continue
@@ -635,22 +799,18 @@ def obtener_plantas_espacios(centro, edificio):
 
         planta_txt = normalizar_texto(planta_db)
 
-        if planta_txt and planta_txt not in plantas:
+        if not planta_txt:
+            continue
+
+        if not planta_visible(
+            centro_db,
+            edificio_db,
+            planta_txt,
+        ):
+            continue
+
+        if planta_txt not in plantas:
             plantas.append(planta_txt)
-
-    # Si todavía no hay espacios cargados, usa las plantas base.
-    if not plantas:
-        for centro_base, edificios_base in PLANTAS_BASE.items():
-            if normalizar_comparacion(centro_base) != centro_buscado:
-                continue
-
-            for edificio_base, plantas_base in edificios_base.items():
-                if (
-                    normalizar_comparacion(edificio_base)
-                    == edificio_buscado
-                ):
-                    plantas = list(plantas_base)
-                    break
 
     return plantas
 
@@ -1078,16 +1238,7 @@ def obtener_espacio_por_codigo(codigo):
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT
-            id,
-            codigo,
-            centro,
-            edificio,
-            planta,
-            espacio,
-            tipo,
-            activo,
-            qr_habilitado
+        SELECT id, codigo, centro, edificio, planta, espacio, tipo, activo
         FROM espacios
         WHERE codigo = ?
         LIMIT 1
