@@ -255,6 +255,75 @@ def obtener_modelos_checklist():
     return datos
 
 
+def actualizar_modelo_checklist(
+    id_modelo,
+    categoria,
+    tarea_clave,
+    item,
+):
+    """
+    Edita un modelo existente sin borrar su estado activo/desactivado.
+    """
+    categoria = str(categoria or "").strip()
+    tarea_clave = str(tarea_clave or "").strip().lower()
+    item = str(item or "").strip()
+
+    if not categoria:
+        return False, "Indica una categoría."
+
+    if not tarea_clave:
+        return False, "Indica una palabra clave."
+
+    if not item:
+        return False, "Indica el punto del checklist."
+
+    asegurar_tabla_checklist_modelos()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT COUNT(*)
+            FROM preventivo_checklist_modelos
+            WHERE id <> ?
+              AND LOWER(categoria) = LOWER(?)
+              AND LOWER(tarea_clave) = LOWER(?)
+              AND LOWER(item) = LOWER(?)
+        """), (
+            int(id_modelo),
+            categoria,
+            tarea_clave,
+            item,
+        ))
+
+        if int(cursor.fetchone()[0] or 0) > 0:
+            return False, "Ya existe otro punto igual para esa tarea."
+
+        cursor.execute(_sql("""
+            UPDATE preventivo_checklist_modelos
+            SET categoria = ?,
+                tarea_clave = ?,
+                item = ?
+            WHERE id = ?
+        """), (
+            categoria,
+            tarea_clave,
+            item,
+            int(id_modelo),
+        ))
+
+        conn.commit()
+        return True, "Modelo actualizado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo actualizar el modelo: {e}"
+
+    finally:
+        conn.close()
+
+
 def activar_desactivar_modelo_checklist(id_modelo, activo):
     conn = conectar()
     cursor = conn.cursor()
@@ -313,6 +382,14 @@ def sembrar_modelos_checklist_por_defecto():
         ("Fontanería", "baño", "Comprobar desagües"),
         ("Fontanería", "baño", "Comprobar malos olores"),
 
+        # Una única visita preventiva al baño debe revisar también
+        # la iluminación visible del espacio.
+        ("Iluminación", "baño", "Comprobar encendido de todas las luminarias"),
+        ("Iluminación", "baño", "Revisar luces fundidas o parpadeos"),
+        ("Iluminación", "baño", "Revisar pantallas y difusores"),
+        ("Iluminación", "baño", "Comprobar interruptores o sensores de presencia"),
+        ("Iluminación", "baño", "Comprobar luz de emergencia si existe"),
+
         ("Fontanería", "grifo", "Comprobar fugas"),
         ("Fontanería", "grifo", "Comprobar cierre correcto"),
         ("Fontanería", "grifo", "Comprobar presión de agua"),
@@ -344,17 +421,29 @@ def pantalla_checklist_preventivo_config():
     st.markdown("### ✅ Checklist preventivo configurable")
 
     st.info(
-        "Aquí puedes crear modelos de checklist. "
-        "Cuando una tarea preventiva contenga la palabra clave, se cargarán estos puntos automáticamente."
+        "Aquí puedes crear y editar modelos de checklist. "
+        "WC, baño y aseo utilizan la misma familia en el motor preventivo."
     )
 
-    if st.button("🌱 Cargar modelos por defecto", use_container_width=True):
+    if st.button(
+        "🌱 Cargar / completar modelos por defecto",
+        use_container_width=True,
+        key="cfg_check_sembrar_defecto",
+    ):
         creados = sembrar_modelos_checklist_por_defecto()
-        st.success(f"Modelos creados: {creados}")
+
+        if creados:
+            st.success(
+                f"Se han añadido {creados} puntos que faltaban."
+            )
+        else:
+            st.info(
+                "Los modelos por defecto ya estaban cargados."
+            )
+
         st.rerun()
 
     st.markdown("---")
-
     st.markdown("#### ➕ Añadir punto de checklist")
 
     categoria = st.selectbox(
@@ -371,12 +460,20 @@ def pantalla_checklist_preventivo_config():
 
     item = st.text_input(
         "Punto del checklist",
-        placeholder="Ejemplo: Comprobación de diferenciales con botón TEST",
+        placeholder="Ejemplo: Comprobar sensor de presencia",
         key="cfg_check_item"
     )
 
-    if st.button("➕ Crear punto de checklist", use_container_width=True):
-        ok, mensaje = crear_modelo_checklist(categoria, tarea_clave, item)
+    if st.button(
+        "➕ Crear punto de checklist",
+        use_container_width=True,
+        key="cfg_check_crear",
+    ):
+        ok, mensaje = crear_modelo_checklist(
+            categoria,
+            tarea_clave,
+            item,
+        )
 
         if ok:
             st.success(mensaje)
@@ -385,61 +482,134 @@ def pantalla_checklist_preventivo_config():
             st.warning(mensaje)
 
     st.markdown("---")
-
     st.markdown("#### 📋 Modelos existentes")
+
+    filtro_clave = st.text_input(
+        "🔎 Buscar modelo",
+        placeholder="Ejemplo: baño, iluminación, split...",
+        key="cfg_check_buscar_modelo",
+    )
 
     modelos = obtener_modelos_checklist()
 
+    if filtro_clave:
+        buscar = str(filtro_clave).strip().lower()
+
+        modelos = [
+            modelo
+            for modelo in modelos
+            if buscar in " ".join(
+                str(valor or "").lower()
+                for valor in modelo[1:4]
+            )
+        ]
+
     if not modelos:
-        st.info("Todavía no hay modelos de checklist.")
-    else:
-        for id_modelo, categoria, tarea_clave, item, activo in modelos:
-            icono = "✅" if activo else "⛔"
-            titulo = f"{icono} {categoria} · {tarea_clave} · {item}"
+        st.info("No hay modelos de checklist que mostrar.")
+        return
 
-            with st.expander(titulo, expanded=False):
-                st.markdown(f"**Categoría:** {categoria}")
-                st.markdown(f"**Palabra clave:** {tarea_clave}")
-                st.markdown(f"**Punto:** {item}")
-                st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
+    st.caption(
+        f"{len(modelos)} modelo(s) mostrado(s). "
+        "Los cambios afectan a futuros checklists; no modifican OT ya creadas."
+    )
 
-                c1, c2 = st.columns(2)
+    for id_modelo, categoria_actual, tarea_clave_actual, item_actual, activo in modelos:
+        icono = "✅" if activo else "⛔"
+        titulo = (
+            f"{icono} {categoria_actual} · "
+            f"{tarea_clave_actual} · {item_actual}"
+        )
 
-                with c1:
-                    if activo:
-                        if st.button(
-                            f"⛔ Desactivar {id_modelo}",
-                            key=f"desactivar_check_modelo_{id_modelo}",
-                            use_container_width=True
-                        ):
-                            activar_desactivar_modelo_checklist(id_modelo, 0)
-                            st.rerun()
-                    else:
-                        if st.button(
-                            f"✅ Activar {id_modelo}",
-                            key=f"activar_check_modelo_{id_modelo}",
-                            use_container_width=True
-                        ):
-                            activar_desactivar_modelo_checklist(id_modelo, 1)
-                            st.rerun()
+        with st.expander(titulo, expanded=False):
+            nueva_categoria = st.selectbox(
+                "Categoría",
+                CATEGORIAS_CHECKLIST_PREVENTIVO,
+                index=(
+                    CATEGORIAS_CHECKLIST_PREVENTIVO.index(categoria_actual)
+                    if categoria_actual in CATEGORIAS_CHECKLIST_PREVENTIVO
+                    else len(CATEGORIAS_CHECKLIST_PREVENTIVO) - 1
+                ),
+                key=f"editar_check_categoria_{id_modelo}",
+            )
 
-                with c2:
-                    confirmar = st.checkbox(
-                        "Confirmar borrado",
-                        key=f"confirmar_borrar_check_modelo_{id_modelo}"
+            nueva_clave = st.text_input(
+                "Palabra clave",
+                value=str(tarea_clave_actual or ""),
+                key=f"editar_check_clave_{id_modelo}",
+            )
+
+            nuevo_item = st.text_area(
+                "Punto del checklist",
+                value=str(item_actual or ""),
+                key=f"editar_check_item_{id_modelo}",
+                height=90,
+            )
+
+            st.caption(
+                f"Estado actual: {'Activo' if activo else 'Desactivado'}"
+            )
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+                if st.button(
+                    "💾 Guardar cambios",
+                    key=f"guardar_check_modelo_{id_modelo}",
+                    use_container_width=True,
+                ):
+                    ok, mensaje = actualizar_modelo_checklist(
+                        id_modelo=id_modelo,
+                        categoria=nueva_categoria,
+                        tarea_clave=nueva_clave,
+                        item=nuevo_item,
                     )
 
-                    if st.button(
-                        f"🗑️ Borrar {id_modelo}",
-                        key=f"borrar_check_modelo_{id_modelo}",
-                        use_container_width=True
-                    ):
-                        if confirmar:
-                            borrar_modelo_checklist(id_modelo)
-                            st.warning("Modelo eliminado.")
-                            st.rerun()
-                        else:
-                            st.error("Marca la confirmación antes de borrar.")
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.warning(mensaje)
+
+            with c2:
+                if activo:
+                    texto_estado = "⛔ Desactivar"
+                    nuevo_estado = 0
+                else:
+                    texto_estado = "✅ Activar"
+                    nuevo_estado = 1
+
+                if st.button(
+                    texto_estado,
+                    key=f"estado_check_modelo_{id_modelo}",
+                    use_container_width=True,
+                ):
+                    activar_desactivar_modelo_checklist(
+                        id_modelo,
+                        nuevo_estado,
+                    )
+                    st.rerun()
+
+            st.markdown("---")
+
+            confirmar = st.checkbox(
+                "Confirmar borrado definitivo",
+                key=f"confirmar_borrar_check_modelo_{id_modelo}",
+            )
+
+            if st.button(
+                "🗑️ Borrar modelo",
+                key=f"borrar_check_modelo_{id_modelo}",
+                use_container_width=True,
+            ):
+                if confirmar:
+                    borrar_modelo_checklist(id_modelo)
+                    st.warning("Modelo eliminado.")
+                    st.rerun()
+                else:
+                    st.error(
+                        "Marca la confirmación antes de borrar."
+                    )
+
 
 # =====================================================
 # RECLASIFICACIÓN DE ÁREAS DE OT ANTIGUAS
@@ -1181,48 +1351,23 @@ def mostrar_arbol_colegio():
 # CONFIGURACIÓN ESPACIOS
 # =====================================================
 
-ZONAS_ESPECIALES_P22 = [
-    "Exterior",
-    "Sala técnica / Instalaciones",
-]
-
-
-def obtener_plantas_catalogo_config(centro, edificio):
-    """
-    Devuelve las plantas normales del edificio y añade zonas técnicas
-    especiales cuando corresponda.
-
-    No modifica PLANTAS_BASE ni elimina ninguna planta existente.
-    """
-    plantas = list(
-        PLANTAS_BASE.get(
-            centro,
-            {},
-        ).get(
-            edificio,
-            [],
-        )
-    )
-
-    if centro == "Pearson 22":
-        for zona in ZONAS_ESPECIALES_P22:
-            if zona not in plantas:
-                plantas.append(zona)
-
-    return plantas
-
-
 def pantalla_configuracion_espacios():
     crear_tabla_espacios()
 
     st.markdown("### 🏫 Catálogo de espacios del colegio")
 
-    sub1, sub2, sub3, sub4 = st.tabs([
-        "➕ Crear",
-        "📚 Catálogo",
-        "📍 Plantas",
-        "🌳 Árbol del colegio"
-    ])
+    seccion_espacios = st.radio(
+        "Sección de espacios",
+        [
+            "➕ Crear",
+            "📚 Catálogo",
+            "📍 Plantas",
+            "🌳 Árbol del colegio",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="cfg_espacios_seccion",
+    )
 
     tipos_espacio = [
         "Aula",
@@ -1234,16 +1379,14 @@ def pantalla_configuracion_espacios():
         "Sala técnica",
         "Pasillo",
         "Patio",
-        "Exterior",
         "Terrado",
-        "Sala técnica / Instalaciones",
         "Almacén",
         "Laboratorio",
         "Gimnasio",
         "Otro",
     ]
 
-    with sub1:
+    if seccion_espacios == "➕ Crear":
         st.markdown("#### ➕ Crear nuevo espacio")
 
         centro = st.selectbox(
@@ -1260,10 +1403,7 @@ def pantalla_configuracion_espacios():
             key="cfg_catalogo_edificio"
         )
 
-        plantas = obtener_plantas_catalogo_config(
-            centro,
-            edificio,
-        )
+        plantas = PLANTAS_BASE.get(centro, {}).get(edificio, [])
 
         planta = st.selectbox(
             "Planta",
@@ -1320,7 +1460,7 @@ def pantalla_configuracion_espacios():
                 else:
                     st.error("No se pudo guardar el espacio.")
 
-    with sub2:
+    elif seccion_espacios == "📚 Catálogo":
         st.markdown("#### 📚 Espacios registrados")
 
         espacios = obtener_espacios_catalogo(activos=True)
@@ -1352,20 +1492,7 @@ def pantalla_configuracion_espacios():
                         key=f"edit_esp_edificio_{id_espacio}"
                     )
 
-                    nuevas_plantas = obtener_plantas_catalogo_config(
-                        nuevo_centro,
-                        nuevo_edificio,
-                    )
-
-                    # Compatibilidad con espacios ya existentes que
-                    # tengan una zona no incluida todavía en la lista.
-                    if (
-                        planta
-                        and planta not in nuevas_plantas
-                    ):
-                        nuevas_plantas.append(
-                            planta
-                        )
+                    nuevas_plantas = PLANTAS_BASE.get(nuevo_centro, {}).get(nuevo_edificio, [])
 
                     nueva_planta = st.selectbox(
                         "Planta",
@@ -1439,7 +1566,7 @@ def pantalla_configuracion_espacios():
                             st.warning("Espacio desactivado.")
                             st.rerun()
 
-    with sub3:
+    elif seccion_espacios == "📍 Plantas":
         st.markdown("#### 📍 Plantas visibles")
 
         plantas = obtener_plantas_config()
@@ -1474,7 +1601,7 @@ def pantalla_configuracion_espacios():
                             actualizar_visible_planta(id_planta, 1)
                             st.rerun()
 
-    with sub4:
+    elif seccion_espacios == "🌳 Árbol del colegio":
         mostrar_arbol_colegio()
 
 
@@ -1484,139 +1611,240 @@ def pantalla_configuracion_espacios():
 # =====================================================
 
 def pantalla_configuracion():
+    """
+    Configuración con carga bajo demanda.
+
+    A diferencia de st.tabs(), solo ejecuta la sección seleccionada.
+    Esto evita cargar a la vez Catálogo, Árbol, Legionella, Checklist,
+    Inteligencia y Borrados en cada rerun.
+    """
     st.subheader("⚙️ Configuración")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏫 Espacios",
-        "💧 Legionella",
-        "✅ Checklist preventivo",
-        "🧠 Inteligencia",
-        "🧹 Borrados"
-    ])
+    seccion = st.radio(
+        "Sección de configuración",
+        [
+            "🏫 Espacios",
+            "💧 Legionella",
+            "✅ Checklist preventivo",
+            "🧠 Inteligencia",
+            "🧹 Borrados",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="cfg_seccion_principal",
+    )
 
-    with tab1:
+    if seccion == "🏫 Espacios":
         pantalla_configuracion_espacios()
+        return
 
-    with tab2:
-        st.markdown("### 💧 Configuración Legionella")
+    if seccion == "✅ Checklist preventivo":
+        pantalla_checklist_preventivo_config()
+        return
 
-        if st.button("🧹 Limpiar puntos inválidos (None)", use_container_width=True):
-            afectados = limpiar_puntos_legionella_invalidos()
-            st.success(f"{afectados} puntos limpiados/desactivados.")
-            st.rerun()
+    if seccion == "🧠 Inteligencia":
+        mostrar_reclasificacion_areas_ot()
+        return
 
-        sub1, sub2 = st.tabs(["➕ Añadir punto", "📋 Puntos existentes"])
+    if seccion == "🧹 Borrados":
+        pantalla_borrados_inicio()
+        return
 
-        with sub1:
-            st.markdown("#### Añadir punto de control")
+    # =================================================
+    # LEGIONELLA
+    # =================================================
+    st.markdown("### 💧 Configuración Legionella")
 
-            centro_leg = st.selectbox("Centro", CENTROS, key="cfg_leg_centro")
-            edificios_leg = obtener_edificios(centro_leg)
-            edificio_leg = st.selectbox("Edificio", edificios_leg, key="cfg_leg_edificio")
+    if st.button(
+        "🧹 Limpiar puntos inválidos (None)",
+        use_container_width=True,
+        key="cfg_leg_limpiar_invalidos",
+    ):
+        afectados = limpiar_puntos_legionella_invalidos()
+        st.success(
+            f"{afectados} puntos limpiados/desactivados."
+        )
+        st.rerun()
 
-            instalacion = st.selectbox(
-                "Instalación",
-                INSTALACIONES_LEGIONELLA,
-                key="cfg_leg_instalacion"
+    seccion_legionella = st.radio(
+        "Gestión Legionella",
+        [
+            "➕ Añadir punto",
+            "📋 Puntos existentes",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="cfg_leg_seccion",
+    )
+
+    if seccion_legionella == "➕ Añadir punto":
+        st.markdown("#### Añadir punto de control")
+
+        centro_leg = st.selectbox(
+            "Centro",
+            CENTROS,
+            key="cfg_leg_centro",
+        )
+
+        edificios_leg = obtener_edificios(
+            centro_leg
+        )
+
+        edificio_leg = st.selectbox(
+            "Edificio",
+            edificios_leg,
+            key="cfg_leg_edificio",
+        )
+
+        instalacion = st.selectbox(
+            "Instalación",
+            INSTALACIONES_LEGIONELLA,
+            key="cfg_leg_instalacion",
+        )
+
+        if instalacion == "Otro":
+            instalacion = st.text_input(
+                "Especificar instalación",
+                key="cfg_leg_instalacion_otro",
             )
 
-            if instalacion == "Otro":
-                instalacion = st.text_input("Especificar instalación", key="cfg_leg_instalacion_otro")
+        tipo_punto = st.selectbox(
+            "Tipo de punto",
+            TIPOS_PUNTO_LEGIONELLA,
+            key="cfg_leg_tipo_punto",
+        )
 
-            tipo_punto = st.selectbox(
-                "Tipo de punto",
-                TIPOS_PUNTO_LEGIONELLA,
-                key="cfg_leg_tipo_punto"
+        nombre_punto = st.text_input(
+            "Nombre del punto",
+            placeholder=(
+                "Ejemplo: Acumulador ACS 800L, "
+                "Retorno ACS, Ducha vestuario..."
+            ),
+            key="cfg_leg_nombre_punto",
+        )
+
+        ubicacion = st.text_input(
+            "Ubicación",
+            placeholder=(
+                "Ejemplo: Cuarto técnico, vestuario, "
+                "sala calderas..."
+            ),
+            key="cfg_leg_ubicacion",
+        )
+
+        observaciones = st.text_area(
+            "Observaciones",
+            key="cfg_leg_observaciones",
+        )
+
+        if st.button(
+            "➕ Crear punto Legionella",
+            use_container_width=True,
+            key="cfg_leg_crear_punto",
+        ):
+            ok, mensaje = crear_punto_legionella(
+                centro=centro_leg,
+                edificio=edificio_leg,
+                instalacion=instalacion,
+                tipo_punto=tipo_punto,
+                nombre_punto=nombre_punto,
+                ubicacion=ubicacion,
+                observaciones=observaciones,
             )
 
-            nombre_punto = st.text_input(
-                "Nombre del punto",
-                placeholder="Ejemplo: Acumulador ACS 800L, Retorno ACS, Ducha vestuario..."
+            if ok:
+                st.success(mensaje)
+                st.rerun()
+            else:
+                st.warning(mensaje)
+
+        return
+
+    # =================================================
+    # PUNTOS EXISTENTES
+    # =================================================
+    st.markdown("#### Puntos de control existentes")
+
+    puntos = obtener_puntos_legionella()
+
+    if not puntos:
+        st.info(
+            "No hay puntos de Legionella creados."
+        )
+        return
+
+    for (
+        id_punto,
+        centro,
+        edificio,
+        instalacion,
+        tipo_punto,
+        nombre_punto,
+        ubicacion,
+        activo,
+        observaciones,
+    ) in puntos:
+
+        icono = "✅" if activo else "⛔"
+
+        titulo = (
+            f"{icono} {centro} · {edificio} · "
+            f"{nombre_punto}"
+        )
+
+        with st.expander(
+            titulo,
+            expanded=False,
+        ):
+            st.markdown(
+                f"**Centro:** {centro}"
+            )
+            st.markdown(
+                f"**Edificio:** {edificio}"
+            )
+            st.markdown(
+                f"**Instalación:** {instalacion}"
+            )
+            st.markdown(
+                f"**Tipo punto:** {tipo_punto}"
+            )
+            st.markdown(
+                f"**Nombre:** {nombre_punto}"
+            )
+            st.markdown(
+                f"**Ubicación:** {ubicacion or '-'}"
+            )
+            st.markdown(
+                f"**Estado:** "
+                f"{'Activo' if activo else 'Desactivado'}"
             )
 
-            ubicacion = st.text_input(
-                "Ubicación",
-                placeholder="Ejemplo: Cuarto técnico, vestuario, sala calderas..."
-            )
-
-            observaciones = st.text_area("Observaciones")
-
-            if st.button("➕ Crear punto Legionella", use_container_width=True):
-                ok, mensaje = crear_punto_legionella(
-                    centro=centro_leg,
-                    edificio=edificio_leg,
-                    instalacion=instalacion,
-                    tipo_punto=tipo_punto,
-                    nombre_punto=nombre_punto,
-                    ubicacion=ubicacion,
-                    observaciones=observaciones
+            if observaciones:
+                st.info(
+                    observaciones
                 )
 
-                if ok:
-                    st.success(mensaje)
-                    st.rerun()
-                else:
-                    st.warning(mensaje)
-
-        with sub2:
-            st.markdown("#### Puntos de control existentes")
-
-            puntos = obtener_puntos_legionella()
-
-            if not puntos:
-                st.info("No hay puntos de Legionella creados.")
+            if activo:
+                texto_boton = (
+                    f"⛔ Desactivar punto {id_punto}"
+                )
+                nuevo_estado = 0
             else:
-                for (
+                texto_boton = (
+                    f"✅ Activar punto {id_punto}"
+                )
+                nuevo_estado = 1
+
+            if st.button(
+                texto_boton,
+                key=f"estado_leg_{id_punto}",
+                use_container_width=True,
+            ):
+                activar_desactivar_punto_legionella(
                     id_punto,
-                    centro,
-                    edificio,
-                    instalacion,
-                    tipo_punto,
-                    nombre_punto,
-                    ubicacion,
-                    activo,
-                    observaciones
-                ) in puntos:
+                    nuevo_estado,
+                )
+                st.rerun()
 
-                    icono = "✅" if activo else "⛔"
-                    titulo = f"{icono} {centro} · {edificio} · {nombre_punto}"
-
-                    with st.expander(titulo, expanded=False):
-                        st.markdown(f"**Centro:** {centro}")
-                        st.markdown(f"**Edificio:** {edificio}")
-                        st.markdown(f"**Instalación:** {instalacion}")
-                        st.markdown(f"**Tipo punto:** {tipo_punto}")
-                        st.markdown(f"**Nombre:** {nombre_punto}")
-                        st.markdown(f"**Ubicación:** {ubicacion or '-'}")
-                        st.markdown(f"**Estado:** {'Activo' if activo else 'Desactivado'}")
-
-                        if observaciones:
-                            st.info(observaciones)
-
-                        if activo:
-                            if st.button(
-                                f"⛔ Desactivar punto {id_punto}",
-                                key=f"desactivar_leg_{id_punto}",
-                                use_container_width=True
-                            ):
-                                activar_desactivar_punto_legionella(id_punto, 0)
-                                st.rerun()
-                        else:
-                            if st.button(
-                                f"✅ Activar punto {id_punto}",
-                                key=f"activar_leg_{id_punto}",
-                                use_container_width=True
-                            ):
-                                activar_desactivar_punto_legionella(id_punto, 1)
-                                st.rerun()
-
-    with tab3:
-        pantalla_checklist_preventivo_config()
-
-    with tab4:
-        mostrar_reclasificacion_areas_ot()
-    
-    with tab5:
-        pantalla_borrados_inicio()
 
         
