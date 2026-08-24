@@ -248,26 +248,56 @@ def actualizar_planificacion_preventivo(
     frecuencia,
     proxima_fecha,
     operario,
-    activo
+    activo,
+    area=None,
+    tarea=None,
 ):
+    """
+    Actualiza la planificación preventiva.
+
+    Compatibilidad:
+    - Mantiene los parámetros históricos.
+    - Área y tarea son opcionales para no romper llamadas antiguas.
+    - No modifica centro, edificio, planta, espacio ni el ID.
+    """
     conn = conectar()
     cursor = conn.cursor()
 
     try:
-        cursor.execute(_sql("""
-            UPDATE preventivo_tareas
-            SET frecuencia = ?,
-                proxima_fecha = ?,
-                operario = ?,
-                activo = ?
-            WHERE id = ?
-        """), (
-            frecuencia,
-            proxima_fecha,
-            operario,
-            1 if activo else 0,
-            int(tarea_id)
-        ))
+        if area is None and tarea is None:
+            cursor.execute(_sql("""
+                UPDATE preventivo_tareas
+                SET frecuencia = ?,
+                    proxima_fecha = ?,
+                    operario = ?,
+                    activo = ?
+                WHERE id = ?
+            """), (
+                frecuencia,
+                proxima_fecha,
+                operario,
+                1 if activo else 0,
+                int(tarea_id)
+            ))
+        else:
+            cursor.execute(_sql("""
+                UPDATE preventivo_tareas
+                SET area = ?,
+                    tarea = ?,
+                    frecuencia = ?,
+                    proxima_fecha = ?,
+                    operario = ?,
+                    activo = ?
+                WHERE id = ?
+            """), (
+                str(area or "").strip(),
+                str(tarea or "").strip(),
+                frecuencia,
+                proxima_fecha,
+                operario,
+                1 if activo else 0,
+                int(tarea_id)
+            ))
 
         conn.commit()
         return True
@@ -278,6 +308,7 @@ def actualizar_planificacion_preventivo(
 
     finally:
         conn.close()
+
 
 def mostrar_panel_inteligente_preventivo():
     st.markdown("## 🛠 Centro de Control Preventivo")
@@ -1584,9 +1615,59 @@ def pantalla_preventivo():
 
                 with st.expander(titulo, expanded=False):
                     st.caption(
-                        f"🔧 Área: {area or '-'} · "
+                        f"🔧 Área actual: {area or '-'} · "
                         f"👷 Operario: {operario or '-'}"
                     )
+
+                    st.markdown("#### ✏️ Datos de la planificación")
+
+                    col_dato1, col_dato2 = st.columns(2)
+
+                    with col_dato1:
+                        indice_area = (
+                            AREAS.index(area)
+                            if area in AREAS
+                            else 0
+                        )
+
+                        area_editada = st.selectbox(
+                            "Área",
+                            AREAS,
+                            index=indice_area,
+                            key=f"plan_prev_area_{tarea_id}"
+                        )
+
+                    with col_dato2:
+                        tareas_area = TAREAS_PREVENTIVAS_POR_AREA.get(
+                            area_editada,
+                            TAREAS_PREVENTIVAS_POR_AREA["General"]
+                        )
+
+                        tarea_actual = str(tarea or "").strip()
+                        opciones_tarea = list(tareas_area)
+
+                        if tarea_actual and tarea_actual not in opciones_tarea:
+                            opciones_tarea = [tarea_actual] + opciones_tarea
+
+                        tarea_seleccionada = st.selectbox(
+                            "Tarea preventiva",
+                            opciones_tarea,
+                            index=(
+                                opciones_tarea.index(tarea_actual)
+                                if tarea_actual in opciones_tarea
+                                else 0
+                            ),
+                            key=f"plan_prev_tarea_{tarea_id}"
+                        )
+
+                        if tarea_seleccionada == "Otra":
+                            tarea_editada = st.text_input(
+                                "Especificar tarea preventiva",
+                                value="",
+                                key=f"plan_prev_tarea_otra_{tarea_id}"
+                            ).strip()
+                        else:
+                            tarea_editada = tarea_seleccionada
 
                     col1, col2 = st.columns(2)
 
@@ -1657,15 +1738,23 @@ def pantalla_preventivo():
                         use_container_width=True
                     ):
                         try:
-                            actualizado = actualizar_planificacion_preventivo(
-                                tarea_id=tarea_id,
-                                frecuencia=str(int(frecuencia_editada)),
-                                proxima_fecha=proxima_fecha_editada.strftime(
-                                    "%Y-%m-%d"
-                                ),
-                                operario=operario_editado,
-                                activo=activo_editado
-                            )
+                            if not str(tarea_editada or "").strip():
+                                st.warning(
+                                    "La tarea preventiva no puede quedar vacía."
+                                )
+                                actualizado = False
+                            else:
+                                actualizado = actualizar_planificacion_preventivo(
+                                    tarea_id=tarea_id,
+                                    frecuencia=str(int(frecuencia_editada)),
+                                    proxima_fecha=proxima_fecha_editada.strftime(
+                                        "%Y-%m-%d"
+                                    ),
+                                    operario=operario_editado,
+                                    activo=activo_editado,
+                                    area=area_editada,
+                                    tarea=str(tarea_editada).strip(),
+                                )
 
                             if actualizado:
                                 generadas = generar_ots_preventivo_si_toca()
