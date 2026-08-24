@@ -1424,7 +1424,9 @@ def pantalla_configuracion_espacios():
         "Sala técnica",
         "Pasillo",
         "Patio",
+        "Exterior",
         "Terrado",
+        "Sala técnica / Instalaciones",
         "Almacén",
         "Laboratorio",
         "Gimnasio",
@@ -1972,6 +1974,7 @@ def pantalla_configuracion():
                     nuevo_estado,
                 )
                 st.rerun()
+
 
 
 
