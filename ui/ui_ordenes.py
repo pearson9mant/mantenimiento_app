@@ -615,19 +615,75 @@ def pantalla_ordenes():
                 centro = st.selectbox("Centro", CENTROS, key="orden_int_centro")
                 st.info("Número de OT interna: se asignará al crear la orden")
 
-                edificios_disponibles = EDIFICIOS.get(centro, [])
-                edificio = st.selectbox("Edificio", edificios_disponibles, key=f"orden_int_edificio_{centro}")
+                edificios_disponibles = obtener_edificios_espacios(
+                    centro
+                )
 
-                espacios_disponibles = obtener_espacios(edificio, centro)
+                if not edificios_disponibles:
+                    edificios_disponibles = EDIFICIOS.get(
+                        centro,
+                        [],
+                    )
+
+                edificio = st.selectbox(
+                    "Edificio",
+                    edificios_disponibles,
+                    key=f"orden_int_edificio_{centro}",
+                )
+
+                plantas_disponibles = obtener_plantas_espacios(
+                    centro,
+                    edificio,
+                )
+
+                if not plantas_disponibles:
+                    plantas_disponibles = ["General"]
+
+                planta = st.selectbox(
+                    "Planta / Zona",
+                    plantas_disponibles,
+                    key=f"orden_int_planta_{centro}_{edificio}",
+                )
+
+                filas_espacios = obtener_espacios_por_planta(
+                    centro,
+                    edificio,
+                    planta,
+                )
+
+                espacios_disponibles = []
+
+                for fila_espacio in filas_espacios:
+                    nombre_espacio = extraer_nombre_espacio(
+                        fila_espacio
+                    )
+
+                    if (
+                        nombre_espacio
+                        and nombre_espacio not in espacios_disponibles
+                    ):
+                        espacios_disponibles.append(
+                            nombre_espacio
+                        )
+
+                # Conservamos las opciones históricas.
+                for opcion_extra in ["General", "Otro"]:
+                    if opcion_extra not in espacios_disponibles:
+                        espacios_disponibles.append(
+                            opcion_extra
+                        )
 
                 espacio_sel = st.selectbox(
                     "Espacio",
                     espacios_disponibles,
-                    key=f"orden_int_espacio_{edificio}"
+                    key=f"orden_int_espacio_{centro}_{edificio}_{planta}",
                 )
 
                 if espacio_sel == "Otro":
-                    espacio = st.text_input("Especificar espacio nuevo", key="orden_int_espacio_otro")
+                    espacio = st.text_input(
+                        "Especificar espacio nuevo",
+                        key="orden_int_espacio_otro",
+                    )
                 else:
                     espacio = espacio_sel
 
@@ -716,30 +772,38 @@ def pantalla_ordenes():
                             numero = obtener_siguiente_numero_ot(centro, "INC")
 
                             datos_orden = (
-                                numero,
-                                descripcion,
-                                "Abierta",
-                                centro,
-                                edificio,
-                                espacio,
-                                area,
-                                prioridad,
-                                operario,
-                                st.session_state.get("origen_ot_manual", "APP"),
-                                "",
-                                "",
-                                "postgres_fotos",
-                                tipo_solicitante_guardar,
-                                "Interna",
-                                "",
-                                "",
-                                "",
-                                "",
-                                "",
-                                "",
-                                0,
-                                0,
-                                ""
+                                numero,                                      # 0
+                                descripcion,                                 # 1
+                                "Abierta",                                   # 2
+                                centro,                                      # 3
+                                edificio,                                    # 4
+                                espacio,                                     # 5
+                                area,                                        # 6
+                                prioridad,                                   # 7
+                                operario,                                    # 8
+                                st.session_state.get(
+                                    "origen_ot_manual",
+                                    "APP",
+                                ),                                           # 9
+                                "",                                          # 10 solicitante
+                                "",                                          # 11 fecha_origen
+                                "postgres_fotos",                            # 12 foto
+                                tipo_solicitante_guardar,                    # 13
+                                "Interna",                                   # 14
+                                "",                                          # 15 empresa_externa
+                                "",                                          # 16 contacto_empresa
+                                "",                                          # 17 telefono_empresa
+                                "",                                          # 18 email_empresa
+                                "",                                          # 19 fecha_aviso/programada
+                                "",                                          # 20 fecha_realizacion
+                                "",                                          # 21 trabajo_a_realizar
+                                "",                                          # 22 trabajo_realizado
+                                "",                                          # 23 firma_operario
+                                "",                                          # 24 fecha_firma_operario
+                                0,                                           # 25 coste_estimado
+                                0,                                           # 26 coste_final
+                                "",                                          # 27 observaciones_estado
+                                planta,                                      # 28 planta/zona
                             )
 
                             crear_orden(datos_orden)
@@ -777,19 +841,74 @@ def pantalla_ordenes():
                 centro_ext = st.selectbox("Centro", CENTROS, key="orden_ext_centro")
                 st.info("Número de OT externa: se asignará al crear la orden")
 
-                edificios_disponibles_ext = EDIFICIOS.get(centro_ext, [])
-                edificio_ext = st.selectbox("Edificio", edificios_disponibles_ext, key=f"orden_ext_edificio_{centro_ext}")
+                edificios_disponibles_ext = obtener_edificios_espacios(
+                    centro_ext
+                )
 
-                espacios_disponibles_ext = obtener_espacios(edificio_ext, centro_ext)
+                if not edificios_disponibles_ext:
+                    edificios_disponibles_ext = EDIFICIOS.get(
+                        centro_ext,
+                        [],
+                    )
+
+                edificio_ext = st.selectbox(
+                    "Edificio",
+                    edificios_disponibles_ext,
+                    key=f"orden_ext_edificio_{centro_ext}",
+                )
+
+                plantas_disponibles_ext = obtener_plantas_espacios(
+                    centro_ext,
+                    edificio_ext,
+                )
+
+                if not plantas_disponibles_ext:
+                    plantas_disponibles_ext = ["General"]
+
+                planta_ext = st.selectbox(
+                    "Planta / Zona",
+                    plantas_disponibles_ext,
+                    key=f"orden_ext_planta_{centro_ext}_{edificio_ext}",
+                )
+
+                filas_espacios_ext = obtener_espacios_por_planta(
+                    centro_ext,
+                    edificio_ext,
+                    planta_ext,
+                )
+
+                espacios_disponibles_ext = []
+
+                for fila_espacio in filas_espacios_ext:
+                    nombre_espacio = extraer_nombre_espacio(
+                        fila_espacio
+                    )
+
+                    if (
+                        nombre_espacio
+                        and nombre_espacio not in espacios_disponibles_ext
+                    ):
+                        espacios_disponibles_ext.append(
+                            nombre_espacio
+                        )
+
+                for opcion_extra in ["General", "Otro"]:
+                    if opcion_extra not in espacios_disponibles_ext:
+                        espacios_disponibles_ext.append(
+                            opcion_extra
+                        )
 
                 espacio_sel_ext = st.selectbox(
                     "Espacio",
                     espacios_disponibles_ext,
-                    key=f"orden_ext_espacio_{edificio_ext}"
+                    key=f"orden_ext_espacio_{centro_ext}_{edificio_ext}_{planta_ext}",
                 )
 
                 if espacio_sel_ext == "Otro":
-                    espacio_ext = st.text_input("Especificar espacio nuevo", key="orden_ext_espacio_otro")
+                    espacio_ext = st.text_input(
+                        "Especificar espacio nuevo",
+                        key="orden_ext_espacio_otro",
+                    )
                 else:
                     espacio_ext = espacio_sel_ext
 
@@ -872,7 +991,9 @@ def pantalla_ordenes():
                                 contacto_empresa,
                                 telefono_empresa,
                                 email_empresa,
-                                str(fecha_aviso_empresa) if fecha_aviso_empresa else "",
+                                str(fecha_aviso_empresa)
+                                if fecha_aviso_empresa
+                                else "",
                                 "",
                                 trabajo_a_realizar,
                                 "",
@@ -880,7 +1001,8 @@ def pantalla_ordenes():
                                 "",
                                 coste_estimado,
                                 0,
-                                ""
+                                "",
+                                planta_ext,
                             )
 
                             crear_orden(datos_orden_ext)
