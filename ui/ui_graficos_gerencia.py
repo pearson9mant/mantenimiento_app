@@ -454,6 +454,157 @@ def grafico_balance_mensual(evolucion):
     )
 
 
+
+# =========================================================
+# MODELO E · LÍNEAS DE EVOLUCIÓN
+# =========================================================
+
+def grafico_preventivo_incidencias_lineas(evolucion):
+    """
+    Evolución mensual mediante líneas.
+
+    Usa datos reales cuando existen al menos dos meses.
+    Si solo existe un mes real, muestra además una DEMO VISUAL
+    claramente identificada para poder valorar el diseño sin
+    confundirla con información real de Gerencia.
+    """
+    datos = _preparar_evolucion(evolucion)
+
+    st.markdown("#### E · Líneas de evolución")
+
+    if datos.empty:
+        st.info("Todavía no hay datos reales para representar.")
+        return
+
+    datos_grafico = datos.copy()
+    es_demo = False
+
+    # Con un único punto no existe una línea ascendente/descendente.
+    # Para el laboratorio creamos exclusivamente una demostración visual.
+    if len(datos_grafico) < 2:
+        es_demo = True
+
+        ultimo = _ultimo_mes(datos_grafico)
+
+        datos_grafico = pd.DataFrame([
+            {
+                "mes": "Abr 26",
+                "Incidencias creadas": 10,
+                "Preventivos realizados": 2,
+            },
+            {
+                "mes": "May 26",
+                "Incidencias creadas": 9,
+                "Preventivos realizados": 3,
+            },
+            {
+                "mes": "Jun 26",
+                "Incidencias creadas": 8,
+                "Preventivos realizados": 4,
+            },
+            {
+                "mes": "Jul 26",
+                "Incidencias creadas": 7,
+                "Preventivos realizados": 5,
+            },
+            {
+                "mes": ultimo["mes"],
+                "Incidencias creadas": ultimo["Incidencias creadas"],
+                "Preventivos realizados": ultimo["Preventivos realizados"],
+            },
+        ])
+
+        st.warning(
+            "🧪 DEMO VISUAL: solo el último mes corresponde a los datos actuales. "
+            "Los meses anteriores son simulados únicamente para valorar cómo "
+            "quedaría el gráfico cuando tengamos histórico."
+        )
+
+    largos = _datos_largos(datos_grafico)
+
+    if alt is None:
+        st.line_chart(
+            datos_grafico.set_index("mes")[
+                ["Incidencias creadas", "Preventivos realizados"]
+            ],
+            use_container_width=True,
+            height=300,
+        )
+        return
+
+    orden_meses = datos_grafico["mes"].tolist()
+
+    lineas = (
+        alt.Chart(largos)
+        .mark_line(
+            point=alt.OverlayMarkDef(
+                filled=True,
+                size=85,
+            ),
+            strokeWidth=3,
+        )
+        .encode(
+            x=alt.X(
+                "mes:N",
+                sort=orden_meses,
+                title=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "Cantidad:Q",
+                title="Actuaciones",
+                scale=alt.Scale(zero=True),
+            ),
+            color=alt.Color(
+                "Tipo:N",
+                title=None,
+                legend=alt.Legend(orient="bottom"),
+            ),
+            tooltip=[
+                alt.Tooltip("mes:N", title="Mes"),
+                alt.Tooltip("Tipo:N", title="Tipo"),
+                alt.Tooltip("Cantidad:Q", title="Cantidad"),
+            ],
+        )
+    )
+
+    etiquetas = (
+        alt.Chart(largos)
+        .mark_text(
+            dy=-12,
+            fontSize=11,
+            fontWeight="bold",
+        )
+        .encode(
+            x=alt.X(
+                "mes:N",
+                sort=orden_meses,
+            ),
+            y=alt.Y("Cantidad:Q"),
+            color=alt.Color(
+                "Tipo:N",
+                legend=None,
+            ),
+            text=alt.Text("Cantidad:Q"),
+            detail="Tipo:N",
+        )
+    )
+
+    st.altair_chart(
+        (lineas + etiquetas).properties(height=300),
+        use_container_width=True,
+    )
+
+    if es_demo:
+        st.caption(
+            "La finalidad de esta prueba es valorar la lectura visual: "
+            "preventivos creciendo e incidencias reduciéndose. "
+            "En Gerencia nunca se utilizarán meses simulados."
+        )
+    else:
+        _aviso_historico(datos)
+
+
 # =========================================================
 # LABORATORIO
 # =========================================================
@@ -477,11 +628,12 @@ def pantalla_laboratorio_preventivo_incidencias(
         f"{ultimo['Preventivos realizados']} preventivos realizados"
     )
 
-    tab_a, tab_b, tab_c, tab_d = st.tabs([
+    tab_a, tab_b, tab_c, tab_d, tab_e = st.tabs([
         "A · Vertical",
         "B · Horizontal",
         "C · Compacto",
         "D · Balance",
+        "E · Líneas",
     ])
 
     with tab_a:
@@ -501,6 +653,11 @@ def pantalla_laboratorio_preventivo_incidencias(
 
     with tab_d:
         grafico_balance_mensual(
+            evolucion
+        )
+
+    with tab_e:
+        grafico_preventivo_incidencias_lineas(
             evolucion
         )
 
