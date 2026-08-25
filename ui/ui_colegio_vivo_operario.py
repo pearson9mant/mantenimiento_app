@@ -1139,11 +1139,6 @@ def pantalla_colegio_vivo_operario():
             args=(mision, "mision"),
         )
 
-        _mostrar_siguiente_ot_corazon(
-            mision=mision,
-            ordenes=ordenes,
-        )
-
     else:
         st.markdown(
             '<div class="cv-no-work">'
