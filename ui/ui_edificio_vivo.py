@@ -697,14 +697,33 @@ ZONAS_EXTERNAS_P22_PREFERIDAS = [
 ]
 
 
-def _es_planta_fisica_p22(planta):
-    """
-    Indica si una entrada de plantas_config pertenece al dibujo físico
-    ya existente del edificio.
+ALIASES_ZONAS_EXTERNAS_P22 = {
+    "Acceso Pearson 22": [
+        "acceso pearson 22",
+        "entrada pearson 22",
+        "acceso principal",
+        "entrada principal",
+        "patio exterior",
+        "patio/exterior",
+        "exterior",
+    ],
+    "Acceso Patio Fútbol": [
+        "acceso patio futbol",
+        "entrada patio futbol",
+        "acceso campo futbol",
+        "entrada campo futbol",
+        "patio futbol",
+        "campo futbol",
+    ],
+    "Parking": [
+        "parking",
+        "parquing",
+        "aparcamiento",
+    ],
+}
 
-    Todo lo que NO sea una planta física puede mostrarse como zona
-    externa/anexa sin deformar el edificio.
-    """
+
+def _es_planta_fisica_p22(planta):
     planta_n = normalizar_planta(planta)
 
     return bool(
@@ -721,25 +740,54 @@ def _es_planta_fisica_p22(planta):
     )
 
 
+def _zona_externa_p22_canonica(valor):
+    """
+    Convierte nombres antiguos/configurados al nombre visual acordado.
+    """
+    texto = _norm(valor)
+
+    if not texto:
+        return ""
+
+    for zona, aliases in ALIASES_ZONAS_EXTERNAS_P22.items():
+        for alias in aliases:
+            alias_n = _norm(alias)
+
+            if texto == alias_n or alias_n in texto:
+                return zona
+
+    return ""
+
+
 def _zonas_externas_configuradas_p22():
     """
-    Lee Configuración > Espacios > Plantas y devuelve las zonas visibles
-    de Pearson 22 que no corresponden a plantas físicas.
-
-    Se priorizan los nombres:
+    Muestra SIEMPRE las tres zonas acordadas para Pearson 22:
     - Acceso Pearson 22
     - Acceso Patio Fútbol
     - Parking
 
-    Pero cualquier futura zona visible no física también podrá aparecer.
+    Si en Configuración existen nombres antiguos como Patio/Exterior,
+    se relacionan internamente mediante aliases, pero el dibujo muestra
+    únicamente los nombres acordados.
     """
+    zonas = [
+        {
+            "nombre": nombre,
+            "edificio": "",
+        }
+        for nombre, _icono in ZONAS_EXTERNAS_P22_PREFERIDAS
+    ]
+
     try:
         filas = obtener_plantas_config()
     except Exception:
         filas = []
 
-    zonas = []
-    vistas = set()
+    # Conservamos, si existe, el edificio configurado para cada zona.
+    por_nombre = {
+        item["nombre"]: item
+        for item in zonas
+    }
 
     for fila in filas or []:
         try:
@@ -747,9 +795,7 @@ def _zonas_externas_configuradas_p22():
         except Exception:
             continue
 
-        centro_n = normalizar_centro(centro)
-
-        if centro_n != "Pearson 22":
+        if normalizar_centro(centro) != "Pearson 22":
             continue
 
         try:
@@ -762,45 +808,20 @@ def _zonas_externas_configuradas_p22():
 
         planta_txt = str(planta or "").strip()
 
-        if not planta_txt:
+        if not planta_txt or _es_planta_fisica_p22(planta_txt):
             continue
 
-        if _es_planta_fisica_p22(planta_txt):
+        zona_canonica = _zona_externa_p22_canonica(
+            planta_txt
+        )
+
+        if not zona_canonica:
             continue
 
-        clave = _norm(planta_txt)
-
-        if not clave or clave in vistas:
-            continue
-
-        vistas.add(clave)
-        zonas.append(
-            {
-                "nombre": planta_txt,
-                "edificio": normalizar_edificio(
-                    edificio,
-                    centro_n,
-                ),
-            }
+        por_nombre[zona_canonica]["edificio"] = normalizar_edificio(
+            edificio,
+            "Pearson 22",
         )
-
-    # Orden estable: primero las zonas acordadas, después cualquier otra.
-    prioridad = {
-        _norm(nombre): indice
-        for indice, (nombre, _icono) in enumerate(
-            ZONAS_EXTERNAS_P22_PREFERIDAS
-        )
-    }
-
-    zonas.sort(
-        key=lambda item: (
-            prioridad.get(
-                _norm(item["nombre"]),
-                999,
-            ),
-            _norm(item["nombre"]),
-        )
-    )
 
     return zonas
 
@@ -844,6 +865,14 @@ def _datos_zona_externa_p22(
     ejecutables = []
     bloqueadas = []
 
+    aliases_zona = [
+        _norm(alias)
+        for alias in ALIASES_ZONAS_EXTERNAS_P22.get(
+            zona,
+            [zona],
+        )
+    ]
+
     def _coincide_zona_ot(ot_dict):
         valores = [
             ot_dict.get("planta"),
@@ -861,9 +890,12 @@ def _datos_zona_externa_p22(
             if valor_n == zona_n:
                 return True
 
-            # Compatibilidad con ubicaciones descriptivas más antiguas.
-            if zona_n and zona_n in valor_n:
-                return True
+            for alias_n in aliases_zona:
+                if (
+                    valor_n == alias_n
+                    or alias_n in valor_n
+                ):
+                    return True
 
         return False
 
@@ -1021,7 +1053,7 @@ def _pintar_zonas_externas_p22(
 
     st.markdown(
         '<div class="cv-annex-wrap">'
-        '<div class="cv-annex-title">ZONAS EXTERIORES / ANEXAS</div>'
+        '<div class="cv-annex-title">ACCESOS Y EXTERIORES</div>'
         '</div>',
         unsafe_allow_html=True,
     )
