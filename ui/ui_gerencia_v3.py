@@ -280,6 +280,139 @@ def _activas(datos):
     ].copy()
 
 
+def _es_actividad_tecnica_programada_fila(fila):
+    """
+    Clasifica una OT como actividad técnica programada cuando es un
+    Preventivo o un control Legionella normal.
+
+    Una correctiva nacida de Preventivo/Legionella NO se clasifica aquí:
+    sigue contando como carga correctiva real para Gerencia.
+    """
+    numero_ot = _norm(fila.get("numero_ot", ""))
+    origen = _norm(fila.get("origen", ""))
+    descripcion = _norm(fila.get("descripcion", ""))
+    area = _norm(fila.get("area", ""))
+
+    texto = " ".join([
+        numero_ot,
+        origen,
+        descripcion,
+        area,
+    ])
+
+    # Marcadores inequívocos de correctiva real.
+    marcadores_correctiva = [
+        "correctiva desde preventivo",
+        "correctivo desde preventivo",
+        "correctiva desde legionella",
+        "correctivo legionella",
+        "correctiva legionella",
+        "averia detectada",
+        "incidencia detectada",
+    ]
+
+    if any(marcador in texto for marcador in marcadores_correctiva):
+        return False
+
+    # Las correctivas de la aplicación suelen usar numeración INC-.
+    # Si existe ese prefijo, prevalece sobre el origen técnico.
+    if numero_ot.startswith("inc "):
+        return False
+
+    # Preventivo programado.
+    if (
+        numero_ot.startswith("prev ")
+        or origen == "preventivo"
+        or descripcion.startswith("preventivo ")
+        or "[preventivo]" in str(fila.get("descripcion", "") or "").lower()
+    ):
+        return True
+
+    # Legionella programada / control reglamentario.
+    if (
+        numero_ot.startswith("leg ")
+        or origen == "legionella"
+        or descripcion.startswith("control legionella")
+    ):
+        return True
+
+    return False
+
+
+def _actividad_tecnica(datos):
+    """
+    Preventivos y controles Legionella programados.
+    Se conservan visibles, pero no inflan la carga correctiva ni el
+    semáforo ejecutivo de Gerencia.
+    """
+    if datos.empty:
+        return datos.copy()
+
+    mascara = datos.apply(
+        _es_actividad_tecnica_programada_fila,
+        axis=1,
+    )
+
+    return datos[mascara].copy()
+
+
+def _correctivas(datos):
+    """
+    Todas las actuaciones que representan una incidencia/correctiva real,
+    tanto activas como históricas.
+    """
+    if datos.empty:
+        return datos.copy()
+
+    mascara_tecnica = datos.apply(
+        _es_actividad_tecnica_programada_fila,
+        axis=1,
+    )
+
+    return datos[~mascara_tecnica].copy()
+
+
+def _actividad_tecnica_activa(datos):
+    return _activas(_actividad_tecnica(datos))
+
+
+def _correctivas_activas(datos):
+    return _activas(_correctivas(datos))
+
+
+def _desglose_actividad_tecnica(datos):
+    actividad = _actividad_tecnica_activa(datos)
+
+    if actividad.empty:
+        return {
+            "total": 0,
+            "preventivos": 0,
+            "legionella": 0,
+        }
+
+    numero = actividad["numero_ot"].fillna("").astype(str).apply(_norm)
+    origen = actividad["origen"].fillna("").astype(str).apply(_norm)
+    descripcion = actividad["descripcion"].fillna("").astype(str).apply(_norm)
+
+    es_preventivo = (
+        numero.str.startswith("prev ")
+        | origen.eq("preventivo")
+        | descripcion.str.startswith("preventivo ")
+    )
+
+    es_legionella = (
+        numero.str.startswith("leg ")
+        | origen.eq("legionella")
+        | descripcion.str.startswith("control legionella")
+    )
+
+    return {
+        "total": int(len(actividad)),
+        "preventivos": int(es_preventivo.sum()),
+        "legionella": int(es_legionella.sum()),
+    }
+
+
 def _urgentes(datos):
     if datos.empty:
         return datos
@@ -300,7 +433,12 @@ def _urgentes(datos):
 
 
 def _activas_centro_totales(df, centro):
-    """Todas las órdenes activas del centro, sin exigir edificio ni planta."""
+    """
+    Carga correctiva activa real del centro, sin exigir edificio ni planta.
+
+    Preventivos y controles Legionella programados quedan fuera de este
+    contador para no transmitir a Gerencia una falsa sensación de atraso.
+    """
     if df.empty:
         return df.copy()
 
@@ -311,7 +449,7 @@ def _activas_centro_totales(df, centro):
         .apply(lambda valor: _coincide_centro(valor, centro))
     ].copy()
 
-    return _activas(datos)
+    return _correctivas_activas(datos)
 
 
 def _clave_fila_orden(fila):
@@ -342,7 +480,9 @@ def _indices_ubicados_centro(df, centro):
 
     for edificio, plantas in EDIFICIOS[centro].items():
         for planta in plantas:
-            datos = _activas(_filtrar_ubicacion(df, centro, edificio, planta))
+            datos = _correctivas_activas(
+                _filtrar_ubicacion(df, centro, edificio, planta)
+            )
             for _, fila in datos.iterrows():
                 claves.add(_clave_fila_orden(fila))
 
@@ -467,14 +607,32 @@ def _pendiente_material(datos):
     return datos[estado_normalizado.isin(estados_material)].copy()
 
 def _estado_planta(df, centro, edificio, planta):
-    activas = _activas(_datos_planta_completos(df, centro, edificio, planta))
+    """
+    El mapa de Gerencia representa la carga correctiva real.
+
+    Preventivos y controles Legionella programados no aumentan el número
+    de la planta ni cambian su semáforo. Si originan una correctiva real,
+    esa correctiva sí cuenta.
+    """
+    datos = _datos_planta_completos(
+        df,
+        centro,
+        edificio,
+        planta,
+    )
+
+    activas = _correctivas_activas(datos)
     cantidad = len(activas)
+
     if len(_urgentes(activas)):
         return "critica", cantidad
+
     if cantidad >= 3:
         return "atencion", cantidad
+
     if cantidad:
         return "seguimiento", cantidad
+
     return "correcta", 0
 
 
@@ -788,7 +946,17 @@ def _mostrar_mapa(df):
 
 def _mostrar_detalle(df, centro, edificio, planta):
     datos = _datos_planta_completos(df, centro, edificio, planta)
-    activas = _activas(datos)
+
+    # Gerencia separa salud/carga del edificio de la actividad técnica.
+    correctivas_todas = _correctivas(datos)
+    activas = _correctivas_activas(datos)
+    actividad_tecnica = _actividad_tecnica_activa(datos)
+    desglose_tecnico = _desglose_actividad_tecnica(datos)
+
+    total_tecnica = desglose_tecnico["total"]
+    total_preventivos = desglose_tecnico["preventivos"]
+    total_legionella = desglose_tecnico["legionella"]
+
     urgentes = _urgentes(activas)
 
     if not activas.empty:
@@ -807,7 +975,7 @@ def _mostrar_detalle(df, centro, edificio, planta):
         en_curso = activas
 
     pendiente_material = _pendiente_material(activas)
-    cerradas_mes = _cerradas_mes(datos)
+    cerradas_mes = _cerradas_mes(correctivas_todas)
 
     # Estado ejecutivo de la planta.
     if len(urgentes) > 0:
@@ -892,7 +1060,7 @@ def _mostrar_detalle(df, centro, edificio, planta):
     )
 
     valores_kpi = [
-        ("Activas", len(activas), "critical" if len(activas) >= 6 else "alert" if len(activas) >= 3 else "watch" if len(activas) else "good"),
+        ("Carga correctiva", len(activas), "critical" if len(activas) >= 6 else "alert" if len(activas) >= 3 else "watch" if len(activas) else "good"),
         ("En curso", len(en_curso), "good" if len(en_curso) > 0 else "watch" if len(activas) else "good"),
         ("Pendiente material", len(pendiente_material), "alert" if len(pendiente_material) > 0 else "good"),
         ("Urgentes / altas", len(urgentes), "critical" if len(urgentes) > 0 else "good"),
@@ -909,6 +1077,15 @@ def _mostrar_detalle(df, centro, edificio, planta):
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+    if total_tecnica > 0:
+        st.info(
+            "🔧 Actividad técnica programada: "
+            f"{total_tecnica} · "
+            f"Preventivo: {total_preventivos} · "
+            f"Legionella: {total_legionella}. "
+            "Esta actividad no aumenta la carga correctiva de la planta."
+        )
 
     # Resumen de áreas.
     if activas.empty:
@@ -962,7 +1139,7 @@ def _mostrar_detalle(df, centro, edificio, planta):
 
     # Tendencia: incidencias creadas en los últimos 7 días frente a los 7 anteriores.
     fechas_creacion = pd.to_datetime(
-        datos.get("fecha_dt"),
+        correctivas_todas.get("fecha_dt"),
         errors="coerce",
     )
     hoy_normalizado = pd.Timestamp.today().normalize()
@@ -1054,9 +1231,11 @@ def _mostrar_detalle(df, centro, edificio, planta):
             frase_impacto = "La planta se encuentra operativamente bajo control."
 
         frase_resumen = (
-            f"La planta presenta {len(activas)} incidencias activas, "
+            f"La planta presenta {len(activas)} incidencias correctivas activas, "
             f"{len(urgentes)} requieren atención prioritaria y "
             f"{len(pendiente_material)} están pendientes de material. "
+            f"Además hay {total_tecnica} actuaciones técnicas programadas "
+            f"que no se contabilizan como carga correctiva. "
             f"{frase_impacto}"
         )
 
@@ -1075,12 +1254,15 @@ def _mostrar_detalle(df, centro, edificio, planta):
             '<div class="rv-summary">'
             '<div class="rv-summary-title">Visión global de la planta</div>'
             '<ul class="rv-exec-list">'
-            f'<li><span>Incidencias activas</span><strong>{len(activas)}</strong></li>'
+            f'<li><span>Carga correctiva activa</span><strong>{len(activas)}</strong></li>'
             f'<li><span>Atención prioritaria</span><strong>{len(urgentes)}</strong></li>'
             f'<li><span>Pendientes de material</span><strong>{len(pendiente_material)}</strong></li>'
-            f'<li><span>Áreas afectadas</span><strong>{numero_areas}</strong></li>'
+            f'<li><span>Actividad técnica programada</span><strong>{total_tecnica}</strong></li>'
+            f'<li><span>Preventivos activos</span><strong>{total_preventivos}</strong></li>'
+            f'<li><span>Controles Legionella activos</span><strong>{total_legionella}</strong></li>'
+            f'<li><span>Áreas correctivas afectadas</span><strong>{numero_areas}</strong></li>'
             f'<li><span>Responsable principal</span><strong>{html.escape(responsable)}</strong></li>'
-            f'<li><span>OT más antigua</span><strong>{html.escape(ot_mas_antigua)} · {html.escape(antiguedad_texto)}</strong></li>'
+            f'<li><span>OT correctiva más antigua</span><strong>{html.escape(ot_mas_antigua)} · {html.escape(antiguedad_texto)}</strong></li>'
             '</ul>'
             f'<div class="rv-trend {clase_tendencia}">{icono_tendencia} {html.escape(texto_tendencia)}</div>'
             '</div>',
@@ -1088,7 +1270,7 @@ def _mostrar_detalle(df, centro, edificio, planta):
         )
 
     with st.expander(
-        f"Ver detalle de las {len(activas)} incidencias activas",
+        f"Ver detalle de las {len(activas)} incidencias correctivas activas",
         expanded=False,
     ):
         if activas.empty:
@@ -1154,6 +1336,52 @@ def _mostrar_detalle(df, centro, edificio, planta):
 
             st.dataframe(
                 vista,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    if total_tecnica > 0:
+        with st.expander(
+            f"🔧 Ver actividad técnica programada ({total_tecnica})",
+            expanded=False,
+        ):
+            vista_tecnica = actividad_tecnica.copy()
+
+            if "descripcion" in vista_tecnica.columns:
+                vista_tecnica["descripcion"] = (
+                    vista_tecnica["descripcion"].apply(_limpiar_descripcion)
+                )
+
+            columnas_tecnicas = [
+                "numero_ot",
+                "origen",
+                "espacio",
+                "descripcion",
+                "area",
+                "estado",
+                "operario",
+            ]
+
+            columnas_tecnicas = [
+                columna
+                for columna in columnas_tecnicas
+                if columna in vista_tecnica.columns
+            ]
+
+            nombres_tecnicos = {
+                "numero_ot": "OT",
+                "origen": "Actividad",
+                "espacio": "Ubicación",
+                "descripcion": "Descripción",
+                "area": "Área",
+                "estado": "Estado",
+                "operario": "Responsable",
+            }
+
+            st.dataframe(
+                vista_tecnica[columnas_tecnicas].rename(
+                    columns=nombres_tecnicos
+                ),
                 use_container_width=True,
                 hide_index=True,
             )
