@@ -309,6 +309,27 @@ def _normalizar_planta(valor):
         if palabra in palabras:
             return f"Planta {numero}"
 
+    # =====================================================
+    # ZONAS EXTERNAS VÁLIDAS · PEARSON 22
+    # =====================================================
+    # No son plantas físicas del edificio, pero sí ubicaciones reales.
+    # Se dibujan aparte en "Accesos y exteriores" y no deben marcarse
+    # como OT "sin planta".
+    zonas_externas = {
+        "acceso pearson 22": "Acceso Pearson 22",
+        "acceso patio futbol": "Acceso Patio Fútbol",
+        "parking": "Parking",
+        "parquing": "Parking",
+        "aparcamiento": "Parking",
+
+        # Compatibilidad con el nombre antiguo utilizado durante pruebas.
+        "patio exterior": "Acceso Pearson 22",
+        "exterior": "Acceso Pearson 22",
+    }
+
+    if texto in zonas_externas:
+        return zonas_externas[texto]
+
     return ""
 
 
@@ -498,6 +519,21 @@ def _orden_planta(nombre):
 
     if coincidencia:
         return int(coincidencia.group())
+
+    # Las zonas externas no forman parte de las plantas físicas.
+    # Solo damos un orden estable interno para el resumen.
+    if texto == "acceso pearson 22":
+        return -10
+
+    if texto == "acceso patio futbol":
+        return -20
+
+    if texto in [
+        "parking",
+        "parquing",
+        "aparcamiento",
+    ]:
+        return -30
 
     return -100
 
