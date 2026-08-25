@@ -258,6 +258,22 @@ def normalizar_planta(valor):
         if coincidencia:
             return f"Planta {int(coincidencia.group(1))}"
 
+    # Zonas externas válidas de Pearson 22.
+    # No se dibujan como plantas físicas: se muestran en
+    # ACCESOS Y EXTERIORES, pero deben conservar su ubicación real.
+    zonas_externas = {
+        "acceso pearson 22": "Acceso Pearson 22",
+        "acceso patio futbol": "Acceso Patio Fútbol",
+        "parking": "Parking",
+        "parquing": "Parking",
+        "aparcamiento": "Parking",
+        "patio exterior": "Acceso Pearson 22",
+        "exterior": "Acceso Pearson 22",
+    }
+
+    if texto in zonas_externas:
+        return zonas_externas[texto]
+
     return ""
 
 
