@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 
+from ui.ui_graficos_gerencia import pantalla_demo_graficos_gerencia
+
 from database.db import conectar, _sql, _es_postgres
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
 from ui.ui_arbol_colegio import mostrar_arbol_colegio
@@ -1756,6 +1758,7 @@ def pantalla_configuracion():
             "💧 Legionella",
             "✅ Checklist preventivo",
             "🧠 Inteligencia",
+            "📊 Gráficos",
             "🧹 Borrados",
         ],
         horizontal=True,
@@ -1773,6 +1776,10 @@ def pantalla_configuracion():
 
     if seccion == "🧠 Inteligencia":
         mostrar_reclasificacion_areas_ot()
+        return
+
+    if seccion == "📊 Gráficos":
+        pantalla_demo_graficos_gerencia()
         return
 
     if seccion == "🧹 Borrados":
