@@ -3453,8 +3453,54 @@ def _mostrar_areas_cv(activas):
         st.success("Sin incidencias activas en esta planta.")
         return
 
+    datos_areas = activas.copy()
+
+    def _etiqueta_area_gerencia(fila):
+        area = str(
+            fila.get("area")
+            or "Sin área"
+        ).strip()
+
+        if not area:
+            area = "Sin área"
+
+        numero = normalizar_busqueda(
+            fila.get("numero_ot", "")
+        )
+
+        descripcion = normalizar_busqueda(
+            fila.get("descripcion", "")
+        )
+
+        origen = normalizar_busqueda(
+            fila.get("origen", "")
+        )
+
+        es_correctiva_desde_preventivo = (
+            area.lower() == "preventivo"
+            and (
+                numero.startswith("inc ")
+                or "correctiva desde preventivo" in descripcion
+                or "correctivo desde preventivo" in descripcion
+                or (
+                    origen == "preventivo"
+                    and _es_correctiva_real_fila(fila)
+                )
+            )
+        )
+
+        if es_correctiva_desde_preventivo:
+            return "Correctiva detectada en preventivo"
+
+        return area
+
+    datos_areas["_area_gerencia"] = datos_areas.apply(
+        _etiqueta_area_gerencia,
+        axis=1,
+    )
+
     areas = (
-        activas["area"]
+        datos_areas["_area_gerencia"]
         .fillna("Sin área")
         .replace("", "Sin área")
         .value_counts()
@@ -3735,17 +3781,10 @@ def mostrar_colegio_vivo_gerencia(
             unsafe_allow_html=True,
         )
 
-        st.info(
-            f"{icono_centro} **{centro_objetivo} · "
-            f"{estado_centro}** · "
-            f"{total_centro} actuaciones activas"
-        )
-
-        mostrar_cabecera_simple_gerencia(
-            df,
-            centro_objetivo,
-        )
-
+        # =================================================
+        # 1. PRIMERA LECTURA · COLEGIO VIVO
+        # Gerencia ve primero el estado físico del centro.
+        # =================================================
         izquierda, derecha = st.columns(
             [1.08, 1.35],
             gap="large",
@@ -3761,7 +3800,8 @@ def mostrar_colegio_vivo_gerencia(
 
             st.caption(
                 "Pulsa una planta o zona para ver sus datos. "
-                "El color refleja el riesgo, no solo la cantidad."
+                "El color refleja el riesgo correctivo real, "
+                "no la actividad técnica programada."
             )
 
             mostrar_mapa_visual_centro_gerencia(
@@ -3773,10 +3813,30 @@ def mostrar_colegio_vivo_gerencia(
             with st.container(border=True):
                 mostrar_panel_planta_cv(df)
 
-        mostrar_capa_ejecutiva_gerencia(df, centro_objetivo)
+        # =================================================
+        # 2. ESTADO DEL MANTENIMIENTO
+        # La visión ejecutiva viene después del edificio.
+        # =================================================
+        mostrar_cabecera_simple_gerencia(
+            df,
+            centro_objetivo,
+        )
 
-        mostrar_resumen_inferior_cv(df)
+        # =================================================
+        # 3. DIAGNÓSTICO / EFECTO PREVENTIVO / SALUD
+        # =================================================
+        mostrar_capa_ejecutiva_gerencia(
+            df,
+            centro_objetivo,
+        )
 
+        mostrar_resumen_inferior_cv(
+            df
+        )
+
+        # =================================================
+        # 4. DETALLE TÉCNICO
+        # =================================================
         with st.expander(
             "📈 Evolución, inventario y detalle ejecutivo",
             expanded=False,
@@ -3845,20 +3905,6 @@ def mostrar_colegio_vivo_gerencia(
         unsafe_allow_html=True,
     )
 
-    s1, s2 = st.columns(2)
-
-    with s1:
-        st.info(
-            f"{e22} **Pearson 22 · {estado22}** · "
-            f"{total22} actuaciones activas"
-        )
-
-    with s2:
-        st.info(
-            f"{e9} **Pearson 9 · {estado9}** · "
-            f"{total9} actuaciones activas"
-        )
-
     izquierda, derecha = st.columns(
         [1.08, 1.35],
         gap="large",
@@ -3874,7 +3920,8 @@ def mostrar_colegio_vivo_gerencia(
 
         st.caption(
             "Pulsa una planta o zona para ver sus datos. "
-            "El color refleja el riesgo, no solo la cantidad."
+            "El color refleja el riesgo correctivo real, "
+            "no la actividad técnica programada."
         )
 
         for centro in EDIFICIOS_GERENCIA:
@@ -3888,10 +3935,34 @@ def mostrar_colegio_vivo_gerencia(
             mostrar_panel_planta_cv(df)
 
     centro_ejecutivo = st.session_state["gerencia_cv_centro"]
-    st.caption(f"Visión ejecutiva del centro seleccionado · {centro_ejecutivo}")
-    mostrar_capa_ejecutiva_gerencia(df, centro_ejecutivo)
 
-    mostrar_resumen_inferior_cv(df)
+    s1, s2 = st.columns(2)
+
+    with s1:
+        st.info(
+            f"{e22} **Pearson 22 · {estado22}** · "
+            f"{total22} actuaciones correctivas activas"
+        )
+
+    with s2:
+        st.info(
+            f"{e9} **Pearson 9 · {estado9}** · "
+            f"{total9} actuaciones correctivas activas"
+        )
+
+    st.caption(
+        f"Visión ejecutiva del centro seleccionado · "
+        f"{centro_ejecutivo}"
+    )
+
+    mostrar_capa_ejecutiva_gerencia(
+        df,
+        centro_ejecutivo,
+    )
+
+    mostrar_resumen_inferior_cv(
+        df
+    )
 
     with st.expander(
         "📈 Evolución, inventario y detalle ejecutivo",
