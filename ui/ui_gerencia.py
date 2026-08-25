@@ -505,6 +505,168 @@ def es_pendiente_material(df):
     return df["estado"].isin(["Pendiente material", "Esperando material"])
 
 
+def _es_correctiva_real_fila(fila):
+    """
+    Decide si una OT representa carga correctiva real para Gerencia.
+
+    Criterio:
+    - Una INC-* siempre es correctiva real.
+    - Una OT que se declara como correctiva también lo es, aunque proceda
+      de Preventivo o Legionella.
+    - Los PREV-* y los controles LEG-* ordinarios son actividad técnica
+      programada y no deben inflar la carga correctiva.
+    """
+    numero = normalizar_busqueda(
+        fila.get("numero_ot", "")
+    )
+    origen = normalizar_busqueda(
+        fila.get("origen", "")
+    )
+    descripcion = normalizar_busqueda(
+        fila.get("descripcion", "")
+    )
+    area = normalizar_busqueda(
+        fila.get("area", "")
+    )
+
+    texto = " ".join([
+        numero,
+        origen,
+        descripcion,
+        area,
+    ])
+
+    # Una incidencia/correctiva real prevalece sobre el origen.
+    if numero.startswith("inc "):
+        return True
+
+    marcadores_correctiva = [
+        "correctiva",
+        "correctivo",
+        "averia detectada",
+        "incidencia detectada",
+        "reparacion necesaria",
+        "reparar",
+    ]
+
+    if any(
+        marcador in texto
+        for marcador in marcadores_correctiva
+    ):
+        return True
+
+    # Preventivo programado.
+    if (
+        numero.startswith("prev ")
+        or origen == "preventivo"
+        or descripcion.startswith("preventivo ")
+        or "preventivo" in descripcion
+    ):
+        return False
+
+    # Legionella programada / control reglamentario.
+    if (
+        numero.startswith("leg ")
+        or origen == "legionella"
+        or descripcion.startswith("control legionella")
+    ):
+        return False
+
+    # El resto de órdenes activas se consideran carga correctiva/operativa.
+    return True
+
+
+def _mascara_correctiva_real(df):
+    if df.empty:
+        return pd.Series(
+            dtype=bool,
+            index=df.index,
+        )
+
+    return df.apply(
+        _es_correctiva_real_fila,
+        axis=1,
+    )
+
+
+def _solo_correctivas_reales(df):
+    if df.empty:
+        return df.copy()
+
+    return df[
+        _mascara_correctiva_real(df)
+    ].copy()
+
+
+def _solo_actividad_tecnica(df):
+    if df.empty:
+        return df.copy()
+
+    return df[
+        ~_mascara_correctiva_real(df)
+    ].copy()
+
+
+def _desglose_actividad_tecnica(df):
+    """
+    Devuelve actividad técnica activa separada en Preventivo y Legionella.
+    """
+    if df.empty:
+        return {
+            "total": 0,
+            "preventivo": 0,
+            "legionella": 0,
+        }
+
+    tecnicas = _solo_actividad_tecnica(df)
+
+    if tecnicas.empty:
+        return {
+            "total": 0,
+            "preventivo": 0,
+            "legionella": 0,
+        }
+
+    numero = (
+        tecnicas["numero_ot"]
+        .fillna("")
+        .astype(str)
+        .apply(normalizar_busqueda)
+    )
+
+    origen = (
+        tecnicas["origen"]
+        .fillna("")
+        .astype(str)
+        .apply(normalizar_busqueda)
+    )
+
+    descripcion = (
+        tecnicas["descripcion"]
+        .fillna("")
+        .astype(str)
+        .apply(normalizar_busqueda)
+    )
+
+    preventivo = (
+        numero.str.startswith("prev ")
+        | origen.eq("preventivo")
+        | descripcion.str.contains("preventivo", na=False)
+    )
+
+    legionella = (
+        numero.str.startswith("leg ")
+        | origen.eq("legionella")
+        | descripcion.str.startswith("control legionella")
+    )
+
+    return {
+        "total": int(len(tecnicas)),
+        "preventivo": int(preventivo.sum()),
+        "legionella": int(legionella.sum()),
+    }
+
+
 def filtrar_realizadas_mes(df, origen_busqueda):
     if df.empty:
         return df
@@ -540,13 +702,16 @@ def obtener_df_tarjeta(df, centro, tipo):
     datos = df[df["centro"] == centro].copy()
 
     if tipo == "abiertas":
-        return datos[es_abierta(datos)]
+        abiertas = datos[es_abierta(datos)].copy()
+        return _solo_correctivas_reales(abiertas)
 
     if tipo == "en_curso":
-        return datos[es_en_curso(datos)]
+        en_curso = datos[es_en_curso(datos)].copy()
+        return _solo_correctivas_reales(en_curso)
 
     if tipo == "material":
-        return datos[es_pendiente_material(datos)]
+        material = datos[es_pendiente_material(datos)].copy()
+        return _solo_correctivas_reales(material)
 
     if tipo == "cerradas":
         return datos[es_cerrada(datos)]
@@ -918,7 +1083,7 @@ def mostrar_cabecera_simple_gerencia(df, centro):
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric("Abiertas", resumen["abiertas"])
+    c1.metric("Carga correctiva", resumen["abiertas"])
     c2.metric("Prioritarias", resumen["criticas"])
     c3.metric("Pendiente material", resumen["material"])
     c4.metric("Espacios reincidentes", resumen["reincidencias"])
@@ -1060,18 +1225,45 @@ def _filtrar_curso_2026_2027(df, columna_fecha):
 
 
 def _es_preventivo_df(df):
+    if df.empty:
+        return pd.Series(
+            dtype=bool,
+            index=df.index,
+        )
+
+    tecnicas = ~_mascara_correctiva_real(df)
+
     texto = (
-        df["origen"].fillna("").astype(str)
+        df["numero_ot"].fillna("").astype(str)
+        + " "
+        + df["origen"].fillna("").astype(str)
         + " "
         + df["descripcion"].fillna("").astype(str)
         + " "
         + df["area"].fillna("").astype(str)
     ).str.lower()
 
-    return texto.str.contains("preventivo", na=False)
+    return tecnicas & texto.str.contains(
+        "preventivo|prev-",
+        na=False,
+    )
 
 
 def _es_incidencia_df(df):
+    """
+    Incidencias/correctivas reales.
+
+    Una correctiva nacida de Preventivo o Legionella sí cuenta como
+    incidencia; los controles técnicos programados no.
+    """
+    if df.empty:
+        return pd.Series(
+            dtype=bool,
+            index=df.index,
+        )
+
+    mascara = _mascara_correctiva_real(df)
+
     texto = (
         df["origen"].fillna("").astype(str)
         + " "
@@ -1080,8 +1272,13 @@ def _es_incidencia_df(df):
         + df["area"].fillna("").astype(str)
     ).str.lower()
 
-    excluidas = texto.str.contains("preventivo|legionella|verano", na=False)
-    return ~excluidas
+    # Plan de verano sigue siendo planificación, no incidencia ordinaria.
+    verano = texto.str.contains(
+        "verano",
+        na=False,
+    )
+
+    return mascara & (~verano)
 
 
 def obtener_evolucion_mensual(df, centro):
@@ -1318,7 +1515,16 @@ def _resolucion_media(df, centro, dias=90):
     datos = _datos_centro_ejecutivo(df, centro)
     if datos.empty:
         return None, 0
-    datos = datos[es_cerrada(datos) & datos["fecha_dt"].notna() & datos["fecha_cierre_dt"].notna()].copy()
+    datos = datos[
+        es_cerrada(datos)
+        & datos["fecha_dt"].notna()
+        & datos["fecha_cierre_dt"].notna()
+    ].copy()
+
+    datos = _solo_correctivas_reales(
+        datos
+    )
+
     limite = pd.Timestamp.today() - pd.Timedelta(days=dias)
     datos = datos[datos["fecha_cierre_dt"] >= limite].copy()
     if datos.empty:
@@ -2067,7 +2273,7 @@ def mostrar_menu_centro(df, centro):
         c1, c2, c3, c4 = st.columns(4)
 
         with c1:
-            boton_tarjeta("Órdenes abiertas", contar(df, centro, "abiertas"), centro, "abiertas", "📂")
+            boton_tarjeta("Carga correctiva abierta", contar(df, centro, "abiertas"), centro, "abiertas", "📂")
 
         with c2:
             boton_tarjeta("En curso", contar(df, centro, "en_curso"), centro, "en_curso", "🟡")
@@ -2807,9 +3013,37 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
 
 
 def _activas_gerencia(datos):
+    """
+    Carga correctiva activa real de Gerencia.
+
+    Preventivos y controles Legionella programados se conservan en los
+    datos, pero no aumentan el contador ni el semáforo de la planta.
+    """
     if datos.empty:
         return datos
-    return datos[(datos["origen_tabla"] == "activas") & (~datos["estado"].isin(ESTADOS_CERRADOS))].copy()
+
+    activas = datos[
+        (datos["origen_tabla"] == "activas")
+        & (~datos["estado"].isin(ESTADOS_CERRADOS))
+    ].copy()
+
+    return _solo_correctivas_reales(
+        activas
+    )
+
+
+def _actividad_tecnica_activa_gerencia(datos):
+    if datos.empty:
+        return datos
+
+    activas = datos[
+        (datos["origen_tabla"] == "activas")
+        & (~datos["estado"].isin(ESTADOS_CERRADOS))
+    ].copy()
+
+    return _solo_actividad_tecnica(
+        activas
+    )
 
 
 def _urgentes_gerencia(datos):
@@ -3250,10 +3484,36 @@ def mostrar_panel_planta_cv(df):
     edificio = st.session_state["gerencia_cv_edificio"]
     planta = st.session_state["gerencia_cv_planta"]
     datos = filtrar_por_ubicacion_gerencia(df, centro, edificio, planta)
-    activas = _activas_gerencia(datos)
+
+    activas = _activas_gerencia(
+        datos
+    )
+
+    actividad_tecnica = _actividad_tecnica_activa_gerencia(
+        datos
+    )
+
+    desglose_tecnico = _desglose_actividad_tecnica(
+        actividad_tecnica
+    )
+
     urgentes = _urgentes_gerencia(activas)
-    en_curso = activas[activas["estado"].isin(["En curso", "En ejecución"])] if not activas.empty else activas
-    cerradas_mes = _cerradas_mes_planta(datos)
+
+    en_curso = (
+        activas[
+            activas["estado"].isin(
+                ["En curso", "En ejecución"]
+            )
+        ]
+        if not activas.empty
+        else activas
+    )
+
+    # Finalizadas del mes: correctivas reales, para que el panel compare
+    # carga correctiva abierta con trabajo correctivo resuelto.
+    cerradas_mes = _cerradas_mes_planta(
+        _solo_correctivas_reales(datos)
+    )
 
     texto_contexto = (
         "Situación operativa de la zona seleccionada"
@@ -3268,10 +3528,19 @@ def mostrar_panel_planta_cv(df):
     )
 
     k1, k2, k3, k4 = st.columns(4)
-    with k1: _tarjeta_html("Pendientes", len(activas))
+    with k1: _tarjeta_html("Carga correctiva", len(activas))
     with k2: _tarjeta_html("Urgentes / altas", len(urgentes))
     with k3: _tarjeta_html("En curso", len(en_curso))
     with k4: _tarjeta_html("Finalizadas mes", len(cerradas_mes))
+
+    if desglose_tecnico["total"] > 0:
+        st.info(
+            "🔧 Actividad técnica programada: "
+            f"{desglose_tecnico['total']} · "
+            f"Preventivo: {desglose_tecnico['preventivo']} · "
+            f"Legionella: {desglose_tecnico['legionella']}. "
+            "No se suma a la carga correctiva de la planta."
+        )
 
     c_areas, c_prioridad = st.columns([1.05, 1])
     with c_areas:
