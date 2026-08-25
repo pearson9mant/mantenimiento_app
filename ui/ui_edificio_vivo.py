@@ -687,6 +687,426 @@ def _pintar_anexo_servicios_p9(resumen):
 
 
 # =========================================================
+# ZONAS EXTERNAS / ANEXAS · PEARSON 22
+# =========================================================
+
+ZONAS_EXTERNAS_P22_PREFERIDAS = [
+    ("Acceso Pearson 22", "🚪"),
+    ("Acceso Patio Fútbol", "⚽"),
+    ("Parking", "🚗"),
+]
+
+
+def _es_planta_fisica_p22(planta):
+    """
+    Indica si una entrada de plantas_config pertenece al dibujo físico
+    ya existente del edificio.
+
+    Todo lo que NO sea una planta física puede mostrarse como zona
+    externa/anexa sin deformar el edificio.
+    """
+    planta_n = normalizar_planta(planta)
+
+    return bool(
+        planta_n
+        and planta_n in {
+            "Terrado",
+            "Planta 0",
+            "Planta 1",
+            "Planta 2",
+            "Planta 3",
+            "Planta 4",
+            "Planta 5",
+        }
+    )
+
+
+def _zonas_externas_configuradas_p22():
+    """
+    Lee Configuración > Espacios > Plantas y devuelve las zonas visibles
+    de Pearson 22 que no corresponden a plantas físicas.
+
+    Se priorizan los nombres:
+    - Acceso Pearson 22
+    - Acceso Patio Fútbol
+    - Parking
+
+    Pero cualquier futura zona visible no física también podrá aparecer.
+    """
+    try:
+        filas = obtener_plantas_config()
+    except Exception:
+        filas = []
+
+    zonas = []
+    vistas = set()
+
+    for fila in filas or []:
+        try:
+            _id, centro, edificio, planta, visible = fila
+        except Exception:
+            continue
+
+        centro_n = normalizar_centro(centro)
+
+        if centro_n != "Pearson 22":
+            continue
+
+        try:
+            visible_bool = bool(int(visible))
+        except Exception:
+            visible_bool = bool(visible)
+
+        if not visible_bool:
+            continue
+
+        planta_txt = str(planta or "").strip()
+
+        if not planta_txt:
+            continue
+
+        if _es_planta_fisica_p22(planta_txt):
+            continue
+
+        clave = _norm(planta_txt)
+
+        if not clave or clave in vistas:
+            continue
+
+        vistas.add(clave)
+        zonas.append(
+            {
+                "nombre": planta_txt,
+                "edificio": normalizar_edificio(
+                    edificio,
+                    centro_n,
+                ),
+            }
+        )
+
+    # Orden estable: primero las zonas acordadas, después cualquier otra.
+    prioridad = {
+        _norm(nombre): indice
+        for indice, (nombre, _icono) in enumerate(
+            ZONAS_EXTERNAS_P22_PREFERIDAS
+        )
+    }
+
+    zonas.sort(
+        key=lambda item: (
+            prioridad.get(
+                _norm(item["nombre"]),
+                999,
+            ),
+            _norm(item["nombre"]),
+        )
+    )
+
+    return zonas
+
+
+def _icono_zona_externa_p22(nombre):
+    nombre_n = _norm(nombre)
+
+    for nombre_pref, icono in ZONAS_EXTERNAS_P22_PREFERIDAS:
+        if _norm(nombre_pref) == nombre_n:
+            return icono
+
+    if "parking" in nombre_n or "aparcamiento" in nombre_n:
+        return "🚗"
+
+    if "futbol" in nombre_n:
+        return "⚽"
+
+    if "acceso" in nombre_n or "entrada" in nombre_n:
+        return "🚪"
+
+    if "patio" in nombre_n or "exterior" in nombre_n:
+        return "🌳"
+
+    return "📍"
+
+
+def _datos_zona_externa_p22(
+    resumen,
+    zona,
+    edificio_config="",
+):
+    """
+    Recupera las OT de una zona externa usando los datos que ya recibe
+    Colegio Vivo.
+
+    No modifica la base de datos ni mueve órdenes.
+    """
+    zona_n = _norm(zona)
+
+    ordenes = []
+    ejecutables = []
+    bloqueadas = []
+
+    def _coincide_zona_ot(ot_dict):
+        valores = [
+            ot_dict.get("planta"),
+            ot_dict.get("espacio"),
+            ot_dict.get("aula"),
+            ot_dict.get("ubicacion"),
+        ]
+
+        for valor in valores:
+            valor_n = _norm(valor)
+
+            if not valor_n:
+                continue
+
+            if valor_n == zona_n:
+                return True
+
+            # Compatibilidad con ubicaciones descriptivas más antiguas.
+            if zona_n and zona_n in valor_n:
+                return True
+
+        return False
+
+    for clave, datos in (resumen or {}).items():
+        try:
+            centro_clave = normalizar_centro(
+                clave[0]
+            )
+        except Exception:
+            continue
+
+        if centro_clave != "Pearson 22":
+            continue
+
+        for nombre_lista, destino in [
+            ("ordenes", ordenes),
+            ("ordenes_ejecutables", ejecutables),
+            ("ordenes_bloqueadas", bloqueadas),
+        ]:
+            for ot in datos.get(
+                nombre_lista,
+                [],
+            ) or []:
+                try:
+                    ot_dict = dict(ot)
+                except Exception:
+                    continue
+
+                if not _coincide_zona_ot(
+                    ot_dict
+                ):
+                    continue
+
+                destino.append(
+                    ot_dict
+                )
+
+    def _unicas(lista):
+        resultado = []
+        vistas = set()
+
+        for ot in lista:
+            clave_ot = _clave_ot_visual(
+                ot
+            )
+
+            if clave_ot in vistas:
+                continue
+
+            vistas.add(
+                clave_ot
+            )
+            resultado.append(
+                ot
+            )
+
+        return resultado
+
+    ordenes = _unicas(ordenes)
+    ejecutables = _unicas(ejecutables)
+    bloqueadas = _unicas(bloqueadas)
+
+    # Compatibilidad con resúmenes que no separan aún los estados.
+    if ordenes and not ejecutables and not bloqueadas:
+        estados_bloqueados = {
+            "pendiente material",
+            "pendiente proveedor",
+            "pendiente presupuesto",
+            "avisado",
+        }
+
+        estados_cierre = {
+            "finalizada",
+            "finalizado",
+            "cerrada",
+            "cerrado",
+            "cancelada",
+            "cancelado",
+        }
+
+        for ot in ordenes:
+            estado = _norm(
+                ot.get("estado")
+            )
+
+            if estado in estados_cierre:
+                continue
+
+            if estado in estados_bloqueados:
+                bloqueadas.append(
+                    ot
+                )
+            else:
+                ejecutables.append(
+                    ot
+                )
+
+        ejecutables = _unicas(
+            ejecutables
+        )
+        bloqueadas = _unicas(
+            bloqueadas
+        )
+
+    urgentes = sum(
+        1
+        for ot in ordenes
+        if "urgente" in _norm(
+            ot.get("prioridad")
+        )
+    )
+
+    altas = sum(
+        1
+        for ot in ordenes
+        if "alta" in _norm(
+            ot.get("prioridad")
+        )
+    )
+
+    en_curso = sum(
+        1
+        for ot in ordenes
+        if _norm(
+            ot.get("estado")
+        ) == "en curso"
+    )
+
+    return {
+        "total": len(ordenes),
+        "ejecutables": len(ejecutables),
+        "bloqueadas": len(bloqueadas),
+        "en_curso": en_curso,
+        "urgentes": urgentes,
+        "altas": altas,
+        "ordenes": ordenes,
+        "ordenes_ejecutables": ejecutables,
+        "ordenes_bloqueadas": bloqueadas,
+    }
+
+
+def _pintar_zonas_externas_p22(
+    resumen,
+):
+    """
+    Dibuja las zonas externas debajo de los edificios.
+
+    El dibujo físico de los edificios no se modifica.
+    Si no hay zonas externas configuradas, no muestra nada.
+    """
+    zonas = _zonas_externas_configuradas_p22()
+
+    if not zonas:
+        return
+
+    st.markdown(
+        '<div class="cv-annex-wrap">'
+        '<div class="cv-annex-title">ZONAS EXTERIORES / ANEXAS</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.container(
+        key="cv_zonas_externas_p22"
+    ):
+        columnas = st.columns(
+            len(zonas),
+            gap="small",
+        )
+
+        for columna, zona_info in zip(
+            columnas,
+            zonas,
+        ):
+            zona = zona_info["nombre"]
+            edificio_config = zona_info.get(
+                "edificio",
+                "",
+            )
+
+            datos = _datos_zona_externa_p22(
+                resumen,
+                zona,
+                edificio_config=edificio_config,
+            )
+
+            estado = _estado_planta(
+                datos
+            )
+            icono_estado = _icono_estado(
+                estado
+            )
+            contador = _texto_contador(
+                datos
+            )
+            icono_zona = _icono_zona_externa_p22(
+                zona
+            )
+
+            zona_activa = (
+                st.session_state.get(
+                    "colegio_vivo_ultima_centro"
+                ) == "Pearson 22"
+                and st.session_state.get(
+                    "colegio_vivo_ultimo_edificio"
+                ) == "Zonas exteriores"
+                and st.session_state.get(
+                    "colegio_vivo_ultima_planta"
+                ) == zona
+            )
+
+            with columna:
+                st.button(
+                    f"{icono_estado} {icono_zona} "
+                    f"{zona} {contador}",
+                    key=(
+                        "cv_zona_externa_p22_"
+                        f"{zona}"
+                    ),
+                    type=(
+                        "primary"
+                        if zona_activa
+                        else "secondary"
+                    ),
+                    use_container_width=True,
+                    on_click=_abrir_planta,
+                    args=(
+                        "Pearson 22",
+                        "Zonas exteriores",
+                        zona,
+                        datos.get(
+                            "ordenes",
+                            [],
+                        ),
+                        datos.get(
+                            "ordenes_ejecutables",
+                            [],
+                        ),
+                    ),
+                )
+
+
+# =========================================================
 # CSS
 # =========================================================
 
@@ -891,6 +1311,33 @@ def css_edificio_vivo():
             div[data-testid="stHorizontalBlock"] > div{
                 min-width:0 !important;
                 flex:1 1 0 !important;
+            }
+
+            .st-key-cv_zonas_externas_p22
+            div[data-testid="stHorizontalBlock"]{
+                flex-wrap:wrap !important;
+                gap:4px !important;
+                width:100% !important;
+            }
+
+            .st-key-cv_zonas_externas_p22
+            div[data-testid="stHorizontalBlock"] > div{
+                flex:1 1 calc(50% - 4px) !important;
+                min-width:calc(50% - 4px) !important;
+                max-width:calc(50% - 4px) !important;
+            }
+
+            .st-key-cv_zonas_externas_p22
+            div[data-testid="stButton"] > button{
+                min-height:54px !important;
+                height:54px !important;
+                padding:4px 7px !important;
+                font-size:11px !important;
+                line-height:1.15 !important;
+                white-space:normal !important;
+                justify-content:center !important;
+                text-align:center !important;
+                overflow:hidden !important;
             }
 
             .st-key-cv_anexo_p9_mobile
@@ -1132,6 +1579,13 @@ def pintar_campus_operario(
                 plantas,
                 resumen,
             )
+
+    # Pearson 22: zonas externas configurables.
+    # Se pintan aparte para no modificar el dibujo físico existente.
+    if centro == "Pearson 22":
+        _pintar_zonas_externas_p22(
+            resumen,
+        )
 
     # Pearson 9 tiene además un anexo real, independiente de A/B/C,
     # formado por cuatro espacios consecutivos en una sola planta.
