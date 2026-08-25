@@ -1088,7 +1088,7 @@ def mostrar_cabecera_simple_gerencia(df, centro):
     c3.metric("Pendiente material", resumen["material"])
     c4.metric("Espacios reincidentes", resumen["reincidencias"])
 
-    st.markdown("### 🛡️ Efecto del mantenimiento preventivo")
+    st.markdown("### 🛡️ Preventivo e incidencias")
 
     incidencias_mes = int(
         diagnostico.get("incidencias_mes", 0) or 0
@@ -1112,42 +1112,50 @@ def mostrar_cabecera_simple_gerencia(df, centro):
     ].copy()
 
     if con_datos.empty:
-        grafico = (
-            evolucion
-            .head(6)
-            .set_index("mes")[
-                [
-                    "Incidencias creadas",
-                    "Preventivos realizados",
-                ]
-            ]
+        # Sin histórico del curso: enseñamos solo el mes actual real.
+        # Así Gerencia no ve meses futuros a cero.
+        meses_cortos = [
+            "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+        ]
+        hoy = date.today()
+        etiqueta_actual = f"{meses_cortos[hoy.month - 1]} {str(hoy.year)[2:]}"
+
+        grafico = pd.DataFrame(
+            {
+                "Incidencias correctivas": [incidencias_mes],
+                "Preventivos realizados": [preventivos_mes],
+            },
+            index=[etiqueta_actual],
         )
     else:
+        # Últimos seis meses, siempre en el orden cronológico del curso.
         ultimo_indice = int(con_datos.index.max())
         primer_indice = max(0, ultimo_indice - 5)
 
         grafico = (
             evolucion
             .loc[primer_indice:ultimo_indice]
-            .set_index("mes")[
-                [
-                    "Incidencias creadas",
-                    "Preventivos realizados",
-                ]
-            ]
+            .set_index("mes")[[
+                "Incidencias creadas",
+                "Preventivos realizados",
+            ]]
+            .rename(columns={
+                "Incidencias creadas": "Incidencias correctivas",
+            })
         )
 
-    st.line_chart(
+    st.bar_chart(
         grafico,
         use_container_width=True,
-        height=240,
+        height=280,
     )
 
     if con_datos.empty:
         st.info(
-            "Efecto del preventivo: pendiente de histórico. "
-            "La comparación empezará a ser útil cuando se ejecuten "
-            "los preventivos del curso."
+            "Todavía estamos acumulando histórico. "
+            "Cuando existan varios meses consecutivos podremos comparar "
+            "la actividad preventiva con la evolución de las incidencias."
         )
 
     elif len(con_datos) == 1:
