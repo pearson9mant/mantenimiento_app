@@ -1,6 +1,10 @@
 from datetime import datetime
 from database.db import conectar, _sql
-from modules.ordenes import crear_orden, obtener_siguiente_numero_ot
+from modules.ordenes import (
+    crear_orden,
+    obtener_siguiente_numero_ot,
+    vincular_origen_ot,
+)
 
 try:
     from modules.inventario_aulas import obtener_elementos_aula_para_revision
@@ -151,6 +155,132 @@ def crear_tablas_preventivo_aulas():
     conn.close()
 
 
+
+def crear_ot_preventiva_revision_aula(
+    revision_id,
+    centro,
+    edificio,
+    planta,
+    espacio,
+    operario,
+    observaciones="",
+):
+    """
+    Crea una única OT preventiva asociada a la revisión de aula.
+    Usa crear_orden(), por lo que entra en Operario/Colegio Vivo y
+    utiliza el aviso Telegram normal del sistema.
+    """
+    revision_id = int(revision_id)
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT COALESCE(numero_ot_preventiva, '')
+            FROM preventivo_aulas
+            WHERE id = ?
+        """), (revision_id,))
+        fila = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not fila:
+        return ""
+
+    numero_existente = str(fila[0] or "").strip()
+
+    if numero_existente:
+        return numero_existente
+
+    numero = obtener_siguiente_numero_ot(
+        centro,
+        "PREV",
+    )
+
+    descripcion = (
+        f"[PREVENTIVO AULA] Revisión preventiva · {espacio}"
+    )
+
+    observaciones_ot = f"""
+Revisión preventiva de aula.
+
+Revisión ID: {revision_id}
+Centro: {centro or "-"}
+Edificio: {edificio or "-"}
+Planta: {planta or "-"}
+Aula / espacio: {espacio or "-"}
+Operario: {operario or "-"}
+Observaciones iniciales: {observaciones or "-"}
+""".strip()
+
+    datos_orden = (
+        numero,
+        descripcion,
+        "Abierta",
+        centro,
+        edificio,
+        espacio,
+        "Preventivo",
+        "Media",
+        operario,
+        "PREVENTIVO",
+        "Mantenimiento preventivo",
+        hoy_str(),
+        "",
+        "Operarios",
+        "Interna",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        0,
+        observaciones_ot,
+        planta or "",
+    )
+
+    numero_creado = crear_orden(
+        datos_orden
+    ) or numero
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE preventivo_aulas
+            SET numero_ot_preventiva = ?
+            WHERE id = ?
+        """), (
+            numero_creado,
+            revision_id,
+        ))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    try:
+        vincular_origen_ot(
+            numero_ot=numero_creado,
+            origen_tabla="preventivo_aulas",
+            origen_id=revision_id,
+        )
+    except Exception:
+        pass
+
+    return numero_creado
+
+
 def crear_revision_aula(
     centro,
     edificio,
@@ -160,67 +290,99 @@ def crear_revision_aula(
     numero_ot_preventiva="",
     planta="",
 ):
+    """
+    Crea la revisión y sus elementos.
+
+    Si no recibe una OT preventiva previa, genera automáticamente una
+    OT PREV mediante el circuito general de órdenes. Así queda visible
+    para el operario y se envía Telegram sin crear un sistema paralelo.
+    """
     crear_tablas_preventivo_aulas()
+
+    numero_ot_preventiva = str(
+        numero_ot_preventiva or ""
+    ).strip()
 
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute(_sql("""
-        INSERT INTO preventivo_aulas
-        (
-            fecha,
+    try:
+        cur.execute(_sql("""
+            INSERT INTO preventivo_aulas
+            (
+                fecha,
+                centro,
+                edificio,
+                espacio,
+                operario,
+                estado,
+                observaciones,
+                numero_ot_preventiva,
+                planta
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+        """), (
+            hoy_str(),
             centro,
             edificio,
             espacio,
             operario,
-            estado,
+            "Abierta",
             observaciones,
             numero_ot_preventiva,
             planta
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id
-    """), (
-        hoy_str(),
-        centro,
-        edificio,
-        espacio,
-        operario,
-        "Abierta",
-        observaciones,
-        numero_ot_preventiva,
-        planta
-    ))
-
-    revision_id = cur.fetchone()[0]
-
-    elementos_revision = elementos_para_revision_aula(centro, edificio, espacio)
-
-    for elemento in elementos_revision:
-        cur.execute(_sql("""
-            INSERT INTO preventivo_aulas_items
-            (
-                revision_id,
-                elemento,
-                estado,
-                observaciones,
-                foto,
-                crear_correctivo,
-                numero_ot_correctiva
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """), (
-            revision_id,
-            elemento,
-            "Correcto",
-            "",
-            "",
-            0,
-            ""
         ))
 
-    conn.commit()
-    conn.close()
+        revision_id = cur.fetchone()[0]
+
+        elementos_revision = elementos_para_revision_aula(
+            centro,
+            edificio,
+            espacio
+        )
+
+        for elemento in elementos_revision:
+            cur.execute(_sql("""
+                INSERT INTO preventivo_aulas_items
+                (
+                    revision_id,
+                    elemento,
+                    estado,
+                    observaciones,
+                    foto,
+                    crear_correctivo,
+                    numero_ot_correctiva
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """), (
+                revision_id,
+                elemento,
+                "Correcto",
+                "",
+                "",
+                0,
+                ""
+            ))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    if not numero_ot_preventiva:
+        crear_ot_preventiva_revision_aula(
+            revision_id=revision_id,
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio,
+            operario=operario,
+            observaciones=observaciones,
+        )
 
     return revision_id
 
