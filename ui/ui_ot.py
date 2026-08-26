@@ -20,6 +20,15 @@ from modules.inventario import (
 
 from modules.preventivo import checklist_preventivo_completo
 
+from modules.preventivo_aulas import (
+    obtener_revision_aula_por_ot,
+    obtener_items_revision_aula,
+    guardar_item_revision_y_sincronizar,
+    crear_correctivos_desde_revision,
+    revision_aula_lista_para_cerrar,
+    ESTADOS_REVISION_AULA,
+)
+
 from ui.ui_legionella import obtener_checklist_correctivo_legionella
 
 from ui.ui_ot_controles import (
@@ -362,9 +371,426 @@ def descomponer_orden_operario(fila):
     )
 
 
-def puede_finalizar_preventivo(num_ot, origen, desc):
-    if es_ot_preventiva(origen, desc, num_ot):
-        return checklist_preventivo_completo(num_ot)
+
+def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
+    """
+    Detecta únicamente la OT integral de aula.
+    No afecta al resto de preventivos.
+    """
+    area_txt = normalizar_txt(area)
+    desc_txt = normalizar_txt(descripcion)
+    numero_txt = str(
+        numero_ot or ""
+    ).strip().upper()
+
+    return (
+        numero_txt.startswith("PREV-")
+        and area_txt == "mantenimiento general aulas"
+        and (
+            "preventivo aulas" in desc_txt
+            or "preventivo aula" in desc_txt
+        )
+    )
+
+
+def _es_item_aula_inventariable(item):
+    try:
+        return (
+            str(item[9] or "").strip()
+            == "Elemento inventariable"
+        )
+    except Exception:
+        return False
+
+
+def _validar_cantidades_item_aula(
+    elemento,
+    total,
+    correctas,
+    afectadas,
+):
+    total = int(
+        total or 0
+    )
+    correctas = int(
+        correctas or 0
+    )
+    afectadas = int(
+        afectadas or 0
+    )
+
+    if (
+        total < 0
+        or correctas < 0
+        or afectadas < 0
+    ):
+        return (
+            False,
+            f"{elemento}: las cantidades no pueden ser negativas.",
+        )
+
+    if correctas + afectadas != total:
+        return (
+            False,
+            (
+                f"{elemento}: Total ({total}) debe ser igual a "
+                f"Correctas ({correctas}) + "
+                f"Con incidencia ({afectadas})."
+            ),
+        )
+
+    return True, ""
+
+
+def mostrar_preventivo_aula_operario(
+    num_ot,
+    operario,
+):
+    """
+    Ejecuta dentro de la OT la revisión integral de aula.
+
+    Esta pantalla reutiliza la revisión ya creada por modules.preventivo
+    cuando generó la OT. No crea una nueva revisión ni una segunda OT.
+    """
+    revision = obtener_revision_aula_por_ot(
+        num_ot
+    )
+
+    st.markdown(
+        "### 🏫 Preventivo integral del aula"
+    )
+
+    if not revision:
+        st.error(
+            "Esta OT está marcada como Preventivo aulas, "
+            "pero no se encuentra su revisión vinculada."
+        )
+        return
+
+    (
+        revision_id,
+        fecha_revision,
+        centro_revision,
+        edificio_revision,
+        espacio_revision,
+        operario_revision,
+        estado_revision,
+        observaciones_revision,
+        numero_ot_revision,
+        planta_revision,
+    ) = revision
+
+    st.caption(
+        f"📍 {centro_revision or '-'} · "
+        f"{edificio_revision or '-'} · "
+        f"{planta_revision or '-'} · "
+        f"{espacio_revision or '-'}"
+    )
+
+    st.info(
+        "Los 📦 elementos mantienen actualizado el inventario vivo. "
+        "En ellos debe cumplirse: "
+        "**Total = Correctas + Con incidencia**."
+    )
+
+    items = obtener_items_revision_aula(
+        revision_id
+    )
+
+    if not items:
+        st.warning(
+            "La revisión no contiene elementos. "
+            "Revisa Configuración → Modelo aulas."
+        )
+        return
+
+    categoria_anterior = None
+
+    for item in items:
+        (
+            item_id,
+            _revision_id,
+            elemento,
+            estado_item,
+            observaciones_item,
+            foto_item,
+            crear_correctivo,
+            numero_ot_correctiva,
+            categoria,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_total,
+            cantidad_correcta,
+            cantidad_afectada,
+            modelo_id,
+        ) = item
+
+        categoria = str(
+            categoria or "General"
+        ).strip()
+
+        if categoria != categoria_anterior:
+            st.markdown("---")
+            st.markdown(
+                f"#### {categoria}"
+            )
+            categoria_anterior = categoria
+
+        inventariable = _es_item_aula_inventariable(
+            item
+        )
+
+        icono = (
+            "📦"
+            if inventariable
+            else "🔧"
+        )
+
+        with st.container(border=True):
+            st.markdown(
+                f"**{icono} {elemento}**"
+            )
+
+            if inventariable:
+                c1, c2, c3 = st.columns(3)
+
+                with c1:
+                    total_nuevo = st.number_input(
+                        "Cantidad total",
+                        min_value=0,
+                        step=1,
+                        value=int(
+                            cantidad_total or 0
+                        ),
+                        key=(
+                            f"ot_aula_total_"
+                            f"{num_ot}_{item_id}"
+                        ),
+                    )
+
+                with c2:
+                    correctas_nuevo = st.number_input(
+                        "Correctas",
+                        min_value=0,
+                        step=1,
+                        value=int(
+                            cantidad_correcta or 0
+                        ),
+                        key=(
+                            f"ot_aula_correctas_"
+                            f"{num_ot}_{item_id}"
+                        ),
+                    )
+
+                with c3:
+                    afectadas_nuevo = st.number_input(
+                        "Con incidencia",
+                        min_value=0,
+                        step=1,
+                        value=int(
+                            cantidad_afectada or 0
+                        ),
+                        key=(
+                            f"ot_aula_afectadas_"
+                            f"{num_ot}_{item_id}"
+                        ),
+                    )
+
+                if (
+                    int(correctas_nuevo)
+                    + int(afectadas_nuevo)
+                    != int(total_nuevo)
+                ):
+                    st.warning(
+                        f"{int(correctas_nuevo)} + "
+                        f"{int(afectadas_nuevo)} ≠ "
+                        f"{int(total_nuevo)}"
+                    )
+
+            else:
+                total_nuevo = 0
+                correctas_nuevo = 0
+                afectadas_nuevo = 0
+
+            estado_actual = (
+                estado_item
+                if estado_item
+                in ESTADOS_REVISION_AULA
+                else "Correcto"
+            )
+
+            estado_nuevo = st.radio(
+                "Estado",
+                ESTADOS_REVISION_AULA,
+                index=(
+                    ESTADOS_REVISION_AULA.index(
+                        estado_actual
+                    )
+                ),
+                horizontal=True,
+                key=(
+                    f"ot_aula_estado_"
+                    f"{num_ot}_{item_id}"
+                ),
+            )
+
+            observacion_nueva = st.text_area(
+                "Observación",
+                value=str(
+                    observaciones_item
+                    or ""
+                ),
+                key=(
+                    f"ot_aula_obs_"
+                    f"{num_ot}_{item_id}"
+                ),
+            )
+
+            if numero_ot_correctiva:
+                st.success(
+                    f"🔧 Correctiva vinculada: "
+                    f"{numero_ot_correctiva}"
+                )
+
+            crear_corr = False
+
+            if estado_nuevo == "Avería":
+                crear_corr = st.checkbox(
+                    "Crear OT correctiva",
+                    value=(
+                        bool(crear_correctivo)
+                        if not numero_ot_correctiva
+                        else False
+                    ),
+                    disabled=bool(
+                        numero_ot_correctiva
+                    ),
+                    key=(
+                        f"ot_aula_corr_"
+                        f"{num_ot}_{item_id}"
+                    ),
+                )
+
+            if st.button(
+                "💾 Guardar punto",
+                key=(
+                    f"ot_aula_guardar_"
+                    f"{num_ot}_{item_id}"
+                ),
+                use_container_width=True,
+            ):
+                if (
+                    estado_nuevo
+                    in [
+                        "Ajustado",
+                        "Revisar",
+                        "Avería",
+                    ]
+                    and not str(
+                        observacion_nueva
+                        or ""
+                    ).strip()
+                ):
+                    st.warning(
+                        "Este estado necesita una observación."
+                    )
+                else:
+                    if inventariable:
+                        ok_cant, mensaje_cant = (
+                            _validar_cantidades_item_aula(
+                                elemento,
+                                total_nuevo,
+                                correctas_nuevo,
+                                afectadas_nuevo,
+                            )
+                        )
+                    else:
+                        ok_cant = True
+                        mensaje_cant = ""
+
+                    if not ok_cant:
+                        st.warning(
+                            mensaje_cant
+                        )
+                    else:
+                        ok = guardar_item_revision_y_sincronizar(
+                            revision_id=revision_id,
+                            item_id=item_id,
+                            estado=estado_nuevo,
+                            observaciones=observacion_nueva,
+                            foto=foto_item or "",
+                            crear_correctivo=crear_corr,
+                            cantidad_total=total_nuevo,
+                            cantidad_correcta=correctas_nuevo,
+                            cantidad_afectada=afectadas_nuevo,
+                        )
+
+                        if ok:
+                            creadas = 0
+
+                            if (
+                                estado_nuevo == "Avería"
+                                and crear_corr
+                            ):
+                                creadas = (
+                                    crear_correctivos_desde_revision(
+                                        revision_id
+                                    )
+                                )
+
+                            if creadas > 0:
+                                st.success(
+                                    "Guardado. "
+                                    f"Se han creado {creadas} "
+                                    "OT correctiva(s)."
+                                )
+                            else:
+                                st.success(
+                                    "Punto guardado e inventario actualizado."
+                                )
+
+                            st.rerun()
+
+                        else:
+                            st.error(
+                                "No se ha podido guardar este punto."
+                            )
+
+    st.markdown("---")
+
+    if revision_aula_lista_para_cerrar(
+        num_ot
+    ):
+        st.success(
+            "✅ Preventivo de aula completo. "
+            "La OT ya puede finalizarse."
+        )
+    else:
+        st.warning(
+            "Completa los estados, observaciones necesarias "
+            "y cantidades antes de finalizar la OT."
+        )
+
+
+def puede_finalizar_preventivo(num_ot, origen, desc, area=''):
+    if es_preventivo_aulas_ot(
+        area,
+        desc,
+        num_ot
+    ):
+        return revision_aula_lista_para_cerrar(
+            num_ot
+        )
+
+    if es_ot_preventiva(
+        origen,
+        desc,
+        num_ot
+    ):
+        return checklist_preventivo_completo(
+            num_ot
+        )
+
     return True
 
 
@@ -1251,7 +1677,17 @@ def mostrar_tarjeta_ot(
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
-        if es_ot_preventiva(origen, desc, num_ot):
+        if es_preventivo_aulas_ot(
+            area,
+            desc,
+            num_ot
+        ):
+            mostrar_preventivo_aula_operario(
+                num_ot=num_ot,
+                operario=operario,
+            )
+
+        elif es_ot_preventiva(origen, desc, num_ot):
             mostrar_checklist_preventivo_operario(
                 num_ot=num_ot,
                 desc=desc,
@@ -1313,7 +1749,7 @@ def mostrar_tarjeta_ot(
 
             with c1:
                 if st.button("✔\nSí, finalizar", key=f"{modo}_si_fin_rapido_{id_orden}", use_container_width=True):
-                    if not puede_finalizar_preventivo(num_ot, origen, desc):
+                    if not puede_finalizar_preventivo(num_ot, origen, desc, area):
                         st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
                     elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
                         st.error("No puedes finalizar esta OT de Legionella hasta completar el control/checklist correspondiente.")
@@ -1444,7 +1880,7 @@ def mostrar_tarjeta_ot(
                 with c1:
                     if st.button("✔\nSí, finalizar", key=f"{modo}_si_fin_completo_{id_orden}", use_container_width=True):
 
-                        if not puede_finalizar_preventivo(num_ot, origen, desc):
+                        if not puede_finalizar_preventivo(num_ot, origen, desc, area):
                             st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
 
                         elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
