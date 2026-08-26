@@ -1089,6 +1089,145 @@ def ot_correctiva_cerrada(numero_ot):
     ]
 
 
+
+def obtener_revision_aula_por_ot(numero_ot):
+    """
+    Localiza la revisión integral asociada a una OT preventiva concreta.
+    """
+    crear_tablas_preventivo_aulas()
+
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return None
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT
+                id,
+                fecha,
+                centro,
+                edificio,
+                espacio,
+                operario,
+                estado,
+                observaciones,
+                numero_ot_preventiva,
+                COALESCE(planta, '')
+            FROM preventivo_aulas
+            WHERE numero_ot_preventiva = ?
+            ORDER BY id DESC
+            LIMIT 1
+        """), (numero_ot,))
+
+        return cur.fetchone()
+
+    finally:
+        conn.close()
+
+
+def revision_aula_lista_para_cerrar(numero_ot):
+    """
+    Regla de cierre del Preventivo integral de aulas.
+
+    Requisitos:
+    - existe revisión vinculada a la OT;
+    - todos los elementos tienen un estado válido;
+    - Ajustado / Revisar / Avería requieren observación;
+    - en inventariables se cumple Total = Correctas + Afectadas;
+    - si una Avería está marcada para crear correctiva,
+      la OT correctiva debe estar ya creada.
+    """
+    revision = obtener_revision_aula_por_ot(
+        numero_ot
+    )
+
+    if not revision:
+        return False
+
+    revision_id = revision[0]
+    items = obtener_items_revision_aula(
+        revision_id
+    )
+
+    if not items:
+        return False
+
+    for item in items:
+        (
+            item_id,
+            _revision_id,
+            elemento,
+            estado,
+            observaciones,
+            foto,
+            crear_correctivo,
+            numero_ot_correctiva,
+            categoria,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_total,
+            cantidad_correcta,
+            cantidad_afectada,
+            modelo_id,
+        ) = item
+
+        estado = str(
+            estado or ""
+        ).strip()
+
+        observaciones = str(
+            observaciones or ""
+        ).strip()
+
+        if estado not in ESTADOS_REVISION_AULA:
+            return False
+
+        if (
+            estado in [
+                "Ajustado",
+                "Revisar",
+                "Avería",
+            ]
+            and not observaciones
+        ):
+            return False
+
+        if (
+            str(tipo_linea or "").strip()
+            == "Elemento inventariable"
+        ):
+            total = int(
+                cantidad_total or 0
+            )
+            correctas = int(
+                cantidad_correcta or 0
+            )
+            afectadas = int(
+                cantidad_afectada or 0
+            )
+
+            if total < 0 or correctas < 0 or afectadas < 0:
+                return False
+
+            if correctas + afectadas != total:
+                return False
+
+        if (
+            estado == "Avería"
+            and bool(crear_correctivo)
+            and not str(
+                numero_ot_correctiva or ""
+            ).strip()
+        ):
+            return False
+
+    return True
+
+
 def resumen_revision_aula(revision_id):
     items = obtener_items_revision_aula(
         revision_id
