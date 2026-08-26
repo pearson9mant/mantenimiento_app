@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from database.db import conectar, _sql
 from modules.ordenes import (
     crear_orden,
@@ -7,23 +8,13 @@ from modules.ordenes import (
 )
 
 try:
-    from modules.inventario_aulas import obtener_elementos_aula_para_revision
+    from modules.inventario_aulas import (
+        guardar_o_actualizar_espacio,
+        obtener_inventario_por_espacio,
+    )
 except Exception:
-    obtener_elementos_aula_para_revision = None
-
-
-ELEMENTOS_REVISION_AULA = [
-    "Mesas",
-    "Sillas",
-    "Pantalla / proyector",
-    "Pizarra",
-    "Iluminación",
-    "Enchufes visibles",
-    "Puerta / maneta",
-    "Ventanas / persianas",
-    "Papeleras",
-    "Estado general del aula",
-]
+    guardar_o_actualizar_espacio = None
+    obtener_inventario_por_espacio = None
 
 
 ESTADOS_REVISION_AULA = [
@@ -61,57 +52,67 @@ def area_por_elemento_aula(elemento):
 
     if any(x in elemento_txt for x in [
         "luz", "ilumin", "enchufe", "interruptor", "canaleta",
-        "cable", "toma corriente", "emergencia"
+        "cable", "toma corriente", "emergencia", "diferencial",
+        "magnetotermico", "cuadro electrico",
     ]):
         return "Electricidad"
 
     if any(x in elemento_txt for x in [
         "proyector", "pantalla", "hdmi", "altavoz", "ordenador",
         "pc", "monitor", "informat", "red", "switch", "wifi",
-        "mando", "pizarra digital"
+        "mando", "pizarra digital",
     ]):
         return "Informática"
 
     if any(x in elemento_txt for x in [
         "puerta", "maneta", "cerradura", "cierrapuertas",
-        "ventana", "persiana", "carpinter", "bisagra"
+        "ventana", "persiana", "carpinter", "bisagra",
     ]):
         return "Carpintería"
 
     if any(x in elemento_txt for x in [
         "grifo", "lavabo", "agua", "desague", "cisterna",
-        "wc", "inodoro", "fregadero", "fontaner"
+        "wc", "inodoro", "fregadero", "fontaner",
     ]):
         return "Fontanería"
 
     if any(x in elemento_txt for x in [
         "split", "aire", "clima", "climatizacion", "radiador",
-        "termostato"
+        "termostato", "condensado", "filtro",
     ]):
         return "Climatización"
 
     if any(x in elemento_txt for x in [
         "mesa", "silla", "pizarra", "papelera", "estanteria",
-        "armario", "mueble", "corcho", "mobiliario"
+        "armario", "mueble", "corcho", "mobiliario",
     ]):
         return "Equipamiento"
 
     return "Equipamiento"
 
 
-def elementos_para_revision_aula(centro, edificio, espacio):
-    if obtener_elementos_aula_para_revision:
-        try:
-            elementos = obtener_elementos_aula_para_revision(centro, edificio, espacio)
-            if elementos:
-                return elementos
-        except Exception:
-            pass
+# =====================================================
+# ESTRUCTURA
+# =====================================================
 
-    return ELEMENTOS_REVISION_AULA
+def _asegurar_columna(cur, conn, tabla, columna, tipo_sql):
+    try:
+        cur.execute(_sql(f"""
+            ALTER TABLE {tabla}
+            ADD COLUMN {columna} {tipo_sql}
+        """))
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
 
 def crear_tablas_preventivo_aulas():
+    """
+    Mantiene las tablas antiguas y añade únicamente las columnas necesarias
+    para el nuevo Preventivo de Aulas.
+
+    No borra ni renombra datos existentes.
+    """
     conn = conectar()
     cur = conn.cursor()
 
@@ -142,19 +143,123 @@ def crear_tablas_preventivo_aulas():
         )
     """))
 
-    try:
-        cur.execute(_sql("""
-            ALTER TABLE preventivo_aulas
-            ADD COLUMN planta TEXT
-        """))
-        conn.commit()
-    except Exception:
-        conn.rollback()
-
     conn.commit()
+
+    _asegurar_columna(cur, conn, "preventivo_aulas", "planta", "TEXT")
+
+    for columna, tipo in [
+        ("categoria", "TEXT DEFAULT ''"),
+        ("tipo_linea", "TEXT DEFAULT ''"),
+        ("pide_cantidad", "INTEGER DEFAULT 0"),
+        ("cantidad_total", "INTEGER DEFAULT 0"),
+        ("cantidad_correcta", "INTEGER DEFAULT 0"),
+        ("cantidad_afectada", "INTEGER DEFAULT 0"),
+        ("modelo_id", "INTEGER DEFAULT 0"),
+    ]:
+        _asegurar_columna(
+            cur,
+            conn,
+            "preventivo_aulas_items",
+            columna,
+            tipo,
+        )
+
     conn.close()
 
 
+# =====================================================
+# MODELO CONFIGURADO
+# =====================================================
+
+def obtener_modelo_aula_activo():
+    """
+    Lee directamente el catálogo que se administra desde Configuración
+    (preventivo_aula_modelos).
+
+    Así Configuración sigue siendo la fuente maestra y este módulo
+    solo consume el modelo.
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                id,
+                categoria,
+                elemento,
+                tipo_linea,
+                COALESCE(pide_cantidad, 0),
+                COALESCE(cantidad_defecto, 0),
+                COALESCE(orden, 0)
+            FROM preventivo_aula_modelos
+            WHERE activo = 1
+            ORDER BY
+                COALESCE(orden, 0) ASC,
+                categoria ASC,
+                elemento ASC
+        """)
+        return cur.fetchall()
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return []
+
+    finally:
+        conn.close()
+
+
+def _inventario_actual_por_elemento(centro, edificio, espacio):
+    """
+    Devuelve el inventario vivo actual del espacio indexado por nombre
+    normalizado de elemento.
+    """
+    resultado = {}
+
+    if obtener_inventario_por_espacio is None:
+        return resultado
+
+    try:
+        inventario = obtener_inventario_por_espacio(
+            centro,
+            edificio,
+            espacio,
+        ) or []
+    except Exception:
+        return resultado
+
+    for fila in inventario:
+        try:
+            elemento = str(fila[5] or "").strip()
+            cantidad = int(float(fila[6] or 0))
+            estado = str(fila[7] or "").strip()
+            foto = str(fila[13] or "").strip()
+        except Exception:
+            continue
+
+        clave = normalizar_texto(elemento)
+
+        if not clave:
+            continue
+
+        # Si por compatibilidad antigua hubiera duplicados, conserva el último
+        # registro recibido para ese nombre.
+        resultado[clave] = {
+            "elemento": elemento,
+            "cantidad": max(0, cantidad),
+            "estado": estado,
+            "foto": foto,
+        }
+
+    return resultado
+
+
+# =====================================================
+# OT PREVENTIVA
+# =====================================================
 
 def crear_ot_preventiva_revision_aula(
     revision_id,
@@ -167,8 +272,8 @@ def crear_ot_preventiva_revision_aula(
 ):
     """
     Crea una única OT preventiva asociada a la revisión de aula.
-    Usa crear_orden(), por lo que entra en Operario/Colegio Vivo y
-    utiliza el aviso Telegram normal del sistema.
+    Usa crear_orden(), por lo que conserva el circuito normal de
+    Operario, Colegio Vivo y avisos del sistema.
     """
     revision_id = int(revision_id)
 
@@ -281,6 +386,10 @@ Observaciones iniciales: {observaciones or "-"}
     return numero_creado
 
 
+# =====================================================
+# CREACIÓN DE REVISIÓN DESDE MODELO
+# =====================================================
+
 def crear_revision_aula(
     centro,
     edificio,
@@ -291,13 +400,31 @@ def crear_revision_aula(
     planta="",
 ):
     """
-    Crea la revisión y sus elementos.
+    Crea una revisión utilizando el modelo activo de Configuración.
 
-    Si no recibe una OT preventiva previa, genera automáticamente una
-    OT PREV mediante el circuito general de órdenes. Así queda visible
-    para el operario y se envía Telegram sin crear un sistema paralelo.
+    Elemento inventariable:
+    - precarga la cantidad del inventario vivo si ya existe;
+    - en la primera revisión usa la cantidad sugerida del modelo;
+    - guarda cantidad total, correcta y afectada.
+
+    Comprobación técnica:
+    - no utiliza cantidades.
     """
     crear_tablas_preventivo_aulas()
+
+    modelo = obtener_modelo_aula_activo()
+
+    if not modelo:
+        raise ValueError(
+            "El Modelo aulas está vacío. "
+            "Ve a Configuración > Modelo aulas y carga o activa elementos."
+        )
+
+    inventario_actual = _inventario_actual_por_elemento(
+        centro,
+        edificio,
+        espacio,
+    )
 
     numero_ot_preventiva = str(
         numero_ot_preventiva or ""
@@ -331,18 +458,45 @@ def crear_revision_aula(
             "Abierta",
             observaciones,
             numero_ot_preventiva,
-            planta
+            planta,
         ))
 
         revision_id = cur.fetchone()[0]
 
-        elementos_revision = elementos_para_revision_aula(
-            centro,
-            edificio,
-            espacio
-        )
+        for (
+            modelo_id,
+            categoria,
+            elemento,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_defecto,
+            orden,
+        ) in modelo:
+            tipo_linea = str(tipo_linea or "").strip()
+            es_inventariable = (
+                tipo_linea == "Elemento inventariable"
+            )
 
-        for elemento in elementos_revision:
+            cantidad_base = 0
+
+            if es_inventariable:
+                previo = inventario_actual.get(
+                    normalizar_texto(elemento)
+                )
+
+                if previo is not None:
+                    cantidad_base = int(
+                        previo.get("cantidad", 0) or 0
+                    )
+                else:
+                    try:
+                        cantidad_base = max(
+                            0,
+                            int(cantidad_defecto or 0),
+                        )
+                    except Exception:
+                        cantidad_base = 0
+
             cur.execute(_sql("""
                 INSERT INTO preventivo_aulas_items
                 (
@@ -352,9 +506,16 @@ def crear_revision_aula(
                     observaciones,
                     foto,
                     crear_correctivo,
-                    numero_ot_correctiva
+                    numero_ot_correctiva,
+                    categoria,
+                    tipo_linea,
+                    pide_cantidad,
+                    cantidad_total,
+                    cantidad_correcta,
+                    cantidad_afectada,
+                    modelo_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """), (
                 revision_id,
                 elemento,
@@ -362,7 +523,14 @@ def crear_revision_aula(
                 "",
                 "",
                 0,
-                ""
+                "",
+                categoria,
+                tipo_linea,
+                1 if (es_inventariable and bool(pide_cantidad)) else 0,
+                cantidad_base if es_inventariable else 0,
+                cantidad_base if es_inventariable else 0,
+                0,
+                int(modelo_id or 0),
             ))
 
         conn.commit()
@@ -370,6 +538,7 @@ def crear_revision_aula(
     except Exception:
         conn.rollback()
         raise
+
     finally:
         conn.close()
 
@@ -386,6 +555,10 @@ def crear_revision_aula(
 
     return revision_id
 
+
+# =====================================================
+# CONSULTAS
+# =====================================================
 
 def obtener_revisiones_aulas(limite=100):
     crear_tablas_preventivo_aulas()
@@ -429,15 +602,48 @@ def obtener_revision_aula(revision_id):
 
 
 def obtener_items_revision_aula(revision_id):
+    """
+    Devuelve la estructura nueva.
+
+    Posiciones:
+    0 id
+    1 revision_id
+    2 elemento
+    3 estado
+    4 observaciones
+    5 foto
+    6 crear_correctivo
+    7 numero_ot_correctiva
+    8 categoria
+    9 tipo_linea
+    10 pide_cantidad
+    11 cantidad_total
+    12 cantidad_correcta
+    13 cantidad_afectada
+    14 modelo_id
+    """
     crear_tablas_preventivo_aulas()
 
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT id, revision_id, elemento, estado,
-               observaciones, foto, crear_correctivo,
-               numero_ot_correctiva
+        SELECT
+            id,
+            revision_id,
+            elemento,
+            estado,
+            observaciones,
+            foto,
+            crear_correctivo,
+            numero_ot_correctiva,
+            COALESCE(categoria, ''),
+            COALESCE(tipo_linea, ''),
+            COALESCE(pide_cantidad, 0),
+            COALESCE(cantidad_total, 0),
+            COALESCE(cantidad_correcta, 0),
+            COALESCE(cantidad_afectada, 0),
+            COALESCE(modelo_id, 0)
         FROM preventivo_aulas_items
         WHERE revision_id = ?
         ORDER BY id ASC
@@ -449,12 +655,19 @@ def obtener_items_revision_aula(revision_id):
     return datos
 
 
+# =====================================================
+# GUARDADO + INVENTARIO VIVO
+# =====================================================
+
 def actualizar_item_revision_aula(
     item_id,
     estado,
     observaciones="",
     foto="",
-    crear_correctivo=0
+    crear_correctivo=0,
+    cantidad_total=0,
+    cantidad_correcta=0,
+    cantidad_afectada=0,
 ):
     crear_tablas_preventivo_aulas()
 
@@ -466,14 +679,20 @@ def actualizar_item_revision_aula(
         SET estado = ?,
             observaciones = ?,
             foto = ?,
-            crear_correctivo = ?
+            crear_correctivo = ?,
+            cantidad_total = ?,
+            cantidad_correcta = ?,
+            cantidad_afectada = ?
         WHERE id = ?
     """), (
         estado,
         observaciones,
         foto,
         1 if crear_correctivo else 0,
-        item_id
+        max(0, int(cantidad_total or 0)),
+        max(0, int(cantidad_correcta or 0)),
+        max(0, int(cantidad_afectada or 0)),
+        item_id,
     ))
 
     conn.commit()
@@ -481,6 +700,120 @@ def actualizar_item_revision_aula(
 
     return True
 
+
+def sincronizar_item_inventario_vivo(
+    revision_id,
+    item_id,
+):
+    """
+    Copia un elemento inventariable revisado al inventario vivo.
+
+    No suma cantidades: actualiza el registro existente del espacio.
+    """
+    if guardar_o_actualizar_espacio is None:
+        return False
+
+    revision = obtener_revision_aula(revision_id)
+
+    if not revision:
+        return False
+
+    (
+        _id,
+        fecha,
+        centro,
+        edificio,
+        espacio,
+        operario,
+        estado_revision,
+        observaciones_revision,
+        numero_ot_preventiva,
+        planta,
+    ) = revision
+
+    items = obtener_items_revision_aula(revision_id)
+
+    item = next(
+        (
+            fila
+            for fila in items
+            if int(fila[0]) == int(item_id)
+        ),
+        None,
+    )
+
+    if item is None:
+        return False
+
+    tipo_linea = str(item[9] or "").strip()
+
+    if tipo_linea != "Elemento inventariable":
+        return True
+
+    elemento = str(item[2] or "").strip()
+    estado = str(item[3] or "Correcto").strip()
+    observaciones = str(item[4] or "").strip()
+    foto = str(item[5] or "").strip()
+    cantidad_total = max(0, int(item[11] or 0))
+    cantidad_afectada = max(0, int(item[13] or 0))
+
+    return bool(
+        guardar_o_actualizar_espacio(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+            elemento=elemento,
+            cantidad=cantidad_total,
+            estado=estado,
+            ancho=0,
+            alto=0,
+            fondo=0,
+            unidad="ud",
+            observaciones=observaciones,
+            foto=foto,
+            operario=operario,
+            cantidad_afectada=cantidad_afectada,
+        )
+    )
+
+
+def guardar_item_revision_y_sincronizar(
+    revision_id,
+    item_id,
+    estado,
+    observaciones="",
+    foto="",
+    crear_correctivo=0,
+    cantidad_total=0,
+    cantidad_correcta=0,
+    cantidad_afectada=0,
+):
+    """
+    Guarda una línea y, si es inventariable, actualiza el censo vivo.
+    """
+    ok = actualizar_item_revision_aula(
+        item_id=item_id,
+        estado=estado,
+        observaciones=observaciones,
+        foto=foto,
+        crear_correctivo=crear_correctivo,
+        cantidad_total=cantidad_total,
+        cantidad_correcta=cantidad_correcta,
+        cantidad_afectada=cantidad_afectada,
+    )
+
+    if not ok:
+        return False
+
+    return sincronizar_item_inventario_vivo(
+        revision_id=revision_id,
+        item_id=item_id,
+    )
+
+
+# =====================================================
+# CIERRE / CORRECTIVOS
+# =====================================================
 
 def cerrar_revision_aula(revision_id, observaciones=""):
     crear_tablas_preventivo_aulas()
@@ -496,7 +829,7 @@ def cerrar_revision_aula(revision_id, observaciones=""):
     """), (
         "Cerrada",
         observaciones,
-        revision_id
+        revision_id,
     ))
 
     conn.commit()
@@ -508,49 +841,21 @@ def cerrar_revision_aula(revision_id, observaciones=""):
 def obtener_items_con_averia(revision_id):
     crear_tablas_preventivo_aulas()
 
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        SELECT id, revision_id, elemento, estado,
-               observaciones, foto, crear_correctivo,
-               numero_ot_correctiva
-        FROM preventivo_aulas_items
-        WHERE revision_id = ?
-          AND estado = ?
-    """), (
-        revision_id,
-        "Avería"
-    ))
-
-    datos = cur.fetchall()
-    conn.close()
-
-    return datos
+    return [
+        fila
+        for fila in obtener_items_revision_aula(revision_id)
+        if str(fila[3] or "") == "Avería"
+    ]
 
 
 def obtener_items_a_revisar(revision_id):
     crear_tablas_preventivo_aulas()
 
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute(_sql("""
-        SELECT id, revision_id, elemento, estado,
-               observaciones, foto, crear_correctivo,
-               numero_ot_correctiva
-        FROM preventivo_aulas_items
-        WHERE revision_id = ?
-          AND estado = ?
-    """), (
-        revision_id,
-        "Revisar"
-    ))
-
-    datos = cur.fetchall()
-    conn.close()
-
-    return datos
+    return [
+        fila
+        for fila in obtener_items_revision_aula(revision_id)
+        if str(fila[3] or "") == "Revisar"
+    ]
 
 
 def crear_correctivos_desde_revision(revision_id):
@@ -578,14 +883,20 @@ def crear_correctivos_desde_revision(revision_id):
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT id, elemento, observaciones, foto, numero_ot_correctiva
+        SELECT
+            id,
+            elemento,
+            observaciones,
+            foto,
+            numero_ot_correctiva,
+            COALESCE(cantidad_afectada, 0)
         FROM preventivo_aulas_items
         WHERE revision_id = ?
           AND estado = ?
           AND crear_correctivo = 1
     """), (
         revision_id,
-        "Avería"
+        "Avería",
     ))
 
     items = cur.fetchall()
@@ -593,23 +904,45 @@ def crear_correctivos_desde_revision(revision_id):
     creadas = 0
 
     for item in items:
-        item_id, elemento, observaciones_item, foto, numero_ot_correctiva = item
+        (
+            item_id,
+            elemento,
+            observaciones_item,
+            foto,
+            numero_ot_correctiva,
+            cantidad_afectada,
+        ) = item
 
         if numero_ot_correctiva:
             continue
 
-        numero = obtener_siguiente_numero_ot(centro, "CORR")
+        numero = obtener_siguiente_numero_ot(
+            centro,
+            "CORR",
+        )
 
-        area = area_por_elemento_aula(elemento)
+        area = area_por_elemento_aula(
+            elemento
+        )
 
-        descripcion = f"[CORRECTIVO AULA] {elemento} - {espacio}"
+        descripcion = (
+            f"[CORRECTIVO AULA] "
+            f"{elemento} - {espacio}"
+        )
+
+        afectadas_txt = ""
+        if int(cantidad_afectada or 0) > 0:
+            afectadas_txt = (
+                f"\nCantidad afectada: "
+                f"{int(cantidad_afectada)}"
+            )
 
         observaciones_ot = f"""
 Correctivo generado desde revisión preventiva de aula.
 
 Aula/Espacio: {espacio}
 Planta: {planta or "-"}
-Elemento: {elemento}
+Elemento: {elemento}{afectadas_txt}
 Área asignada automáticamente: {area}
 Observación: {observaciones_item or "-"}
 Fecha revisión: {fecha or hoy_str()}
@@ -617,46 +950,48 @@ OT preventiva origen: {numero_ot_preventiva or "-"}
 """.strip()
 
         datos_orden = (
-            numero,                         # 0 numero_ot
-            descripcion,                    # 1 descripcion
-            "Abierta",                      # 2 estado
-            centro,                         # 3 centro
-            edificio,                       # 4 edificio
-            espacio,                        # 5 espacio
-            area,                           # 6 area
-            "Media",                        # 7 prioridad
-            operario,                       # 8 operario
-            "PREVENTIVO_AULA",              # 9 origen
-            "Mantenimiento preventivo",     # 10 solicitante
-            hoy_str(),                      # 11 fecha_origen
-            foto or "",                     # 12 foto
-            "Operarios",                    # 13 tipo_solicitante
-            "Interna",                      # 14 tipo_orden
-            "",                             # 15 empresa_externa
-            "",                             # 16 contacto_empresa
-            "",                             # 17 telefono_empresa
-            "",                             # 18 email_empresa
-            "",                             # 19 fecha_aviso_empresa
-            "",                             # 20 fecha_realizacion
-            "",                             # 21 trabajo_a_realizar
-            "",                             # 22 trabajo_realizado
-            "",                             # 23 firma_operario
-            "",                             # 24 fecha_firma_operario
-            0,                              # 25 coste_estimado
-            0,                              # 26 coste_final
-            observaciones_ot,               # 27 observaciones_estado
-            planta or "",                   # 28 planta
+            numero,
+            descripcion,
+            "Abierta",
+            centro,
+            edificio,
+            espacio,
+            area,
+            "Media",
+            operario,
+            "PREVENTIVO_AULA",
+            "Mantenimiento preventivo",
+            hoy_str(),
+            foto or "",
+            "Operarios",
+            "Interna",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            0,
+            0,
+            observaciones_ot,
+            planta or "",
         )
 
-        crear_orden(datos_orden)
+        numero_creado = crear_orden(
+            datos_orden
+        ) or numero
 
         cur.execute(_sql("""
             UPDATE preventivo_aulas_items
             SET numero_ot_correctiva = ?
             WHERE id = ?
         """), (
-            numero,
-            item_id
+            numero_creado,
+            item_id,
         ))
 
         creadas += 1
@@ -671,11 +1006,13 @@ def obtener_estado_ot(numero_ot):
     if not numero_ot:
         return ""
 
-    posibles_columnas = ["numero_ot", "numero", "codigo"]
+    posibles_columnas = [
+        "numero_ot",
+        "numero",
+        "codigo",
+    ]
 
     for columna in posibles_columnas:
-
-        # Buscar en OTs activas
         conn = conectar()
         cur = conn.cursor()
 
@@ -688,9 +1025,9 @@ def obtener_estado_ot(numero_ot):
             """), (numero_ot,))
 
             fila = cur.fetchone()
-            conn.close()
 
             if fila:
+                conn.close()
                 return str(fila[0] or "")
 
         except Exception:
@@ -698,9 +1035,13 @@ def obtener_estado_ot(numero_ot):
                 conn.rollback()
             except Exception:
                 pass
-            conn.close()
 
-        # Buscar en histórico
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
         conn = conectar()
         cur = conn.cursor()
 
@@ -713,9 +1054,9 @@ def obtener_estado_ot(numero_ot):
             """), (numero_ot,))
 
             fila = cur.fetchone()
-            conn.close()
 
             if fila:
+                conn.close()
                 return str(fila[0] or "")
 
         except Exception:
@@ -723,42 +1064,78 @@ def obtener_estado_ot(numero_ot):
                 conn.rollback()
             except Exception:
                 pass
-            conn.close()
+
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     return ""
 
 
 def ot_correctiva_cerrada(numero_ot):
-    estado = obtener_estado_ot(numero_ot).lower()
+    estado = obtener_estado_ot(
+        numero_ot
+    ).lower()
 
     return estado in [
         "finalizada",
+        "finalizado",
         "cerrado",
         "cerrada",
         "cancelada",
+        "cancelado",
     ]
 
 
 def resumen_revision_aula(revision_id):
-    items = obtener_items_revision_aula(revision_id)
+    items = obtener_items_revision_aula(
+        revision_id
+    )
 
     total = len(items)
-    correctos = len([i for i in items if str(i[3]) == "Correcto"])
-    ajustados = len([i for i in items if str(i[3]) == "Ajustado"])
-    revisar = len([i for i in items if str(i[3]) == "Revisar"])
+    correctos = len([
+        i for i in items
+        if str(i[3]) == "Correcto"
+    ])
+    ajustados = len([
+        i for i in items
+        if str(i[3]) == "Ajustado"
+    ])
+    revisar = len([
+        i for i in items
+        if str(i[3]) == "Revisar"
+    ])
 
     averias_detectadas = 0
     averias_pendientes = 0
     averias_resueltas = 0
 
+    total_unidades = 0
+    unidades_correctas = 0
+    unidades_afectadas = 0
+
     for i in items:
         estado_item = str(i[3] or "")
-        numero_ot_correctiva = str(i[7] or "")
+        numero_ot_correctiva = str(
+            i[7] or ""
+        )
+
+        if str(i[9] or "") == "Elemento inventariable":
+            total_unidades += int(i[11] or 0)
+            unidades_correctas += int(i[12] or 0)
+            unidades_afectadas += int(i[13] or 0)
 
         if estado_item == "Avería":
             averias_detectadas += 1
 
-            if numero_ot_correctiva and ot_correctiva_cerrada(numero_ot_correctiva):
+            if (
+                numero_ot_correctiva
+                and ot_correctiva_cerrada(
+                    numero_ot_correctiva
+                )
+            ):
                 averias_resueltas += 1
             else:
                 averias_pendientes += 1
@@ -772,4 +1149,8 @@ def resumen_revision_aula(revision_id):
         "averias_detectadas": averias_detectadas,
         "averias_pendientes": averias_pendientes,
         "averias_resueltas": averias_resueltas,
+        "unidades_total": total_unidades,
+        "unidades_correctas": unidades_correctas,
+        "unidades_afectadas": unidades_afectadas,
     }
+
