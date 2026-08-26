@@ -3,6 +3,8 @@ from pathlib import Path
 
 from config import CENTROS, EDIFICIOS, OPERARIOS
 from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
     obtener_plantas_espacios,
     obtener_espacios_por_planta,
 )
@@ -63,57 +65,89 @@ def pantalla_preventivo_aulas():
     tab1, tab2 = st.tabs(["➕ Nueva revisión", "📋 Revisiones"])
 
     with tab1:
-        centro = st.selectbox("Centro", CENTROS, key="prev_aula_centro")
+        # =====================================================
+        # UBICACIÓN DESDE EL CATÁLOGO REAL DE ESPACIOS
+        # Centro -> Edificio -> Planta -> Aula / espacio
+        # =====================================================
+        centros_catalogo = obtener_centros_espacios() or []
+        centros_disponibles = centros_catalogo or CENTROS
 
-        edificios_disponibles = EDIFICIOS.get(centro, [])
-        edificio = st.selectbox(
-            "Edificio",
-            edificios_disponibles,
-            key=f"prev_aula_edificio_{centro}"
+        centro = st.selectbox(
+            "Centro",
+            centros_disponibles,
+            key="prev_aula_centro"
         )
 
-        plantas_disponibles = obtener_plantas_espacios(
-            centro,
-            edificio,
-        )
+        edificios_disponibles = obtener_edificios_espacios(centro) or []
 
-        if not plantas_disponibles:
-            plantas_disponibles = ["Sin planta"]
-
-        planta = st.selectbox(
-            "Planta",
-            plantas_disponibles,
-            key=f"prev_aula_planta_{centro}_{edificio}",
-        )
-
-        espacios_encontrados = obtener_espacios_por_planta(
-            centro,
-            edificio,
-            planta,
-        )
-
-        espacios_disponibles = [
-            fila[0]
-            for fila in espacios_encontrados
-            if fila and fila[0]
-        ]
-
-        if not espacios_disponibles:
-            espacios_disponibles = ["Otro"]
-
-        espacio_sel = st.selectbox(
-            "Aula / espacio",
-            espacios_disponibles,
-            key=f"prev_aula_espacio_{centro}_{edificio}_{planta}",
-        )
-
-        if espacio_sel == "Otro":
-            espacio = st.text_input(
-                "Especificar aula / espacio",
-                key="prev_aula_espacio_otro",
+        if not edificios_disponibles:
+            st.warning(
+                "No hay edificios registrados en el catálogo de espacios "
+                "para este centro."
             )
+            edificio = ""
+            planta = ""
+            espacio = ""
         else:
-            espacio = espacio_sel
+            edificio = st.selectbox(
+                "Edificio",
+                edificios_disponibles,
+                key=f"prev_aula_edificio_{centro}"
+            )
+
+            plantas_disponibles = obtener_plantas_espacios(
+                centro,
+                edificio,
+            ) or []
+
+            if not plantas_disponibles:
+                st.warning(
+                    "Este edificio no tiene plantas registradas en el "
+                    "catálogo de espacios."
+                )
+                planta = ""
+                espacio = ""
+            else:
+                planta = st.selectbox(
+                    "Planta",
+                    plantas_disponibles,
+                    key=f"prev_aula_planta_{centro}_{edificio}",
+                )
+
+                espacios_encontrados = obtener_espacios_por_planta(
+                    centro,
+                    edificio,
+                    planta,
+                ) or []
+
+                espacios_disponibles = [
+                    fila[0]
+                    for fila in espacios_encontrados
+                    if fila and fila[0]
+                ]
+
+                if espacios_disponibles:
+                    espacio_sel = st.selectbox(
+                        "Aula / espacio",
+                        espacios_disponibles + ["Otro"],
+                        key=f"prev_aula_espacio_{centro}_{edificio}_{planta}",
+                    )
+
+                    if espacio_sel == "Otro":
+                        espacio = st.text_input(
+                            "Especificar aula / espacio",
+                            key=(
+                                f"prev_aula_espacio_otro_"
+                                f"{centro}_{edificio}_{planta}"
+                            ),
+                        )
+                    else:
+                        espacio = espacio_sel
+                else:
+                    st.warning(
+                        "No hay aulas o espacios registrados en esta planta."
+                    )
+                    espacio = ""
 
         operario_auto = operario_por_centro(centro)
 
@@ -143,7 +177,11 @@ def pantalla_preventivo_aulas():
         )
 
         if st.button("✅ Crear revisión de aula", use_container_width=True):
-            if not str(espacio).strip():
+            if not str(edificio).strip():
+                st.warning("Indica un edificio válido del catálogo.")
+            elif not str(planta).strip():
+                st.warning("Indica una planta válida del catálogo.")
+            elif not str(espacio).strip():
                 st.warning("Indica un aula o espacio.")
             elif not str(operario).strip():
                 st.warning("Indica un operario.")
