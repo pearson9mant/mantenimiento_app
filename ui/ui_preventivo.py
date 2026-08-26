@@ -110,6 +110,11 @@ TAREAS_PREVENTIVAS_POR_AREA = {
         "Otra",
     ],
 
+    "Mantenimiento general aulas": [
+        "Preventivo aulas",
+        "Otra",
+    ],
+
     "General": [
         "Revisión visual general",
         "Comprobación de funcionamiento",
@@ -203,6 +208,23 @@ def operario_por_centro(centro):
     if centro == "Pearson 22":
         return "J.A. Almeda"
     return OPERARIOS[0] if OPERARIOS else ""
+
+
+def obtener_areas_preventivo():
+    """
+    Áreas disponibles únicamente dentro del módulo Preventivo.
+
+    Se añade 'Mantenimiento general aulas' sin modificar config.AREAS,
+    por lo que no afecta a incidencias, inventario, OT ni otros módulos.
+    """
+    areas = list(AREAS)
+
+    area_aulas = "Mantenimiento general aulas"
+
+    if area_aulas not in areas:
+        areas.append(area_aulas)
+
+    return areas
 
 
 def existe_preventivo_duplicado(
@@ -1116,9 +1138,11 @@ def pantalla_preventivo():
         # Una tarea nueva todavía no ha sido revisada.
         ultima_fecha = ""
 
+        areas_preventivo = obtener_areas_preventivo()
+
         area = st.selectbox(
             "Área",
-            AREAS,
+            areas_preventivo,
             key="prev_area"
         )
         
@@ -1624,15 +1648,17 @@ def pantalla_preventivo():
                     col_dato1, col_dato2 = st.columns(2)
 
                     with col_dato1:
+                        areas_planificacion = obtener_areas_preventivo()
+
                         indice_area = (
-                            AREAS.index(area)
-                            if area in AREAS
+                            areas_planificacion.index(area)
+                            if area in areas_planificacion
                             else 0
                         )
 
                         area_editada = st.selectbox(
                             "Área",
-                            AREAS,
+                            areas_planificacion,
                             index=indice_area,
                             key=f"plan_prev_area_{tarea_id}"
                         )
