@@ -18,6 +18,8 @@ from modules.corazon_sistema import latido_corazon
 
 from modules.inventario import (
     obtener_material_por_codigo,
+    obtener_materiales_para_select,
+    obtener_movimientos_inventario,
     registrar_movimiento_inventario
 )
 
@@ -524,6 +526,256 @@ def mostrar_crear_correctiva_desde_revision(
         st.success("Ya se han creado correctivas desde esta revisión.")
 
     return st.session_state.get(f"correctiva_creada_{id_orden}", False)
+
+
+
+def obtener_materiales_registrados_ot(numero_ot):
+    """
+    Devuelve los movimientos de salida asociados a una OT.
+    """
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return []
+
+    try:
+        movimientos = obtener_movimientos_inventario() or []
+    except Exception:
+        return []
+
+    resultado = []
+
+    for fila in movimientos:
+        try:
+            (
+                id_mov,
+                codigo_material,
+                material,
+                tipo_movimiento,
+                cantidad,
+                motivo,
+                numero_ot_mov,
+                operario,
+                fecha_movimiento,
+                descripcion_ot,
+                centro_ot,
+                edificio_ot,
+                espacio_ot,
+                area_ot,
+                prioridad_ot,
+                estado_ot,
+                fecha_creacion_ot,
+                origen_ot,
+            ) = fila
+        except Exception:
+            continue
+
+        if str(numero_ot_mov or "").strip() != numero_ot:
+            continue
+
+        if str(tipo_movimiento or "").strip().lower() != "salida":
+            continue
+
+        resultado.append({
+            "codigo": str(codigo_material or "").strip(),
+            "material": str(material or "").strip(),
+            "cantidad": float(cantidad or 0),
+            "motivo": str(motivo or "").strip(),
+            "operario": str(operario or "").strip(),
+            "fecha": str(fecha_movimiento or "").strip(),
+        })
+
+    return resultado
+
+
+def mostrar_material_olvidado_ot_historica(
+    id_hist,
+    num_ot_hist,
+    operario_sel,
+):
+    """
+    Permite añadir material olvidado a una OT finalizada sin reabrirla.
+    Registra una salida de inventario vinculada a la misma OT.
+    """
+    numero_ot = str(num_ot_hist or "").strip()
+
+    if not numero_ot:
+        return
+
+    st.markdown("---")
+    st.markdown("### 📦 Material / recambio utilizado")
+
+    materiales_registrados = obtener_materiales_registrados_ot(
+        numero_ot
+    )
+
+    if materiales_registrados:
+        st.caption("Material que ya consta asociado a esta OT:")
+
+        for mov in materiales_registrados:
+            cantidad = float(mov.get("cantidad", 0) or 0)
+
+            cantidad_txt = (
+                str(int(cantidad))
+                if cantidad.is_integer()
+                else f"{cantidad:g}"
+            )
+
+            st.markdown(
+                f"- **{mov.get('material') or mov.get('codigo') or 'Material'}** "
+                f"· {cantidad_txt}"
+            )
+
+            detalle = []
+
+            if mov.get("codigo"):
+                detalle.append(mov["codigo"])
+
+            if mov.get("fecha"):
+                detalle.append(mov["fecha"][:19])
+
+            if mov.get("operario"):
+                detalle.append(mov["operario"])
+
+            if mov.get("motivo"):
+                detalle.append(mov["motivo"])
+
+            if detalle:
+                st.caption(" · ".join(detalle))
+
+    else:
+        st.caption(
+            "No consta material descontado del inventario en esta OT."
+        )
+
+    clave_abrir = (
+        f"hist_material_olvidado_abierto_"
+        f"{id_hist}_{numero_ot}"
+    )
+
+    if not st.session_state.get(clave_abrir, False):
+        if st.button(
+            "➕ Añadir material olvidado",
+            key=f"btn_material_olvidado_{id_hist}_{numero_ot}",
+            use_container_width=True,
+        ):
+            st.session_state[clave_abrir] = True
+            st.rerun()
+
+        return
+
+    if st.button(
+        "✖ Cerrar añadido de material",
+        key=f"btn_cerrar_material_olvidado_{id_hist}_{numero_ot}",
+        use_container_width=True,
+    ):
+        st.session_state[clave_abrir] = False
+        st.rerun()
+
+    try:
+        materiales_select = obtener_materiales_para_select() or []
+    except Exception as e:
+        st.error("No se ha podido cargar el inventario.")
+        st.caption(str(e))
+        return
+
+    if not materiales_select:
+        st.info("No hay materiales activos en el inventario.")
+        return
+
+    materiales_validos = []
+
+    for fila in materiales_select:
+        try:
+            codigo = str(fila[0] or "").strip()
+            material = str(fila[1] or "").strip()
+            stock = float(fila[2] or 0)
+            unidad = str(fila[3] or "").strip()
+        except Exception:
+            continue
+
+        if not codigo:
+            continue
+
+        materiales_validos.append({
+            "codigo": codigo,
+            "material": material or codigo,
+            "stock": stock,
+            "unidad": unidad,
+        })
+
+    if not materiales_validos:
+        st.info("No hay materiales válidos para seleccionar.")
+        return
+
+    codigos = [m["codigo"] for m in materiales_validos]
+    por_codigo = {m["codigo"]: m for m in materiales_validos}
+
+    codigo_sel = st.selectbox(
+        "Material",
+        codigos,
+        format_func=lambda codigo: (
+            f"{por_codigo[codigo]['material']} · "
+            f"Stock: {por_codigo[codigo]['stock']:g} "
+            f"{por_codigo[codigo]['unidad']}"
+        ),
+        key=f"hist_material_sel_{id_hist}_{numero_ot}",
+    )
+
+    material_sel = por_codigo[codigo_sel]
+    stock_disponible = float(material_sel.get("stock") or 0)
+
+    cantidad = st.number_input(
+        "Cantidad utilizada",
+        min_value=0.0,
+        max_value=max(stock_disponible, 0.0),
+        value=1.0 if stock_disponible >= 1 else 0.0,
+        step=1.0,
+        disabled=stock_disponible <= 0,
+        key=f"hist_material_cantidad_{id_hist}_{numero_ot}",
+    )
+
+    if stock_disponible <= 0:
+        st.warning("Este material no tiene stock disponible.")
+
+    confirmar = st.checkbox(
+        "Confirmo que este material se utilizó en esta OT finalizada",
+        key=f"hist_material_confirmar_{id_hist}_{numero_ot}",
+    )
+
+    if st.button(
+        "💾 Registrar material utilizado",
+        key=f"hist_material_guardar_{id_hist}_{numero_ot}",
+        use_container_width=True,
+        type="primary",
+        disabled=stock_disponible <= 0,
+    ):
+        if not confirmar:
+            st.warning("Marca primero la confirmación.")
+            return
+
+        if float(cantidad or 0) <= 0:
+            st.warning("Indica una cantidad mayor que 0.")
+            return
+
+        ok, mensaje = registrar_movimiento_inventario(
+            codigo_material=codigo_sel,
+            tipo_movimiento="Salida",
+            cantidad=float(cantidad),
+            motivo="Material añadido posteriormente a OT finalizada",
+            numero_ot=numero_ot,
+            operario=operario_sel,
+        )
+
+        if ok:
+            st.success(
+                "Material añadido correctamente a la OT finalizada "
+                "y descontado del inventario."
+            )
+            st.session_state[clave_abrir] = False
+            st.rerun()
+        else:
+            st.error(mensaje)
 
 
 def filtrar_seguridad_operario(ordenes, operario_sel):
@@ -2082,6 +2334,12 @@ def pantalla_operario(modo="ordenes"):
                         f"📷 No se pudieron cargar "
                         f"las fotos: {e}"
                     )
+
+            mostrar_material_olvidado_ot_historica(
+                id_hist=id_hist,
+                num_ot_hist=num_ot_hist,
+                operario_sel=operario_sel,
+            )
 
 # =====================================================
 # COMPATIBILIDAD CON APP.PY
