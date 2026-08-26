@@ -571,6 +571,62 @@ def pantalla_historico_general():
         height=480,
     )
 
+    # =====================================================
+    # MATERIAL OLVIDADO · ACCESO DIRECTO Y VISIBLE
+    # =====================================================
+    st.markdown("### 📦 Añadir recambio a una OT finalizada")
+    st.caption(
+        "Selecciona una OT finalizada. Podrás ver el material ya asociado "
+        "y registrar un recambio que olvidaste indicar al cerrarla."
+    )
+
+    df_ot_finalizadas = df_f[
+        (df_f["fuente"] == "historico_ordenes")
+        & (df_f["numero_ot"].fillna("").astype(str).str.strip() != "")
+    ].copy()
+
+    if df_ot_finalizadas.empty:
+        st.info("No hay OT finalizadas disponibles con los filtros actuales.")
+    else:
+        opciones_ot = []
+
+        for indice, fila_ot in df_ot_finalizadas.iterrows():
+            numero = _texto(fila_ot.get("numero_ot"))
+            actuacion = _texto(fila_ot.get("actuacion"))
+            ubicacion = _ubicacion_evento(fila_ot)
+
+            etiqueta = numero
+
+            if ubicacion:
+                etiqueta += f" · {ubicacion}"
+
+            if actuacion:
+                texto_corto = actuacion.replace("\n", " ").strip()
+                if len(texto_corto) > 80:
+                    texto_corto = texto_corto[:80].rstrip() + "..."
+                etiqueta += f" · {texto_corto}"
+
+            opciones_ot.append((indice, etiqueta))
+
+        indices_ot = [indice for indice, _ in opciones_ot]
+        etiquetas_ot = {
+            indice: etiqueta
+            for indice, etiqueta in opciones_ot
+        }
+
+        indice_sel = st.selectbox(
+            "OT finalizada",
+            indices_ot,
+            format_func=lambda indice: etiquetas_ot.get(indice, str(indice)),
+            key="hist_general_ot_material_olvidado",
+        )
+
+        row_sel = df_ot_finalizadas.loc[indice_sel]
+
+        _mostrar_material_olvidado_historico_general(
+            row_sel
+        )
+
     with st.expander("🔍 Ver detalle de los últimos registros filtrados", expanded=False):
         for _, row in df_f.head(50).iterrows():
             titulo = (
@@ -601,7 +657,6 @@ def pantalla_historico_general():
 
                 st.caption("Fuente: " + _texto(row.get("fuente")))
 
-                _mostrar_material_olvidado_historico_general(row)
 
     exportar = vista[["Fecha", "Tipo", "Ubicación", "Actuación", "Operario", "Resultado", "OT"]].copy()
     csv = exportar.to_csv(index=False).encode("utf-8-sig")
