@@ -374,23 +374,50 @@ def descomponer_orden_operario(fila):
 
 def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
     """
-    Detecta únicamente la OT integral de aula.
-    No afecta al resto de preventivos.
+    Reconoce únicamente una OT del Preventivo integral de aulas.
+
+    No depende del texto del área guardada en la OT, porque algunas
+    planificaciones antiguas o generadas por compatibilidad pueden
+    conservar un área genérica como "Preventivo".
+
+    Criterios:
+    1. La OT debe ser PREV.
+    2. La descripción debe identificar Preventivo aulas.
+    3. Debe existir una revisión de aula vinculada a ese numero_ot.
+
+    Así evitamos que una preventiva normal entre por este circuito.
     """
-    area_txt = normalizar_txt(area)
-    desc_txt = normalizar_txt(descripcion)
+    desc_txt = normalizar_txt(
+        descripcion
+    )
+
     numero_txt = str(
         numero_ot or ""
     ).strip().upper()
 
-    return (
-        numero_txt.startswith("PREV-")
-        and area_txt == "mantenimiento general aulas"
-        and (
-            "preventivo aulas" in desc_txt
-            or "preventivo aula" in desc_txt
+    if not numero_txt.startswith(
+        "PREV-"
+    ):
+        return False
+
+    if (
+        "preventivo aulas"
+        not in desc_txt
+        and "preventivo aula"
+        not in desc_txt
+    ):
+        return False
+
+    try:
+        revision = (
+            obtener_revision_aula_por_ot(
+                numero_ot
+            )
         )
-    )
+    except Exception:
+        revision = None
+
+    return revision is not None
 
 
 def _es_item_aula_inventariable(item):
