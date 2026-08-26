@@ -2,6 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from database.db import conectar, _sql
+from modules.inventario import (
+    obtener_materiales_para_select,
+    registrar_movimiento_inventario,
+)
 
 
 COLUMNAS_EVENTO = [
@@ -279,12 +283,219 @@ def _ubicacion_evento(row):
     )
 
 
+
+def _movimientos_material_ot(numero_ot):
+    numero_ot = _texto(numero_ot)
+
+    if not numero_ot:
+        return pd.DataFrame()
+
+    return _leer_df_seguro(
+        """
+        SELECT
+            codigo_material,
+            material,
+            cantidad,
+            motivo,
+            operario,
+            fecha_movimiento
+        FROM movimientos_inventario
+        WHERE numero_ot = ?
+          AND LOWER(COALESCE(tipo_movimiento, '')) = 'salida'
+        ORDER BY fecha_movimiento DESC, id DESC
+        """,
+        (numero_ot,),
+    )
+
+
+def _formatear_cantidad_material(valor):
+    try:
+        numero = float(valor or 0)
+    except Exception:
+        return _texto(valor)
+
+    return str(int(numero)) if numero.is_integer() else f"{numero:g}"
+
+
+def _mostrar_material_olvidado_historico_general(row):
+    if _texto(row.get("fuente")) != "historico_ordenes":
+        return
+
+    numero_ot = _texto(row.get("numero_ot"))
+    id_fuente = _texto(row.get("id_fuente"))
+
+    if not numero_ot:
+        return
+
+    st.markdown("---")
+    st.markdown("#### 📦 Material / recambio utilizado")
+
+    movimientos = _movimientos_material_ot(numero_ot)
+
+    if not movimientos.empty:
+        st.caption("Material que ya consta asociado a esta OT:")
+
+        for _, mov in movimientos.iterrows():
+            material = (
+                _texto(mov.get("material"))
+                or _texto(mov.get("codigo_material"))
+                or "Material"
+            )
+            cantidad = _formatear_cantidad_material(mov.get("cantidad"))
+
+            st.markdown(f"- **{material}** · {cantidad}")
+
+            detalle = []
+            if _texto(mov.get("codigo_material")):
+                detalle.append(_texto(mov.get("codigo_material")))
+            if _texto(mov.get("fecha_movimiento")):
+                detalle.append(_formatear_fecha(mov.get("fecha_movimiento")))
+            if _texto(mov.get("operario")):
+                detalle.append(_texto(mov.get("operario")))
+            if _texto(mov.get("motivo")):
+                detalle.append(_texto(mov.get("motivo")))
+
+            if detalle:
+                st.caption(" · ".join(detalle))
+    else:
+        st.caption("No consta material descontado del inventario en esta OT.")
+
+    clave_base = f"hist_general_material_{id_fuente}_{numero_ot}"
+    clave_abierto = f"{clave_base}_abierto"
+
+    if not st.session_state.get(clave_abierto, False):
+        if st.button(
+            "➕ Añadir material olvidado",
+            key=f"{clave_base}_abrir",
+            use_container_width=True,
+        ):
+            st.session_state[clave_abierto] = True
+            st.rerun()
+        return
+
+    if st.button(
+        "✖ Cerrar",
+        key=f"{clave_base}_cerrar",
+        use_container_width=True,
+    ):
+        st.session_state[clave_abierto] = False
+        st.rerun()
+
+    try:
+        materiales = obtener_materiales_para_select() or []
+    except Exception as error:
+        st.error("No se ha podido cargar el inventario.")
+        st.caption(str(error))
+        return
+
+    opciones = []
+    for fila in materiales:
+        try:
+            codigo = _texto(fila[0])
+            material = _texto(fila[1])
+            stock = float(fila[2] or 0)
+            unidad = _texto(fila[3])
+        except Exception:
+            continue
+
+        if codigo:
+            opciones.append({
+                "codigo": codigo,
+                "material": material or codigo,
+                "stock": stock,
+                "unidad": unidad,
+            })
+
+    if not opciones:
+        st.info("No hay materiales activos en el inventario.")
+        return
+
+    opciones.sort(
+        key=lambda item: (
+            0 if item["stock"] > 0 else 1,
+            item["material"].lower(),
+            item["codigo"].lower(),
+        )
+    )
+
+    codigos = [item["codigo"] for item in opciones]
+    por_codigo = {item["codigo"]: item for item in opciones}
+
+    codigo_sel = st.selectbox(
+        "Material",
+        codigos,
+        format_func=lambda codigo: (
+            f"{por_codigo[codigo]['material']} · "
+            f"Stock: {por_codigo[codigo]['stock']:g} "
+            f"{por_codigo[codigo]['unidad']}"
+        ),
+        key=f"{clave_base}_material",
+    )
+
+    stock_disponible = float(por_codigo[codigo_sel]["stock"] or 0)
+
+    cantidad = st.number_input(
+        "Cantidad utilizada",
+        min_value=0.0,
+        max_value=max(stock_disponible, 0.0),
+        value=1.0 if stock_disponible >= 1 else 0.0,
+        step=1.0,
+        disabled=stock_disponible <= 0,
+        key=f"{clave_base}_cantidad",
+    )
+
+    if stock_disponible <= 0:
+        st.warning("Este material no tiene stock disponible.")
+
+    confirmar = st.checkbox(
+        "Confirmo que este material se utilizó en esta OT finalizada",
+        key=f"{clave_base}_confirmar",
+    )
+
+    if st.button(
+        "💾 Registrar material utilizado",
+        key=f"{clave_base}_guardar",
+        use_container_width=True,
+        type="primary",
+        disabled=stock_disponible <= 0,
+    ):
+        if not confirmar:
+            st.warning("Marca primero la confirmación.")
+            return
+
+        if float(cantidad or 0) <= 0:
+            st.warning("Indica una cantidad mayor que 0.")
+            return
+
+        ok, mensaje = registrar_movimiento_inventario(
+            codigo_material=codigo_sel,
+            tipo_movimiento="Salida",
+            cantidad=float(cantidad),
+            motivo="Material añadido posteriormente a OT finalizada",
+            numero_ot=numero_ot,
+            operario=_texto(row.get("operario")) or "Histórico General",
+        )
+
+        if not ok:
+            st.error(mensaje)
+            return
+
+        obtener_historico_general.clear()
+        st.session_state[clave_abierto] = False
+        st.success(
+            "Material añadido correctamente a la OT finalizada "
+            "y descontado del inventario."
+        )
+        st.rerun()
+
+
 def pantalla_historico_general():
     st.markdown("## 📚 Histórico General")
 
     st.info(
         "Vista cronológica de toda la actividad registrada. "
-        "Es de solo lectura: cada dato permanece en su módulo original."
+        "Los datos históricos permanecen en su módulo original; "
+        "en las OT finalizadas solo se permite añadir material olvidado."
     )
 
     df = obtener_historico_general()
@@ -390,6 +601,8 @@ def pantalla_historico_general():
 
                 st.caption("Fuente: " + _texto(row.get("fuente")))
 
+                _mostrar_material_olvidado_historico_general(row)
+
     exportar = vista[["Fecha", "Tipo", "Ubicación", "Actuación", "Operario", "Resultado", "OT"]].copy()
     csv = exportar.to_csv(index=False).encode("utf-8-sig")
 
@@ -403,5 +616,6 @@ def pantalla_historico_general():
     )
 
     st.caption(
-        "Histórico General no borra, edita ni sustituye los históricos especializados."
+        "Histórico General no borra, reabre ni sustituye los históricos especializados. "
+        "La única acción permitida es registrar material olvidado en una OT finalizada."
     )
