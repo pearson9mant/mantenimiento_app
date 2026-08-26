@@ -26,6 +26,7 @@ from modules.preventivo_aulas import (
     guardar_item_revision_y_sincronizar,
     crear_correctivos_desde_revision,
     revision_aula_lista_para_cerrar,
+    resumen_revision_aula,
     ESTADOS_REVISION_AULA,
 )
 
@@ -784,6 +785,135 @@ def mostrar_preventivo_aula_operario(
                             )
 
     st.markdown("---")
+    st.markdown("### 📊 Resultado de la revisión")
+
+    resumen = resumen_revision_aula(
+        revision_id
+    )
+
+    unidades_total = int(
+        resumen.get("unidades_total", 0) or 0
+    )
+    unidades_correctas = int(
+        resumen.get("unidades_correctas", 0) or 0
+    )
+    unidades_afectadas = int(
+        resumen.get("unidades_afectadas", 0) or 0
+    )
+
+    total_lineas = int(
+        resumen.get("total", 0) or 0
+    )
+    correctos = int(
+        resumen.get("correctos", 0) or 0
+    )
+    ajustados = int(
+        resumen.get("ajustados", 0) or 0
+    )
+    revisar = int(
+        resumen.get("revisar", 0) or 0
+    )
+    averias = int(
+        resumen.get("averias_detectadas", 0) or 0
+    )
+    averias_pendientes = int(
+        resumen.get("averias_pendientes", 0) or 0
+    )
+    averias_resueltas = int(
+        resumen.get("averias_resueltas", 0) or 0
+    )
+
+    # Las comprobaciones técnicas son las líneas no inventariables.
+    total_inventariables = sum(
+        1
+        for item in items
+        if _es_item_aula_inventariable(item)
+    )
+    total_comprobaciones = max(
+        0,
+        total_lineas - total_inventariables,
+    )
+
+    comprobaciones_correctas = sum(
+        1
+        for item in items
+        if (
+            not _es_item_aula_inventariable(item)
+            and str(item[3] or "") == "Correcto"
+        )
+    )
+    comprobaciones_ajustadas = sum(
+        1
+        for item in items
+        if (
+            not _es_item_aula_inventariable(item)
+            and str(item[3] or "") == "Ajustado"
+        )
+    )
+    comprobaciones_revisar = sum(
+        1
+        for item in items
+        if (
+            not _es_item_aula_inventariable(item)
+            and str(item[3] or "") == "Revisar"
+        )
+    )
+    comprobaciones_averia = sum(
+        1
+        for item in items
+        if (
+            not _es_item_aula_inventariable(item)
+            and str(item[3] or "") == "Avería"
+        )
+    )
+
+    r1, r2, r3 = st.columns(3)
+
+    with r1:
+        st.metric(
+            "📦 Unidades inventariadas",
+            unidades_total,
+        )
+        st.caption(
+            f"✅ {unidades_correctas} correctas · "
+            f"⚠️ {unidades_afectadas} afectadas"
+        )
+
+    with r2:
+        st.metric(
+            "🔧 Comprobaciones técnicas",
+            total_comprobaciones,
+        )
+        st.caption(
+            f"✅ {comprobaciones_correctas} correctas · "
+            f"🛠️ {comprobaciones_ajustadas} ajustadas · "
+            f"👀 {comprobaciones_revisar} revisar · "
+            f"🚨 {comprobaciones_averia} avería"
+        )
+
+    with r3:
+        st.metric(
+            "🚨 Averías detectadas",
+            averias,
+        )
+        st.caption(
+            f"⏳ {averias_pendientes} pendientes · "
+            f"✅ {averias_resueltas} resueltas"
+        )
+
+    # Estado automático del aula a partir de la revisión real.
+    if averias > 0 or unidades_afectadas > 0:
+        estado_resultante = "🔴 Requiere actuación"
+    elif revisar > 0:
+        estado_resultante = "🟡 Requiere seguimiento"
+    elif ajustados > 0:
+        estado_resultante = "🟢 Correcta · con ajustes realizados"
+    else:
+        estado_resultante = "🟢 Correcta"
+
+    st.info(
+        f"**Estado resultante del aula:** {estado_resultante}"
+    )
 
     if revision_aula_lista_para_cerrar(
         num_ot
