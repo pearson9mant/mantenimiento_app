@@ -8,6 +8,8 @@ from modules.ordenes import (
     vincular_origen_ot,
 )
 
+from modules.preventivo_aulas import crear_revision_aula
+
 
 _ESTRUCTURA_PREVENTIVO_ASEGURADA = False
 
@@ -166,6 +168,38 @@ def normalizar_clave_checklist(texto):
     ]
 
     return " ".join(palabras)
+
+
+def es_preventivo_integral_aulas(area, tarea):
+    """
+    Identifica exclusivamente el preventivo integral de aulas.
+
+    Se apoya principalmente en la tarea "Preventivo aulas".
+    El área se comprueba cuando viene informada, pero no se utiliza
+    como única condición para mantener compatibilidad con planificaciones
+    antiguas que pudieran haber guardado un área genérica.
+
+    El resto de preventivos continúa exactamente por el circuito habitual.
+    """
+    tarea_txt = normalizar_clave_checklist(tarea)
+    area_txt = normalizar_clave_checklist(area)
+
+    es_tarea_aulas = (
+        tarea_txt == "preventivo aulas"
+        or "preventivo aulas" in tarea_txt
+        or "preventivo aula" in tarea_txt
+    )
+
+    if not es_tarea_aulas:
+        return False
+
+    # Si el área es la nueva, coincidencia completa.
+    if area_txt == "mantenimiento general aulas":
+        return True
+
+    # Compatibilidad: la tarea es suficientemente específica para
+    # reconocer una planificación antigua o un área guardada genérica.
+    return True
 
 
 def obtener_items_checklist_configurado(tarea):
@@ -989,12 +1023,38 @@ Fecha límite: {fecha_limite or '-'}
                 id_preventivo=int(tarea_id),
             )
 
-            crear_checklist_preventivo(
-                numero,
-                tarea_id,
+            if es_preventivo_integral_aulas(
+                area,
                 tarea,
-                operario
-            )
+            ):
+                # -------------------------------------------------
+                # PREVENTIVO INTEGRAL DE AULA
+                # -------------------------------------------------
+                # La OT ya existe y es la única OT preventiva.
+                # Creamos únicamente la revisión integral asociada,
+                # copiando el modelo activo de Configuración y
+                # precargando el inventario vivo del aula.
+                crear_revision_aula(
+                    centro=centro,
+                    edificio=edificio,
+                    planta=planta or "",
+                    espacio=espacio,
+                    operario=operario,
+                    observaciones=observaciones_ot,
+                    numero_ot_preventiva=numero,
+                )
+
+            else:
+                # -------------------------------------------------
+                # TODOS LOS PREVENTIVOS EXISTENTES
+                # -------------------------------------------------
+                # Conservan exactamente el checklist tradicional.
+                crear_checklist_preventivo(
+                    numero,
+                    tarea_id,
+                    tarea,
+                    operario
+                )
 
             cursor.execute(_sql("""
                 INSERT INTO preventivo_registros
