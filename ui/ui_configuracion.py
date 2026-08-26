@@ -69,6 +69,27 @@ CATEGORIAS_CHECKLIST_PREVENTIVO = [
 
 
 # =====================================================
+# MODELO CONFIGURABLE · PREVENTIVO DE AULAS
+# =====================================================
+
+CATEGORIAS_MODELO_AULA = [
+    "Mobiliario",
+    "Electricidad",
+    "Iluminación",
+    "Climatización",
+    "Informática / Audiovisual",
+    "Carpintería / Cerramientos",
+    "General",
+]
+
+
+TIPOS_LINEA_MODELO_AULA = [
+    "Elemento inventariable",
+    "Comprobación técnica",
+]
+
+
+# =====================================================
 # LEGIONELLA
 # =====================================================
 
@@ -612,6 +633,984 @@ def pantalla_checklist_preventivo_config():
                 else:
                     st.error(
                         "Marca la confirmación antes de borrar."
+                    )
+
+
+
+# =====================================================
+# MODELO PREVENTIVO DE AULAS
+# =====================================================
+
+def asegurar_tabla_modelo_preventivo_aula():
+    """
+    Catálogo configurable que define qué se revisará dentro de un aula.
+
+    No guarda todavía resultados de una revisión.
+    Solo define el MODELO:
+    - elementos inventariables con cantidad;
+    - comprobaciones técnicas sin cantidad.
+
+    Es independiente del checklist preventivo antiguo para no alterar
+    los preventivos de cuadros, baños, splits, etc. que ya funcionan.
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if _es_postgres():
+        id_sql = "SERIAL PRIMARY KEY"
+    else:
+        id_sql = "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_aula_modelos (
+            id {id_sql},
+            categoria TEXT,
+            elemento TEXT,
+            tipo_linea TEXT,
+            pide_cantidad INTEGER DEFAULT 1,
+            cantidad_defecto INTEGER DEFAULT 0,
+            activo INTEGER DEFAULT 1,
+            orden INTEGER DEFAULT 0
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def crear_modelo_preventivo_aula(
+    categoria,
+    elemento,
+    tipo_linea,
+    pide_cantidad=True,
+    cantidad_defecto=0,
+):
+    categoria = str(categoria or "").strip()
+    elemento = str(elemento or "").strip()
+    tipo_linea = str(tipo_linea or "").strip()
+
+    if not categoria:
+        return False, "Indica una categoría."
+
+    if not elemento:
+        return False, "Indica el elemento o comprobación."
+
+    if tipo_linea not in TIPOS_LINEA_MODELO_AULA:
+        return False, "Tipo de línea no válido."
+
+    if tipo_linea == "Comprobación técnica":
+        pide_cantidad = False
+        cantidad_defecto = 0
+
+    try:
+        cantidad_defecto = max(
+            0,
+            int(cantidad_defecto or 0),
+        )
+    except Exception:
+        cantidad_defecto = 0
+
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT COUNT(*)
+            FROM preventivo_aula_modelos
+            WHERE LOWER(TRIM(categoria)) = LOWER(TRIM(?))
+              AND LOWER(TRIM(elemento)) = LOWER(TRIM(?))
+        """), (
+            categoria,
+            elemento,
+        ))
+
+        if int(cursor.fetchone()[0] or 0) > 0:
+            return False, "Ese elemento ya existe en el modelo de aula."
+
+        cursor.execute("""
+            SELECT COALESCE(MAX(orden), 0)
+            FROM preventivo_aula_modelos
+        """)
+
+        siguiente_orden = int(
+            cursor.fetchone()[0] or 0
+        ) + 10
+
+        cursor.execute(_sql("""
+            INSERT INTO preventivo_aula_modelos
+            (
+                categoria,
+                elemento,
+                tipo_linea,
+                pide_cantidad,
+                cantidad_defecto,
+                activo,
+                orden
+            )
+            VALUES (?, ?, ?, ?, ?, 1, ?)
+        """), (
+            categoria,
+            elemento,
+            tipo_linea,
+            1 if pide_cantidad else 0,
+            cantidad_defecto,
+            siguiente_orden,
+        ))
+
+        conn.commit()
+        return True, "Elemento añadido al modelo de aula."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo crear el elemento: {e}"
+
+    finally:
+        conn.close()
+
+
+def obtener_modelos_preventivo_aula(
+    solo_activos=False,
+):
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    sql = """
+        SELECT
+            id,
+            categoria,
+            elemento,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_defecto,
+            activo,
+            orden
+        FROM preventivo_aula_modelos
+    """
+
+    if solo_activos:
+        sql += " WHERE activo = 1"
+
+    sql += """
+        ORDER BY
+            orden ASC,
+            categoria ASC,
+            elemento ASC
+    """
+
+    cursor.execute(sql)
+    datos = cursor.fetchall()
+
+    conn.close()
+    return datos
+
+
+def actualizar_modelo_preventivo_aula(
+    id_modelo,
+    categoria,
+    elemento,
+    tipo_linea,
+    pide_cantidad,
+    cantidad_defecto,
+):
+    categoria = str(categoria or "").strip()
+    elemento = str(elemento or "").strip()
+    tipo_linea = str(tipo_linea or "").strip()
+
+    if not categoria:
+        return False, "Indica una categoría."
+
+    if not elemento:
+        return False, "Indica el elemento o comprobación."
+
+    if tipo_linea not in TIPOS_LINEA_MODELO_AULA:
+        return False, "Tipo de línea no válido."
+
+    if tipo_linea == "Comprobación técnica":
+        pide_cantidad = False
+        cantidad_defecto = 0
+
+    try:
+        cantidad_defecto = max(
+            0,
+            int(cantidad_defecto or 0),
+        )
+    except Exception:
+        cantidad_defecto = 0
+
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT COUNT(*)
+            FROM preventivo_aula_modelos
+            WHERE id <> ?
+              AND LOWER(TRIM(categoria)) = LOWER(TRIM(?))
+              AND LOWER(TRIM(elemento)) = LOWER(TRIM(?))
+        """), (
+            int(id_modelo),
+            categoria,
+            elemento,
+        ))
+
+        if int(cursor.fetchone()[0] or 0) > 0:
+            return False, "Ya existe otro elemento igual."
+
+        cursor.execute(_sql("""
+            UPDATE preventivo_aula_modelos
+            SET categoria = ?,
+                elemento = ?,
+                tipo_linea = ?,
+                pide_cantidad = ?,
+                cantidad_defecto = ?
+            WHERE id = ?
+        """), (
+            categoria,
+            elemento,
+            tipo_linea,
+            1 if pide_cantidad else 0,
+            cantidad_defecto,
+            int(id_modelo),
+        ))
+
+        conn.commit()
+        return True, "Modelo actualizado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo actualizar: {e}"
+
+    finally:
+        conn.close()
+
+
+def activar_desactivar_modelo_preventivo_aula(
+    id_modelo,
+    activo,
+):
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            UPDATE preventivo_aula_modelos
+            SET activo = ?
+            WHERE id = ?
+        """), (
+            1 if activo else 0,
+            int(id_modelo),
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+def borrar_modelo_preventivo_aula(
+    id_modelo,
+):
+    """
+    Borrado físico disponible únicamente desde Configuración.
+    Para el uso normal es preferible desactivar, preservando el modelo.
+    """
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            DELETE FROM preventivo_aula_modelos
+            WHERE id = ?
+        """), (
+            int(id_modelo),
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+def sembrar_modelo_preventivo_aula():
+    """
+    Modelo inicial.
+
+    No impone cantidades reales del colegio.
+    Las cantidades por defecto solo sirven como ayuda en la primera
+    revisión y podrán modificarse desde Configuración.
+    """
+    modelos = [
+        # -------------------------------------------------
+        # MOBILIARIO / CENSO
+        # -------------------------------------------------
+        (
+            "Mobiliario",
+            "Silla alumno",
+            "Elemento inventariable",
+            True,
+            25,
+        ),
+        (
+            "Mobiliario",
+            "Mesa alumno",
+            "Elemento inventariable",
+            True,
+            25,
+        ),
+        (
+            "Mobiliario",
+            "Mesa profesor",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Mobiliario",
+            "Silla profesor",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Mobiliario",
+            "Armario",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Mobiliario",
+            "Pizarra tradicional",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+
+        # -------------------------------------------------
+        # INFORMÁTICA / AUDIOVISUAL
+        # -------------------------------------------------
+        (
+            "Informática / Audiovisual",
+            "Pizarra digital",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Informática / Audiovisual",
+            "Proyector",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+
+        # -------------------------------------------------
+        # ELECTRICIDAD DEL AULA
+        # Los cuadros generales de planta quedan fuera.
+        # -------------------------------------------------
+        (
+            "Electricidad",
+            "Cuadro eléctrico del aula",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Electricidad",
+            "Diferencial del aula",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Electricidad",
+            "Magnetotérmico 16A enchufes",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Electricidad",
+            "Magnetotérmico 10A iluminación",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Electricidad",
+            "Enchufes",
+            "Elemento inventariable",
+            True,
+            6,
+        ),
+        (
+            "Electricidad",
+            "Prueba visual del cuadro eléctrico del aula",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+        (
+            "Electricidad",
+            "Prueba del diferencial",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+
+        # -------------------------------------------------
+        # ILUMINACIÓN
+        # -------------------------------------------------
+        (
+            "Iluminación",
+            "Luminarias",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+        (
+            "Iluminación",
+            "Interruptores / pulsadores",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Iluminación",
+            "Luz de emergencia",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+        (
+            "Iluminación",
+            "Comprobar encendido general",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+
+        # -------------------------------------------------
+        # CLIMATIZACIÓN
+        # -------------------------------------------------
+        (
+            "Climatización",
+            "Aire acondicionado",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+        (
+            "Climatización",
+            "Limpieza / estado de filtros",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+        (
+            "Climatización",
+            "Desagüe de condensados",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+        (
+            "Climatización",
+            "Funcionamiento frío / calor",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+        (
+            "Climatización",
+            "Ruidos o vibraciones anómalas",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+
+        # -------------------------------------------------
+        # CERRAMIENTOS
+        # -------------------------------------------------
+        (
+            "Carpintería / Cerramientos",
+            "Puerta",
+            "Elemento inventariable",
+            True,
+            1,
+        ),
+        (
+            "Carpintería / Cerramientos",
+            "Ventanas",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+        (
+            "Carpintería / Cerramientos",
+            "Persianas",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+
+        # -------------------------------------------------
+        # GENERAL
+        # -------------------------------------------------
+        (
+            "General",
+            "Estado de pintura",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+        (
+            "General",
+            "Estado general del aula",
+            "Comprobación técnica",
+            False,
+            0,
+        ),
+    ]
+
+    creados = 0
+
+    for (
+        categoria,
+        elemento,
+        tipo_linea,
+        pide_cantidad,
+        cantidad_defecto,
+    ) in modelos:
+
+        ok, _ = crear_modelo_preventivo_aula(
+            categoria=categoria,
+            elemento=elemento,
+            tipo_linea=tipo_linea,
+            pide_cantidad=pide_cantidad,
+            cantidad_defecto=cantidad_defecto,
+        )
+
+        if ok:
+            creados += 1
+
+    return creados
+
+
+def pantalla_modelo_preventivo_aula_config():
+    asegurar_tabla_modelo_preventivo_aula()
+
+    st.markdown("### 🧩 Modelo de preventivo de aulas")
+
+    st.info(
+        "Aquí defines una sola vez qué debe revisar el operario en un aula. "
+        "Los elementos inventariables llevarán cantidad y estado; "
+        "las comprobaciones técnicas solo llevarán resultado y observación."
+    )
+
+    st.caption(
+        "Los cuadros eléctricos generales de planta continúan fuera de este "
+        "modelo y mantienen su preventivo eléctrico independiente."
+    )
+
+    if st.button(
+        "🌱 Cargar / completar modelo inicial de aula",
+        key="cfg_modelo_aula_sembrar",
+        use_container_width=True,
+    ):
+        creados = sembrar_modelo_preventivo_aula()
+
+        if creados > 0:
+            st.success(
+                f"Modelo de aula completado. "
+                f"Se han añadido {creados} elementos que faltaban."
+            )
+        else:
+            st.info(
+                "El modelo inicial ya estaba cargado."
+            )
+
+        st.rerun()
+
+    modelos = obtener_modelos_preventivo_aula()
+
+    total_activos = sum(
+        1
+        for fila in modelos
+        if bool(fila[6])
+    )
+
+    total_inventariables = sum(
+        1
+        for fila in modelos
+        if bool(fila[6])
+        and str(fila[3]) == "Elemento inventariable"
+    )
+
+    total_comprobaciones = sum(
+        1
+        for fila in modelos
+        if bool(fila[6])
+        and str(fila[3]) == "Comprobación técnica"
+    )
+
+    m1, m2, m3 = st.columns(3)
+
+    m1.metric(
+        "Activos",
+        total_activos,
+    )
+
+    m2.metric(
+        "📦 Inventariables",
+        total_inventariables,
+    )
+
+    m3.metric(
+        "🔧 Comprobaciones",
+        total_comprobaciones,
+    )
+
+    st.markdown("---")
+    st.markdown("#### ➕ Añadir elemento o comprobación")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        categoria = st.selectbox(
+            "Categoría",
+            CATEGORIAS_MODELO_AULA,
+            key="cfg_modelo_aula_categoria",
+        )
+
+    with c2:
+        tipo_linea = st.selectbox(
+            "Tipo",
+            TIPOS_LINEA_MODELO_AULA,
+            key="cfg_modelo_aula_tipo",
+        )
+
+    elemento = st.text_input(
+        "Elemento / comprobación",
+        placeholder=(
+            "Ejemplo: Purificador de aire, Altavoces, "
+            "Comprobar cierre de ventanas..."
+        ),
+        key="cfg_modelo_aula_elemento",
+    )
+
+    es_inventariable = (
+        tipo_linea == "Elemento inventariable"
+    )
+
+    c3, c4 = st.columns(2)
+
+    with c3:
+        pide_cantidad = st.checkbox(
+            "Registrar cantidad",
+            value=es_inventariable,
+            disabled=not es_inventariable,
+            key="cfg_modelo_aula_pide_cantidad",
+        )
+
+    with c4:
+        cantidad_defecto = st.number_input(
+            "Cantidad sugerida",
+            min_value=0,
+            step=1,
+            value=0,
+            disabled=not es_inventariable,
+            key="cfg_modelo_aula_cantidad_defecto",
+            help=(
+                "Solo es una ayuda para la primera revisión. "
+                "La cantidad real se confirmará en cada aula."
+            ),
+        )
+
+    if st.button(
+        "➕ Añadir al modelo de aula",
+        key="cfg_modelo_aula_crear",
+        use_container_width=True,
+    ):
+        ok, mensaje = crear_modelo_preventivo_aula(
+            categoria=categoria,
+            elemento=elemento,
+            tipo_linea=tipo_linea,
+            pide_cantidad=pide_cantidad,
+            cantidad_defecto=cantidad_defecto,
+        )
+
+        if ok:
+            st.success(mensaje)
+            st.rerun()
+        else:
+            st.warning(mensaje)
+
+    st.markdown("---")
+    st.markdown("#### 📋 Modelo actual")
+
+    filtro_categoria = st.selectbox(
+        "Filtrar categoría",
+        ["Todas"] + CATEGORIAS_MODELO_AULA,
+        key="cfg_modelo_aula_filtro_categoria",
+    )
+
+    buscar = st.text_input(
+        "🔎 Buscar",
+        placeholder="Ejemplo: aire, silla, diferencial, persiana...",
+        key="cfg_modelo_aula_buscar",
+    ).strip().lower()
+
+    modelos_filtrados = []
+
+    for fila in modelos:
+        (
+            id_modelo,
+            categoria_actual,
+            elemento_actual,
+            tipo_actual,
+            pide_cantidad_actual,
+            cantidad_defecto_actual,
+            activo,
+            orden,
+        ) = fila
+
+        if (
+            filtro_categoria != "Todas"
+            and categoria_actual != filtro_categoria
+        ):
+            continue
+
+        if buscar:
+            texto = (
+                f"{categoria_actual} "
+                f"{elemento_actual} "
+                f"{tipo_actual}"
+            ).lower()
+
+            if buscar not in texto:
+                continue
+
+        modelos_filtrados.append(fila)
+
+    if not modelos_filtrados:
+        st.info(
+            "No hay elementos del modelo con estos filtros."
+        )
+        return
+
+    st.caption(
+        f"{len(modelos_filtrados)} elemento(s) mostrado(s). "
+        "Desactivar es preferible a borrar cuando ya se ha usado un elemento."
+    )
+
+    for fila in modelos_filtrados:
+        (
+            id_modelo,
+            categoria_actual,
+            elemento_actual,
+            tipo_actual,
+            pide_cantidad_actual,
+            cantidad_defecto_actual,
+            activo,
+            orden,
+        ) = fila
+
+        icono_estado = "✅" if activo else "⛔"
+
+        if tipo_actual == "Elemento inventariable":
+            icono_tipo = "📦"
+            detalle = (
+                f"Cantidad sugerida: "
+                f"{int(cantidad_defecto_actual or 0)}"
+            )
+        else:
+            icono_tipo = "🔧"
+            detalle = "Sin cantidad"
+
+        titulo = (
+            f"{icono_estado} {icono_tipo} "
+            f"{categoria_actual} · {elemento_actual}"
+        )
+
+        with st.expander(
+            titulo,
+            expanded=False,
+        ):
+            st.caption(
+                f"{tipo_actual} · {detalle}"
+            )
+
+            nueva_categoria = st.selectbox(
+                "Categoría",
+                CATEGORIAS_MODELO_AULA,
+                index=(
+                    CATEGORIAS_MODELO_AULA.index(
+                        categoria_actual
+                    )
+                    if categoria_actual in CATEGORIAS_MODELO_AULA
+                    else len(CATEGORIAS_MODELO_AULA) - 1
+                ),
+                key=f"cfg_modelo_aula_edit_cat_{id_modelo}",
+            )
+
+            nuevo_elemento = st.text_input(
+                "Elemento / comprobación",
+                value=str(
+                    elemento_actual or ""
+                ),
+                key=f"cfg_modelo_aula_edit_elemento_{id_modelo}",
+            )
+
+            nuevo_tipo = st.selectbox(
+                "Tipo",
+                TIPOS_LINEA_MODELO_AULA,
+                index=(
+                    TIPOS_LINEA_MODELO_AULA.index(
+                        tipo_actual
+                    )
+                    if tipo_actual in TIPOS_LINEA_MODELO_AULA
+                    else 0
+                ),
+                key=f"cfg_modelo_aula_edit_tipo_{id_modelo}",
+            )
+
+            inventariable_editado = (
+                nuevo_tipo == "Elemento inventariable"
+            )
+
+            ec1, ec2 = st.columns(2)
+
+            with ec1:
+                nuevo_pide_cantidad = st.checkbox(
+                    "Registrar cantidad",
+                    value=bool(
+                        pide_cantidad_actual
+                    ) if inventariable_editado else False,
+                    disabled=not inventariable_editado,
+                    key=(
+                        f"cfg_modelo_aula_edit_pide_"
+                        f"{id_modelo}"
+                    ),
+                )
+
+            with ec2:
+                nueva_cantidad_defecto = st.number_input(
+                    "Cantidad sugerida",
+                    min_value=0,
+                    step=1,
+                    value=(
+                        int(cantidad_defecto_actual or 0)
+                        if inventariable_editado
+                        else 0
+                    ),
+                    disabled=not inventariable_editado,
+                    key=(
+                        f"cfg_modelo_aula_edit_cantidad_"
+                        f"{id_modelo}"
+                    ),
+                )
+
+            bc1, bc2 = st.columns(2)
+
+            with bc1:
+                if st.button(
+                    "💾 Guardar cambios",
+                    key=(
+                        f"cfg_modelo_aula_guardar_"
+                        f"{id_modelo}"
+                    ),
+                    use_container_width=True,
+                ):
+                    ok, mensaje = actualizar_modelo_preventivo_aula(
+                        id_modelo=id_modelo,
+                        categoria=nueva_categoria,
+                        elemento=nuevo_elemento,
+                        tipo_linea=nuevo_tipo,
+                        pide_cantidad=nuevo_pide_cantidad,
+                        cantidad_defecto=nueva_cantidad_defecto,
+                    )
+
+                    if ok:
+                        st.success(mensaje)
+                        st.rerun()
+                    else:
+                        st.warning(mensaje)
+
+            with bc2:
+                if activo:
+                    texto_estado = "⛔ Desactivar"
+                    nuevo_estado = 0
+                else:
+                    texto_estado = "✅ Activar"
+                    nuevo_estado = 1
+
+                if st.button(
+                    texto_estado,
+                    key=(
+                        f"cfg_modelo_aula_estado_"
+                        f"{id_modelo}"
+                    ),
+                    use_container_width=True,
+                ):
+                    if activar_desactivar_modelo_preventivo_aula(
+                        id_modelo,
+                        nuevo_estado,
+                    ):
+                        st.rerun()
+
+            st.markdown("---")
+
+            confirmar_borrado = st.checkbox(
+                "Confirmo borrado definitivo",
+                key=(
+                    f"cfg_modelo_aula_confirmar_borrar_"
+                    f"{id_modelo}"
+                ),
+            )
+
+            if st.button(
+                "🗑️ Borrar definitivamente",
+                key=(
+                    f"cfg_modelo_aula_borrar_"
+                    f"{id_modelo}"
+                ),
+                use_container_width=True,
+            ):
+                if not confirmar_borrado:
+                    st.error(
+                        "Marca primero la confirmación."
+                    )
+                elif borrar_modelo_preventivo_aula(
+                    id_modelo
+                ):
+                    st.warning(
+                        "Elemento eliminado del modelo."
+                    )
+                    st.rerun()
+                else:
+                    st.error(
+                        "No se pudo borrar el elemento."
                     )
 
 
@@ -1757,6 +2756,7 @@ def pantalla_configuracion():
             "🏫 Espacios",
             "💧 Legionella",
             "✅ Checklist preventivo",
+            "🧩 Modelo aulas",
             "🧠 Inteligencia",
             "📊 Gráficos",
             "🧹 Borrados",
@@ -1772,6 +2772,10 @@ def pantalla_configuracion():
 
     if seccion == "✅ Checklist preventivo":
         pantalla_checklist_preventivo_config()
+        return
+
+    if seccion == "🧩 Modelo aulas":
+        pantalla_modelo_preventivo_aula_config()
         return
 
     if seccion == "🧠 Inteligencia":
