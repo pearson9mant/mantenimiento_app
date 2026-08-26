@@ -678,6 +678,240 @@ def asegurar_tabla_modelo_preventivo_aula():
     conn.close()
 
 
+
+def asegurar_tabla_modelo_preventivo_aula_espacio():
+    """
+    Configuración específica por espacio.
+
+    No duplica el catálogo general: solo guarda qué elementos del modelo
+    general están activos o inactivos en un espacio concreto.
+    """
+    asegurar_tabla_modelo_preventivo_aula()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if _es_postgres():
+        id_sql = "SERIAL PRIMARY KEY"
+    else:
+        id_sql = "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS preventivo_aula_modelo_espacios (
+            id {id_sql},
+            centro TEXT,
+            edificio TEXT,
+            planta TEXT,
+            espacio TEXT,
+            modelo_id INTEGER,
+            activo INTEGER DEFAULT 1
+        )
+    """)
+
+    conn.commit()
+
+    # Índice único lógico por espacio + modelo.
+    try:
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            idx_prev_aula_modelo_espacio_unico
+            ON preventivo_aula_modelo_espacios
+            (centro, edificio, planta, espacio, modelo_id)
+        """)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
+    conn.close()
+
+
+def obtener_configuracion_modelo_aula_espacio(
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    """
+    Devuelve un diccionario {modelo_id: activo} para un espacio concreto.
+    """
+    asegurar_tabla_modelo_preventivo_aula_espacio()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(_sql("""
+        SELECT modelo_id, activo
+        FROM preventivo_aula_modelo_espacios
+        WHERE centro = ?
+          AND edificio = ?
+          AND COALESCE(planta, '') = ?
+          AND espacio = ?
+    """), (
+        centro,
+        edificio,
+        planta or "",
+        espacio,
+    ))
+
+    datos = {
+        int(modelo_id): int(activo or 0)
+        for modelo_id, activo in cursor.fetchall()
+    }
+
+    conn.close()
+    return datos
+
+
+def guardar_estado_modelo_aula_espacio(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    modelo_id,
+    activo,
+):
+    """
+    Activa o desactiva un elemento del modelo general para un espacio.
+    """
+    asegurar_tabla_modelo_preventivo_aula_espacio()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        # Intento UPDATE primero.
+        cursor.execute(_sql("""
+            UPDATE preventivo_aula_modelo_espacios
+            SET activo = ?
+            WHERE centro = ?
+              AND edificio = ?
+              AND COALESCE(planta, '') = ?
+              AND espacio = ?
+              AND modelo_id = ?
+        """), (
+            1 if activo else 0,
+            centro,
+            edificio,
+            planta or "",
+            espacio,
+            int(modelo_id),
+        ))
+
+        if cursor.rowcount == 0:
+            cursor.execute(_sql("""
+                INSERT INTO preventivo_aula_modelo_espacios
+                (
+                    centro,
+                    edificio,
+                    planta,
+                    espacio,
+                    modelo_id,
+                    activo
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """), (
+                centro,
+                edificio,
+                planta or "",
+                espacio,
+                int(modelo_id),
+                1 if activo else 0,
+            ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+def copiar_modelo_general_a_espacio(
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    """
+    Inicializa la configuración del espacio copiando el estado activo actual
+    del modelo general. No cambia el catálogo general.
+    """
+    modelos = obtener_modelos_preventivo_aula(
+        solo_activos=False
+    )
+
+    if not modelos:
+        return 0
+
+    guardados = 0
+
+    for (
+        modelo_id,
+        categoria,
+        elemento,
+        tipo_linea,
+        pide_cantidad,
+        cantidad_defecto,
+        activo,
+        orden,
+    ) in modelos:
+        if guardar_estado_modelo_aula_espacio(
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio,
+            modelo_id=modelo_id,
+            activo=bool(activo),
+        ):
+            guardados += 1
+
+    return guardados
+
+
+def restablecer_modelo_espacio_a_general(
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    """
+    Elimina la personalización del espacio.
+    La siguiente revisión vuelve a usar el modelo general activo.
+    """
+    asegurar_tabla_modelo_preventivo_aula_espacio()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            DELETE FROM preventivo_aula_modelo_espacios
+            WHERE centro = ?
+              AND edificio = ?
+              AND COALESCE(planta, '') = ?
+              AND espacio = ?
+        """), (
+            centro,
+            edificio,
+            planta or "",
+            espacio,
+        ))
+
+        afectados = cursor.rowcount
+        conn.commit()
+        return int(afectados or 0)
+
+    except Exception:
+        conn.rollback()
+        return 0
+
+    finally:
+        conn.close()
+
+
 def crear_modelo_preventivo_aula(
     categoria,
     elemento,
@@ -1023,6 +1257,20 @@ def sembrar_modelo_preventivo_aula():
             True,
             0,
         ),
+        (
+            "Informática / Audiovisual",
+            "Pantalla de proyección manual",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
+        (
+            "Informática / Audiovisual",
+            "Pantalla de proyección eléctrica",
+            "Elemento inventariable",
+            True,
+            0,
+        ),
 
         # -------------------------------------------------
         # ELECTRICIDAD DEL AULA
@@ -1219,8 +1467,24 @@ def sembrar_modelo_preventivo_aula():
 
 def pantalla_modelo_preventivo_aula_config():
     asegurar_tabla_modelo_preventivo_aula()
+    asegurar_tabla_modelo_preventivo_aula_espacio()
 
     st.markdown("### 🧩 Modelo de preventivo de aulas")
+
+    modo_modelo_aulas = st.radio(
+        "Configuración del modelo",
+        [
+            "📋 Modelo general",
+            "🏫 Por aula / espacio",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="cfg_modelo_aula_modo",
+    )
+
+    if modo_modelo_aulas == "🏫 Por aula / espacio":
+        pantalla_modelo_preventivo_aula_por_espacio()
+        return
 
     st.info(
         "Aquí defines una sola vez qué debe revisar el operario en un aula. "
@@ -1612,6 +1876,333 @@ def pantalla_modelo_preventivo_aula_config():
                     st.error(
                         "No se pudo borrar el elemento."
                     )
+
+
+
+def pantalla_modelo_preventivo_aula_por_espacio():
+    """
+    Personaliza el modelo general para un espacio concreto.
+
+    El catálogo maestro sigue estando en 'Modelo general'.
+    Aquí solo se decide qué elementos se aplican a cada espacio.
+    """
+    asegurar_tabla_modelo_preventivo_aula()
+    asegurar_tabla_modelo_preventivo_aula_espacio()
+
+    st.markdown("### 🏫 Modelo específico por aula / espacio")
+
+    st.info(
+        "Aquí decides qué elementos del modelo general se aplican a un espacio concreto. "
+        "Desactivar un elemento aquí no lo borra del catálogo general."
+    )
+
+    centro = st.selectbox(
+        "Centro",
+        list(PLANTAS_BASE.keys()),
+        key="cfg_modelo_espacio_centro",
+    )
+
+    edificios = list(
+        PLANTAS_BASE.get(
+            centro,
+            {},
+        ).keys()
+    )
+
+    if not edificios:
+        st.warning("No hay edificios configurados para este centro.")
+        return
+
+    edificio = st.selectbox(
+        "Edificio",
+        edificios,
+        key="cfg_modelo_espacio_edificio",
+    )
+
+    plantas = obtener_plantas_catalogo_config(
+        centro,
+        edificio,
+    )
+
+    if not plantas:
+        st.warning("No hay plantas configuradas para este edificio.")
+        return
+
+    planta = st.selectbox(
+        "Planta",
+        plantas,
+        key="cfg_modelo_espacio_planta",
+    )
+
+    espacios_catalogo = obtener_espacios_catalogo(
+        activos=True
+    )
+
+    espacios = []
+
+    for (
+        id_espacio,
+        centro_f,
+        edificio_f,
+        planta_f,
+        espacio_f,
+        tipo_f,
+        activo_f,
+    ) in espacios_catalogo:
+        if (
+            str(centro_f) == str(centro)
+            and str(edificio_f) == str(edificio)
+            and str(planta_f) == str(planta)
+        ):
+            nombre = str(espacio_f or "").strip()
+
+            if nombre and nombre not in espacios:
+                espacios.append(nombre)
+
+    if not espacios:
+        st.warning("No hay espacios registrados en esta planta.")
+        return
+
+    espacio = st.selectbox(
+        "Aula / espacio",
+        espacios,
+        key="cfg_modelo_espacio_espacio",
+    )
+
+    modelos = obtener_modelos_preventivo_aula(
+        solo_activos=False
+    )
+
+    if not modelos:
+        st.info("No hay elementos en el modelo general.")
+        return
+
+    config_actual = obtener_configuracion_modelo_aula_espacio(
+        centro=centro,
+        edificio=edificio,
+        planta=planta,
+        espacio=espacio,
+    )
+
+    tiene_config_especifica = bool(
+        config_actual
+    )
+
+    st.caption(
+        f"📍 {centro} · {edificio} · {planta} · {espacio}"
+    )
+
+    if not tiene_config_especifica:
+        st.info(
+            "Este espacio todavía usa directamente el modelo general activo."
+        )
+
+        if st.button(
+            "📋 Crear configuración específica desde el modelo general",
+            key="cfg_modelo_espacio_copiar_general",
+            use_container_width=True,
+            type="primary",
+        ):
+            cantidad = copiar_modelo_general_a_espacio(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio,
+            )
+
+            if cantidad > 0:
+                st.success(
+                    f"Configuración creada con {cantidad} elementos."
+                )
+                st.rerun()
+            else:
+                st.warning(
+                    "No se pudo crear la configuración específica."
+                )
+
+        return
+
+    c1, c2, c3 = st.columns(3)
+
+    activos_espacio = sum(
+        1
+        for (
+            modelo_id,
+            categoria,
+            elemento,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_defecto,
+            activo_general,
+            orden,
+        ) in modelos
+        if bool(config_actual.get(
+            int(modelo_id),
+            int(activo_general or 0),
+        ))
+    )
+
+    total_inventariables = sum(
+        1
+        for (
+            modelo_id,
+            categoria,
+            elemento,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_defecto,
+            activo_general,
+            orden,
+        ) in modelos
+        if (
+            str(tipo_linea) == "Elemento inventariable"
+            and bool(config_actual.get(
+                int(modelo_id),
+                int(activo_general or 0),
+            ))
+        )
+    )
+
+    total_comprobaciones = sum(
+        1
+        for (
+            modelo_id,
+            categoria,
+            elemento,
+            tipo_linea,
+            pide_cantidad,
+            cantidad_defecto,
+            activo_general,
+            orden,
+        ) in modelos
+        if (
+            str(tipo_linea) == "Comprobación técnica"
+            and bool(config_actual.get(
+                int(modelo_id),
+                int(activo_general or 0),
+            ))
+        )
+    )
+
+    c1.metric("Activos en este espacio", activos_espacio)
+    c2.metric("📦 Inventariables", total_inventariables)
+    c3.metric("🔧 Comprobaciones", total_comprobaciones)
+
+    st.markdown("---")
+
+    filtro_categoria = st.selectbox(
+        "Filtrar categoría",
+        ["Todas"] + CATEGORIAS_MODELO_AULA,
+        key="cfg_modelo_espacio_filtro_categoria",
+    )
+
+    buscar = st.text_input(
+        "🔎 Buscar elemento",
+        placeholder="Ejemplo: proyector, pantalla, pizarra, aire...",
+        key="cfg_modelo_espacio_buscar",
+    ).strip().lower()
+
+    for (
+        modelo_id,
+        categoria,
+        elemento,
+        tipo_linea,
+        pide_cantidad,
+        cantidad_defecto,
+        activo_general,
+        orden,
+    ) in modelos:
+
+        if (
+            filtro_categoria != "Todas"
+            and categoria != filtro_categoria
+        ):
+            continue
+
+        if buscar:
+            texto = (
+                f"{categoria} {elemento} {tipo_linea}"
+            ).lower()
+
+            if buscar not in texto:
+                continue
+
+        estado_espacio = bool(
+            config_actual.get(
+                int(modelo_id),
+                int(activo_general or 0),
+            )
+        )
+
+        icono_tipo = (
+            "📦"
+            if str(tipo_linea) == "Elemento inventariable"
+            else "🔧"
+        )
+
+        with st.container(border=True):
+            col_txt, col_estado = st.columns(
+                [4, 1],
+                vertical_alignment="center",
+            )
+
+            with col_txt:
+                st.markdown(
+                    f"**{icono_tipo} {elemento}**"
+                )
+                st.caption(
+                    f"{categoria} · {tipo_linea}"
+                )
+
+            with col_estado:
+                nuevo_estado = st.toggle(
+                    "Activo",
+                    value=estado_espacio,
+                    key=(
+                        f"cfg_modelo_espacio_toggle_"
+                        f"{centro}_{edificio}_{planta}_{espacio}_{modelo_id}"
+                    ),
+                )
+
+            if nuevo_estado != estado_espacio:
+                if guardar_estado_modelo_aula_espacio(
+                    centro=centro,
+                    edificio=edificio,
+                    planta=planta,
+                    espacio=espacio,
+                    modelo_id=modelo_id,
+                    activo=nuevo_estado,
+                ):
+                    st.rerun()
+
+    st.markdown("---")
+
+    confirmar_reset = st.checkbox(
+        "Confirmo que quiero quitar la personalización de este espacio",
+        key="cfg_modelo_espacio_confirmar_reset",
+    )
+
+    if st.button(
+        "↩️ Volver a usar el modelo general",
+        key="cfg_modelo_espacio_reset",
+        use_container_width=True,
+    ):
+        if not confirmar_reset:
+            st.warning(
+                "Marca primero la confirmación."
+            )
+        else:
+            restablecer_modelo_espacio_a_general(
+                centro=centro,
+                edificio=edificio,
+                planta=planta,
+                espacio=espacio,
+            )
+
+            st.success(
+                "El espacio vuelve a usar el modelo general activo."
+            )
+            st.rerun()
 
 
 # =====================================================
