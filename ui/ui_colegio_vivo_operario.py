@@ -157,21 +157,19 @@ def _obtener_mision_corazon_colegio(
     ordenes,
 ):
     """
-    El Corazón decide SIEMPRE la primera misión global real.
-
-    La ubicación anterior del operario NO condiciona esta primera decisión:
-    primero manda la prioridad global del Corazón. La cercanía solo puede
-    utilizarse después, para proponer continuidad de trabajo cuando no haya
-    entrado nada más importante.
-
-    Si por cualquier motivo el Corazón no responde, conserva el criterio
-    anterior como respaldo para no romper la pantalla.
+    El Corazón decide la misión real.
+    Si por cualquier motivo no responde, conserva el criterio anterior
+    como respaldo para no romper la pantalla.
     """
+    ubicacion_preferida = st.session_state.get(
+        "corazon_ubicacion_preferida"
+    )
+
     try:
         latido = latido_corazon(
             operario=operario,
             centro=centro or None,
-            ubicacion_preferida=None,
+            ubicacion_preferida=ubicacion_preferida,
         )
 
         mision_corazon = latido.get("mision") or {}
@@ -182,6 +180,13 @@ def _obtener_mision_corazon_colegio(
         )
 
         if encontrada:
+            encontrada["_estado_corazon"] = latido.get(
+                "estado_corazon",
+                ""
+            )
+            encontrada["_ot_en_curso_corazon"] = latido.get(
+                "ot_en_curso"
+            )
             return encontrada
 
     except Exception:
@@ -696,7 +701,7 @@ def _mostrar_planta_seleccionada():
                 f"{prioridad} · {estado}"
             )
 
-            if es_ejecutable:
+            if es_ejecutable or estado.strip().lower() == "pendiente material":
                 st.button(
                     f"▶ EMPEZAR {numero_ot}",
                     key=f"cv_empezar_planta_{ot.get('id')}",
@@ -708,6 +713,50 @@ def _mostrar_planta_seleccionada():
     return True
 
 
+
+
+def _mostrar_ot_en_curso_interrumpida(mision):
+    """
+    Mantiene visible la OT que sigue En curso cuando el Corazón
+    propone atender antes otra actuación crítica.
+    No modifica ningún estado.
+    """
+    if not mision:
+        return
+
+    if mision.get("_estado_corazon") != "interrumpir":
+        return
+
+    ot_en_curso = mision.get("_ot_en_curso_corazon") or {}
+
+    if not ot_en_curso:
+        return
+
+    numero_ot = str(
+        ot_en_curso.get("numero_ot")
+        or ot_en_curso.get("id")
+        or "OT"
+    ).strip()
+
+    espacio = _texto_aula(
+        ot_en_curso
+    )
+
+    descripcion = _texto_averia(
+        ot_en_curso
+    )
+
+    with st.container(border=True):
+        st.markdown(
+            f"⏸️ **SIGUE EN CURSO · {numero_ot} · {espacio}**"
+        )
+        st.markdown(
+            descripcion
+        )
+        st.caption(
+            "Esta OT sigue En curso. El Corazón propone atender antes "
+            "la incidencia crítica y volver después a este trabajo."
+        )
 
 
 def _mostrar_recuerdo_corazon(mision):
@@ -1117,6 +1166,10 @@ def pantalla_colegio_vivo_operario():
         st.markdown(
             html_mision,
             unsafe_allow_html=True,
+        )
+
+        _mostrar_ot_en_curso_interrumpida(
+            mision
         )
 
         _mostrar_recuerdo_corazon(
