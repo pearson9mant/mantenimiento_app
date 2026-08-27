@@ -1347,6 +1347,13 @@ def obtener_aulas_para_qr():
 
 
 def obtener_espacio_por_codigo(codigo):
+    """
+    Devuelve el espacio completo por código QR.
+
+    IMPORTANTE:
+    incluye qr_habilitado como novena columna porque el formulario QR
+    necesita leer el estado real guardado en la base de datos.
+    """
     crear_tabla_espacios()
     asegurar_codigos_espacios()
 
@@ -1354,7 +1361,16 @@ def obtener_espacio_por_codigo(codigo):
     cur = conn.cursor()
 
     cur.execute(_sql("""
-        SELECT id, codigo, centro, edificio, planta, espacio, tipo, activo
+        SELECT
+            id,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo,
+            activo,
+            COALESCE(qr_habilitado, 0)
         FROM espacios
         WHERE codigo = ?
         LIMIT 1
