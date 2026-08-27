@@ -157,19 +157,21 @@ def _obtener_mision_corazon_colegio(
     ordenes,
 ):
     """
-    El Corazón decide la misión real.
-    Si por cualquier motivo no responde, conserva el criterio anterior
-    como respaldo para no romper la pantalla.
-    """
-    ubicacion_preferida = st.session_state.get(
-        "corazon_ubicacion_preferida"
-    )
+    El Corazón decide SIEMPRE la primera misión global real.
 
+    La ubicación anterior del operario NO condiciona esta primera decisión:
+    primero manda la prioridad global del Corazón. La cercanía solo puede
+    utilizarse después, para proponer continuidad de trabajo cuando no haya
+    entrado nada más importante.
+
+    Si por cualquier motivo el Corazón no responde, conserva el criterio
+    anterior como respaldo para no romper la pantalla.
+    """
     try:
         latido = latido_corazon(
             operario=operario,
             centro=centro or None,
-            ubicacion_preferida=ubicacion_preferida,
+            ubicacion_preferida=None,
         )
 
         mision_corazon = latido.get("mision") or {}
@@ -694,7 +696,7 @@ def _mostrar_planta_seleccionada():
                 f"{prioridad} · {estado}"
             )
 
-            if es_ejecutable or estado.strip().lower() == "pendiente material":
+            if es_ejecutable:
                 st.button(
                     f"▶ EMPEZAR {numero_ot}",
                     key=f"cv_empezar_planta_{ot.get('id')}",
