@@ -30,6 +30,7 @@ from modules.espacios import (
     crear_planta_configurable,
     actualizar_visible_planta,
     qr_habilitado_espacio,
+    habilitar_qr_todos_espacios_activos,
     PLANTAS_BASE,
 )
 
@@ -3073,11 +3074,11 @@ def pantalla_configuracion_espacios():
 
         qr_habilitado = st.checkbox(
             "📱 Habilitar QR para este espacio",
-            value=(tipo == "Aula"),
+            value=True,
             key="cfg_catalogo_qr_habilitado",
             help=(
-                "Actívalo si quieres generar una placa QR para comunicar "
-                "incidencias directamente desde este espacio."
+                "Los espacios nuevos nacen con QR habilitado. "
+                "Desmárcalo solo si este espacio concreto no debe tener formulario QR."
             ),
         )
 
@@ -3104,6 +3105,45 @@ def pantalla_configuracion_espacios():
 
     elif seccion_espacios == "📚 Catálogo":
         st.markdown("#### 📚 Espacios registrados")
+
+        with st.expander(
+            "📱 Corregir QR de espacios antiguos",
+            expanded=False,
+        ):
+            st.caption(
+                "Úsalo una sola vez para espacios creados antes del nuevo criterio, "
+                "por ejemplo Cocina, Despachos, WC o salas."
+            )
+
+            confirmar_qr_todos = st.checkbox(
+                "Confirmo habilitar QR en todos los espacios activos",
+                key="cfg_confirmar_qr_todos_espacios",
+            )
+
+            if st.button(
+                "📱 Habilitar QR en todos los espacios activos",
+                key="cfg_habilitar_qr_todos_espacios",
+                use_container_width=True,
+            ):
+                if not confirmar_qr_todos:
+                    st.warning("Marca primero la confirmación.")
+                else:
+                    ok_qr, afectados_qr = habilitar_qr_todos_espacios_activos()
+
+                    if ok_qr:
+                        if afectados_qr > 0:
+                            st.success(
+                                f"QR habilitado en {afectados_qr} espacios antiguos."
+                            )
+                        else:
+                            st.info(
+                                "Todos los espacios activos ya tenían QR habilitado."
+                            )
+                        st.rerun()
+                    else:
+                        st.error(
+                            "No se pudo actualizar el estado QR de los espacios."
+                        )
 
         espacios = obtener_espacios_catalogo(activos=True)
 
