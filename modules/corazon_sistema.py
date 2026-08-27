@@ -1184,8 +1184,8 @@ def _clave_decision_prioridades_corazon(item):
         dias = 0
 
     return (
-        1 if str(item.get("tipo_prioridad") or "").strip() == "Sanitaria" else 0,
         1 if bool(item.get("riesgo_operativo_critico")) else 0,
+        1 if str(item.get("tipo_prioridad") or "").strip() == "Sanitaria" else 0,
         _peso_tipo_prioridad_corazon(item.get("tipo_prioridad")),
         _peso_prioridad_declarada_corazon(item.get("prioridad")),
         int(item.get("score", 0) or 0),
