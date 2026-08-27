@@ -3740,6 +3740,14 @@ def mostrar_panel_planta_cv(df):
 
     urgentes = _urgentes_gerencia(activas)
 
+    pendientes_totales = _todas_activas_gerencia(
+        datos
+    )
+
+    finalizadas_mes_totales = _finalizadas_mes_gerencia(
+        datos
+    )
+
     en_curso = (
         activas[
             activas["estado"].isin(
@@ -3768,19 +3776,21 @@ def mostrar_panel_planta_cv(df):
         unsafe_allow_html=True,
     )
 
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: _tarjeta_html("Carga correctiva", len(activas))
-    with k2: _tarjeta_html("Urgentes / altas", len(urgentes))
-    with k3: _tarjeta_html("En curso", len(en_curso))
-    with k4: _tarjeta_html("Finalizadas mes", len(cerradas_mes))
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1: _tarjeta_html("Pendientes totales", len(pendientes_totales))
+    with k2: _tarjeta_html("Correctivas", len(activas))
+    with k3: _tarjeta_html("Urgentes / altas", len(urgentes))
+    with k4: _tarjeta_html("En curso", len(en_curso))
+    with k5: _tarjeta_html("Finalizadas mes", len(finalizadas_mes_totales))
 
     if desglose_tecnico["total"] > 0:
         st.info(
-            "🔧 Actividad técnica programada: "
-            f"{desglose_tecnico['total']} · "
+            "🔴 Pendientes totales: "
+            f"{len(pendientes_totales)} = "
+            f"{len(activas)} correctivas + "
+            f"{desglose_tecnico['total']} actividad técnica programada · "
             f"Preventivo: {desglose_tecnico['preventivo']} · "
-            f"Legionella: {desglose_tecnico['legionella']}. "
-            "No se suma a la carga correctiva de la planta."
+            f"Legionella: {desglose_tecnico['legionella']}."
         )
 
     c_areas, c_prioridad = st.columns([1.05, 1])
@@ -3852,15 +3862,15 @@ def mostrar_panel_planta_cv(df):
             )
 
     if edificio == "Anexo Servicios":
-        st.markdown("#### Incidencias de esta zona")
+        st.markdown("#### Incidencias correctivas de esta zona")
     else:
-        st.markdown("#### Incidencias de esta planta")
+        st.markdown("#### Incidencias correctivas de esta planta")
 
     if activas.empty:
         if edificio == "Anexo Servicios":
-            st.success("Zona sin incidencias activas.")
+            st.success("Zona sin incidencias correctivas activas.")
         else:
-            st.success("Planta sin incidencias activas.")
+            st.success("Planta sin incidencias correctivas activas.")
     else:
         columnas = [
             "numero_ot",
