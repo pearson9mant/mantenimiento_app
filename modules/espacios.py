@@ -358,7 +358,7 @@ def crear_tabla_espacios():
             ("tipo", "TEXT"),
             ("activo", "INTEGER DEFAULT 1"),
             ("codigo", "TEXT"),
-            ("qr_habilitado", "INTEGER DEFAULT 0"),
+            ("qr_habilitado", "INTEGER DEFAULT 1"),
         ]:
             try:
                 cur.execute(_sql(f"""
@@ -485,7 +485,7 @@ def crear_espacio(
     planta,
     espacio,
     tipo="Espacio",
-    qr_habilitado=0,
+    qr_habilitado=1,
 ):
     crear_tabla_espacios()
 
@@ -1003,6 +1003,35 @@ def actualizar_qr_habilitado_espacio(id_espacio, habilitado):
     except Exception:
         conn.rollback()
         return False
+    finally:
+        conn.close()
+
+
+def habilitar_qr_todos_espacios_activos():
+    """
+    Activa QR en todos los espacios activos que todavía no lo tengan.
+    """
+    crear_tabla_espacios()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE espacios
+            SET qr_habilitado = 1
+            WHERE activo = 1
+              AND COALESCE(qr_habilitado, 0) <> 1
+        """))
+
+        afectados = int(cur.rowcount or 0)
+        conn.commit()
+        return True, afectados
+
+    except Exception:
+        conn.rollback()
+        return False, 0
+
     finally:
         conn.close()
 
