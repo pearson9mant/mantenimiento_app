@@ -3777,20 +3777,35 @@ def mostrar_panel_planta_cv(df):
     )
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    with k1: _tarjeta_html("Pendientes totales", len(pendientes_totales))
-    with k2: _tarjeta_html("Correctivas", len(activas))
-    with k3: _tarjeta_html("Urgentes / altas", len(urgentes))
-    with k4: _tarjeta_html("En curso", len(en_curso))
-    with k5: _tarjeta_html("Finalizadas mes", len(finalizadas_mes_totales))
+    with k1:
+        _tarjeta_html(
+            "Pendientes totales",
+            len(pendientes_totales),
+        )
+    with k2:
+        _tarjeta_html(
+            "Correctivas",
+            len(activas),
+        )
+    with k3:
+        _tarjeta_html(
+            "Preventivas",
+            desglose_tecnico["preventivo"],
+        )
+    with k4:
+        _tarjeta_html(
+            "Legionella",
+            desglose_tecnico["legionella"],
+        )
+    with k5:
+        _tarjeta_html(
+            "Finalizadas mes",
+            len(finalizadas_mes_totales),
+        )
 
     if desglose_tecnico["total"] > 0:
-        st.info(
-            "🔴 Pendientes totales: "
-            f"{len(pendientes_totales)} = "
-            f"{len(activas)} correctivas + "
-            f"{desglose_tecnico['total']} actividad técnica programada · "
-            f"Preventivo: {desglose_tecnico['preventivo']} · "
-            f"Legionella: {desglose_tecnico['legionella']}."
+        st.caption(
+            "Pendientes totales = correctivas + actividad técnica programada."
         )
 
     c_areas, c_prioridad = st.columns([1.05, 1])
