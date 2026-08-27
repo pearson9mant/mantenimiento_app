@@ -294,6 +294,238 @@ def preparar_inventario():
     return df
 
 
+
+@st.cache_data(ttl=60, show_spinner=False)
+def preparar_inventario_espacios():
+    """
+    Inventario vivo instalado en aulas/espacios.
+    Fuente: tabla inventario_aulas.
+    """
+    df = leer_tabla("inventario_aulas")
+
+    if df.empty:
+        return pd.DataFrame()
+
+    columnas_defecto = {
+        "centro": "",
+        "edificio": "",
+        "espacio": "",
+        "elemento": "",
+        "cantidad": 0,
+        "cantidad_afectada": 0,
+        "estado": "",
+        "fecha_revision": "",
+        "operario": "",
+    }
+
+    for col, valor in columnas_defecto.items():
+        if col not in df.columns:
+            df[col] = valor
+
+    for col in [
+        "centro",
+        "edificio",
+        "espacio",
+        "elemento",
+        "estado",
+        "fecha_revision",
+        "operario",
+    ]:
+        df[col] = df[col].fillna("").astype(str).str.strip()
+
+    df["cantidad_num"] = pd.to_numeric(
+        df["cantidad"], errors="coerce"
+    ).fillna(0).clip(lower=0)
+
+    df["afectadas_num"] = pd.to_numeric(
+        df["cantidad_afectada"], errors="coerce"
+    ).fillna(0).clip(lower=0)
+
+    df.loc[
+        df["afectadas_num"] > df["cantidad_num"],
+        "afectadas_num",
+    ] = df["cantidad_num"]
+
+    df["correctas_num"] = (
+        df["cantidad_num"] - df["afectadas_num"]
+    ).clip(lower=0)
+
+    return df[
+        (df["centro"] != "")
+        & (df["espacio"] != "")
+        & (df["elemento"] != "")
+    ].copy()
+
+
+def filtrar_inventario_espacios_por_centro(df, centro):
+    if df.empty:
+        return df.copy()
+
+    return df[
+        df["centro"].fillna("").astype(str).str.strip()
+        == str(centro or "").strip()
+    ].copy()
+
+
+def _resumen_elementos_inventario_espacios(datos):
+    if datos.empty:
+        return pd.DataFrame(
+            columns=["Elemento", "Unidades", "Correctas", "Afectadas", "Espacios"]
+        )
+
+    resumen = (
+        datos.groupby("elemento", dropna=False)
+        .agg(
+            Unidades=("cantidad_num", "sum"),
+            Correctas=("correctas_num", "sum"),
+            Afectadas=("afectadas_num", "sum"),
+            Espacios=("espacio", "nunique"),
+        )
+        .reset_index()
+        .rename(columns={"elemento": "Elemento"})
+    )
+
+    for col in ["Unidades", "Correctas", "Afectadas", "Espacios"]:
+        resumen[col] = pd.to_numeric(
+            resumen[col], errors="coerce"
+        ).fillna(0).round(0).astype(int)
+
+    return resumen.sort_values(
+        ["Afectadas", "Unidades", "Elemento"],
+        ascending=[False, False, True],
+    ).reset_index(drop=True)
+
+
+def mostrar_inventario_espacios_gerencia(centro, key_sufijo="principal"):
+    """
+    Vista ejecutiva del inventario real de aulas y espacios.
+    No modifica datos.
+    """
+    inventario = preparar_inventario_espacios()
+    datos = filtrar_inventario_espacios_por_centro(
+        inventario, centro
+    )
+
+    st.markdown("### 🏫 Inventario real de aulas y espacios")
+    st.caption(
+        "Equipamiento instalado y censado durante los preventivos. "
+        "No es el almacén de recambios."
+    )
+
+    if datos.empty:
+        st.info(
+            f"Todavía no hay equipamiento de espacios inventariado para {centro}."
+        )
+        return
+
+    espacios_inventariados = int(datos["espacio"].nunique())
+    unidades_totales = int(round(datos["cantidad_num"].sum()))
+    unidades_afectadas = int(round(datos["afectadas_num"].sum()))
+    tipos_elemento = int(datos["elemento"].nunique())
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("🏫 Espacios inventariados", espacios_inventariados)
+    k2.metric("📦 Unidades censadas", unidades_totales)
+    k3.metric("⚠️ Unidades afectadas", unidades_afectadas)
+    k4.metric("🧩 Tipos de elemento", tipos_elemento)
+
+    st.markdown("#### 🔎 Consultar equipamiento")
+
+    edificios = sorted({
+        str(v).strip()
+        for v in datos["edificio"].tolist()
+        if str(v or "").strip()
+    })
+
+    c1, c2 = st.columns([1, 1.4])
+
+    with c1:
+        edificio_filtro = st.selectbox(
+            "Edificio",
+            ["Todos"] + edificios,
+            key=f"gerencia_inv_esp_edificio_{centro}_{key_sufijo}",
+        )
+
+    with c2:
+        buscar = st.text_input(
+            "Buscar elemento",
+            placeholder="Ejemplo: aire acondicionado, silla, pizarra digital...",
+            key=f"gerencia_inv_esp_buscar_{centro}_{key_sufijo}",
+        ).strip()
+
+    filtrados = datos.copy()
+
+    if edificio_filtro != "Todos":
+        filtrados = filtrados[
+            filtrados["edificio"] == edificio_filtro
+        ].copy()
+
+    if buscar:
+        filtrados = filtrados[
+            filtrados["elemento"].apply(
+                lambda valor: coincide_busqueda_flexible(buscar, valor)
+            )
+        ].copy()
+
+    if filtrados.empty:
+        st.info("No hay resultados con estos filtros.")
+        return
+
+    resumen = _resumen_elementos_inventario_espacios(
+        filtrados
+    )
+
+    st.dataframe(
+        resumen,
+        use_container_width=True,
+        hide_index=True,
+        height=min(420, 38 + len(resumen) * 35),
+    )
+
+    with st.expander("🔎 Ver detalle por espacio", expanded=False):
+        detalle = filtrados[
+            [
+                "edificio",
+                "espacio",
+                "elemento",
+                "cantidad_num",
+                "correctas_num",
+                "afectadas_num",
+                "estado",
+                "fecha_revision",
+                "operario",
+            ]
+        ].copy()
+
+        detalle = detalle.rename(
+            columns={
+                "edificio": "Edificio",
+                "espacio": "Espacio",
+                "elemento": "Elemento",
+                "cantidad_num": "Unidades",
+                "correctas_num": "Correctas",
+                "afectadas_num": "Afectadas",
+                "estado": "Estado",
+                "fecha_revision": "Última revisión",
+                "operario": "Revisado por",
+            }
+        )
+
+        for col in ["Unidades", "Correctas", "Afectadas"]:
+            detalle[col] = pd.to_numeric(
+                detalle[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+        st.dataframe(
+            detalle.sort_values(
+                ["Edificio", "Espacio", "Elemento"]
+            ),
+            use_container_width=True,
+            hide_index=True,
+            height=420,
+        )
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def preparar_movimientos_inventario():
     movimientos, tabla = leer_primera_tabla_existente([
@@ -1104,110 +1336,10 @@ def mostrar_cabecera_simple_gerencia(df, centro):
         f"{preventivos_mes} preventivos realizados"
     )
 
-    evolucion = obtener_evolucion_mensual(df, centro)
-
-    con_datos = evolucion[
-        (evolucion["Preventivos realizados"] > 0)
-        | (evolucion["Incidencias creadas"] > 0)
-    ].copy()
-
-    if con_datos.empty:
-        # Sin histórico del curso: enseñamos solo el mes actual real.
-        # Así Gerencia no ve meses futuros a cero.
-        meses_cortos = [
-            "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
-        ]
-        hoy = date.today()
-        etiqueta_actual = f"{meses_cortos[hoy.month - 1]} {str(hoy.year)[2:]}"
-
-        grafico = pd.DataFrame(
-            {
-                "Incidencias correctivas": [incidencias_mes],
-                "Preventivos realizados": [preventivos_mes],
-            },
-            index=[etiqueta_actual],
-        )
-    else:
-        # Últimos seis meses, siempre en el orden cronológico del curso.
-        ultimo_indice = int(con_datos.index.max())
-        primer_indice = max(0, ultimo_indice - 5)
-
-        grafico = (
-            evolucion
-            .loc[primer_indice:ultimo_indice]
-            .set_index("mes")[[
-                "Incidencias creadas",
-                "Preventivos realizados",
-            ]]
-            .rename(columns={
-                "Incidencias creadas": "Incidencias correctivas",
-            })
-        )
-
-    st.bar_chart(
-        grafico,
-        use_container_width=True,
-        height=280,
+    st.caption(
+        "La representación gráfica Preventivo / Correctivo "
+        "queda temporalmente oculta hasta elegir el modelo definitivo."
     )
-
-    if con_datos.empty:
-        st.info(
-            "Todavía estamos acumulando histórico. "
-            "Cuando existan varios meses consecutivos podremos comparar "
-            "la actividad preventiva con la evolución de las incidencias."
-        )
-
-    elif len(con_datos) == 1:
-        st.info(
-            "Todavía hay un solo mes con datos. "
-            "La tendencia será más fiable cuando existan varios "
-            "meses consecutivos."
-        )
-
-    else:
-        actual = con_datos.iloc[-1]
-        anterior = con_datos.iloc[-2]
-
-        inc_actual = int(actual["Incidencias creadas"])
-        inc_anterior = int(anterior["Incidencias creadas"])
-        prev_actual = int(actual["Preventivos realizados"])
-        prev_anterior = int(anterior["Preventivos realizados"])
-
-        if prev_actual >= prev_anterior and inc_actual < inc_anterior:
-            reduccion = (
-                round(
-                    ((inc_anterior - inc_actual) / inc_anterior) * 100
-                )
-                if inc_anterior > 0
-                else 0
-            )
-
-            st.success(
-                "Tendencia favorable: el mantenimiento preventivo "
-                "se mantiene o aumenta mientras las incidencias "
-                f"disminuyen un {reduccion}% respecto al mes anterior."
-            )
-
-        elif prev_actual > prev_anterior and inc_actual >= inc_anterior:
-            st.warning(
-                "Todavía no se observa una reducción clara de incidencias "
-                "aunque ha aumentado la actividad preventiva. "
-                "Conviene seguir acumulando histórico."
-            )
-
-        elif inc_actual < inc_anterior:
-            st.success(
-                "Las incidencias están disminuyendo respecto al mes anterior. "
-                "Se seguirá observando su relación con el preventivo."
-            )
-
-        else:
-            st.info(
-                "Aún no hay una tendencia suficiente para atribuir "
-                "cambios en las incidencias al mantenimiento preventivo."
-            )
-
 
 def _serie_mensual_base():
     return pd.DataFrame({
@@ -3838,6 +3970,15 @@ def mostrar_colegio_vivo_gerencia(
             centro_objetivo,
         )
 
+        with st.expander(
+            "🏫 Inventario real de aulas y espacios",
+            expanded=False,
+        ):
+            mostrar_inventario_espacios_gerencia(
+                centro_objetivo,
+                key_sufijo="perfil_gerencia",
+            )
+
         mostrar_resumen_inferior_cv(
             df
         )
@@ -3846,14 +3987,9 @@ def mostrar_colegio_vivo_gerencia(
         # 4. DETALLE TÉCNICO
         # =================================================
         with st.expander(
-            "📈 Evolución, inventario y detalle ejecutivo",
+            "💶 Recursos y detalle ejecutivo",
             expanded=False,
         ):
-            mostrar_evolucion_mantenimiento(
-                df,
-                centro_objetivo,
-            )
-
             total_inv = total_inventario_centro(
                 centro_objetivo
             )
@@ -3968,22 +4104,26 @@ def mostrar_colegio_vivo_gerencia(
         centro_ejecutivo,
     )
 
+    with st.expander(
+        "🏫 Inventario real de aulas y espacios",
+        expanded=False,
+    ):
+        mostrar_inventario_espacios_gerencia(
+            centro_ejecutivo,
+            key_sufijo="admin_global",
+        )
+
     mostrar_resumen_inferior_cv(
         df
     )
 
     with st.expander(
-        "📈 Evolución, inventario y detalle ejecutivo",
+        "💶 Recursos y detalle ejecutivo",
         expanded=False,
     ):
         centro = st.session_state[
             "gerencia_cv_centro"
         ]
-
-        mostrar_evolucion_mantenimiento(
-            df,
-            centro,
-        )
 
         total_inv = total_inventario_centro(
             centro
