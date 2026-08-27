@@ -3186,6 +3186,54 @@ def _actividad_tecnica_activa_gerencia(datos):
     )
 
 
+def _todas_activas_gerencia(datos):
+    if datos.empty:
+        return datos
+
+    return datos[
+        (datos["origen_tabla"] == "activas")
+        & (~datos["estado"].isin(ESTADOS_CERRADOS))
+    ].copy()
+
+
+def _finalizadas_mes_gerencia(datos):
+    if datos.empty:
+        return datos
+
+    cerradas = datos[es_cerrada(datos)].copy()
+
+    if cerradas.empty:
+        return cerradas
+
+    fecha_ref = cerradas["fecha_cierre_dt"].copy()
+    fecha_ref = fecha_ref.where(
+        fecha_ref.notna(),
+        cerradas["fecha_dt"],
+    )
+
+    hoy = pd.Timestamp.today()
+
+    return cerradas[
+        fecha_ref.notna()
+        & (fecha_ref.dt.month == hoy.month)
+        & (fecha_ref.dt.year == hoy.year)
+    ].copy()
+
+
+def _carga_total_planta(df, centro, edificio, planta):
+    datos = filtrar_por_ubicacion_gerencia(
+        df,
+        centro,
+        edificio,
+        planta,
+    )
+
+    pendientes = _todas_activas_gerencia(datos)
+    finalizadas = _finalizadas_mes_gerencia(datos)
+
+    return int(len(pendientes)), int(len(finalizadas))
+
+
 def _urgentes_gerencia(datos):
     if datos.empty:
         return datos
@@ -3368,11 +3416,6 @@ def _pintar_edificio_visual_gerencia(
     edificio,
     plantas,
 ):
-    """
-    Representación visual tipo Colegio Vivo de Operario.
-    Solo cambia el dibujo; datos y selección siguen usando
-    la lógica actual de Gerencia.
-    """
     st.markdown(
         (
             '<div class="cv-map-roof"></div>'
@@ -3388,7 +3431,14 @@ def _pintar_edificio_visual_gerencia(
     seleccionado_planta = st.session_state.get("gerencia_cv_planta")
 
     for planta in plantas:
-        icono, cantidad, _ = _estado_planta(
+        icono, _, _ = _estado_planta(
+            df,
+            centro,
+            edificio,
+            planta,
+        )
+
+        pendientes, finalizadas = _carga_total_planta(
             df,
             centro,
             edificio,
@@ -3401,8 +3451,6 @@ def _pintar_edificio_visual_gerencia(
             else planta.replace("Planta ", "P")
         )
 
-        contador = "✓" if cantidad == 0 else f"({cantidad})"
-
         seleccionada = (
             centro == seleccionado_centro
             and edificio == seleccionado_edificio
@@ -3410,7 +3458,7 @@ def _pintar_edificio_visual_gerencia(
         )
 
         st.button(
-            f"{icono} {etiqueta} {contador}",
+            f"{icono} {etiqueta}  🔴 {pendientes}  💙 {finalizadas}",
             key=f"cv_visual_{centro}_{edificio}_{planta}",
             use_container_width=True,
             on_click=_seleccionar_planta_cv,
@@ -3466,14 +3514,20 @@ def _pintar_anexo_visual_gerencia(df):
             columnas,
             zonas,
         ):
-            icono_estado, cantidad, _ = _estado_planta(
+            icono_estado, _, _ = _estado_planta(
                 df,
                 "Pearson 9",
                 "Anexo Servicios",
                 zona,
             )
 
-            contador = "✓" if cantidad == 0 else f"({cantidad})"
+            pendientes, finalizadas = _carga_total_planta(
+                df,
+                "Pearson 9",
+                "Anexo Servicios",
+                zona,
+            )
+
             icono_zona = iconos_zona.get(zona, "📍")
 
             seleccionada = (
@@ -3484,7 +3538,8 @@ def _pintar_anexo_visual_gerencia(df):
 
             with columna:
                 st.button(
-                    f"{icono_estado} {icono_zona} {zona} {contador}",
+                    f"{icono_estado} {icono_zona} {zona}\n"
+                    f"🔴 {pendientes}  💙 {finalizadas}",
                     key=f"cv_visual_p9_anexo_{zona}",
                     use_container_width=True,
                     on_click=_seleccionar_planta_cv,
@@ -3940,8 +3995,8 @@ def mostrar_colegio_vivo_gerencia(
 
             st.caption(
                 "Pulsa una planta o zona para ver sus datos. "
-                "El color refleja el riesgo correctivo real, "
-                "no la actividad técnica programada."
+                "🔴 = actuaciones pendientes · 💙 = actuaciones finalizadas este mes. "
+                "El semáforo sigue reflejando únicamente el riesgo correctivo real."
             )
 
             mostrar_mapa_visual_centro_gerencia(
