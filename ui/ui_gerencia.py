@@ -3877,26 +3877,64 @@ def mostrar_panel_planta_cv(df):
             )
 
     if edificio == "Anexo Servicios":
-        st.markdown("#### Incidencias correctivas de esta zona")
+        st.markdown("#### Actuaciones pendientes de esta zona")
     else:
-        st.markdown("#### Incidencias correctivas de esta planta")
+        st.markdown("#### Actuaciones pendientes de esta planta")
 
-    if activas.empty:
+    if pendientes_totales.empty:
         if edificio == "Anexo Servicios":
-            st.success("Zona sin incidencias correctivas activas.")
+            st.success("Zona sin actuaciones pendientes.")
         else:
-            st.success("Planta sin incidencias correctivas activas.")
+            st.success("Planta sin actuaciones pendientes.")
     else:
+        vista = pendientes_totales.copy()
+
+        def _tipo_actuacion_gerencia(fila):
+            if _es_correctiva_real_fila(fila):
+                return "Correctiva"
+
+            numero = normalizar_busqueda(
+                fila.get("numero_ot", "")
+            )
+            origen = normalizar_busqueda(
+                fila.get("origen", "")
+            )
+            descripcion = normalizar_busqueda(
+                fila.get("descripcion", "")
+            )
+
+            if (
+                numero.startswith("prev ")
+                or origen == "preventivo"
+                or "preventivo" in descripcion
+            ):
+                return "Preventivo"
+
+            if (
+                numero.startswith("leg ")
+                or origen == "legionella"
+                or "legionella" in descripcion
+            ):
+                return "Legionella"
+
+            return "Actividad técnica"
+
+        vista["Tipo"] = vista.apply(
+            _tipo_actuacion_gerencia,
+            axis=1,
+        )
+
         columnas = [
             "numero_ot",
+            "Tipo",
             "descripcion",
             "area",
             "prioridad",
             "estado",
         ]
-        
+
         vista = (
-            activas
+            vista
             .sort_values(
                 "fecha_dt",
                 ascending=False,
@@ -3904,20 +3942,26 @@ def mostrar_panel_planta_cv(df):
             )[columnas]
             .copy()
         )
-        
+
         vista.columns = [
             "OT",
+            "Tipo",
             "Descripción",
             "Área",
             "Prioridad",
             "Estado",
         ]
-        
+
+        altura_tabla = min(
+            420,
+            42 + (len(vista) * 35),
+        )
+
         st.dataframe(
             vista,
             use_container_width=True,
             hide_index=True,
-            height=238,
+            height=altura_tabla,
         )
 
 
