@@ -1873,6 +1873,37 @@ def mostrar_tarjeta_ot(
                     planta=planta_mostrar,
                 )
 
+        # -------------------------------------------------
+        # PENDIENTE MATERIAL · REAPERTURA POR EL OPERARIO
+        # -------------------------------------------------
+        estado_normalizado = normalizar_txt(est)
+
+        if (
+            es_operario()
+            and estado_normalizado == "pendiente material"
+        ):
+            st.markdown("### 📦 Material pendiente")
+            st.info(
+                "Esta OT está pendiente de material. "
+                "Si el material ya ha llegado, puedes reabrirla "
+                "y continuar el trabajo sin esperar a Administración."
+            )
+
+            if st.button(
+                "📦 Material recibido · Reabrir OT",
+                key=f"{modo}_material_recibido_reabrir_{id_orden}",
+                use_container_width=True,
+                type="primary",
+            ):
+                actualizar_estado(
+                    id_orden,
+                    "Abierta",
+                    "Material recibido. OT reabierta por el operario.",
+                )
+
+                st.session_state["recalcular_corazon"] = True
+                st.rerun()
+
         st.markdown("### 📝 Estado y observaciones")
 
         observacion_estado_nueva = st.text_area(
