@@ -694,7 +694,7 @@ def _mostrar_planta_seleccionada():
                 f"{prioridad} · {estado}"
             )
 
-            if es_ejecutable:
+            if es_ejecutable or estado.strip().lower() == "pendiente material":
                 st.button(
                     f"▶ EMPEZAR {numero_ot}",
                     key=f"cv_empezar_planta_{ot.get('id')}",
