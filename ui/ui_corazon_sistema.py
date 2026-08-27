@@ -1,6 +1,9 @@
 import streamlit as st
 
-from modules.corazon_sistema import diagnosticar_corazon_sistema
+from modules.corazon_sistema import (
+    diagnosticar_corazon_sistema,
+    obtener_mision_actual,
+)
 from database.db import conectar, _sql
 from ui.ui_trabajar_ot import pantalla_trabajar_ot
 
@@ -2094,9 +2097,17 @@ def mostrar_corazon_operario():
         edificios
     )
 
-    primera_ot = _elegir_primera_actuacion(
-        edificios
+    latido = obtener_mision_actual(
+        operario=operario,
+        centro=centro_motor,
     )
+
+    primera_ot = latido.get("mision")
+
+    if not primera_ot:
+        primera_ot = _elegir_primera_actuacion(
+            edificios
+        )
 
     if not primera_ot:
         st.success(
@@ -2117,6 +2128,19 @@ def mostrar_corazon_operario():
                     )
 
         return
+
+    numero_primera = str(
+        primera_ot.get("numero_ot", "") or ""
+    ).strip()
+
+    if numero_primera:
+        for trabajo in prioridades:
+            if (
+                str(trabajo.get("numero_ot", "") or "").strip()
+                == numero_primera
+            ):
+                primera_ot = trabajo
+                break
 
     edificio_recomendado = _texto_valido_corazon(
         primera_ot.get("edificio"),
