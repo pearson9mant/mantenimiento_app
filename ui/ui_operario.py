@@ -943,17 +943,40 @@ def mostrar_resumen_ot_operario(fila):
 
         st.markdown(descripcion_corta or "Sin descripción.")
 
-        if st.button(
-            "🔎 Abrir y trabajar esta OT",
-            key=f"abrir_ot_operario_{id_ot}",
-            use_container_width=True
-        ):
-            try:
-                st.session_state["operario_ot_abierta_id"] = int(id_ot)
-            except (TypeError, ValueError):
-                st.error("No se ha podido abrir esta orden.")
-            else:
-                st.rerun()
+        if normalizar_txt(estado_txt) in [
+            "pendiente material",
+            "esperando material",
+        ]:
+            if st.button(
+                "📦 Material recibido · Reabrir OT",
+                key=f"material_recibido_listado_{id_ot}",
+                use_container_width=True,
+                type="primary",
+            ):
+                resultado = actualizar_estado(
+                    id_ot,
+                    "Abierta",
+                    "Material recibido. OT reabierta por el operario.",
+                )
+
+                if isinstance(resultado, dict) and not resultado.get("ok", False):
+                    st.error("No se ha podido reabrir la OT.")
+                else:
+                    st.session_state["recalcular_corazon"] = True
+                    st.rerun()
+
+        else:
+            if st.button(
+                "🔎 Abrir y trabajar esta OT",
+                key=f"abrir_ot_operario_{id_ot}",
+                use_container_width=True
+            ):
+                try:
+                    st.session_state["operario_ot_abierta_id"] = int(id_ot)
+                except (TypeError, ValueError):
+                    st.error("No se ha podido abrir esta orden.")
+                else:
+                    st.rerun()
 
 
 
@@ -1264,22 +1287,47 @@ def _mostrar_fila_jornada_operario(fila):
         )
 
     with col_abrir:
-        if st.button(
-            "▶",
-            key=f"jornada_abrir_ot_{id_ot}",
-            help="Abrir y trabajar esta OT",
-            use_container_width=True
-        ):
-            try:
-                st.session_state[
-                    "operario_ot_abierta_id"
-                ] = int(id_ot)
-            except (TypeError, ValueError):
-                st.error(
-                    "No se ha podido abrir esta orden."
+        estado_normalizado = normalizar_txt(estado)
+
+        if estado_normalizado in [
+            "pendiente material",
+            "esperando material",
+        ]:
+            if st.button(
+                "📦",
+                key=f"jornada_material_recibido_{id_ot}",
+                help="Material recibido · Reabrir OT",
+                use_container_width=True,
+            ):
+                resultado = actualizar_estado(
+                    id_ot,
+                    "Abierta",
+                    "Material recibido. OT reabierta por el operario.",
                 )
-            else:
-                st.rerun()
+
+                if isinstance(resultado, dict) and not resultado.get("ok", False):
+                    st.error("No se ha podido reabrir la OT.")
+                else:
+                    st.session_state["recalcular_corazon"] = True
+                    st.rerun()
+
+        else:
+            if st.button(
+                "▶",
+                key=f"jornada_abrir_ot_{id_ot}",
+                help="Abrir y trabajar esta OT",
+                use_container_width=True
+            ):
+                try:
+                    st.session_state[
+                        "operario_ot_abierta_id"
+                    ] = int(id_ot)
+                except (TypeError, ValueError):
+                    st.error(
+                        "No se ha podido abrir esta orden."
+                    )
+                else:
+                    st.rerun()
 
 
 def _agrupar_ordenes_por_planta(ordenes):
