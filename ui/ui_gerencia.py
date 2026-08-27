@@ -3446,9 +3446,9 @@ def _pintar_edificio_visual_gerencia(
         )
 
         etiqueta = (
-            "T"
+            "Terrado"
             if planta == "Terrado"
-            else planta.replace("Planta ", "P")
+            else planta
         )
 
         seleccionada = (
