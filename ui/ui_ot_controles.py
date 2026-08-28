@@ -902,7 +902,6 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         incidencias_creadas.append(numero_incidencia)
         st.session_state[clave_incidencias] = incidencias_creadas
         st.session_state[f"prev_contador_anomalia_{num_ot}"] = contador + 1
-        st.session_state["recalcular_corazon"] = True
         st.success(mensaje)
         st.rerun()
 
