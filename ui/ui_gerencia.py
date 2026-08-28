@@ -4,6 +4,7 @@ from datetime import datetime, date
 import unicodedata
 
 from database.db import conectar
+from modules.corazon_sistema import construir_prioridades_globales
 
 
 CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
@@ -2446,6 +2447,168 @@ def mostrar_menu_centro(df, centro):
             boton_tarjeta_dinero("Material utilizado", total_usado, centro, "inventario_utilizado", "📉")
 
 
+
+def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
+    """Histórico de OT por espacio. Vista solo de lectura."""
+    st.markdown("### 📚 Histórico por espacio")
+    st.caption(
+        "Busca un aula o zona para consultar las OT realizadas "
+        "y su historial de mantenimiento."
+    )
+
+    if df.empty:
+        st.info("No hay histórico disponible.")
+        return
+
+    datos = df[
+        df["centro"].fillna("").astype(str).str.strip()
+        == str(centro or "").strip()
+    ].copy()
+
+    historico = datos[es_cerrada(datos)].copy()
+
+    if historico.empty:
+        st.info("Todavía no hay OT finalizadas para consultar.")
+        return
+
+    historico["espacio_limpio"] = (
+        historico["espacio"].fillna("").astype(str).str.strip()
+    )
+
+    historico = historico[
+        ~historico["espacio_limpio"].str.lower().isin(
+            ["", "-", "sin espacio", "nan", "none"]
+        )
+    ].copy()
+
+    if historico.empty:
+        st.info("No hay espacios válidos informados en el histórico.")
+        return
+
+    edificios = sorted({
+        str(v).strip()
+        for v in historico["edificio"].fillna("").tolist()
+        if str(v or "").strip()
+    })
+
+    c1, c2 = st.columns([1, 1.6])
+
+    with c1:
+        edificio_sel = st.selectbox(
+            "Edificio",
+            ["Todos"] + edificios,
+            key=f"gerencia_hist_edificio_{centro}_{key_sufijo}",
+        )
+
+    with c2:
+        buscar = st.text_input(
+            "Buscar espacio",
+            placeholder="Ejemplo: I4B, WC chicos, comedor...",
+            key=f"gerencia_hist_buscar_{centro}_{key_sufijo}",
+        ).strip()
+
+    filtrado = historico.copy()
+
+    if edificio_sel != "Todos":
+        filtrado = filtrado[
+            filtrado["edificio"].fillna("").astype(str).str.strip()
+            == edificio_sel
+        ].copy()
+
+    if buscar:
+        filtrado = filtrado[
+            filtrado["espacio_limpio"].apply(
+                lambda valor: coincide_busqueda_flexible(buscar, valor)
+            )
+        ].copy()
+
+    espacios = sorted({
+        str(v).strip()
+        for v in filtrado["espacio_limpio"].tolist()
+        if str(v or "").strip()
+    })
+
+    if not espacios:
+        st.info("No hay espacios que coincidan con la búsqueda.")
+        return
+
+    espacio_sel = st.selectbox(
+        "Espacio",
+        espacios,
+        key=f"gerencia_hist_espacio_{centro}_{key_sufijo}",
+    )
+
+    detalle = historico[
+        historico["espacio_limpio"] == espacio_sel
+    ].copy()
+
+    if edificio_sel != "Todos":
+        detalle = detalle[
+            detalle["edificio"].fillna("").astype(str).str.strip()
+            == edificio_sel
+        ].copy()
+
+    fecha_ref = detalle["fecha_cierre_dt"].copy()
+    fecha_ref = fecha_ref.where(fecha_ref.notna(), detalle["fecha_dt"])
+    ultima = fecha_ref.max()
+
+    areas = {
+        str(v).strip()
+        for v in detalle["area"].fillna("").tolist()
+        if str(v or "").strip()
+    }
+
+    k1, k2, k3 = st.columns(3)
+    k1.metric("OT realizadas", len(detalle))
+    k2.metric(
+        "Última actuación",
+        ultima.strftime("%d/%m/%Y") if pd.notna(ultima) else "Sin fecha",
+    )
+    k3.metric("Áreas implicadas", len(areas))
+
+    columnas = [
+        "numero_ot", "fecha_creacion", "fecha_cierre",
+        "edificio", "planta", "espacio", "descripcion",
+        "area", "prioridad", "operario",
+    ]
+
+    for col in ["observaciones_cierre", "trabajo_realizado", "observaciones"]:
+        if col in detalle.columns:
+            columnas.append(col)
+
+    columnas = [c for c in columnas if c in detalle.columns]
+
+    detalle = detalle.sort_values(
+        ["fecha_cierre_dt", "fecha_dt"],
+        ascending=[False, False],
+        na_position="last",
+    )
+
+    renombrar = {
+        "numero_ot": "OT",
+        "fecha_creacion": "Fecha alta",
+        "fecha_cierre": "Fecha cierre",
+        "edificio": "Edificio",
+        "planta": "Planta",
+        "espacio": "Espacio",
+        "descripcion": "Descripción",
+        "area": "Área",
+        "prioridad": "Prioridad",
+        "operario": "Operario",
+        "observaciones_cierre": "Cierre / solución",
+        "trabajo_realizado": "Trabajo realizado",
+        "observaciones": "Observaciones",
+    }
+
+    st.dataframe(
+        detalle[columnas].rename(columns=renombrar),
+        use_container_width=True,
+        hide_index=True,
+        height=min(500, 45 + len(detalle) * 35),
+    )
+
+
+
 def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     datos = obtener_df_tarjeta(df, centro, tipo)
 
@@ -3815,23 +3978,62 @@ def mostrar_panel_planta_cv(df):
     with c_prioridad:
         st.markdown("#### Actuación que requiere más atención")
 
-        if activas.empty:
+        if pendientes_totales.empty:
             st.success("No hay actuaciones pendientes.")
 
         else:
-            candidatos = (
-                urgentes
-                if not urgentes.empty
-                else activas
-            )
+            fila = None
 
-            candidatos = candidatos.sort_values(
-                ["fecha_dt"],
-                ascending=True,
-                na_position="last",
-            )
+            try:
+                ranking_planta = construir_prioridades_globales(
+                    centro=centro,
+                    limite=1,
+                    df_ordenes_abiertas=pendientes_totales,
+                )
 
-            fila = candidatos.iloc[0]
+                if ranking_planta:
+                    numero_corazon = str(
+                        ranking_planta[0].get("numero_ot") or ""
+                    ).strip()
+
+                    coincidencia = pendientes_totales[
+                        pendientes_totales["numero_ot"]
+                        .fillna("")
+                        .astype(str)
+                        .str.strip()
+                        == numero_corazon
+                    ]
+
+                    if not coincidencia.empty:
+                        fila = coincidencia.iloc[0]
+
+            except Exception:
+                fila = None
+
+            if fila is None:
+                candidatos = pendientes_totales.copy()
+                peso = {
+                    "urgente": 4,
+                    "alta": 3,
+                    "media": 2,
+                    "normal": 1,
+                    "baja": 1,
+                }
+                candidatos["_peso_prioridad_gerencia"] = (
+                    candidatos["prioridad"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                    .map(peso)
+                    .fillna(0)
+                )
+                candidatos = candidatos.sort_values(
+                    ["_peso_prioridad_gerencia", "fecha_dt"],
+                    ascending=[False, True],
+                    na_position="last",
+                )
+                fila = candidatos.iloc[0]
 
             descripcion_prioritaria = str(
                 fila.get("descripcion", "")
@@ -3853,6 +4055,11 @@ def mostrar_panel_planta_cv(df):
                 or ""
             ).strip()
 
+            estado_prioritario = str(
+                fila.get("estado", "")
+                or ""
+            ).strip()
+
             with st.container(border=True):
                 st.markdown(
                     f"**{descripcion_prioritaria}**"
@@ -3865,6 +4072,11 @@ def mostrar_panel_planta_cv(df):
                 st.markdown(
                     f"**{prioridad_prioritaria}**"
                     + (
+                        f" · {estado_prioritario}"
+                        if estado_prioritario
+                        else ""
+                    )
+                    + (
                         f" · `{numero_ot_prioritaria}`"
                         if numero_ot_prioritaria
                         else ""
@@ -3872,8 +4084,9 @@ def mostrar_panel_planta_cv(df):
                 )
 
             st.caption(
-                "Esta referencia es para seguimiento de Gerencia. "
-                "La prioridad operativa la determina el ❤️ Corazón."
+                "Esta referencia es para seguimiento de Gerencia "
+                "y usa el mismo criterio técnico del ❤️ Corazón, "
+                "limitado a la planta seleccionada."
             )
 
     if edificio == "Anexo Servicios":
@@ -4095,6 +4308,16 @@ def mostrar_colegio_vivo_gerencia(
         )
 
         with st.expander(
+            "📚 Histórico por espacio",
+            expanded=False,
+        ):
+            mostrar_historico_espacios_gerencia(
+                df,
+                centro_objetivo,
+                key_sufijo="perfil_gerencia",
+            )
+
+        with st.expander(
             "🏫 Inventario real de aulas y espacios",
             expanded=False,
         ):
@@ -4227,6 +4450,16 @@ def mostrar_colegio_vivo_gerencia(
         df,
         centro_ejecutivo,
     )
+
+    with st.expander(
+        "📚 Histórico por espacio",
+        expanded=False,
+    ):
+        mostrar_historico_espacios_gerencia(
+            df,
+            centro_ejecutivo,
+            key_sufijo="admin_global",
+        )
 
     with st.expander(
         "🏫 Inventario real de aulas y espacios",
