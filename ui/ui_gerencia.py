@@ -1337,10 +1337,11 @@ def mostrar_cabecera_simple_gerencia(df, centro):
         f"{preventivos_mes} preventivos realizados"
     )
 
-    st.caption(
-        "La representación gráfica Preventivo / Correctivo "
-        "queda temporalmente oculta hasta elegir el modelo definitivo."
-    )
+    if pd.Timestamp.today().date() < FECHA_INICIO_EVOLUCION:
+        st.caption(
+            "📈 La evolución del curso 2026/2027 comenzará a mostrar "
+            "datos a partir de septiembre de 2026."
+        )
 
 def _serie_mensual_base():
     return pd.DataFrame({
