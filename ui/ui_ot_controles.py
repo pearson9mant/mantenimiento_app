@@ -1,7 +1,14 @@
 import streamlit as st
-from datetime import date
+from datetime import date, datetime
 
-from modules.ordenes import obtener_vinculacion_ot
+from modules.ordenes import (
+    obtener_vinculacion_ot,
+    crear_orden,
+    obtener_siguiente_numero_ot,
+    guardar_foto_ot,
+)
+
+from database.db import conectar, _sql
 
 from ui.procedimientos_legionella import (
     mostrar_control_sala_acs,
@@ -493,8 +500,72 @@ def mostrar_ejecucion_legionella_operario(
     return False
 
 
-def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
-    st.markdown("### ✅ Checklist preventivo")
+def _limpiar_nombre_foto_preventivo(texto):
+    texto = str(texto or "")
+
+    for caracter in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]:
+        texto = texto.replace(caracter, "_")
+
+    return texto.replace(" ", "_")
+
+
+def _operario_incidencia_por_centro(centro, operario_actual=""):
+    centro = str(centro or "").strip()
+
+    if centro == "Pearson 9":
+        return "Luis Lozano"
+
+    if centro == "Pearson 22":
+        return "J.A. Almeda"
+
+    return str(operario_actual or "").strip()
+
+
+def _obtener_ubicacion_preventiva(numero_ot):
+    """Obtiene la ubicación real de la OT preventiva sin pedirla al operario."""
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT centro, edificio, planta, espacio
+            FROM ordenes_trabajo
+            WHERE numero_ot = ?
+            LIMIT 1
+        """), (numero_ot,))
+
+        fila = cur.fetchone()
+
+        if not fila:
+            return "", "", "", ""
+
+        return tuple(str(valor or "").strip() for valor in fila[:4])
+
+    except Exception:
+        return "", "", "", ""
+
+    finally:
+        conn.close()
+
+
+def _guardar_revision_general_preventiva(
+    num_ot,
+    desc,
+    operario,
+    numeros_incidencia=None,
+):
+    """
+    Mantiene compatible la tabla de checklist existente.
+
+    La interfaz deja de obligar a revisar tarjetas una a una, pero guardamos
+    la revisión general sobre las filas ya existentes para que el cierre,
+    histórico y preventivos antiguos sigan funcionando sin migrar tablas.
+    """
+    numeros_incidencia = [
+        str(numero or "").strip()
+        for numero in (numeros_incidencia or [])
+        if str(numero or "").strip()
+    ]
 
     checks = obtener_checklist_preventivo_detallado(num_ot)
 
@@ -503,361 +574,363 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
             num_ot,
             0,
             limpiar_tarea_preventiva(desc),
-            operario
+            operario,
         )
-
         checks = obtener_checklist_preventivo_detallado(num_ot)
 
     if not checks:
-        st.warning("No se ha podido crear el checklist preventivo.")
         return False
 
-    total = len(checks)
-    completados = 0
-    correctos = 0
-    ajustados = 0
-    averias = 0
-    pendientes_revision = 0
-    observaciones_faltantes = 0
-    correctivas_pendientes_interfaz = 0
+    hay_anomalias = bool(numeros_incidencia)
+    referencias = ", ".join(numeros_incidencia)
 
-    datos_para_guardar = []
+    items = []
 
-    opciones_estado = [
-        "",
-        "Correcto",
-        "Ajustado",
-        "Revisar",
-        "Avería",
-    ]
+    for indice, check in enumerate(checks):
+        id_check = check[0]
 
-    st.caption(
-        "✅ Correcto · 🛠 Ajustado · 🟡 Revisar · 🔴 Avería. "
-        "Ajustado, Revisar y Avería requieren una observación técnica."
-    )
-
-    for check in checks:
-        (
-            id_check,
-            check_numero_ot,
-            tarea_id,
-            item,
-            hecho,
-            fecha_hecho,
-            operario_check,
-            observaciones_antiguas,
-            estado_revision,
-            observaciones_revision,
-            crear_correctivo,
-            numero_ot_correctiva,
-        ) = check
-
-        estado_guardado = str(
-            estado_revision or ""
-        ).strip()
-
-        # Compatibilidad con checklists antiguos
-        if not estado_guardado and bool(hecho):
-            estado_guardado = "Correcto"
-
-        with st.container(border=True):
-            st.markdown(f"#### {item}")
-
-            indice_estado = (
-                opciones_estado.index(estado_guardado)
-                if estado_guardado in opciones_estado
-                else 0
-            )
-
-            nuevo_estado = st.radio(
-                "Resultado",
-                opciones_estado,
-                index=indice_estado,
-                horizontal=True,
-                format_func=lambda valor: {
-                    "": "⚪ Pendiente",
-                    "Correcto": "✅ Correcto",
-                    "Ajustado": "🛠 Ajustado",
-                    "Revisar": "🟡 Revisar",
-                    "Avería": "🔴 Avería",
-                }.get(valor, valor),
-                key=f"prev_estado_{num_ot}_{id_check}",
-            )
-
-            requiere_observacion = nuevo_estado in [
-                "Ajustado",
-                "Revisar",
-                "Avería",
-            ]
-
-            etiqueta_observacion = (
-                "Observaciones técnicas *"
-                if requiere_observacion
-                else "Observaciones"
-            )
-
-            placeholder_observacion = {
-                "Ajustado": (
-                    "Indica qué desviación encontraste y qué ajuste realizaste."
-                ),
-                "Revisar": (
-                    "Indica qué debe volver a comprobarse y por qué."
-                ),
-                "Avería": (
-                    "Describe la avería detectada y el estado del elemento."
-                ),
-            }.get(
-                nuevo_estado,
-                "Describe lo revisado si necesitas dejar constancia."
-            )
-
-            nueva_observacion = st.text_area(
-                etiqueta_observacion,
-                value=str(
-                    observaciones_revision
-                    or observaciones_antiguas
-                    or ""
-                ),
-                key=f"prev_obs_{num_ot}_{id_check}",
-                placeholder=placeholder_observacion,
-            )
-
-            if requiere_observacion and not str(
-                nueva_observacion or ""
-            ).strip():
-                st.warning(
-                    "Este resultado requiere una observación técnica."
-                )
-                observaciones_faltantes += 1
-
-            crear_correctiva_nueva = False
-
-            if nuevo_estado == "Avería":
-                crear_correctiva_nueva = st.checkbox(
-                    "🔧 Crear OT correctiva para esta avería",
-                    value=bool(crear_correctivo),
-                    key=f"prev_crear_corr_{num_ot}_{id_check}",
-                )
-
-                if numero_ot_correctiva:
-                    st.success(
-                        f"🔧 Correctiva vinculada: {numero_ot_correctiva}"
-                    )
-                elif crear_correctiva_nueva:
-                    st.info(
-                        "La preventiva podrá cerrarse cuando generes "
-                        "la correctiva marcada."
-                    )
-                    correctivas_pendientes_interfaz += 1
-
-            datos_para_guardar.append({
-                "id_check": id_check,
-                "estado_revision": nuevo_estado,
-                "observaciones_revision": nueva_observacion,
-                "crear_correctivo": crear_correctiva_nueva,
-            })
-
-        if nuevo_estado:
-            completados += 1
-
-        if nuevo_estado == "Correcto":
-            correctos += 1
-        elif nuevo_estado == "Ajustado":
-            ajustados += 1
-        elif nuevo_estado == "Revisar":
-            pendientes_revision += 1
-        elif nuevo_estado == "Avería":
-            averias += 1
-
-    # ------------------------------------------------------
-    # RESUMEN VISIBLE DEL TRABAJO PREVENTIVO
-    # ------------------------------------------------------
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("✅ Correctos", correctos)
-    c2.metric("🛠 Ajustados", ajustados)
-    c3.metric("🟡 Revisar", pendientes_revision)
-    c4.metric("🔴 Averías", averias)
-
-    st.caption(
-        f"Checklist: {completados}/{total} completado"
-    )
-
-    if pendientes_revision > 0:
-        st.warning(
-            f"🟡 {pendientes_revision} punto(s) quedan señalados para "
-            "seguimiento técnico. La preventiva puede cerrarse una vez "
-            "guardada correctamente."
-        )
-
-    if ajustados > 0:
-        st.info(
-            f"🛠 {ajustados} punto(s) se han ajustado durante la revisión "
-            "y quedarán registrados en el histórico."
-        )
-
-    if averias > 0:
-        st.error(
-            f"🔴 Se han detectado {averias} avería(s). "
-            "Las marcadas para correctiva deben tener su OT vinculada "
-            "antes de cerrar esta preventiva."
-        )
-
-    # ------------------------------------------------------
-    # GUARDAR
-    # ------------------------------------------------------
-    if st.button(
-        "💾 Guardar checklist preventivo",
-        key=f"guardar_checklist_completo_{num_ot}",
-        use_container_width=True,
-        type="primary",
-    ):
-        if observaciones_faltantes > 0:
-            st.error(
-                "Completa las observaciones obligatorias de los puntos "
-                "Ajustado, Revisar o Avería antes de guardar."
-            )
-        else:
-            try:
-                guardado = guardar_checklist_preventivo_completo(
-                    items=datos_para_guardar,
-                    operario=nombre_operario_actual() or operario,
-                )
-
-                if guardado:
-                    st.success(
-                        "Checklist preventivo guardado correctamente."
-                    )
-                    st.rerun()
-                else:
-                    st.error(
-                        "No se ha podido guardar el checklist."
-                    )
-
-            except Exception as e:
-                st.error(
-                    f"Error guardando el checklist: {e}"
-                )
-
-    # ------------------------------------------------------
-    # CREAR CORRECTIVAS
-    # ------------------------------------------------------
-    hay_correctivas_marcadas = any(
-        item.get("estado_revision") == "Avería"
-        and bool(item.get("crear_correctivo"))
-        for item in datos_para_guardar
-    )
-
-    if completados == total and averias > 0:
-        if hay_correctivas_marcadas:
-            if st.button(
-                "🔧 Crear correctivas marcadas",
-                key=f"prev_generar_correctivas_{num_ot}",
-                use_container_width=True,
-            ):
-                if observaciones_faltantes > 0:
-                    st.error(
-                        "Antes de crear correctivas, completa las observaciones "
-                        "técnicas obligatorias."
-                    )
-                else:
-                    try:
-                        guardar_checklist_preventivo_completo(
-                            items=datos_para_guardar,
-                            operario=nombre_operario_actual() or operario,
-                        )
-
-                        creadas, mensajes = (
-                            crear_correctivas_checklist_preventivo(num_ot)
-                        )
-
-                        if creadas > 0:
-                            st.success(
-                                f"Se han creado {creadas} OT correctiva(s)."
-                            )
-
-                            for mensaje in mensajes:
-                                if mensaje:
-                                    st.caption(str(mensaje))
-
-                            st.rerun()
-
-                        else:
-                            st.info(
-                                "No hay correctivas nuevas pendientes. "
-                                "Puede que ya estén creadas."
-                            )
-
-                    except Exception as e:
-                        st.error(
-                            f"No se han podido crear las correctivas: {e}"
-                        )
-
-        else:
-            st.warning(
-                "Hay averías registradas, pero ninguna está marcada "
-                "para crear una OT correctiva."
-            )
-
-    # ------------------------------------------------------
-    # ESTADO REAL GUARDADO EN BASE DE DATOS
-    # ------------------------------------------------------
-    resumen_guardado = resumen_checklist_preventivo(num_ot)
-
-    if resumen_guardado["total"] > 0:
-        if resumen_guardado["correctivas_creadas"] > 0:
-            st.success(
-                f"🔧 Correctivas vinculadas: "
-                f"{resumen_guardado['correctivas_creadas']}"
-            )
-
-        if resumen_guardado["correctivas_pendientes"] > 0:
-            st.warning(
-                f"Faltan por crear "
-                f"{resumen_guardado['correctivas_pendientes']} "
-                "correctiva(s) marcada(s)."
-            )
-
-        if resumen_guardado["observaciones_faltantes"] > 0:
-            st.warning(
-                "Hay resultados guardados que todavía necesitan "
-                "observación técnica."
-            )
-
-        if resumen_guardado["listo_para_cerrar"]:
-            if resumen_guardado["revisar"] > 0:
-                st.success(
-                    "✅ Preventiva lista para cerrar. "
-                    "Los puntos marcados como Revisar quedan registrados "
-                    "para seguimiento."
-                )
-            elif resumen_guardado["averias"] > 0:
-                st.success(
-                    "✅ Preventiva lista para cerrar. "
-                    "Las averías y sus correctivas quedan trazadas."
+        if indice == 0:
+            if hay_anomalias:
+                estado = "Revisar"
+                observacion = (
+                    "Revisión visual y funcional general realizada. "
+                    "Se detectaron anomalías y se generaron las siguientes "
+                    f"incidencias: {referencias}."
                 )
             else:
-                st.success(
-                    "✅ Preventiva lista para cerrar."
+                estado = "Correcto"
+                observacion = (
+                    "Revisión visual y funcional general realizada sin "
+                    "anomalías detectadas."
+                )
+        else:
+            estado = "Correcto"
+            observacion = "Revisado dentro de la inspección general del espacio."
+
+        items.append({
+            "id_check": id_check,
+            "estado_revision": estado,
+            "observaciones_revision": observacion,
+            "crear_correctivo": False,
+        })
+
+    return bool(
+        guardar_checklist_preventivo_completo(
+            items=items,
+            operario=nombre_operario_actual() or operario,
+        )
+    )
+
+
+def _crear_incidencia_desde_revision_preventiva(
+    num_ot_preventiva,
+    centro,
+    edificio,
+    planta,
+    espacio,
+    operario,
+    descripcion,
+    fotos,
+):
+    """Crea una INC con la misma estructura base que el formulario QR."""
+    descripcion_limpia = str(descripcion or "").strip()
+
+    if not descripcion_limpia:
+        return False, "Describe brevemente la anomalía detectada.", ""
+
+    fotos = list(fotos or [])
+
+    if len(fotos) > 5:
+        return False, "Puedes añadir un máximo de 5 fotografías.", ""
+
+    fotos_validas = []
+
+    for foto in fotos:
+        try:
+            tamano = int(getattr(foto, "size", 0) or 0)
+        except Exception:
+            tamano = 0
+
+        if tamano > 5 * 1024 * 1024:
+            return (
+                False,
+                f"La fotografía {getattr(foto, 'name', 'seleccionada')} supera 5 MB.",
+                "",
+            )
+
+        fotos_validas.append(
+            (
+                str(getattr(foto, "name", "foto.jpg") or "foto.jpg"),
+                foto.getvalue(),
+            )
+        )
+
+    numero_ot = obtener_siguiente_numero_ot(centro, "INC")
+    operario_destino = _operario_incidencia_por_centro(
+        centro,
+        operario,
+    )
+    fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    observaciones_origen = (
+        "Incidencia detectada durante una revisión preventiva del espacio.\n"
+        f"OT preventiva origen: {num_ot_preventiva}\n"
+        f"Planta: {planta or '-'}"
+    )
+
+    datos_orden = (
+        numero_ot,
+        descripcion_limpia,
+        "Abierta",
+        centro,
+        edificio,
+        espacio,
+        "Otros",
+        "Media",
+        operario_destino,
+        "PREVENTIVO",
+        observaciones_origen,
+        fecha_origen,
+        "postgres_fotos" if fotos_validas else "",
+        "Revisión preventiva",
+        "Interna",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        0,
+        "",
+        planta,
+    )
+
+    try:
+        crear_orden(datos_orden)
+    except Exception as error:
+        return False, f"No se ha podido crear la incidencia: {error}", ""
+
+    error_fotos = ""
+
+    if fotos_validas:
+        try:
+            for indice, (nombre_original, contenido) in enumerate(
+                fotos_validas,
+                start=1,
+            ):
+                nombre_foto = _limpiar_nombre_foto_preventivo(
+                    f"{numero_ot}_{indice}_{nombre_original}"
                 )
 
-            return True
+                guardar_foto_ot(
+                    numero_ot=numero_ot,
+                    nombre_foto=nombre_foto,
+                    foto_data=contenido,
+                )
+        except Exception as error:
+            error_fotos = str(error)
 
-    if completados < total:
-        st.warning(
-            "Todos los puntos deben tener un resultado antes de finalizar."
-        )
-    elif observaciones_faltantes > 0:
-        st.warning(
-            "Faltan observaciones técnicas obligatorias."
-        )
-    elif correctivas_pendientes_interfaz > 0:
-        st.warning(
-            "Genera las correctivas marcadas antes de finalizar."
+    if error_fotos:
+        mensaje = (
+            f"Incidencia {numero_ot} creada, pero alguna fotografía "
+            "no se pudo guardar."
         )
     else:
-        st.info(
-            "Guarda el checklist para validar el cierre de la preventiva."
+        mensaje = f"Incidencia {numero_ot} creada correctamente."
+
+    return True, mensaje, numero_ot
+
+
+def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
+    """
+    Nueva revisión preventiva de espacios.
+
+    Filosofía:
+    - revisar el espacio de forma visual y funcional;
+    - una sola decisión: si existe alguna anomalía;
+    - si existe, crear una o varias INC normales con la ubicación heredada;
+    - conservar el checklist antiguo únicamente como soporte de trazabilidad y
+      compatibilidad con el cierre, sin mostrar sus tarjetas al operario.
+    """
+    st.markdown("### 👀 Revisión preventiva del espacio")
+
+    checks = obtener_checklist_preventivo_detallado(num_ot)
+
+    if not checks:
+        crear_checklist_preventivo(
+            num_ot,
+            0,
+            limpiar_tarea_preventiva(desc),
+            operario,
         )
+        checks = obtener_checklist_preventivo_detallado(num_ot)
+
+    if not checks:
+        st.warning("No se ha podido preparar la revisión preventiva.")
+        return False
+
+    centro, edificio, planta, espacio = _obtener_ubicacion_preventiva(num_ot)
+
+    if not any([centro, edificio, espacio]):
+        st.warning(
+            "No se ha podido recuperar la ubicación de esta preventiva. "
+            "No se crearán incidencias hasta disponer de una ubicación válida."
+        )
+
+    st.caption(
+        f"📍 {centro or '-'} · {edificio or '-'} · "
+        f"{planta or '-'} · {espacio or '-'}"
+    )
+
+    st.info(
+        "Realiza una comprobación visual y funcional general del espacio: "
+        "agua, iluminación, mecanismos, mobiliario, puertas, climatización "
+        "y cualquier otra anomalía visible o comunicada."
+    )
+
+    resumen_guardado = resumen_checklist_preventivo(num_ot)
+
+    if resumen_guardado.get("listo_para_cerrar"):
+        st.success(
+            "✅ Revisión preventiva registrada. Esta OT ya puede finalizarse."
+        )
+        return True
+
+    clave_incidencias = f"prev_incidencias_creadas_{num_ot}"
+    incidencias_creadas = list(
+        st.session_state.get(clave_incidencias, []) or []
+    )
+
+    if incidencias_creadas:
+        st.success(
+            "Incidencias creadas durante esta revisión: "
+            + ", ".join(incidencias_creadas)
+        )
+
+    respuesta = st.radio(
+        "¿Has detectado alguna anomalía?",
+        ["No", "Sí"],
+        index=None,
+        horizontal=True,
+        key=f"prev_anomalia_general_{num_ot}",
+    )
+
+    if respuesta == "No":
+        st.caption(
+            "Si todo está correcto, guarda la revisión y después podrás "
+            "finalizar la OT preventiva."
+        )
+
+        if st.button(
+            "✅ Guardar revisión sin anomalías",
+            key=f"prev_guardar_sin_anomalias_{num_ot}",
+            use_container_width=True,
+            type="primary",
+        ):
+            if _guardar_revision_general_preventiva(
+                num_ot=num_ot,
+                desc=desc,
+                operario=operario,
+                numeros_incidencia=[],
+            ):
+                st.success("Revisión preventiva guardada correctamente.")
+                st.rerun()
+            else:
+                st.error("No se ha podido guardar la revisión preventiva.")
+
+        return False
+
+    if respuesta != "Sí":
+        st.info("Indica si has detectado alguna anomalía para continuar.")
+        return False
+
+    st.markdown("#### 🔧 Anomalía detectada")
+    st.caption(
+        "Se creará una incidencia normal, como las del QR, con este espacio "
+        "ya asignado automáticamente."
+    )
+
+    contador = int(
+        st.session_state.get(
+            f"prev_contador_anomalia_{num_ot}",
+            1,
+        )
+        or 1
+    )
+
+    descripcion_anomalia = st.text_area(
+        "¿Qué ocurre en este espacio?",
+        placeholder="Ej.: WC pierde agua, downlight fundido, puerta no cierra...",
+        height=120,
+        key=f"prev_desc_anomalia_{num_ot}_{contador}",
+    )
+
+    fotos = st.file_uploader(
+        "Añadir fotografías (opcional)",
+        type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key=f"prev_fotos_anomalia_{num_ot}_{contador}",
+    )
+
+    if st.button(
+        "➕ Crear incidencia",
+        key=f"prev_crear_incidencia_{num_ot}_{contador}",
+        use_container_width=True,
+        type="primary",
+        disabled=not bool(centro and edificio and espacio),
+    ):
+        ok, mensaje, numero_incidencia = _crear_incidencia_desde_revision_preventiva(
+            num_ot_preventiva=num_ot,
+            centro=centro,
+            edificio=edificio,
+            planta=planta,
+            espacio=espacio,
+            operario=operario,
+            descripcion=descripcion_anomalia,
+            fotos=fotos,
+        )
+
+        if not ok:
+            st.error(mensaje)
+            return False
+
+        incidencias_creadas.append(numero_incidencia)
+        st.session_state[clave_incidencias] = incidencias_creadas
+        st.session_state[f"prev_contador_anomalia_{num_ot}"] = contador + 1
+        st.session_state["recalcular_corazon"] = True
+        st.success(mensaje)
+        st.rerun()
+
+    if incidencias_creadas:
+        st.markdown("---")
+        st.caption(
+            "Puedes crear otra incidencia arriba. Cuando ya no haya más "
+            "anomalías, cierra la revisión preventiva."
+        )
+
+        if st.button(
+            "✅ Terminar revisión preventiva",
+            key=f"prev_terminar_revision_{num_ot}",
+            use_container_width=True,
+        ):
+            if _guardar_revision_general_preventiva(
+                num_ot=num_ot,
+                desc=desc,
+                operario=operario,
+                numeros_incidencia=incidencias_creadas,
+            ):
+                st.success(
+                    "Revisión preventiva guardada y anomalías trazadas "
+                    "como incidencias independientes."
+                )
+                st.rerun()
+            else:
+                st.error("No se ha podido cerrar la revisión preventiva.")
 
     return False
 
