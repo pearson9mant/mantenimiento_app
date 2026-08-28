@@ -4291,52 +4291,54 @@ def mostrar_colegio_vivo_gerencia(
                 mostrar_panel_planta_cv(df)
 
         # =================================================
-        # 2. ESTADO DEL MANTENIMIENTO
-        # La visión ejecutiva viene después del edificio.
+        # 2. INFORMACIÓN EJECUTIVA EN PESTAÑAS
+        # Fuera de pestañas queda únicamente Colegio Vivo.
         # =================================================
-        mostrar_cabecera_simple_gerencia(
-            df,
-            centro_objetivo,
+        tab_diag, tab_evol, tab_hist, tab_inv, tab_rec = st.tabs(
+            [
+                "📊 Diagnóstico",
+                "📈 Evolución",
+                "📚 Histórico",
+                "🏫 Inventario",
+                "💶 Recursos",
+            ]
         )
 
-        # =================================================
-        # 3. DIAGNÓSTICO / EFECTO PREVENTIVO / SALUD
-        # =================================================
-        mostrar_capa_ejecutiva_gerencia(
-            df,
-            centro_objetivo,
-        )
+        with tab_diag:
+            mostrar_cabecera_simple_gerencia(
+                df,
+                centro_objetivo,
+            )
 
-        with st.expander(
-            "📚 Histórico por espacio",
-            expanded=False,
-        ):
+            mostrar_capa_ejecutiva_gerencia(
+                df,
+                centro_objetivo,
+            )
+
+            mostrar_resumen_inferior_cv(
+                df
+            )
+
+        with tab_evol:
+            mostrar_evolucion_mantenimiento(
+                df,
+                centro_objetivo,
+            )
+
+        with tab_hist:
             mostrar_historico_espacios_gerencia(
                 df,
                 centro_objetivo,
                 key_sufijo="perfil_gerencia",
             )
 
-        with st.expander(
-            "🏫 Inventario real de aulas y espacios",
-            expanded=False,
-        ):
+        with tab_inv:
             mostrar_inventario_espacios_gerencia(
                 centro_objetivo,
                 key_sufijo="perfil_gerencia",
             )
 
-        mostrar_resumen_inferior_cv(
-            df
-        )
-
-        # =================================================
-        # 4. DETALLE TÉCNICO
-        # =================================================
-        with st.expander(
-            "💶 Recursos y detalle ejecutivo",
-            expanded=False,
-        ):
+        with tab_rec:
             total_inv = total_inventario_centro(
                 centro_objetivo
             )
@@ -4427,66 +4429,70 @@ def mostrar_colegio_vivo_gerencia(
 
     centro_ejecutivo = st.session_state["gerencia_cv_centro"]
 
-    s1, s2 = st.columns(2)
-
-    with s1:
-        st.info(
-            f"{e22} **Pearson 22 · {estado22}** · "
-            f"{total22} actuaciones correctivas activas"
-        )
-
-    with s2:
-        st.info(
-            f"{e9} **Pearson 9 · {estado9}** · "
-            f"{total9} actuaciones correctivas activas"
-        )
-
-    st.caption(
-        f"Visión ejecutiva del centro seleccionado · "
-        f"{centro_ejecutivo}"
+    tab_diag, tab_evol, tab_hist, tab_inv, tab_rec = st.tabs(
+        [
+            "📊 Diagnóstico",
+            "📈 Evolución",
+            "📚 Histórico",
+            "🏫 Inventario",
+            "💶 Recursos",
+        ]
     )
 
-    mostrar_capa_ejecutiva_gerencia(
-        df,
-        centro_ejecutivo,
-    )
+    with tab_diag:
+        s1, s2 = st.columns(2)
 
-    with st.expander(
-        "📚 Histórico por espacio",
-        expanded=False,
-    ):
+        with s1:
+            st.info(
+                f"{e22} **Pearson 22 · {estado22}** · "
+                f"{total22} actuaciones correctivas activas"
+            )
+
+        with s2:
+            st.info(
+                f"{e9} **Pearson 9 · {estado9}** · "
+                f"{total9} actuaciones correctivas activas"
+            )
+
+        st.caption(
+            f"Visión ejecutiva del centro seleccionado · "
+            f"{centro_ejecutivo}"
+        )
+
+        mostrar_capa_ejecutiva_gerencia(
+            df,
+            centro_ejecutivo,
+        )
+
+        mostrar_resumen_inferior_cv(
+            df
+        )
+
+    with tab_evol:
+        mostrar_evolucion_mantenimiento(
+            df,
+            centro_ejecutivo,
+        )
+
+    with tab_hist:
         mostrar_historico_espacios_gerencia(
             df,
             centro_ejecutivo,
             key_sufijo="admin_global",
         )
 
-    with st.expander(
-        "🏫 Inventario real de aulas y espacios",
-        expanded=False,
-    ):
+    with tab_inv:
         mostrar_inventario_espacios_gerencia(
             centro_ejecutivo,
             key_sufijo="admin_global",
         )
 
-    mostrar_resumen_inferior_cv(
-        df
-    )
-
-    with st.expander(
-        "💶 Recursos y detalle ejecutivo",
-        expanded=False,
-    ):
-        centro = st.session_state[
-            "gerencia_cv_centro"
-        ]
-
+    with tab_rec:
         total_inv = total_inventario_centro(
-            centro
+            centro_ejecutivo
         )
         total_usado = total_utilizado_centro(
-            centro,
+            centro_ejecutivo,
             df,
         )
 
