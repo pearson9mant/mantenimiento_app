@@ -933,7 +933,11 @@ def mostrar_preventivo_aula_operario(
     - Revisión visual/funcional general.
     - Cada anomalía genera una INC normal.
     """
-    revision = obtener_revision_aula_por_ot(
+    (
+        revision,
+        items,
+        estado_general,
+    ) = obtener_contexto_revision_aula_por_ot(
         num_ot
     )
 
