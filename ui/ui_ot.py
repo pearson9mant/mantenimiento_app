@@ -1126,14 +1126,14 @@ def mostrar_preventivo_aula_operario(
         )
 
     else:
-        categoria_anterior = None
-        cols = None
-        indice_col = 0
+        # Inventario ya censado: una línea por elemento.
+        # Mucho menos scroll y muchos menos componentes Streamlit.
+        inventario_por_categoria = {}
 
         for item in inventariables:
             elemento = str(
                 item[2] or ""
-            )
+            ).strip()
             categoria = str(
                 item[8] or "General"
             ).strip()
@@ -1141,38 +1141,24 @@ def mostrar_preventivo_aula_operario(
                 item[11] or 0
             )
 
-            if categoria != categoria_anterior:
-                st.markdown(
-                    f"#### {categoria}"
-                )
-                categoria_anterior = categoria
-                cols = st.columns(
-                    3
-                )
-                indice_col = 0
+            inventario_por_categoria.setdefault(
+                categoria,
+                [],
+            ).append(
+                (elemento, cantidad)
+            )
 
-            if (
-                cols is None
-                or indice_col >= 3
-            ):
-                cols = st.columns(
-                    3
+        for categoria, lineas in inventario_por_categoria.items():
+            st.markdown(
+                f"**{categoria}**"
+            )
+
+            st.markdown(
+                "\n".join(
+                    f"- {elemento}: **{cantidad}**"
+                    for elemento, cantidad in lineas
                 )
-                indice_col = 0
-
-            with cols[indice_col]:
-                with st.container(
-                    border=True
-                ):
-                    st.markdown(
-                        f"**{elemento}**"
-                    )
-                    st.metric(
-                        "Cantidad",
-                        cantidad,
-                    )
-
-            indice_col += 1
+            )
 
     # =====================================================
     # REVISIÓN GENERAL
@@ -1383,8 +1369,22 @@ def mostrar_preventivo_aula_operario(
         "### 📊 Resultado de la revisión"
     )
 
-    resumen = resumen_revision_aula(
-        revision_id
+    # Ya tenemos items y estado_general cargados en esta misma pantalla.
+    # No repetimos consultas a base de datos solo para mostrar el resumen.
+    unidades_total = sum(
+        int(item[11] or 0)
+        for item in inventariables
+    )
+
+    incidencias_total = len(
+        incidencias_creadas
+    )
+
+    revision_completada = bool(
+        estado_general.get(
+            "completada",
+            False,
+        )
     )
 
     r1, r2, r3 = st.columns(
@@ -1393,51 +1393,33 @@ def mostrar_preventivo_aula_operario(
 
     r1.metric(
         "📦 Unidades inventariadas",
-        int(
-            resumen.get(
-                "unidades_total",
-                0,
-            )
-            or 0
-        ),
+        unidades_total,
     )
 
     r2.metric(
         "🔧 INC creadas",
-        int(
-            resumen.get(
-                "incidencias_revision_total",
-                0,
-            )
-            or 0
-        ),
+        incidencias_total,
     )
 
     r3.metric(
         "👀 Revisión",
         (
             "Completa"
-            if resumen.get(
-                "revision_general_completada"
-            )
+            if revision_completada
             else "Pendiente"
         ),
     )
 
-    if revision_aula_lista_para_cerrar(
-        num_ot
-    ):
+    if revision_completada:
         st.success(
             "✅ Preventivo de aula completo. "
             "La OT ya puede finalizarse."
         )
-
     else:
         st.warning(
             "La OT no puede finalizarse "
             "hasta terminar la revisión preventiva."
         )
-
 
 def puede_finalizar_preventivo(num_ot, origen, desc, area=''):
     if es_preventivo_aulas_ot(
