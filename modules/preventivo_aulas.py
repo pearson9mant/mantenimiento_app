@@ -5,6 +5,7 @@ from modules.ordenes import (
     crear_orden,
     obtener_siguiente_numero_ot,
     vincular_origen_ot,
+    guardar_foto_ot,
 )
 
 try:
@@ -146,6 +147,20 @@ def crear_tablas_preventivo_aulas():
     conn.commit()
 
     _asegurar_columna(cur, conn, "preventivo_aulas", "planta", "TEXT")
+    _asegurar_columna(
+        cur,
+        conn,
+        "preventivo_aulas",
+        "revision_general_completada",
+        "INTEGER DEFAULT 0",
+    )
+    _asegurar_columna(
+        cur,
+        conn,
+        "preventivo_aulas",
+        "incidencias_revision",
+        "TEXT DEFAULT ''",
+    )
 
     for columna, tipo in [
         ("categoria", "TEXT DEFAULT ''"),
@@ -811,6 +826,300 @@ def guardar_item_revision_y_sincronizar(
     )
 
 
+
+# =====================================================
+# REVISIÓN GENERAL + INCIDENCIAS NORMALES
+# =====================================================
+
+def _limpiar_nombre_foto_incidencia(texto):
+    texto = str(texto or "")
+    for caracter in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]:
+        texto = texto.replace(caracter, "_")
+    return texto.replace(" ", "_")
+
+
+def obtener_estado_revision_general_aula(revision_id):
+    crear_tablas_preventivo_aulas()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT
+                COALESCE(revision_general_completada, 0),
+                COALESCE(incidencias_revision, '')
+            FROM preventivo_aulas
+            WHERE id = ?
+            LIMIT 1
+        """), (int(revision_id),))
+
+        fila = cur.fetchone()
+
+        if not fila:
+            return {"completada": False, "incidencias": []}
+
+        incidencias = [
+            x.strip()
+            for x in str(fila[1] or "").split("|")
+            if x.strip()
+        ]
+
+        return {
+            "completada": bool(int(fila[0] or 0)),
+            "incidencias": incidencias,
+        }
+
+    finally:
+        conn.close()
+
+
+def registrar_incidencia_revision_aula(revision_id, numero_ot):
+    revision_id = int(revision_id)
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return False
+
+    estado = obtener_estado_revision_general_aula(revision_id)
+    incidencias = list(estado.get("incidencias", []) or [])
+
+    if numero_ot not in incidencias:
+        incidencias.append(numero_ot)
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE preventivo_aulas
+            SET incidencias_revision = ?
+            WHERE id = ?
+        """), ("|".join(incidencias), revision_id))
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def marcar_revision_general_aula_completada(revision_id, completada=True):
+    crear_tablas_preventivo_aulas()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE preventivo_aulas
+            SET revision_general_completada = ?
+            WHERE id = ?
+        """), (
+            1 if completada else 0,
+            int(revision_id),
+        ))
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def crear_incidencia_desde_revision_aula(
+    revision_id,
+    descripcion,
+    fotos=None,
+):
+    revision = obtener_revision_aula(revision_id)
+
+    if not revision:
+        return False, "No se ha encontrado la revisión de aula.", ""
+
+    (
+        _id,
+        fecha,
+        centro,
+        edificio,
+        espacio,
+        operario,
+        estado_revision,
+        observaciones_revision,
+        numero_ot_preventiva,
+        planta,
+    ) = revision
+
+    descripcion_limpia = str(descripcion or "").strip()
+
+    if not descripcion_limpia:
+        return False, "Describe brevemente la anomalía detectada.", ""
+
+    fotos = list(fotos or [])
+
+    if len(fotos) > 5:
+        return False, "Puedes añadir un máximo de 5 fotografías.", ""
+
+    fotos_validas = []
+
+    for foto in fotos:
+        try:
+            tamano = int(getattr(foto, "size", 0) or 0)
+        except Exception:
+            tamano = 0
+
+        if tamano > 5 * 1024 * 1024:
+            return (
+                False,
+                f"La fotografía {getattr(foto, 'name', 'seleccionada')} supera 5 MB.",
+                "",
+            )
+
+        fotos_validas.append(
+            (
+                str(getattr(foto, "name", "foto.jpg") or "foto.jpg"),
+                foto.getvalue(),
+            )
+        )
+
+    numero_ot = obtener_siguiente_numero_ot(
+        centro,
+        "INC",
+    )
+
+    fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    observaciones_origen = (
+        "Incidencia detectada durante una revisión preventiva de aula.\n"
+        f"Revisión ID: {revision_id}\n"
+        f"OT preventiva origen: {numero_ot_preventiva or '-'}\n"
+        f"Planta: {planta or '-'}"
+    )
+
+    datos_orden = (
+        numero_ot,
+        descripcion_limpia,
+        "Abierta",
+        centro,
+        edificio,
+        espacio,
+        "Otros",
+        "Media",
+        operario,
+        "PREVENTIVO_AULA",
+        observaciones_origen,
+        fecha_origen,
+        "postgres_fotos" if fotos_validas else "",
+        "Revisión preventiva",
+        "Interna",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        0,
+        "",
+        planta or "",
+    )
+
+    try:
+        numero_creado = crear_orden(datos_orden) or numero_ot
+    except Exception as error:
+        return False, f"No se ha podido crear la incidencia: {error}", ""
+
+    error_fotos = ""
+
+    if fotos_validas:
+        try:
+            for indice, (nombre_original, contenido) in enumerate(
+                fotos_validas,
+                start=1,
+            ):
+                nombre_foto = _limpiar_nombre_foto_incidencia(
+                    f"{numero_creado}_{indice}_{nombre_original}"
+                )
+
+                guardar_foto_ot(
+                    numero_ot=numero_creado,
+                    nombre_foto=nombre_foto,
+                    foto_data=contenido,
+                )
+        except Exception as error:
+            error_fotos = str(error)
+
+    registrar_incidencia_revision_aula(
+        revision_id,
+        numero_creado,
+    )
+
+    if error_fotos:
+        mensaje = (
+            f"Incidencia {numero_creado} creada, pero alguna fotografía "
+            "no se pudo guardar."
+        )
+    else:
+        mensaje = f"Incidencia {numero_creado} creada correctamente."
+
+    return True, mensaje, numero_creado
+
+
+def guardar_inventario_revision_aula(
+    revision_id,
+    cantidades,
+):
+    items = obtener_items_revision_aula(revision_id)
+
+    mapa = {
+        int(item[0]): item
+        for item in items
+    }
+
+    for item_id, valores in cantidades.items():
+        item_id = int(item_id)
+        item = mapa.get(item_id)
+
+        if item is None:
+            continue
+
+        if str(item[9] or "").strip() != "Elemento inventariable":
+            continue
+
+        total, correctas, afectadas = valores
+        total = max(0, int(total or 0))
+        correctas = max(0, int(correctas or 0))
+        afectadas = max(0, int(afectadas or 0))
+
+        if correctas + afectadas != total:
+            raise ValueError(
+                f"{item[2]}: Total ({total}) debe ser igual a "
+                f"Correctas ({correctas}) + Con incidencia ({afectadas})."
+            )
+
+        estado = "Avería" if afectadas > 0 else "Correcto"
+
+        guardar_item_revision_y_sincronizar(
+            revision_id=revision_id,
+            item_id=item_id,
+            estado=estado,
+            observaciones=str(item[4] or ""),
+            foto=str(item[5] or ""),
+            crear_correctivo=0,
+            cantidad_total=total,
+            cantidad_correcta=correctas,
+            cantidad_afectada=afectadas,
+        )
+
+    return True
+
+
 # =====================================================
 # CIERRE / CORRECTIVOS
 # =====================================================
@@ -1131,15 +1440,14 @@ def obtener_revision_aula_por_ot(numero_ot):
 
 def revision_aula_lista_para_cerrar(numero_ot):
     """
-    Regla de cierre del Preventivo integral de aulas.
+    Regla de cierre del Preventivo de Aulas.
 
-    Requisitos:
-    - existe revisión vinculada a la OT;
-    - todos los elementos tienen un estado válido;
-    - Ajustado / Revisar / Avería requieren observación;
-    - en inventariables se cumple Total = Correctas + Afectadas;
-    - si una Avería está marcada para crear correctiva,
-      la OT correctiva debe estar ya creada.
+    Nuevo flujo:
+    - inventario coherente;
+    - revisión visual/funcional general completada;
+    - anomalías como INC independientes.
+
+    Mantiene compatibilidad con revisiones antiguas ya cumplimentadas.
     """
     revision = obtener_revision_aula_por_ot(
         numero_ot
@@ -1157,76 +1465,49 @@ def revision_aula_lista_para_cerrar(numero_ot):
         return False
 
     for item in items:
-        (
-            item_id,
-            _revision_id,
-            elemento,
-            estado,
-            observaciones,
-            foto,
-            crear_correctivo,
-            numero_ot_correctiva,
-            categoria,
-            tipo_linea,
-            pide_cantidad,
-            cantidad_total,
-            cantidad_correcta,
-            cantidad_afectada,
-            modelo_id,
-        ) = item
+        if str(item[9] or "").strip() != "Elemento inventariable":
+            continue
 
-        estado = str(
-            estado or ""
-        ).strip()
+        total = int(item[11] or 0)
+        correctas = int(item[12] or 0)
+        afectadas = int(item[13] or 0)
 
-        observaciones = str(
-            observaciones or ""
-        ).strip()
+        if total < 0 or correctas < 0 or afectadas < 0:
+            return False
+
+        if correctas + afectadas != total:
+            return False
+
+    estado_general = obtener_estado_revision_general_aula(
+        revision_id
+    )
+
+    if estado_general.get("completada"):
+        return True
+
+    for item in items:
+        estado = str(item[3] or "").strip()
+        observaciones = str(item[4] or "").strip()
+        crear_correctivo = bool(item[6])
+        numero_ot_correctiva = str(item[7] or "").strip()
 
         if estado not in ESTADOS_REVISION_AULA:
             return False
 
         if (
-            estado in [
-                "Ajustado",
-                "Revisar",
-                "Avería",
-            ]
+            estado in ["Ajustado", "Revisar", "Avería"]
             and not observaciones
         ):
             return False
 
         if (
-            str(tipo_linea or "").strip()
-            == "Elemento inventariable"
-        ):
-            total = int(
-                cantidad_total or 0
-            )
-            correctas = int(
-                cantidad_correcta or 0
-            )
-            afectadas = int(
-                cantidad_afectada or 0
-            )
-
-            if total < 0 or correctas < 0 or afectadas < 0:
-                return False
-
-            if correctas + afectadas != total:
-                return False
-
-        if (
             estado == "Avería"
-            and bool(crear_correctivo)
-            and not str(
-                numero_ot_correctiva or ""
-            ).strip()
+            and crear_correctivo
+            and not numero_ot_correctiva
         ):
             return False
 
     return True
-
 
 def resumen_revision_aula(revision_id):
     items = obtener_items_revision_aula(
@@ -1279,6 +1560,13 @@ def resumen_revision_aula(revision_id):
             else:
                 averias_pendientes += 1
 
+    estado_general = obtener_estado_revision_general_aula(
+        revision_id
+    )
+    incidencias_revision = list(
+        estado_general.get("incidencias", []) or []
+    )
+
     return {
         "total": total,
         "correctos": correctos,
@@ -1291,5 +1579,10 @@ def resumen_revision_aula(revision_id):
         "unidades_total": total_unidades,
         "unidades_correctas": unidades_correctas,
         "unidades_afectadas": unidades_afectadas,
+        "revision_general_completada": bool(
+            estado_general.get("completada")
+        ),
+        "incidencias_revision": incidencias_revision,
+        "incidencias_revision_total": len(incidencias_revision),
     }
 
