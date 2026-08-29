@@ -265,6 +265,83 @@ def existe_preventivo_duplicado(
 
     return total > 0
 
+
+def crear_tarea_preventiva_planificada(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    area,
+    tarea,
+    frecuencia,
+    proxima_fecha,
+    operario,
+    observaciones="",
+    foto="",
+    tipo="Preventivo",
+    prioridad="Media",
+    duracion_prevista="",
+    material_necesario="",
+    empresa_externa="",
+    fecha_limite="",
+):
+    """
+    Crea una tarea en preventivo_tareas sin generar directamente una OT.
+
+    La OT la generará generar_ots_preventivo_si_toca() cuando corresponda,
+    por lo que Preventivo de aulas usa exactamente el mismo circuito de
+    Planificación que el resto de preventivos.
+    """
+    asegurar_columnas_preventivo()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            INSERT INTO preventivo_tareas
+            (
+                centro, edificio, planta, espacio, area,
+                tarea, frecuencia,
+                ultima_fecha, proxima_fecha,
+                operario, activo, observaciones, foto,
+                tipo, prioridad, duracion_prevista,
+                material_necesario, empresa_externa, fecha_limite
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """), (
+            centro,
+            edificio,
+            str(planta or ""),
+            espacio,
+            area,
+            tarea,
+            str(int(frecuencia_a_dias(frecuencia))),
+            "",
+            str(proxima_fecha),
+            operario,
+            1,
+            observaciones,
+            foto,
+            tipo or "Preventivo",
+            prioridad or "Media",
+            duracion_prevista,
+            material_necesario,
+            empresa_externa,
+            str(fecha_limite or proxima_fecha),
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
 def actualizar_planificacion_preventivo(
     tarea_id,
     frecuencia,
@@ -1307,44 +1384,25 @@ def pantalla_preventivo():
                                 st.error(f"Error guardando foto: {e}")
                                 return
 
-                        conn = conectar()
-                        cursor = conn.cursor()
-
-                        cursor.execute(_sql("""
-                            INSERT INTO preventivo_tareas
-                            (
-                                centro, edificio, planta, espacio, area,
-                                tarea, frecuencia,
-                                ultima_fecha, proxima_fecha,
-                                operario, activo, observaciones, foto,
-                                tipo, prioridad, duracion_prevista,
-                                material_necesario, empresa_externa, fecha_limite
-                            )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)
-                        """), (
-                            centro,
-                            edificio,
-                            planta,
-                            espacio,
-                            area,
-                            tarea,
-                            str(int(frecuencia_dias)),
-                            str(ultima_fecha),
-                            str(proxima_fecha),
-                            operario,
-                            1,
-                            observaciones,
-                            ruta_foto,
-                            tipo,
-                            prioridad,
-                            duracion_prevista,
-                            material_necesario,
-                            empresa_externa,
-                            str(fecha_limite)
-                        ))
-
-                        conn.commit()
-                        conn.close()
+                        crear_tarea_preventiva_planificada(
+                            centro=centro,
+                            edificio=edificio,
+                            planta=planta,
+                            espacio=espacio,
+                            area=area,
+                            tarea=tarea,
+                            frecuencia=str(int(frecuencia_dias)),
+                            proxima_fecha=str(proxima_fecha),
+                            operario=operario,
+                            observaciones=observaciones,
+                            foto=ruta_foto,
+                            tipo=tipo,
+                            prioridad=prioridad,
+                            duracion_prevista=duracion_prevista,
+                            material_necesario=material_necesario,
+                            empresa_externa=empresa_externa,
+                            fecha_limite=str(fecha_limite),
+                        )
 
                         st.success("Tarea preventiva creada correctamente")
                         st.rerun()
