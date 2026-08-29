@@ -636,6 +636,14 @@ def mostrar_menu_admin():
             st.session_state["seccion_actual"] = "Inventario"
             st.rerun()
 
+        if st.button(
+            "🧾\nInventario espacios",
+            key="btn_inventario_espacios_admin",
+            use_container_width=True
+        ):
+            st.session_state["seccion_actual"] = "Inventario espacios"
+            st.rerun()
+
         if st.button("📩\nPedidos material", key="btn_pedidos_admin", use_container_width=True):
             st.session_state["seccion_actual"] = "Pedidos material"
             st.rerun()
@@ -1102,6 +1110,9 @@ if perfil == "admin":
 
     elif seccion == "Inventario":
         pantalla_inventario()
+
+    elif seccion == "Inventario espacios":
+        pantalla_colegio(modo="inventario")
 
     elif seccion == "Inventario aulas":
         pantalla_inventario_aulas()
