@@ -430,6 +430,49 @@ def mostrar_inventario_espacios_gerencia(centro, key_sufijo="principal"):
     k3.metric("⚠️ Unidades afectadas", unidades_afectadas)
     k4.metric("🧩 Tipos de elemento", tipos_elemento)
 
+    # -------------------------------------------------
+    # ELEMENTOS AFECTADOS · SOLO LECTURA
+    # -------------------------------------------------
+    afectados = datos[datos["afectadas_num"] > 0].copy()
+
+    if not afectados.empty:
+        st.markdown("#### ⚠️ Equipamiento que requiere atención")
+
+        afectados_vista = afectados[
+            [
+                "edificio",
+                "espacio",
+                "elemento",
+                "afectadas_num",
+                "estado",
+            ]
+        ].copy()
+
+        afectados_vista = afectados_vista.rename(
+            columns={
+                "edificio": "Edificio",
+                "espacio": "Espacio",
+                "elemento": "Elemento",
+                "afectadas_num": "Afectadas",
+                "estado": "Estado",
+            }
+        )
+
+        afectados_vista["Afectadas"] = pd.to_numeric(
+            afectados_vista["Afectadas"],
+            errors="coerce",
+        ).fillna(0).round(0).astype(int)
+
+        st.dataframe(
+            afectados_vista.sort_values(
+                ["Afectadas", "Edificio", "Espacio", "Elemento"],
+                ascending=[False, True, True, True],
+            ),
+            use_container_width=True,
+            hide_index=True,
+            height=min(250, 42 + len(afectados_vista) * 35),
+        )
+
     st.markdown("#### 🔎 Consultar equipamiento")
 
     edificios = sorted({
@@ -438,7 +481,7 @@ def mostrar_inventario_espacios_gerencia(centro, key_sufijo="principal"):
         if str(v or "").strip()
     })
 
-    c1, c2 = st.columns([1, 1.4])
+    c1, c2, c3 = st.columns([1, 1, 1.4])
 
     with c1:
         edificio_filtro = st.selectbox(
@@ -447,18 +490,38 @@ def mostrar_inventario_espacios_gerencia(centro, key_sufijo="principal"):
             key=f"gerencia_inv_esp_edificio_{centro}_{key_sufijo}",
         )
 
+    datos_espacios = datos.copy()
+
+    if edificio_filtro != "Todos":
+        datos_espacios = datos_espacios[
+            datos_espacios["edificio"] == edificio_filtro
+        ].copy()
+
+    espacios = sorted({
+        str(v).strip()
+        for v in datos_espacios["espacio"].tolist()
+        if str(v or "").strip()
+    })
+
     with c2:
+        espacio_filtro = st.selectbox(
+            "Espacio / aula",
+            ["Todos"] + espacios,
+            key=f"gerencia_inv_esp_espacio_{centro}_{key_sufijo}",
+        )
+
+    with c3:
         buscar = st.text_input(
             "Buscar elemento",
             placeholder="Ejemplo: aire acondicionado, silla, pizarra digital...",
             key=f"gerencia_inv_esp_buscar_{centro}_{key_sufijo}",
         ).strip()
 
-    filtrados = datos.copy()
+    filtrados = datos_espacios.copy()
 
-    if edificio_filtro != "Todos":
+    if espacio_filtro != "Todos":
         filtrados = filtrados[
-            filtrados["edificio"] == edificio_filtro
+            filtrados["espacio"] == espacio_filtro
         ].copy()
 
     if buscar:
@@ -472,16 +535,56 @@ def mostrar_inventario_espacios_gerencia(centro, key_sufijo="principal"):
         st.info("No hay resultados con estos filtros.")
         return
 
-    resumen = _resumen_elementos_inventario_espacios(
-        filtrados
-    )
+    if espacio_filtro == "Todos":
+        resumen = _resumen_elementos_inventario_espacios(
+            filtrados
+        )
 
-    st.dataframe(
-        resumen,
-        use_container_width=True,
-        hide_index=True,
-        height=min(420, 38 + len(resumen) * 35),
-    )
+        st.dataframe(
+            resumen,
+            use_container_width=True,
+            hide_index=True,
+            height=min(420, 38 + len(resumen) * 35),
+        )
+
+    else:
+        detalle_espacio = filtrados[
+            [
+                "elemento",
+                "cantidad_num",
+                "correctas_num",
+                "afectadas_num",
+                "estado",
+                "fecha_revision",
+                "operario",
+            ]
+        ].copy()
+
+        detalle_espacio = detalle_espacio.rename(
+            columns={
+                "elemento": "Elemento",
+                "cantidad_num": "Unidades",
+                "correctas_num": "Correctas",
+                "afectadas_num": "Afectadas",
+                "estado": "Estado",
+                "fecha_revision": "Última revisión",
+                "operario": "Revisado por",
+            }
+        )
+
+        for col in ["Unidades", "Correctas", "Afectadas"]:
+            detalle_espacio[col] = pd.to_numeric(
+                detalle_espacio[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+        st.markdown(f"##### 📍 {espacio_filtro}")
+
+        st.dataframe(
+            detalle_espacio.sort_values("Elemento"),
+            use_container_width=True,
+            hide_index=True,
+            height=min(420, 38 + len(detalle_espacio) * 35),
+        )
 
     with st.expander("🔎 Ver detalle por espacio", expanded=False):
         detalle = filtrados[
