@@ -1598,15 +1598,16 @@ def obtener_contexto_revision_aula_por_ot(numero_ot):
                 elemento,
                 estado,
                 observaciones,
+                foto,
+                crear_correctivo,
                 numero_ot_correctiva,
-                fecha_correctivo,
-                modelo_id,
-                categoria,
-                tipo_linea,
-                pide_cantidad,
-                cantidad_total,
-                cantidad_correcta,
-                cantidad_afectada
+                COALESCE(categoria, ''),
+                COALESCE(tipo_linea, ''),
+                COALESCE(pide_cantidad, 0),
+                COALESCE(cantidad_total, 0),
+                COALESCE(cantidad_correcta, 0),
+                COALESCE(cantidad_afectada, 0),
+                COALESCE(modelo_id, 0)
             FROM preventivo_aulas_items
             WHERE revision_id = ?
             ORDER BY id ASC
