@@ -1,7 +1,9 @@
 import streamlit as st
+from datetime import date
 from pathlib import Path
 
 from config import CENTROS, OPERARIOS
+from database.db import conectar, _sql
 from modules.espacios import (
     obtener_centros_espacios,
     obtener_edificios_espacios,
@@ -123,6 +125,101 @@ def _validar_cantidades(
         )
 
     return True, ""
+
+
+
+def crear_planificacion_preventivo_aula(
+    centro,
+    edificio,
+    planta,
+    espacio,
+    operario,
+    frecuencia_dias,
+    proxima_fecha,
+    observaciones="",
+):
+    """
+    Programa el Preventivo de aulas en preventivo_tareas.
+
+    No crea una revisión ni una OT directamente. El motor general de
+    Preventivo generará la PREV cuando llegue la fecha y entonces
+    modules.preventivo creará la revisión de aula vinculada.
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT COUNT(*)
+            FROM preventivo_tareas
+            WHERE centro = ?
+              AND edificio = ?
+              AND COALESCE(planta, '') = ?
+              AND espacio = ?
+              AND area = ?
+              AND tarea = ?
+              AND activo = 1
+        """), (
+            centro,
+            edificio,
+            str(planta or ""),
+            espacio,
+            "Mantenimiento general aulas",
+            "Preventivo aulas",
+        ))
+
+        if int(cur.fetchone()[0] or 0) > 0:
+            return (
+                False,
+                "Ya existe un Preventivo de aulas activo para este espacio.",
+            )
+
+        cur.execute(_sql("""
+            INSERT INTO preventivo_tareas
+            (
+                centro, edificio, planta, espacio, area,
+                tarea, frecuencia,
+                ultima_fecha, proxima_fecha,
+                operario, activo, observaciones, foto,
+                tipo, prioridad, duracion_prevista,
+                material_necesario, empresa_externa, fecha_limite
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """), (
+            centro,
+            edificio,
+            str(planta or ""),
+            espacio,
+            "Mantenimiento general aulas",
+            "Preventivo aulas",
+            str(int(frecuencia_dias)),
+            "",
+            str(proxima_fecha),
+            operario,
+            1,
+            observaciones,
+            "",
+            "Preventivo",
+            "Media",
+            "30 min",
+            "",
+            "",
+            str(proxima_fecha),
+        ))
+
+        conn.commit()
+
+        return (
+            True,
+            "Preventivo de aula añadido a Planificación.",
+        )
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 def pantalla_preventivo_aulas():
@@ -254,14 +351,35 @@ def pantalla_preventivo_aulas():
         else:
             operario = operario_sel
 
+        frecuencia_dias = st.number_input(
+            "Frecuencia en días",
+            min_value=1,
+            max_value=3650,
+            value=180,
+            step=1,
+            key="prev_aula_frecuencia_dias",
+        )
+
+        proxima_fecha = st.date_input(
+            "Próxima fecha",
+            value=date.today(),
+            key="prev_aula_proxima_fecha",
+        )
+
         observaciones = st.text_area(
-            "Observaciones iniciales",
+            "Observaciones",
             key="prev_aula_obs_iniciales",
         )
 
+        st.caption(
+            "Al crearla se añadirá a 📅 Planificación. "
+            "La OT preventiva se generará cuando llegue la fecha."
+        )
+
         if st.button(
-            "✅ Crear revisión de aula",
+            "✅ Crear tarea preventiva de aula",
             use_container_width=True,
+            type="primary",
         ):
             if not str(edificio).strip():
                 st.warning(
@@ -281,27 +399,31 @@ def pantalla_preventivo_aulas():
                 )
             else:
                 try:
-                    revision_id = crear_revision_aula(
+                    ok, mensaje = crear_planificacion_preventivo_aula(
                         centro=centro,
                         edificio=edificio,
+                        planta=planta,
                         espacio=espacio,
                         operario=operario,
+                        frecuencia_dias=int(frecuencia_dias),
+                        proxima_fecha=str(proxima_fecha),
                         observaciones=observaciones,
-                        planta=planta,
                     )
                 except Exception as e:
                     st.error(
-                        "No se ha podido crear la revisión de aula."
+                        "No se ha podido crear la planificación preventiva."
                     )
                     st.caption(str(e))
                 else:
-                    st.session_state[
-                        "revision_aula_activa"
-                    ] = revision_id
-                    st.success(
-                        "Revisión de aula creada correctamente."
-                    )
-                    st.rerun()
+                    if ok:
+                        st.success(mensaje)
+                        st.info(
+                            "Ya puedes verla y editarla en la pestaña "
+                            "📅 Planificación."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning(mensaje)
 
     with tab2:
         revisiones = obtener_revisiones_aulas(100)
