@@ -1470,7 +1470,7 @@ def pantalla_modelo_preventivo_aula_config():
     asegurar_tabla_modelo_preventivo_aula()
     asegurar_tabla_modelo_preventivo_aula_espacio()
 
-    st.markdown("### 🧩 Modelo de preventivo de aulas")
+    st.markdown("### 🧩 Modelo base de aulas")
 
     modo_modelo_aulas = st.radio(
         "Configuración del modelo",
@@ -1488,14 +1488,15 @@ def pantalla_modelo_preventivo_aula_config():
         return
 
     st.info(
-        "Aquí defines una sola vez qué debe revisar el operario en un aula. "
-        "Los elementos inventariables llevarán cantidad y estado; "
-        "las comprobaciones técnicas solo llevarán resultado y observación."
+        "Aquí defines el MODELO BASE: qué elementos pueden formar parte "
+        "del inventario inicial de un aula. No es el inventario real de "
+        "cada espacio. Las cantidades reales se guardan en Inventario espacios."
     )
 
     st.caption(
-        "Los cuadros eléctricos generales de planta continúan fuera de este "
-        "modelo y mantienen su preventivo eléctrico independiente."
+        "Las líneas antiguas de «Comprobación técnica» se conservan por "
+        "compatibilidad, pero el nuevo Preventivo de aulas trabaja con "
+        "inventario vivo + revisión general + incidencias INC."
     )
 
     if st.button(
@@ -1600,15 +1601,15 @@ def pantalla_modelo_preventivo_aula_config():
 
     with c4:
         cantidad_defecto = st.number_input(
-            "Cantidad sugerida",
+            "Cantidad sugerida inicial",
             min_value=0,
             step=1,
             value=0,
             disabled=not es_inventariable,
             key="cfg_modelo_aula_cantidad_defecto",
             help=(
-                "Solo es una ayuda para la primera revisión. "
-                "La cantidad real se confirmará en cada aula."
+                "Solo sirve como ayuda para el primer censo. "
+                "Después manda el inventario vivo de cada espacio."
             ),
         )
 
@@ -1781,7 +1782,7 @@ def pantalla_modelo_preventivo_aula_config():
 
             with ec2:
                 nueva_cantidad_defecto = st.number_input(
-                    "Cantidad sugerida",
+                    "Cantidad sugerida inicial",
                     min_value=0,
                     step=1,
                     value=(
@@ -1893,8 +1894,9 @@ def pantalla_modelo_preventivo_aula_por_espacio():
     st.markdown("### 🏫 Modelo específico por aula / espacio")
 
     st.info(
-        "Aquí decides qué elementos del modelo general se aplican a un espacio concreto. "
-        "Desactivar un elemento aquí no lo borra del catálogo general."
+        "Aquí decides qué elementos del MODELO BASE se proponen para un "
+        "espacio concreto. Esto no modifica directamente su inventario vivo. "
+        "Para cantidades reales, altas o bajas usa Inventario espacios."
     )
 
     centro = st.selectbox(
