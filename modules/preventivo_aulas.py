@@ -26,6 +26,9 @@ ESTADOS_REVISION_AULA = [
 ]
 
 
+_ESTRUCTURA_PREVENTIVO_AULAS_ASEGURADA = False
+
+
 def hoy_str():
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -113,7 +116,15 @@ def crear_tablas_preventivo_aulas():
     para el nuevo Preventivo de Aulas.
 
     No borra ni renombra datos existentes.
+
+    La estructura se comprueba una sola vez por proceso Streamlit para
+    evitar ALTER TABLE repetidos en cada rerun de una OT.
     """
+    global _ESTRUCTURA_PREVENTIVO_AULAS_ASEGURADA
+
+    if _ESTRUCTURA_PREVENTIVO_AULAS_ASEGURADA:
+        return
+
     conn = conectar()
     cur = conn.cursor()
 
@@ -217,6 +228,7 @@ def crear_tablas_preventivo_aulas():
             pass
 
     conn.close()
+    _ESTRUCTURA_PREVENTIVO_AULAS_ASEGURADA = True
 
 
 # =====================================================
