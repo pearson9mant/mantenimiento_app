@@ -22,7 +22,7 @@ from modules.preventivo_aulas import (
     obtener_estado_revision_general_aula,
     marcar_revision_general_aula_completada,
     crear_incidencia_desde_revision_aula,
-    guardar_inventario_revision_aula,
+    guardar_inventario_inicial_revision_aula,
     ESTADOS_REVISION_AULA,
 )
 
@@ -495,153 +495,94 @@ def pantalla_preventivo_aulas():
 
                 st.markdown("### 📦 Inventario del aula")
 
-                st.caption(
-                    "El inventario se mantiene vivo. Aquí actualizas sus "
-                    "cantidades; las anomalías se registran después como INC."
+                estado_general = obtener_estado_revision_general_aula(
+                    revision_id
                 )
 
-                if not inventariables:
-                    st.info(
-                        "Esta revisión no tiene elementos inventariables."
+                inventario_requerido = bool(
+                    estado_general.get(
+                        "inventario_inicial_requerido",
+                        False,
                     )
-                else:
+                )
+                inventario_completado = bool(
+                    estado_general.get(
+                        "inventario_inicial_completado",
+                        False,
+                    )
+                )
+
+                if inventario_requerido and not inventario_completado:
+                    st.info(
+                        "Primer censo del aula. Este inventario se hace "
+                        "una sola vez."
+                    )
+
+                    cantidades = {}
                     categoria_anterior = None
 
                     for item in inventariables:
-                        (
-                            item_id,
-                            _revision_id,
-                            elemento,
-                            estado_item,
-                            obs_item,
-                            foto,
-                            crear_correctivo,
-                            numero_ot_correctiva,
-                            categoria,
-                            tipo_linea,
-                            pide_cantidad,
-                            cantidad_total,
-                            cantidad_correcta,
-                            cantidad_afectada,
-                            modelo_id,
-                        ) = item
-
-                        categoria = str(
-                            categoria or "General"
-                        ).strip()
+                        item_id = int(item[0])
+                        elemento = str(item[2] or "")
+                        categoria = str(item[8] or "General").strip()
 
                         if categoria != categoria_anterior:
-                            st.markdown(
-                                f"#### {categoria}"
+                            st.markdown(f"#### {categoria}")
+                            categoria_anterior = categoria
+
+                        cantidades[item_id] = int(
+                            st.number_input(
+                                elemento,
+                                min_value=0,
+                                step=1,
+                                value=int(item[11] or 0),
+                                key=(
+                                    f"admin_aula_censo_"
+                                    f"{revision_id}_{item_id}"
+                                ),
                             )
+                        )
+
+                    if st.button(
+                        "💾 Guardar inventario inicial",
+                        key=f"admin_guardar_censo_{revision_id}",
+                        use_container_width=True,
+                    ):
+                        try:
+                            guardar_inventario_inicial_revision_aula(
+                                revision_id,
+                                cantidades,
+                            )
+                        except Exception as e:
+                            st.error(
+                                "No se ha podido guardar el inventario inicial."
+                            )
+                            st.caption(str(e))
+                        else:
+                            st.success(
+                                "Inventario inicial guardado."
+                            )
+                            st.rerun()
+                else:
+                    st.caption(
+                        "Inventario ya censado. Las revisiones posteriores "
+                        "solo muestran las cantidades existentes."
+                    )
+
+                    categoria_anterior = None
+
+                    for item in inventariables:
+                        elemento = str(item[2] or "")
+                        categoria = str(item[8] or "General").strip()
+                        cantidad = int(item[11] or 0)
+
+                        if categoria != categoria_anterior:
+                            st.markdown(f"#### {categoria}")
                             categoria_anterior = categoria
 
                         st.markdown(
-                            f"**📦 {elemento}**"
+                            f"• **{elemento}:** {cantidad} ud"
                         )
-
-                        q1, q2, q3 = st.columns(3)
-
-                        with q1:
-                            st.number_input(
-                                "Cantidad total",
-                                min_value=0,
-                                step=1,
-                                value=int(cantidad_total or 0),
-                                key=f"total_aula_{item_id}",
-                            )
-
-                        with q2:
-                            st.number_input(
-                                "Correctas",
-                                min_value=0,
-                                step=1,
-                                value=int(cantidad_correcta or 0),
-                                key=f"correctas_aula_{item_id}",
-                            )
-
-                        with q3:
-                            st.number_input(
-                                "Con incidencia",
-                                min_value=0,
-                                step=1,
-                                value=int(cantidad_afectada or 0),
-                                key=f"afectadas_aula_{item_id}",
-                            )
-
-                    if st.button(
-                        "💾 Guardar inventario del aula",
-                        key=f"guardar_inventario_aula_{revision_id}",
-                        use_container_width=True,
-                    ):
-                        cantidades = {}
-                        errores = []
-
-                        for item in inventariables:
-                            item_id = int(item[0])
-                            elemento = str(item[2] or "")
-
-                            total_nuevo = int(
-                                st.session_state.get(
-                                    f"total_aula_{item_id}",
-                                    item[11] or 0,
-                                )
-                                or 0
-                            )
-                            correctas_nuevo = int(
-                                st.session_state.get(
-                                    f"correctas_aula_{item_id}",
-                                    item[12] or 0,
-                                )
-                                or 0
-                            )
-                            afectadas_nuevo = int(
-                                st.session_state.get(
-                                    f"afectadas_aula_{item_id}",
-                                    item[13] or 0,
-                                )
-                                or 0
-                            )
-
-                            ok, mensaje = _validar_cantidades(
-                                elemento,
-                                total_nuevo,
-                                correctas_nuevo,
-                                afectadas_nuevo,
-                            )
-
-                            if not ok:
-                                errores.append(mensaje)
-                            else:
-                                cantidades[item_id] = (
-                                    total_nuevo,
-                                    correctas_nuevo,
-                                    afectadas_nuevo,
-                                )
-
-                        if errores:
-                            st.error(
-                                "No se ha guardado el inventario porque "
-                                "hay cantidades incoherentes."
-                            )
-                            for error in errores:
-                                st.warning(error)
-                        else:
-                            try:
-                                guardar_inventario_revision_aula(
-                                    revision_id,
-                                    cantidades,
-                                )
-                            except Exception as e:
-                                st.error(
-                                    "No se ha podido guardar el inventario del aula."
-                                )
-                                st.caption(str(e))
-                            else:
-                                st.success(
-                                    "Inventario vivo actualizado."
-                                )
-                                st.rerun()
 
                 st.markdown("---")
                 st.markdown(
