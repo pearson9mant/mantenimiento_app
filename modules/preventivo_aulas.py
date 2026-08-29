@@ -1529,6 +1529,139 @@ def ot_correctiva_cerrada(numero_ot):
 
 
 
+
+def obtener_contexto_revision_aula_por_ot(numero_ot):
+    """
+    Carga de una sola vez todo lo necesario para dibujar el preventivo
+    de aula del operario.
+
+    Evita abrir varias conexiones consecutivas a la base de datos para:
+    - localizar la revisión;
+    - cargar sus elementos;
+    - leer el estado del nuevo flujo.
+
+    Devuelve:
+        (revision, items, estado_general)
+    """
+    crear_tablas_preventivo_aulas()
+
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return None, [], {
+            "completada": False,
+            "incidencias": [],
+            "flujo_nuevo": False,
+            "inventario_inicial_requerido": False,
+            "inventario_inicial_completado": False,
+        }
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT
+                id,
+                fecha,
+                centro,
+                edificio,
+                espacio,
+                operario,
+                estado,
+                observaciones,
+                numero_ot_preventiva,
+                COALESCE(planta, '')
+            FROM preventivo_aulas
+            WHERE numero_ot_preventiva = ?
+            ORDER BY id DESC
+            LIMIT 1
+        """), (numero_ot,))
+
+        revision = cur.fetchone()
+
+        if not revision:
+            return None, [], {
+                "completada": False,
+                "incidencias": [],
+                "flujo_nuevo": False,
+                "inventario_inicial_requerido": False,
+                "inventario_inicial_completado": False,
+            }
+
+        revision_id = int(revision[0])
+
+        cur.execute(_sql("""
+            SELECT
+                id,
+                revision_id,
+                elemento,
+                estado,
+                observaciones,
+                numero_ot_correctiva,
+                fecha_correctivo,
+                modelo_id,
+                categoria,
+                tipo_linea,
+                pide_cantidad,
+                cantidad_total,
+                cantidad_correcta,
+                cantidad_afectada
+            FROM preventivo_aulas_items
+            WHERE revision_id = ?
+            ORDER BY id ASC
+        """), (revision_id,))
+
+        items = cur.fetchall()
+
+        cur.execute(_sql("""
+            SELECT
+                COALESCE(revision_general_completada, 0),
+                COALESCE(incidencias_revision, ''),
+                COALESCE(flujo_revision_general, 0),
+                COALESCE(inventario_inicial_requerido, 0),
+                COALESCE(inventario_inicial_completado, 0)
+            FROM preventivo_aulas
+            WHERE id = ?
+        """), (revision_id,))
+
+        fila_estado = cur.fetchone()
+
+        if fila_estado:
+            (
+                completada,
+                incidencias_txt,
+                flujo_nuevo,
+                inventario_requerido,
+                inventario_completado,
+            ) = fila_estado
+        else:
+            completada = 0
+            incidencias_txt = ""
+            flujo_nuevo = 0
+            inventario_requerido = 0
+            inventario_completado = 0
+
+        incidencias = [
+            valor.strip()
+            for valor in str(incidencias_txt or "").split("|")
+            if valor.strip()
+        ]
+
+        estado_general = {
+            "completada": bool(completada),
+            "incidencias": incidencias,
+            "flujo_nuevo": bool(flujo_nuevo),
+            "inventario_inicial_requerido": bool(inventario_requerido),
+            "inventario_inicial_completado": bool(inventario_completado),
+        }
+
+        return revision, items, estado_general
+
+    finally:
+        conn.close()
+
+
 def obtener_revision_aula_por_ot(numero_ot):
     """
     Localiza la revisión integral asociada a una OT preventiva concreta.
