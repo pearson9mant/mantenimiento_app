@@ -22,6 +22,7 @@ from modules.preventivo import checklist_preventivo_completo
 
 from modules.preventivo_aulas import (
     obtener_revision_aula_por_ot,
+    obtener_contexto_revision_aula_por_ot,
     obtener_items_revision_aula,
     guardar_item_revision_y_sincronizar,
     crear_correctivos_desde_revision,
@@ -379,18 +380,11 @@ def descomponer_orden_operario(fila):
 
 def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
     """
-    Reconoce únicamente una OT del Preventivo integral de aulas.
+    Reconoce una OT del Preventivo integral de aulas sin consultar la BD.
 
-    No depende del texto del área guardada en la OT, porque algunas
-    planificaciones antiguas o generadas por compatibilidad pueden
-    conservar un área genérica como "Preventivo".
-
-    Criterios:
-    1. La OT debe ser PREV.
-    2. La descripción debe identificar Preventivo aulas.
-    3. Debe existir una revisión de aula vinculada a ese numero_ot.
-
-    Así evitamos que una preventiva normal entre por este circuito.
+    La validación de que existe una revisión vinculada se hace al abrir
+    la pantalla específica. Así evitamos una conexión remota extra cada
+    vez que Streamlit decide qué tipo de OT está mostrando.
     """
     desc_txt = normalizar_txt(
         descripcion
@@ -405,24 +399,10 @@ def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
     ):
         return False
 
-    if (
-        "preventivo aulas"
-        not in desc_txt
-        and "preventivo aula"
-        not in desc_txt
-    ):
-        return False
-
-    try:
-        revision = (
-            obtener_revision_aula_por_ot(
-                numero_ot
-            )
-        )
-    except Exception:
-        revision = None
-
-    return revision is not None
+    return (
+        "preventivo aulas" in desc_txt
+        or "preventivo aula" in desc_txt
+    )
 
 
 def _es_item_aula_inventariable(item):
@@ -484,7 +464,11 @@ def mostrar_preventivo_aula_operario_legacy(
     Esta pantalla reutiliza la revisión ya creada por modules.preventivo
     cuando generó la OT. No crea una nueva revisión ni una segunda OT.
     """
-    revision = obtener_revision_aula_por_ot(
+    (
+        revision,
+        items,
+        estado_general,
+    ) = obtener_contexto_revision_aula_por_ot(
         num_ot
     )
 
@@ -984,10 +968,6 @@ def mostrar_preventivo_aula_operario(
         f"{espacio_revision or '-'}"
     )
 
-    items = obtener_items_revision_aula(
-        revision_id
-    )
-
     if not items:
         st.warning(
             "La revisión no contiene elementos. "
@@ -1002,12 +982,6 @@ def mostrar_preventivo_aula_operario(
             item
         )
     ]
-
-    estado_general = (
-        obtener_estado_revision_general_aula(
-            revision_id
-        )
-    )
 
     inventario_requerido = bool(
         estado_general.get(
@@ -1174,12 +1148,6 @@ def mostrar_preventivo_aula_operario(
         "Revisa visual y funcionalmente el aula completa: "
         "iluminación, mecanismos, mobiliario, puertas, ventanas, "
         "climatización y cualquier otra anomalía visible."
-    )
-
-    estado_general = (
-        obtener_estado_revision_general_aula(
-            revision_id
-        )
     )
 
     incidencias_creadas = list(
