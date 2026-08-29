@@ -161,6 +161,27 @@ def crear_tablas_preventivo_aulas():
         "incidencias_revision",
         "TEXT DEFAULT ''",
     )
+    _asegurar_columna(
+        cur,
+        conn,
+        "preventivo_aulas",
+        "flujo_revision_general",
+        "INTEGER DEFAULT 0",
+    )
+    _asegurar_columna(
+        cur,
+        conn,
+        "preventivo_aulas",
+        "inventario_inicial_requerido",
+        "INTEGER DEFAULT 0",
+    )
+    _asegurar_columna(
+        cur,
+        conn,
+        "preventivo_aulas",
+        "inventario_inicial_completado",
+        "INTEGER DEFAULT 0",
+    )
 
     for columna, tipo in [
         ("categoria", "TEXT DEFAULT ''"),
@@ -178,6 +199,22 @@ def crear_tablas_preventivo_aulas():
             columna,
             tipo,
         )
+
+    # Transición segura: las revisiones abiertas ya vinculadas a PREV
+    # pasan al flujo nuevo. Los históricos cerrados no se tocan.
+    try:
+        cur.execute(_sql("""
+            UPDATE preventivo_aulas
+            SET flujo_revision_general = 1
+            WHERE LOWER(COALESCE(estado, '')) <> 'cerrada'
+              AND TRIM(COALESCE(numero_ot_preventiva, '')) <> ''
+        """))
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
     conn.close()
 
@@ -460,9 +497,12 @@ def crear_revision_aula(
                 estado,
                 observaciones,
                 numero_ot_preventiva,
-                planta
+                planta,
+                flujo_revision_general,
+                inventario_inicial_requerido,
+                inventario_inicial_completado
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
         """), (
             hoy_str(),
@@ -474,6 +514,9 @@ def crear_revision_aula(
             observaciones,
             numero_ot_preventiva,
             planta,
+            1,
+            0 if inventario_actual else 1,
+            1 if inventario_actual else 0,
         ))
 
         revision_id = cur.fetchone()[0]
@@ -839,6 +882,9 @@ def _limpiar_nombre_foto_incidencia(texto):
 
 
 def obtener_estado_revision_general_aula(revision_id):
+    """
+    Estado del nuevo Preventivo de aulas.
+    """
     crear_tablas_preventivo_aulas()
 
     conn = conectar()
@@ -848,7 +894,10 @@ def obtener_estado_revision_general_aula(revision_id):
         cur.execute(_sql("""
             SELECT
                 COALESCE(revision_general_completada, 0),
-                COALESCE(incidencias_revision, '')
+                COALESCE(incidencias_revision, ''),
+                COALESCE(flujo_revision_general, 0),
+                COALESCE(inventario_inicial_requerido, 0),
+                COALESCE(inventario_inicial_completado, 0)
             FROM preventivo_aulas
             WHERE id = ?
             LIMIT 1
@@ -857,7 +906,13 @@ def obtener_estado_revision_general_aula(revision_id):
         fila = cur.fetchone()
 
         if not fila:
-            return {"completada": False, "incidencias": []}
+            return {
+                "completada": False,
+                "incidencias": [],
+                "flujo_nuevo": False,
+                "inventario_inicial_requerido": False,
+                "inventario_inicial_completado": False,
+            }
 
         incidencias = [
             x.strip()
@@ -868,8 +923,32 @@ def obtener_estado_revision_general_aula(revision_id):
         return {
             "completada": bool(int(fila[0] or 0)),
             "incidencias": incidencias,
+            "flujo_nuevo": bool(int(fila[2] or 0)),
+            "inventario_inicial_requerido": bool(int(fila[3] or 0)),
+            "inventario_inicial_completado": bool(int(fila[4] or 0)),
         }
 
+    finally:
+        conn.close()
+
+
+def marcar_inventario_inicial_aula_completado(revision_id):
+    crear_tablas_preventivo_aulas()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE preventivo_aulas
+            SET inventario_inicial_completado = 1
+            WHERE id = ?
+        """), (int(revision_id),))
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -1008,11 +1087,11 @@ def crear_incidencia_desde_revision_aula(
         "Otros",
         "Media",
         operario,
-        "PREVENTIVO_AULA",
-        observaciones_origen,
+        "PREVENTIVO",
+        "Mantenimiento preventivo",
         fecha_origen,
         "postgres_fotos" if fotos_validas else "",
-        "Revisión preventiva",
+        "Operarios",
         "Interna",
         "",
         "",
@@ -1026,7 +1105,7 @@ def crear_incidencia_desde_revision_aula(
         "",
         0,
         0,
-        "",
+        observaciones_origen,
         planta or "",
     )
 
@@ -1069,6 +1148,45 @@ def crear_incidencia_desde_revision_aula(
         mensaje = f"Incidencia {numero_creado} creada correctamente."
 
     return True, mensaje, numero_creado
+
+
+def guardar_inventario_inicial_revision_aula(
+    revision_id,
+    cantidades_totales,
+):
+    """
+    Primer censo del aula. Solo se introduce la cantidad instalada.
+    Los siguientes preventivos reutilizan el inventario vivo.
+    """
+    items = obtener_items_revision_aula(revision_id)
+    mapa = {int(item[0]): item for item in items}
+
+    for item_id, cantidad in cantidades_totales.items():
+        item_id = int(item_id)
+        item = mapa.get(item_id)
+
+        if item is None:
+            continue
+
+        if str(item[9] or "").strip() != "Elemento inventariable":
+            continue
+
+        total = max(0, int(cantidad or 0))
+
+        guardar_item_revision_y_sincronizar(
+            revision_id=revision_id,
+            item_id=item_id,
+            estado="Correcto",
+            observaciones=str(item[4] or ""),
+            foto=str(item[5] or ""),
+            crear_correctivo=0,
+            cantidad_total=total,
+            cantidad_correcta=total,
+            cantidad_afectada=0,
+        )
+
+    marcar_inventario_inicial_aula_completado(revision_id)
+    return True
 
 
 def guardar_inventario_revision_aula(
@@ -1440,52 +1558,51 @@ def obtener_revision_aula_por_ot(numero_ot):
 
 def revision_aula_lista_para_cerrar(numero_ot):
     """
-    Regla de cierre del Preventivo de Aulas.
+    Cierre del Preventivo de aulas.
 
-    Nuevo flujo:
-    - inventario coherente;
-    - revisión visual/funcional general completada;
-    - anomalías como INC independientes.
+    Flujo nuevo:
+    - primer censo, solo cuando todavía no existe inventario vivo;
+    - revisión general terminada explícitamente;
+    - las anomalías son INC independientes.
 
-    Mantiene compatibilidad con revisiones antiguas ya cumplimentadas.
+    El histórico antiguo conserva su regla previa.
     """
-    revision = obtener_revision_aula_por_ot(
-        numero_ot
-    )
+    revision = obtener_revision_aula_por_ot(numero_ot)
 
     if not revision:
         return False
 
     revision_id = revision[0]
-    items = obtener_items_revision_aula(
-        revision_id
-    )
+    items = obtener_items_revision_aula(revision_id)
 
     if not items:
         return False
 
-    for item in items:
-        if str(item[9] or "").strip() != "Elemento inventariable":
-            continue
+    estado_general = obtener_estado_revision_general_aula(revision_id)
 
-        total = int(item[11] or 0)
-        correctas = int(item[12] or 0)
-        afectadas = int(item[13] or 0)
-
-        if total < 0 or correctas < 0 or afectadas < 0:
+    if estado_general.get("flujo_nuevo"):
+        if (
+            estado_general.get("inventario_inicial_requerido")
+            and not estado_general.get("inventario_inicial_completado")
+        ):
             return False
 
-        if correctas + afectadas != total:
-            return False
-
-    estado_general = obtener_estado_revision_general_aula(
-        revision_id
-    )
-
-    if estado_general.get("completada"):
-        return True
+        return bool(estado_general.get("completada"))
 
     for item in items:
+        tipo_linea = str(item[9] or "").strip()
+
+        if tipo_linea == "Elemento inventariable":
+            total = int(item[11] or 0)
+            correctas = int(item[12] or 0)
+            afectadas = int(item[13] or 0)
+
+            if total < 0 or correctas < 0 or afectadas < 0:
+                return False
+
+            if correctas + afectadas != total:
+                return False
+
         estado = str(item[3] or "").strip()
         observaciones = str(item[4] or "").strip()
         crear_correctivo = bool(item[6])
@@ -1494,10 +1611,7 @@ def revision_aula_lista_para_cerrar(numero_ot):
         if estado not in ESTADOS_REVISION_AULA:
             return False
 
-        if (
-            estado in ["Ajustado", "Revisar", "Avería"]
-            and not observaciones
-        ):
+        if estado in ["Ajustado", "Revisar", "Avería"] and not observaciones:
             return False
 
         if (
