@@ -28,6 +28,10 @@ from modules.preventivo_aulas import (
     revision_aula_lista_para_cerrar,
     resumen_revision_aula,
     ESTADOS_REVISION_AULA,
+    obtener_estado_revision_general_aula,
+    guardar_inventario_inicial_revision_aula,
+    marcar_revision_general_aula_completada,
+    crear_incidencia_desde_revision_aula,
 )
 
 from ui.ui_legionella import obtener_checklist_correctivo_legionella
@@ -470,7 +474,7 @@ def _validar_cantidades_item_aula(
     return True, ""
 
 
-def mostrar_preventivo_aula_operario(
+def mostrar_preventivo_aula_operario_legacy(
     num_ot,
     operario,
 ):
@@ -926,6 +930,512 @@ def mostrar_preventivo_aula_operario(
         st.warning(
             "Completa los estados, observaciones necesarias "
             "y cantidades antes de finalizar la OT."
+        )
+
+
+
+def mostrar_preventivo_aula_operario(
+    num_ot,
+    operario,
+):
+    """
+    Flujo actual del Preventivo integral de aulas.
+
+    El flujo anterior se conserva íntegro en
+    mostrar_preventivo_aula_operario_legacy() por seguridad.
+
+    - Primer preventivo del aula: censo inicial una sola vez.
+    - Preventivos posteriores: solo lectura de cantidades.
+    - Revisión visual/funcional general.
+    - Cada anomalía genera una INC normal.
+    """
+    revision = obtener_revision_aula_por_ot(
+        num_ot
+    )
+
+    st.markdown(
+        "### 🏫 Preventivo integral del aula"
+    )
+
+    if not revision:
+        st.error(
+            "Esta OT está marcada como Preventivo aulas, "
+            "pero no se encuentra su revisión vinculada."
+        )
+        return
+
+    (
+        revision_id,
+        fecha_revision,
+        centro_revision,
+        edificio_revision,
+        espacio_revision,
+        operario_revision,
+        estado_revision,
+        observaciones_revision,
+        numero_ot_revision,
+        planta_revision,
+    ) = revision
+
+    st.caption(
+        f"📍 {centro_revision or '-'} · "
+        f"{edificio_revision or '-'} · "
+        f"{planta_revision or '-'} · "
+        f"{espacio_revision or '-'}"
+    )
+
+    items = obtener_items_revision_aula(
+        revision_id
+    )
+
+    if not items:
+        st.warning(
+            "La revisión no contiene elementos. "
+            "Revisa Configuración → Modelo aulas."
+        )
+        return
+
+    inventariables = [
+        item
+        for item in items
+        if _es_item_aula_inventariable(
+            item
+        )
+    ]
+
+    estado_general = (
+        obtener_estado_revision_general_aula(
+            revision_id
+        )
+    )
+
+    inventario_requerido = bool(
+        estado_general.get(
+            "inventario_inicial_requerido",
+            False,
+        )
+    )
+
+    inventario_completado = bool(
+        estado_general.get(
+            "inventario_inicial_completado",
+            False,
+        )
+    )
+
+    # =====================================================
+    # INVENTARIO
+    # =====================================================
+    st.markdown(
+        "### 📦 Inventario del aula"
+    )
+
+    if (
+        inventario_requerido
+        and not inventario_completado
+    ):
+        st.info(
+            "Es el primer preventivo de este aula. "
+            "Haz ahora el inventario inicial una sola vez. "
+            "En los próximos preventivos solo verás las cantidades."
+        )
+
+        cantidades = {}
+        categoria_anterior = None
+
+        for item in inventariables:
+            item_id = int(
+                item[0]
+            )
+            elemento = str(
+                item[2] or ""
+            )
+            categoria = str(
+                item[8] or "General"
+            ).strip()
+
+            if categoria != categoria_anterior:
+                st.markdown(
+                    f"#### {categoria}"
+                )
+                categoria_anterior = categoria
+
+            cantidades[item_id] = int(
+                st.number_input(
+                    elemento,
+                    min_value=0,
+                    step=1,
+                    value=int(
+                        item[11] or 0
+                    ),
+                    key=(
+                        f"ot_aula_censo_"
+                        f"{num_ot}_{item_id}"
+                    ),
+                )
+            )
+
+        if st.button(
+            "💾 Guardar inventario inicial",
+            key=(
+                f"ot_aula_guardar_censo_"
+                f"{num_ot}"
+            ),
+            use_container_width=True,
+            type="primary",
+        ):
+            try:
+                guardar_inventario_inicial_revision_aula(
+                    revision_id=revision_id,
+                    cantidades_totales=cantidades,
+                )
+
+            except Exception as error:
+                st.error(
+                    "No se ha podido guardar "
+                    "el inventario inicial."
+                )
+                st.caption(
+                    str(error)
+                )
+
+            else:
+                st.success(
+                    "Inventario inicial guardado. "
+                    "No tendrás que volver a hacerlo "
+                    "en el siguiente preventivo."
+                )
+                st.rerun()
+
+        st.info(
+            "Guarda primero el inventario inicial "
+            "para continuar con la revisión preventiva."
+        )
+        return
+
+    st.caption(
+        "Inventario ya censado. "
+        "En esta revisión solo se muestran "
+        "las cantidades instaladas."
+    )
+
+    if not inventariables:
+        st.info(
+            "No hay elementos inventariables "
+            "configurados para este aula."
+        )
+
+    else:
+        categoria_anterior = None
+        cols = None
+        indice_col = 0
+
+        for item in inventariables:
+            elemento = str(
+                item[2] or ""
+            )
+            categoria = str(
+                item[8] or "General"
+            ).strip()
+            cantidad = int(
+                item[11] or 0
+            )
+
+            if categoria != categoria_anterior:
+                st.markdown(
+                    f"#### {categoria}"
+                )
+                categoria_anterior = categoria
+                cols = st.columns(
+                    3
+                )
+                indice_col = 0
+
+            if (
+                cols is None
+                or indice_col >= 3
+            ):
+                cols = st.columns(
+                    3
+                )
+                indice_col = 0
+
+            with cols[indice_col]:
+                with st.container(
+                    border=True
+                ):
+                    st.markdown(
+                        f"**{elemento}**"
+                    )
+                    st.metric(
+                        "Cantidad",
+                        cantidad,
+                    )
+
+            indice_col += 1
+
+    # =====================================================
+    # REVISIÓN GENERAL
+    # =====================================================
+    st.markdown(
+        "---"
+    )
+    st.markdown(
+        "### 👀 Revisión preventiva del aula"
+    )
+
+    st.info(
+        "Revisa visual y funcionalmente el aula completa: "
+        "iluminación, mecanismos, mobiliario, puertas, ventanas, "
+        "climatización y cualquier otra anomalía visible."
+    )
+
+    estado_general = (
+        obtener_estado_revision_general_aula(
+            revision_id
+        )
+    )
+
+    incidencias_creadas = list(
+        estado_general.get(
+            "incidencias",
+            [],
+        )
+        or []
+    )
+
+    if incidencias_creadas:
+        st.success(
+            "🔧 Incidencias creadas: "
+            + ", ".join(
+                incidencias_creadas
+            )
+        )
+
+    if estado_general.get(
+        "completada"
+    ):
+        st.success(
+            "✅ Revisión preventiva terminada. "
+            "La OT ya puede finalizarse."
+        )
+
+    else:
+        respuesta = st.radio(
+            "¿Has detectado alguna anomalía?",
+            [
+                "No",
+                "Sí",
+            ],
+            index=None,
+            horizontal=True,
+            key=(
+                f"ot_aula_anomalia_"
+                f"{num_ot}"
+            ),
+        )
+
+        if respuesta == "No":
+            if st.button(
+                "✅ Guardar revisión sin anomalías",
+                key=(
+                    f"ot_aula_sin_anomalias_"
+                    f"{num_ot}"
+                ),
+                use_container_width=True,
+                type="primary",
+            ):
+                marcar_revision_general_aula_completada(
+                    revision_id,
+                    True,
+                )
+
+                st.success(
+                    "Revisión preventiva registrada."
+                )
+                st.rerun()
+
+        elif respuesta == "Sí":
+            st.markdown(
+                "#### 🔧 Anomalía detectada"
+            )
+
+            st.caption(
+                "Se creará una incidencia normal, "
+                "como las del QR. "
+                "La ubicación del aula ya viene asignada."
+            )
+
+            contador = int(
+                st.session_state.get(
+                    f"ot_aula_contador_inc_"
+                    f"{num_ot}",
+                    1,
+                )
+                or 1
+            )
+
+            descripcion_anomalia = (
+                st.text_area(
+                    "¿Qué ocurre?",
+                    placeholder=(
+                        "Ej.: downlight fundido, "
+                        "puerta no cierra, "
+                        "persiana averiada..."
+                    ),
+                    height=110,
+                    key=(
+                        f"ot_aula_desc_inc_"
+                        f"{num_ot}_{contador}"
+                    ),
+                )
+            )
+
+            fotos_anomalia = (
+                st.file_uploader(
+                    "📷 Fotografías de la anomalía (opcional)",
+                    type=[
+                        "jpg",
+                        "jpeg",
+                        "png",
+                    ],
+                    accept_multiple_files=True,
+                    key=(
+                        f"ot_aula_fotos_inc_"
+                        f"{num_ot}_{contador}"
+                    ),
+                    help=(
+                        "Máximo 5 fotografías "
+                        "y 5 MB por foto."
+                    ),
+                )
+            )
+
+            if st.button(
+                "➕ Crear incidencia",
+                key=(
+                    f"ot_aula_crear_inc_"
+                    f"{num_ot}_{contador}"
+                ),
+                use_container_width=True,
+                type="primary",
+            ):
+                (
+                    ok,
+                    mensaje,
+                    numero_inc,
+                ) = (
+                    crear_incidencia_desde_revision_aula(
+                        revision_id=revision_id,
+                        descripcion=descripcion_anomalia,
+                        fotos=fotos_anomalia,
+                    )
+                )
+
+                if not ok:
+                    st.error(
+                        mensaje
+                    )
+
+                else:
+                    st.session_state[
+                        f"ot_aula_contador_inc_"
+                        f"{num_ot}"
+                    ] = contador + 1
+
+                    st.success(
+                        mensaje
+                    )
+                    st.rerun()
+
+            if incidencias_creadas:
+                st.caption(
+                    "Puedes crear otra incidencia. "
+                    "Cuando estén todas registradas, "
+                    "termina la revisión."
+                )
+
+                if st.button(
+                    "✅ Terminar revisión preventiva",
+                    key=(
+                        f"ot_aula_terminar_revision_"
+                        f"{num_ot}"
+                    ),
+                    use_container_width=True,
+                ):
+                    marcar_revision_general_aula_completada(
+                        revision_id,
+                        True,
+                    )
+
+                    st.success(
+                        "Revisión preventiva terminada."
+                    )
+                    st.rerun()
+
+    # =====================================================
+    # RESULTADO
+    # =====================================================
+    st.markdown(
+        "---"
+    )
+    st.markdown(
+        "### 📊 Resultado de la revisión"
+    )
+
+    resumen = resumen_revision_aula(
+        revision_id
+    )
+
+    r1, r2, r3 = st.columns(
+        3
+    )
+
+    r1.metric(
+        "📦 Unidades inventariadas",
+        int(
+            resumen.get(
+                "unidades_total",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    r2.metric(
+        "🔧 INC creadas",
+        int(
+            resumen.get(
+                "incidencias_revision_total",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    r3.metric(
+        "👀 Revisión",
+        (
+            "Completa"
+            if resumen.get(
+                "revision_general_completada"
+            )
+            else "Pendiente"
+        ),
+    )
+
+    if revision_aula_lista_para_cerrar(
+        num_ot
+    ):
+        st.success(
+            "✅ Preventivo de aula completo. "
+            "La OT ya puede finalizarse."
+        )
+
+    else:
+        st.warning(
+            "La OT no puede finalizarse "
+            "hasta terminar la revisión preventiva."
         )
 
 
@@ -1938,7 +2448,7 @@ def mostrar_tarjeta_ot(
             with c1:
                 if st.button("✔\nSí, finalizar", key=f"{modo}_si_fin_rapido_{id_orden}", use_container_width=True):
                     if not puede_finalizar_preventivo(num_ot, origen, desc, area):
-                        st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                        st.error("No puedes finalizar esta preventiva hasta completar su revisión.")
                     elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
                         st.error("No puedes finalizar esta OT de Legionella hasta completar el control/checklist correspondiente.")
                     else:
@@ -2069,7 +2579,7 @@ def mostrar_tarjeta_ot(
                     if st.button("✔\nSí, finalizar", key=f"{modo}_si_fin_completo_{id_orden}", use_container_width=True):
 
                         if not puede_finalizar_preventivo(num_ot, origen, desc, area):
-                            st.error("No puedes finalizar esta preventiva hasta completar todo el checklist.")
+                            st.error("No puedes finalizar esta preventiva hasta completar su revisión.")
 
                         elif not puede_finalizar_legionella(id_orden, area, origen, desc, num_ot):
                             st.error("No puedes finalizar esta OT de Legionella hasta completar el control/checklist correspondiente.")
