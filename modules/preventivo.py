@@ -8,6 +8,13 @@ from modules.ordenes import (
     vincular_origen_ot,
 )
 
+from modules.cuadros_electricos import (
+    es_tarea_preventivo_cuadro,
+    resolver_cuadro_preventivo,
+    crear_revision_preventiva_cuadro,
+    obtener_revision_preventiva_cuadro,
+)
+
 from modules.preventivo_aulas import (
     crear_revision_aula,
     obtener_revision_aula_por_ot,
@@ -1065,10 +1072,29 @@ def generar_ots_preventivo_si_toca():
             if fecha_programada > hoy:
                 continue
 
-            es_revision_general_espacio = es_preventivo_integral_espacio(
+            es_revision_cuadro = es_tarea_preventivo_cuadro(
                 area,
                 tarea,
             )
+
+            es_revision_general_espacio = (
+                es_preventivo_integral_espacio(
+                    area,
+                    tarea,
+                )
+                and not es_revision_cuadro
+            )
+
+            cuadro_preventivo = None
+
+            if es_revision_cuadro:
+                cuadro_preventivo = resolver_cuadro_preventivo(
+                    centro=centro,
+                    edificio=edificio,
+                    planta=planta or "",
+                    espacio=espacio,
+                    tarea=tarea,
+                )
 
             if existe_ot_preventiva_abierta(
                 tarea_id,
@@ -1078,9 +1104,42 @@ def generar_ots_preventivo_si_toca():
                 planta,
                 espacio
             ):
-                # Reparación idempotente: si la PREV ya existe pero la
-                # revisión de espacio no llegó a crearse, se crea ahora sobre
+                # Reparación idempotente: si la PREV ya existe pero su
+                # revisión funcional no llegó a crearse, se crea ahora sobre
                 # ESA MISMA OT. Nunca genera una segunda PREV.
+                if es_revision_cuadro and cuadro_preventivo:
+                    numero_existente = obtener_numero_ot_preventiva_abierta(
+                        tarea_id=tarea_id,
+                        tarea=tarea,
+                        centro=centro,
+                        edificio=edificio,
+                        planta=planta,
+                        espacio=espacio,
+                    )
+
+                    if numero_existente:
+                        try:
+                            revision_cuadro_existente = (
+                                obtener_revision_preventiva_cuadro(
+                                    numero_existente
+                                )
+                            )
+                        except Exception:
+                            revision_cuadro_existente = None
+
+                        if not revision_cuadro_existente:
+                            crear_revision_preventiva_cuadro(
+                                numero_ot=numero_existente,
+                                cuadro_id=int(
+                                    cuadro_preventivo[0]
+                                ),
+                                operario=operario,
+                                observaciones=(
+                                    "Revisión preventiva de cuadro reparada "
+                                    "sobre la OT ya existente."
+                                ),
+                            )
+
                 if es_revision_general_espacio:
                     numero_existente = obtener_numero_ot_preventiva_abierta(
                         tarea_id=tarea_id,
@@ -1119,7 +1178,9 @@ def generar_ots_preventivo_si_toca():
                 "PREV"
             )
 
-            if es_revision_general_espacio:
+            if es_revision_cuadro:
+                descripcion = f"[PREVENTIVO CUADRO] {tarea}"
+            elif es_revision_general_espacio:
                 descripcion = f"[PREVENTIVO ESPACIO] {tarea}"
             else:
                 descripcion = f"[PREVENTIVO] {tarea}"
@@ -1176,7 +1237,21 @@ Fecha límite: {fecha_limite or '-'}
                 datos_orden
             )
 
-            if es_revision_general_espacio:
+            if es_revision_cuadro:
+                # -------------------------------------------------
+                # REVISIÓN PREVENTIVA DE CUADRO ELÉCTRICO
+                # -------------------------------------------------
+                if cuadro_preventivo:
+                    crear_revision_preventiva_cuadro(
+                        numero_ot=numero,
+                        cuadro_id=int(
+                            cuadro_preventivo[0]
+                        ),
+                        operario=operario,
+                        observaciones=observaciones_ot,
+                    )
+
+            elif es_revision_general_espacio:
                 # -------------------------------------------------
                 # REVISIÓN GENERAL DE ESPACIO
                 # -------------------------------------------------
