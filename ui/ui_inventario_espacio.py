@@ -202,7 +202,11 @@ def _mostrar_lista_preparada_editable(
             c1, c2, c3, c4 = st.columns([3, 1, 2, 1])
 
             with c1:
-                st.markdown(f"**{elemento}**")
+                nuevo_elemento = st.text_input(
+                    "Elemento / tipo",
+                    value=elemento,
+                    key=f"temp_elemento_{clave_base}_{i}"
+                )
 
             with c2:
                 nueva_cantidad = st.number_input(
@@ -263,7 +267,7 @@ def _mostrar_lista_preparada_editable(
                     st.caption("Foto no disponible.")
 
             elementos_temp[i] = {
-                "elemento": elemento,
+                "elemento": str(nuevo_elemento or "").strip(),
                 "cantidad": nueva_cantidad,
                 "estado": nuevo_estado,
                 "observaciones": nuevas_obs,
@@ -451,6 +455,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 "Retirar"
             ]
 
+            nuevo_elemento = st.text_input(
+                "Elemento / tipo",
+                value=str(elemento or ""),
+                key=f"edit_elemento_{clave_base}_{id_inv}"
+            )
+
             c1, c2 = st.columns(2)
 
             with c1:
@@ -536,6 +546,12 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                 )
 
             if guardar_cambios:
+                nuevo_elemento = str(nuevo_elemento or "").strip()
+
+                if not nuevo_elemento:
+                    st.warning("El nombre del elemento no puede quedar vacío.")
+                    st.stop()
+
                 if numero_ot_correctiva and nuevo_estado == "Correcto":
                     st.warning(
                         "No puedes marcar este elemento como Correcto "
@@ -543,11 +559,38 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                     )
                     st.stop()
 
+                cambia_nombre = (
+                    nuevo_elemento.lower()
+                    != str(elemento or "").strip().lower()
+                )
+
+                if cambia_nombre and numero_ot_correctiva:
+                    st.warning(
+                        "No puedes cambiar el nombre de este elemento "
+                        "mientras tenga una OT correctiva asociada."
+                    )
+                    st.stop()
+
+                if cambia_nombre:
+                    existe_otro = any(
+                        int(x[0]) != int(id_inv)
+                        and str(x[2] or "").strip().lower()
+                        == nuevo_elemento.lower()
+                        for x in inventario
+                    )
+
+                    if existe_otro:
+                        st.warning(
+                            "Ya existe otro elemento con ese nombre "
+                            "en este espacio."
+                        )
+                        st.stop()
+
                 ok = guardar_o_actualizar_espacio(
                     centro=centro,
                     edificio=edificio,
                     espacio=espacio,
-                    elemento=elemento,
+                    elemento=nuevo_elemento,
                     cantidad=nueva_cantidad,
                     cantidad_afectada=nueva_cantidad_afectada,
                     estado=nuevo_estado,
@@ -562,6 +605,19 @@ def _mostrar_inventario_actual(centro, edificio, espacio, inventario, clave_base
                         ""
                     ),
                 )
+
+                if ok and cambia_nombre:
+                    ok_borrar_anterior = eliminar_elemento_inventario_espacio(
+                        id_inv
+                    )
+
+                    if not ok_borrar_anterior:
+                        st.error(
+                            "El nuevo nombre se ha guardado, pero no se pudo "
+                            "retirar la ficha anterior. Revisa el inventario "
+                            "antes de continuar."
+                        )
+                        st.stop()
 
                 if ok:
                     st.success("Elemento actualizado.")
@@ -1020,22 +1076,25 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
             key=f"add_categoria_{clave_base}"
         )
         
-        opciones_base = catalogo.get(categoria_sel, [])
-        
-        if "Otro" not in opciones_base:
-            opciones_base.append("Otro")
-        
-        elemento_nuevo = st.selectbox(
-            "Elemento",
-            opciones_base,
-            key=f"add_elemento_{clave_base}"
+        opciones_base = list(catalogo.get(categoria_sel, []))
+
+        elemento_sugerido = st.selectbox(
+            "Elemento sugerido (opcional)",
+            [""] + opciones_base,
+            key=f"add_elemento_sugerido_{clave_base}"
         )
 
-        if elemento_nuevo == "Otro":
-            elemento_nuevo = st.text_input(
-                "Especificar elemento",
-                key=f"add_elemento_otro_{clave_base}"
-            )
+        elemento_nuevo = st.text_input(
+            "Elemento / tipo",
+            value=elemento_sugerido,
+            placeholder="Ej.: Downlight, Ojo de buey, Puerta de aluminio...",
+            key=f"add_elemento_libre_{clave_base}"
+        )
+
+        st.caption(
+            "La categoría ayuda a localizar una sugerencia, pero el nombre "
+            "del elemento es libre y debe describir lo que realmente hay."
+        )
 
         c1, c2 = st.columns(2)
 
@@ -1136,7 +1195,31 @@ def _mostrar_asistente_inventario(centro, edificio, planta, espacio, inventario,
             ):
                 guardados = 0
 
-                for item in elementos_temp:
+                items_a_guardar = [
+                    item for item in elementos_temp
+                    if int(item.get("cantidad", 0) or 0) > 0
+                ]
+
+                nombres_validos = [
+                    str(item.get("elemento") or "").strip().lower()
+                    for item in items_a_guardar
+                ]
+
+                if any(not nombre for nombre in nombres_validos):
+                    st.warning(
+                        "Todos los elementos con cantidad mayor que 0 "
+                        "deben tener nombre."
+                    )
+                    st.stop()
+
+                if len(nombres_validos) != len(set(nombres_validos)):
+                    st.warning(
+                        "Hay elementos repetidos en la lista preparada. "
+                        "Corrige los nombres antes de guardar."
+                    )
+                    st.stop()
+
+                for item in items_a_guardar:
                     ok = guardar_o_actualizar_espacio(
                         centro=centro,
                         edificio=edificio,
