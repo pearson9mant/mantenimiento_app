@@ -8,7 +8,10 @@ from modules.ordenes import (
     vincular_origen_ot,
 )
 
-from modules.preventivo_aulas import crear_revision_aula
+from modules.preventivo_aulas import (
+    crear_revision_aula,
+    obtener_revision_aula_por_ot,
+)
 
 
 _ESTRUCTURA_PREVENTIVO_ASEGURADA = False
@@ -495,6 +498,121 @@ def existe_ot_preventiva_abierta(
         conn.close()
 
 
+
+def obtener_numero_ot_preventiva_abierta(
+    tarea_id,
+    tarea,
+    centro,
+    edificio,
+    planta,
+    espacio,
+):
+    """
+    Devuelve la OT preventiva abierta ya existente para esta planificación.
+
+    Se usa únicamente para reparar una revisión general de espacio que, por
+    una interrupción entre la creación de la OT y la creación de su revisión,
+    hubiera quedado sin vínculo funcional. No crea ni modifica OTs.
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+
+    estados_cierre = (
+        "finalizada",
+        "finalizado",
+        "cerrada",
+        "cerrado",
+        "cancelada",
+        "cancelado",
+    )
+
+    try:
+        # 1) Vinculación estructural moderna.
+        try:
+            cursor.execute(_sql("""
+                SELECT numero_ot
+                FROM ordenes_trabajo
+                WHERE id_preventivo = ?
+                  AND LOWER(COALESCE(estado, '')) NOT IN (?, ?, ?, ?, ?, ?)
+                ORDER BY id DESC
+                LIMIT 1
+            """), (
+                int(tarea_id),
+                *estados_cierre,
+            ))
+            fila = cursor.fetchone()
+            if fila and fila[0]:
+                return str(fila[0]).strip()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        # 2) Respaldo por registro preventivo histórico.
+        try:
+            cursor.execute(_sql("""
+                SELECT ot.numero_ot
+                FROM preventivo_registros pr
+                INNER JOIN ordenes_trabajo ot
+                    ON ot.numero_ot = pr.numero_ot
+                WHERE pr.tarea_id = ?
+                  AND LOWER(COALESCE(ot.estado, '')) NOT IN (?, ?, ?, ?, ?, ?)
+                ORDER BY ot.id DESC
+                LIMIT 1
+            """), (
+                int(tarea_id),
+                *estados_cierre,
+            ))
+            fila = cursor.fetchone()
+            if fila and fila[0]:
+                return str(fila[0]).strip()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        # 3) Último respaldo para la OT creada justo antes de una excepción:
+        # misma ubicación + misma tarea preventiva.
+        descripcion_espacio = f"[PREVENTIVO ESPACIO] {tarea}"
+        descripcion_legacy = f"[PREVENTIVO] {tarea}"
+        cursor.execute(_sql("""
+            SELECT numero_ot
+            FROM ordenes_trabajo
+            WHERE centro = ?
+              AND edificio = ?
+              AND espacio = ?
+              AND COALESCE(planta, '') = ?
+              AND descripcion IN (?, ?)
+              AND LOWER(COALESCE(estado, '')) NOT IN (?, ?, ?, ?, ?, ?)
+            ORDER BY id DESC
+            LIMIT 1
+        """), (
+            centro,
+            edificio,
+            espacio,
+            str(planta or ""),
+            descripcion_espacio,
+            descripcion_legacy,
+            *estados_cierre,
+        ))
+        fila = cursor.fetchone()
+        if fila and fila[0]:
+            return str(fila[0]).strip()
+
+        return ""
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return ""
+
+    finally:
+        conn.close()
+
 def crear_checklist_preventivo(numero_ot, tarea_id, tarea, operario):
     asegurar_estructura_preventivo()
 
@@ -947,6 +1065,11 @@ def generar_ots_preventivo_si_toca():
             if fecha_programada > hoy:
                 continue
 
+            es_revision_general_espacio = es_preventivo_integral_espacio(
+                area,
+                tarea,
+            )
+
             if existe_ot_preventiva_abierta(
                 tarea_id,
                 tarea,
@@ -955,16 +1078,45 @@ def generar_ots_preventivo_si_toca():
                 planta,
                 espacio
             ):
+                # Reparación idempotente: si la PREV ya existe pero la
+                # revisión de espacio no llegó a crearse, se crea ahora sobre
+                # ESA MISMA OT. Nunca genera una segunda PREV.
+                if es_revision_general_espacio:
+                    numero_existente = obtener_numero_ot_preventiva_abierta(
+                        tarea_id=tarea_id,
+                        tarea=tarea,
+                        centro=centro,
+                        edificio=edificio,
+                        planta=planta,
+                        espacio=espacio,
+                    )
+
+                    if numero_existente:
+                        try:
+                            revision_existente = obtener_revision_aula_por_ot(
+                                numero_existente
+                            )
+                        except Exception:
+                            revision_existente = None
+
+                        if not revision_existente:
+                            crear_revision_aula(
+                                centro=centro,
+                                edificio=edificio,
+                                planta=planta or "",
+                                espacio=espacio,
+                                operario=operario,
+                                observaciones=(
+                                    "Revisión general de espacio reparada "
+                                    "sobre la OT preventiva ya existente."
+                                ),
+                                numero_ot_preventiva=numero_existente,
+                            )
                 continue
 
             numero = obtener_siguiente_numero_ot(
                 centro,
                 "PREV"
-            )
-
-            es_revision_general_espacio = es_preventivo_integral_espacio(
-                area,
-                tarea,
             )
 
             if es_revision_general_espacio:
@@ -1024,14 +1176,6 @@ Fecha límite: {fecha_limite or '-'}
                 datos_orden
             )
 
-            # Vinculación estructural: evita depender de textos.
-            vincular_origen_ot(
-                numero_ot=numero,
-                origen_tabla="preventivo_tareas",
-                origen_id=int(tarea_id),
-                id_preventivo=int(tarea_id),
-            )
-
             if es_revision_general_espacio:
                 # -------------------------------------------------
                 # REVISIÓN GENERAL DE ESPACIO
@@ -1060,6 +1204,19 @@ Fecha límite: {fecha_limite or '-'}
                     tarea,
                     operario
                 )
+
+            # Vinculación estructural complementaria. La revisión funcional
+            # ya está creada en este punto; un fallo secundario de vinculación
+            # no debe dejar una PREV inutilizable.
+            try:
+                vincular_origen_ot(
+                    numero_ot=numero,
+                    origen_tabla="preventivo_tareas",
+                    origen_id=int(tarea_id),
+                    id_preventivo=int(tarea_id),
+                )
+            except Exception:
+                pass
 
             cursor.execute(_sql("""
                 INSERT INTO preventivo_registros
