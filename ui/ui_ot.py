@@ -28,6 +28,7 @@ from modules.cuadros_electricos import (
     guardar_comprobaciones_revision_cuadro,
     comprobaciones_revision_cuadro_completas,
     obtener_puntos_anomalia_revision_cuadro,
+    obtener_incidencia_existente_para_punto,
     marcar_revision_cuadro_completada,
     revision_cuadro_lista_para_cerrar,
     crear_incidencia_desde_revision_cuadro,
@@ -771,6 +772,20 @@ def mostrar_preventivo_cuadro_operario(
             ),
         )
 
+        incidencia_existente_punto = (
+            obtener_incidencia_existente_para_punto(
+                numero_ot_preventiva=num_ot,
+                punto_revision=punto_asociado,
+            )
+        )
+
+        if incidencia_existente_punto:
+            st.success(
+                "✅ Este punto ya está registrado en "
+                f"{incidencia_existente_punto}. "
+                "No se creará otra incidencia igual."
+            )
+
         descripcion = st.text_area(
             "¿Qué ocurre?",
             value=f"{punto_asociado}: ",
@@ -810,6 +825,9 @@ def mostrar_preventivo_cuadro_operario(
             ),
             use_container_width=True,
             type="primary",
+            disabled=bool(
+                incidencia_existente_punto
+            ),
         ):
             guardar_comprobaciones_revision_cuadro(
                 numero_ot=num_ot,
@@ -822,6 +840,7 @@ def mostrar_preventivo_cuadro_operario(
                     numero_ot_preventiva=num_ot,
                     descripcion=descripcion,
                     fotos=fotos,
+                    punto_revision=punto_asociado,
                 )
             )
 
