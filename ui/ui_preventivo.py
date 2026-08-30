@@ -16,6 +16,7 @@ from modules.espacios import (
 )
 from ui.preventivo_aulas import pantalla_preventivo_aulas
 from modules.inteligencia_preventivos import construir_panel_preventivo
+from modules.cuadros_electricos import obtener_cuadros_electricos
 from ui.ui_inteligencia_preventiva import (
     pantalla_inteligencia_preventiva,
 )
@@ -1278,6 +1279,65 @@ def pantalla_preventivo():
             else:
                 tarea = tarea_sel
 
+            cuadro_preventivo_valido = True
+
+            if (
+                area == "Electricidad"
+                and tarea_sel == "Revisar cuadro eléctrico"
+            ):
+                cuadros_ubicacion = []
+
+                try:
+                    cuadros_activos = obtener_cuadros_electricos(
+                        solo_activos=True
+                    )
+                except Exception:
+                    cuadros_activos = []
+
+                for fila_cuadro in cuadros_activos:
+                    if (
+                        str(fila_cuadro[3] or "").strip() == str(centro or "").strip()
+                        and str(fila_cuadro[4] or "").strip() == str(edificio or "").strip()
+                        and str(fila_cuadro[5] or "").strip() == str(planta or "").strip()
+                        and str(fila_cuadro[6] or "").strip() == str(espacio or "").strip()
+                    ):
+                        cuadros_ubicacion.append(
+                            fila_cuadro
+                        )
+
+                if not cuadros_ubicacion:
+                    cuadro_preventivo_valido = False
+                    st.warning(
+                        "No hay ningún cuadro eléctrico activo registrado "
+                        "en esta ubicación. Créalo primero en "
+                        "Configuración → Cuadros eléctricos."
+                    )
+
+                else:
+                    opciones_cuadro = [
+                        str(fila[1] or "").strip()
+                        for fila in cuadros_ubicacion
+                    ]
+
+                    codigo_cuadro = st.selectbox(
+                        "Cuadro eléctrico",
+                        opciones_cuadro,
+                        format_func=lambda codigo: next(
+                            (
+                                f"{fila[1]} · {fila[2]}"
+                                for fila in cuadros_ubicacion
+                                if str(fila[1]) == str(codigo)
+                            ),
+                            codigo,
+                        ),
+                        key="prev_cuadro_electrico",
+                    )
+
+                    tarea = (
+                        f"Revisar cuadro eléctrico "
+                        f"[{codigo_cuadro}]"
+                    )
+
             operario_auto = operario_por_centro(centro)
 
             if operario_auto in OPERARIOS:
@@ -1335,7 +1395,12 @@ def pantalla_preventivo():
                     st.error("No se puede guardar. La foto es demasiado grande.")
                     return
 
-                if not str(tarea).strip():
+                if not cuadro_preventivo_valido:
+                    st.warning(
+                        "Selecciona una ubicación con un cuadro eléctrico "
+                        "registrado antes de crear este preventivo."
+                    )
+                elif not str(tarea).strip():
                     st.warning("La tarea es obligatoria")
                 elif not str(espacio).strip():
                     st.warning("Indica un espacio")
