@@ -19,6 +19,7 @@ from modules.inventario import (
 )
 
 from modules.preventivo import checklist_preventivo_completo
+from modules.ficha_espacio import obtener_inventario_espacio
 
 from modules.preventivo_aulas import (
     obtener_revision_aula_por_ot,
@@ -1131,50 +1132,66 @@ def mostrar_preventivo_aula_operario(
 
     st.caption(
         "Inventario ya censado. "
-        "En esta revisión solo se muestran "
-        "las cantidades instaladas."
+        "En esta revisión se consulta "
+        "el inventario vivo actual del espacio."
     )
 
-    if not inventariables:
+    try:
+        inventario_vivo = obtener_inventario_espacio(
+            centro=centro_revision,
+            edificio=edificio_revision,
+            espacio=espacio_revision,
+        )
+    except Exception as error:
+        inventario_vivo = []
+        st.caption(
+            "No se ha podido consultar el inventario vivo: "
+            f"{error}"
+        )
+
+    if not inventario_vivo:
         st.info(
-            "No hay elementos inventariables "
-            "registrados para este espacio."
+            "No hay elementos registrados actualmente "
+            "en el inventario vivo de este espacio."
         )
 
     else:
-        # Inventario ya censado: una línea por elemento.
-        # Mucho menos scroll y muchos menos componentes Streamlit.
-        inventario_por_categoria = {}
+        st.markdown(
+            "**Inventario existente**"
+        )
 
-        for item in inventariables:
-            elemento = str(
-                item[2] or ""
-            ).strip()
-            categoria = str(
-                item[8] or "General"
-            ).strip()
-            cantidad = int(
-                item[11] or 0
-            )
+        lineas_inventario_vivo = []
 
-            inventario_por_categoria.setdefault(
-                categoria,
-                [],
-            ).append(
-                (elemento, cantidad)
-            )
-
-        for categoria, lineas in inventario_por_categoria.items():
-            st.markdown(
-                f"**{categoria}**"
-            )
-
-            st.markdown(
-                "\n".join(
-                    f"- {elemento}: **{cantidad}**"
-                    for elemento, cantidad in lineas
+        for item_inv in inventario_vivo:
+            try:
+                elemento_inv = str(
+                    item_inv[2] or ""
+                ).strip()
+                cantidad_inv = int(
+                    item_inv[3] or 0
                 )
+            except Exception:
+                continue
+
+            if not elemento_inv:
+                continue
+
+            lineas_inventario_vivo.append(
+                (elemento_inv, cantidad_inv)
             )
+
+        lineas_inventario_vivo.sort(
+            key=lambda linea: normalizar_txt(
+                linea[0]
+            )
+        )
+
+        st.markdown(
+            "\n".join(
+                f"- {elemento}: **{cantidad}**"
+                for elemento, cantidad in lineas_inventario_vivo
+            )
+        )
 
     # =====================================================
     # REVISIÓN GENERAL
@@ -1381,10 +1398,17 @@ def mostrar_preventivo_aula_operario(
 
     # Ya tenemos items y estado_general cargados en esta misma pantalla.
     # No repetimos consultas a base de datos solo para mostrar el resumen.
-    unidades_total = sum(
-        int(item[11] or 0)
-        for item in inventariables
-    )
+    if inventario_completado and inventario_vivo:
+        unidades_total = sum(
+            int(item_inv[3] or 0)
+            for item_inv in inventario_vivo
+            if len(item_inv) > 3
+        )
+    else:
+        unidades_total = sum(
+            int(item[11] or 0)
+            for item in inventariables
+        )
 
     incidencias_total = len(
         incidencias_creadas
