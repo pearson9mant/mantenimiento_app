@@ -380,11 +380,14 @@ def descomponer_orden_operario(fila):
 
 def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
     """
-    Reconoce una OT del Preventivo integral de aulas sin consultar la BD.
+    Reconoce el flujo integral de revisión de espacios sin consultar la BD.
 
-    La validación de que existe una revisión vinculada se hace al abrir
-    la pantalla específica. Así evitamos una conexión remota extra cada
-    vez que Streamlit decide qué tipo de OT está mostrando.
+    Compatibilidad:
+    - mantiene los antiguos Preventivo aulas;
+    - reconoce las nuevas OT marcadas como PREVENTIVO ESPACIO.
+
+    La validación real de la revisión vinculada se mantiene al abrir la OT,
+    evitando una consulta remota adicional por cada tarjeta del listado.
     """
     desc_txt = normalizar_txt(
         descripcion
@@ -400,7 +403,8 @@ def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
         return False
 
     return (
-        "preventivo aulas" in desc_txt
+        "preventivo espacio" in desc_txt
+        or "preventivo aulas" in desc_txt
         or "preventivo aula" in desc_txt
     )
 
@@ -923,12 +927,12 @@ def mostrar_preventivo_aula_operario(
     operario,
 ):
     """
-    Flujo actual del Preventivo integral de aulas.
+    Flujo actual de revisión preventiva integral de espacios.
 
     El flujo anterior se conserva íntegro en
     mostrar_preventivo_aula_operario_legacy() por seguridad.
 
-    - Primer preventivo del aula: censo inicial una sola vez.
+    - Primer preventivo del espacio: censo inicial una sola vez.
     - Preventivos posteriores: solo lectura de cantidades.
     - Revisión visual/funcional general.
     - Cada anomalía genera una INC normal.
@@ -942,12 +946,12 @@ def mostrar_preventivo_aula_operario(
     )
 
     st.markdown(
-        "### 🏫 Preventivo integral del aula"
+        "### 🏫 Revisión preventiva del espacio"
     )
 
     if not revision:
         st.error(
-            "Esta OT está marcada como Preventivo aulas, "
+            "Esta OT está marcada como revisión general de espacio, "
             "pero no se encuentra su revisión vinculada."
         )
         return
@@ -975,7 +979,7 @@ def mostrar_preventivo_aula_operario(
     if not items:
         st.warning(
             "La revisión no contiene elementos. "
-            "Revisa Configuración → Modelo aulas."
+            "No se ha podido preparar el inventario de este espacio."
         )
         return
 
@@ -1005,7 +1009,7 @@ def mostrar_preventivo_aula_operario(
     # INVENTARIO
     # =====================================================
     st.markdown(
-        "### 📦 Inventario del aula"
+        "### 📦 Inventario del espacio"
     )
 
     if (
@@ -1013,7 +1017,7 @@ def mostrar_preventivo_aula_operario(
         and not inventario_completado
     ):
         st.info(
-            "Es el primer preventivo de este aula. "
+            "Es el primer preventivo de este espacio. "
             "Haz ahora el inventario inicial una sola vez. "
             "En los próximos preventivos solo verás las cantidades."
         )
@@ -1100,7 +1104,7 @@ def mostrar_preventivo_aula_operario(
     if not inventariables:
         st.info(
             "No hay elementos inventariables "
-            "configurados para este aula."
+            "registrados para este espacio."
         )
 
     else:
@@ -1145,11 +1149,11 @@ def mostrar_preventivo_aula_operario(
         "---"
     )
     st.markdown(
-        "### 👀 Revisión preventiva del aula"
+        "### 👀 Revisión preventiva del espacio"
     )
 
     st.info(
-        "Revisa visual y funcionalmente el aula completa: "
+        "Revisa visual y funcionalmente el espacio completo: "
         "iluminación, mecanismos, mobiliario, puertas, ventanas, "
         "climatización y cualquier otra anomalía visible."
     )
@@ -1221,7 +1225,7 @@ def mostrar_preventivo_aula_operario(
             st.caption(
                 "Se creará una incidencia normal, "
                 "como las del QR. "
-                "La ubicación del aula ya viene asignada."
+                "La ubicación del espacio ya viene asignada."
             )
 
             contador = int(
@@ -1384,7 +1388,7 @@ def mostrar_preventivo_aula_operario(
 
     if revision_completada:
         st.success(
-            "✅ Preventivo de aula completo. "
+            "✅ Preventivo del espacio completo. "
             "La OT ya puede finalizarse."
         )
     else:
