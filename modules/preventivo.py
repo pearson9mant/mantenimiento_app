@@ -170,36 +170,37 @@ def normalizar_clave_checklist(texto):
     return " ".join(palabras)
 
 
-def es_preventivo_integral_aulas(area, tarea):
+def es_preventivo_integral_espacio(area, tarea):
     """
-    Identifica exclusivamente el preventivo integral de aulas.
+    Identifica el flujo de revisión general de un espacio.
 
-    Se apoya principalmente en la tarea "Preventivo aulas".
-    El área se comprueba cuando viene informada, pero no se utiliza
-    como única condición para mantener compatibilidad con planificaciones
-    antiguas que pudieran haber guardado un área genérica.
+    Compatibilidad:
+    - Los antiguos "Preventivo aulas" siguen entrando exactamente igual.
+    - Las nuevas planificaciones con área "Mantenimiento general" usan el
+      mismo flujo integral para cualquier espacio del catálogo.
 
-    El resto de preventivos continúa exactamente por el circuito habitual.
+    El resto de preventivos (cuadros, split, legionella, etc.) conserva su
+    checklist tradicional.
     """
     tarea_txt = normalizar_clave_checklist(tarea)
     area_txt = normalizar_clave_checklist(area)
 
-    es_tarea_aulas = (
+    if (
         tarea_txt == "preventivo aulas"
         or "preventivo aulas" in tarea_txt
         or "preventivo aula" in tarea_txt
-    )
-
-    if not es_tarea_aulas:
-        return False
-
-    # Si el área es la nueva, coincidencia completa.
-    if area_txt == "mantenimiento general aulas":
+    ):
         return True
 
-    # Compatibilidad: la tarea es suficientemente específica para
-    # reconocer una planificación antigua o un área guardada genérica.
-    return True
+    return area_txt in {
+        "mantenimiento general",
+        "mantenimiento general aulas",
+    }
+
+
+def es_preventivo_integral_aulas(area, tarea):
+    """Alias histórico para no romper imports ni llamadas existentes."""
+    return es_preventivo_integral_espacio(area, tarea)
 
 
 def obtener_items_checklist_configurado(tarea):
@@ -961,7 +962,15 @@ def generar_ots_preventivo_si_toca():
                 "PREV"
             )
 
-            descripcion = f"[PREVENTIVO] {tarea}"
+            es_revision_general_espacio = es_preventivo_integral_espacio(
+                area,
+                tarea,
+            )
+
+            if es_revision_general_espacio:
+                descripcion = f"[PREVENTIVO ESPACIO] {tarea}"
+            else:
+                descripcion = f"[PREVENTIVO] {tarea}"
 
             observaciones_ot = f"""
 Tipo preventivo: {tipo or 'Preventivo'}
@@ -1023,17 +1032,13 @@ Fecha límite: {fecha_limite or '-'}
                 id_preventivo=int(tarea_id),
             )
 
-            if es_preventivo_integral_aulas(
-                area,
-                tarea,
-            ):
+            if es_revision_general_espacio:
                 # -------------------------------------------------
-                # PREVENTIVO INTEGRAL DE AULA
+                # REVISIÓN GENERAL DE ESPACIO
                 # -------------------------------------------------
-                # La OT ya existe y es la única OT preventiva.
-                # Creamos únicamente la revisión integral asociada,
-                # copiando el modelo activo de Configuración y
-                # precargando el inventario vivo del aula.
+                # Conservamos las tablas/funciones históricas de aulas para
+                # no romper nada, pero el flujo ya sirve para cualquier
+                # espacio: aula, WC, despacho, informática, cocina, etc.
                 crear_revision_aula(
                     centro=centro,
                     edificio=edificio,
