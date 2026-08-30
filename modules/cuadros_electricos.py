@@ -47,11 +47,23 @@ def asegurar_tablas_cuadros_electricos():
             observaciones TEXT,
             activo INTEGER DEFAULT 1,
             fecha_creacion TEXT,
-            fecha_actualizacion TEXT
+            fecha_actualizacion TEXT,
+            identificador TEXT
         )
     """)
 
     conn.commit()
+
+    # Migración aditiva: cuadros ya creados antes de incorporar
+    # la identificación individual Q1, Q2, ID1, etc.
+    try:
+        cur.execute("""
+            ALTER TABLE cuadros_electricos_mecanismos
+            ADD COLUMN identificador TEXT
+        """)
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
     try:
         cur.execute("""
@@ -323,7 +335,8 @@ def obtener_mecanismos_cuadro(id_cuadro, solo_activos=True):
             observaciones,
             activo,
             fecha_creacion,
-            fecha_actualizacion
+            fecha_actualizacion,
+            identificador
         FROM cuadros_electricos_mecanismos
         WHERE cuadro_id = ?
     """
@@ -356,12 +369,14 @@ def crear_mecanismo_cuadro(
     fabricante="",
     modelo="",
     observaciones="",
+    identificador="",
 ):
     asegurar_tablas_cuadros_electricos()
 
     mecanismo = str(mecanismo or "").strip()
     caracteristicas = str(caracteristicas or "").strip()
     circuito = str(circuito or "").strip()
+    identificador = str(identificador or "").strip()
 
     if not mecanismo:
         return False, "Indica el mecanismo."
@@ -378,6 +393,25 @@ def crear_mecanismo_cuadro(
     cur = conn.cursor()
 
     try:
+        if identificador:
+            cur.execute(_sql("""
+                SELECT COUNT(*)
+                FROM cuadros_electricos_mecanismos
+                WHERE cuadro_id = ?
+                  AND activo = 1
+                  AND LOWER(TRIM(COALESCE(identificador, ''))) =
+                      LOWER(TRIM(?))
+            """), (
+                int(cuadro_id),
+                identificador,
+            ))
+
+            if int(cur.fetchone()[0] or 0) > 0:
+                return False, (
+                    f"Ya existe el identificador {identificador} "
+                    "en este cuadro."
+                )
+
         cur.execute(_sql("""
             SELECT COUNT(*)
             FROM cuadros_electricos_mecanismos
@@ -416,9 +450,10 @@ def crear_mecanismo_cuadro(
                 observaciones,
                 activo,
                 fecha_creacion,
-                fecha_actualizacion
+                fecha_actualizacion,
+                identificador
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         """), (
             int(cuadro_id),
             mecanismo,
@@ -430,6 +465,7 @@ def crear_mecanismo_cuadro(
             observaciones,
             ahora,
             ahora,
+            identificador,
         ))
 
         conn.commit()
@@ -452,10 +488,12 @@ def actualizar_mecanismo_cuadro(
     fabricante="",
     modelo="",
     observaciones="",
+    identificador="",
 ):
     asegurar_tablas_cuadros_electricos()
 
     mecanismo = str(mecanismo or "").strip()
+    identificador = str(identificador or "").strip()
 
     if not mecanismo:
         return False, "Indica el mecanismo."
@@ -473,6 +511,42 @@ def actualizar_mecanismo_cuadro(
 
     try:
         cur.execute(_sql("""
+            SELECT cuadro_id
+            FROM cuadros_electricos_mecanismos
+            WHERE id = ?
+        """), (
+            int(id_mecanismo),
+        ))
+
+        fila_cuadro = cur.fetchone()
+
+        if not fila_cuadro:
+            return False, "No se encuentra el mecanismo."
+
+        cuadro_id = int(fila_cuadro[0])
+
+        if identificador:
+            cur.execute(_sql("""
+                SELECT COUNT(*)
+                FROM cuadros_electricos_mecanismos
+                WHERE cuadro_id = ?
+                  AND id <> ?
+                  AND activo = 1
+                  AND LOWER(TRIM(COALESCE(identificador, ''))) =
+                      LOWER(TRIM(?))
+            """), (
+                cuadro_id,
+                int(id_mecanismo),
+                identificador,
+            ))
+
+            if int(cur.fetchone()[0] or 0) > 0:
+                return False, (
+                    f"Ya existe el identificador {identificador} "
+                    "en este cuadro."
+                )
+
+        cur.execute(_sql("""
             UPDATE cuadros_electricos_mecanismos
             SET mecanismo = ?,
                 caracteristicas = ?,
@@ -481,7 +555,8 @@ def actualizar_mecanismo_cuadro(
                 fabricante = ?,
                 modelo = ?,
                 observaciones = ?,
-                fecha_actualizacion = ?
+                fecha_actualizacion = ?,
+                identificador = ?
             WHERE id = ?
         """), (
             mecanismo,
@@ -492,6 +567,7 @@ def actualizar_mecanismo_cuadro(
             modelo,
             observaciones,
             _ahora_str(),
+            identificador,
             int(id_mecanismo),
         ))
 
