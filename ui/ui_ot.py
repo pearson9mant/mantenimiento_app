@@ -27,6 +27,7 @@ from modules.cuadros_electricos import (
     obtener_mecanismos_cuadro,
     guardar_comprobaciones_revision_cuadro,
     comprobaciones_revision_cuadro_completas,
+    obtener_puntos_anomalia_revision_cuadro,
     marcar_revision_cuadro_completada,
     revision_cuadro_lista_para_cerrar,
     crear_incidencia_desde_revision_cuadro,
@@ -544,22 +545,61 @@ def mostrar_preventivo_cuadro_operario(
 
     comprobaciones_nuevas = {}
 
+    opciones_estado_revision = [
+        "Pendiente",
+        "✅ Correcto",
+        "⚠️ Anomalía",
+        "➖ No aplica",
+    ]
+
+    mapa_valor_a_opcion = {
+        "": "Pendiente",
+        "correcto": "✅ Correcto",
+        "anomalia": "⚠️ Anomalía",
+        "no_aplica": "➖ No aplica",
+    }
+
+    mapa_opcion_a_valor = {
+        "Pendiente": "",
+        "✅ Correcto": "correcto",
+        "⚠️ Anomalía": "anomalia",
+        "➖ No aplica": "no_aplica",
+    }
+
     for indice, punto in enumerate(
         COMPROBACIONES_PREVENTIVO_CUADRO,
         start=1,
     ):
-        comprobaciones_nuevas[punto] = st.checkbox(
+        valor_guardado = str(
+            comprobaciones_guardadas.get(
+                punto,
+                "",
+            )
+            or ""
+        ).strip().lower()
+
+        opcion_actual = mapa_valor_a_opcion.get(
+            valor_guardado,
+            "Pendiente",
+        )
+
+        seleccion = st.radio(
             punto,
-            value=bool(
-                comprobaciones_guardadas.get(
-                    punto,
-                    False,
-                )
+            opciones_estado_revision,
+            index=opciones_estado_revision.index(
+                opcion_actual
             ),
+            horizontal=True,
             key=(
                 f"prev_cuadro_check_"
                 f"{num_ot}_{indice}"
             ),
+        )
+
+        comprobaciones_nuevas[punto] = (
+            mapa_opcion_a_valor[
+                seleccion
+            ]
         )
 
     observaciones_revision = st.text_area(
@@ -594,21 +634,48 @@ def mostrar_preventivo_cuadro_operario(
             )
 
     checks_completos = all(
-        bool(
+        str(
             comprobaciones_nuevas.get(
                 punto,
-                False,
+                "",
             )
-        )
+            or ""
+        ).strip().lower()
+        in [
+            "correcto",
+            "anomalia",
+            "no_aplica",
+        ]
         for punto in COMPROBACIONES_PREVENTIVO_CUADRO
     )
 
     if not checks_completos:
         st.warning(
-            "Completa todos los puntos de la revisión técnica "
-            "antes de cerrar el preventivo."
+            "Indica el resultado de todos los puntos: "
+            "Correcto, Anomalía o No aplica."
         )
         return
+
+    puntos_anomalia_actuales = [
+        punto
+        for punto in COMPROBACIONES_PREVENTIVO_CUADRO
+        if str(
+            comprobaciones_nuevas.get(
+                punto,
+                "",
+            )
+            or ""
+        ).strip().lower() == "anomalia"
+    ]
+
+    if puntos_anomalia_actuales:
+        st.warning(
+            "⚠️ Puntos con anomalía:\n\n"
+            + "\n".join(
+                f"- {punto}"
+                for punto in puntos_anomalia_actuales
+            )
+        )
 
     # -----------------------------------------------------
     # ANOMALÍAS → INC NORMALES
@@ -645,20 +712,9 @@ def mostrar_preventivo_cuadro_operario(
         )
         return
 
-    respuesta = st.radio(
-        "¿Has detectado alguna anomalía?",
-        [
-            "No",
-            "Sí",
-        ],
-        index=None,
-        horizontal=True,
-        key=f"prev_cuadro_anomalia_{num_ot}",
-    )
-
-    if respuesta == "No":
+    if not puntos_anomalia_actuales:
         if st.button(
-            "✅ Guardar revisión sin anomalías",
+            "✅ Terminar revisión sin anomalías",
             key=f"prev_cuadro_sin_anomalias_{num_ot}",
             use_container_width=True,
             type="primary",
@@ -682,15 +738,16 @@ def mostrar_preventivo_cuadro_operario(
                     "No se ha podido completar la revisión."
                 )
 
-    elif respuesta == "Sí":
+    else:
         st.markdown(
-            "#### 🔧 Anomalía detectada"
+            "#### 🔧 Registrar anomalía"
         )
 
         st.caption(
-            "Se creará una incidencia normal de Electricidad "
-            "con la ubicación del cuadro ya asignada. "
-            "Puedes indicar Q1, ID1, KM1, etc. en la descripción."
+            "Los puntos marcados como ⚠️ Anomalía deben quedar "
+            "trazados mediante una incidencia normal de Electricidad. "
+            "Puedes agrupar en una INC los defectos que formen parte "
+            "de la misma actuación, o crear varias."
         )
 
         contador = int(
@@ -701,8 +758,22 @@ def mostrar_preventivo_cuadro_operario(
             or 1
         )
 
+        opciones_anomalia = list(
+            puntos_anomalia_actuales
+        )
+
+        punto_asociado = st.selectbox(
+            "Punto de revisión asociado",
+            opciones_anomalia,
+            key=(
+                f"prev_cuadro_punto_inc_"
+                f"{num_ot}_{contador}"
+            ),
+        )
+
         descripcion = st.text_area(
             "¿Qué ocurre?",
+            value=f"{punto_asociado}: ",
             placeholder=(
                 "Ej.: Q1 presenta signos de calentamiento "
                 "en el borne de salida."
@@ -769,10 +840,8 @@ def mostrar_preventivo_cuadro_operario(
                 st.rerun()
 
         if incidencias_creadas:
-            st.caption(
-                "Puedes crear otra incidencia. "
-                "Cuando estén todas registradas, "
-                "termina la revisión."
+            st.success(
+                "Ya existe al menos una INC vinculada a esta revisión."
             )
 
             if st.button(
@@ -796,8 +865,10 @@ def mostrar_preventivo_cuadro_operario(
                     st.rerun()
                 else:
                     st.error(
-                        "No se ha podido completar la revisión."
+                        "No se ha podido completar la revisión. "
+                        "Comprueba que exista una INC para las anomalías."
                     )
+
 
 
 def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
