@@ -239,14 +239,21 @@ def _mostrar_inventario_mecanismos(
                 activo,
                 fecha_creacion,
                 fecha_actualizacion,
+                identificador,
             ) = fila
 
             detalle = str(
                 caracteristicas or ""
             ).strip()
 
+            identificador_txt = str(
+                identificador or ""
+            ).strip()
+
             titulo = (
-                f"⚡ {mecanismo or '-'}"
+                f"⚡ "
+                f"{identificador_txt + ' · ' if identificador_txt else ''}"
+                f"{mecanismo or '-'}"
                 f"{' · ' + detalle if detalle else ''}"
                 f" · {int(cantidad or 0)} uds"
             )
@@ -255,6 +262,22 @@ def _mostrar_inventario_mecanismos(
                 titulo,
                 expanded=False,
             ):
+                identificador_nuevo = st.text_input(
+                    "Identificador / posición",
+                    value=str(
+                        identificador or ""
+                    ),
+                    placeholder="Ej.: Q1, Q2, ID1, KM1...",
+                    key=(
+                        f"cfg_cuadro_mec_id_"
+                        f"{id_mecanismo}"
+                    ),
+                    help=(
+                        "Referencia visible o lógica dentro del cuadro. "
+                        "Puede dejarse vacía si todavía no está identificada."
+                    ),
+                )
+
                 mecanismo_nuevo = st.text_input(
                     "Mecanismo",
                     value=str(
@@ -372,6 +395,9 @@ def _mostrar_inventario_mecanismos(
                                 observaciones=(
                                     observaciones_nuevas
                                 ),
+                                identificador=(
+                                    identificador_nuevo
+                                ),
                             )
                         )
 
@@ -421,6 +447,16 @@ def _mostrar_inventario_mecanismos(
     st.markdown("---")
     st.markdown(
         "#### ➕ Añadir mecanismo"
+    )
+
+    identificador_nuevo = st.text_input(
+        "Identificador / posición",
+        placeholder="Ej.: Q1, Q2, ID1, KM1...",
+        key=f"cfg_cuadro_add_id_{id_cuadro}",
+        help=(
+            "Referencia del mecanismo dentro del cuadro. "
+            "Es opcional y puede completarse más adelante."
+        ),
     )
 
     mecanismo_sugerido = st.selectbox(
@@ -495,6 +531,7 @@ def _mostrar_inventario_mecanismos(
             fabricante=fabricante,
             modelo=modelo,
             observaciones=observaciones,
+            identificador=identificador_nuevo,
         )
 
         if ok:
