@@ -1253,10 +1253,128 @@ def registrar_incidencia_revision_cuadro(
         conn.close()
 
 
+def obtener_incidencia_existente_para_punto(
+    numero_ot_preventiva,
+    punto_revision,
+):
+    revision = obtener_revision_preventiva_cuadro(
+        numero_ot_preventiva
+    )
+
+    if not revision:
+        return ""
+
+    punto_norm = _normalizar_cuadro_txt(
+        punto_revision
+    )
+
+    if not punto_norm:
+        return ""
+
+    incidencias = list(
+        revision.get(
+            "incidencias",
+            [],
+        )
+        or []
+    )
+
+    if not incidencias:
+        return ""
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        for numero_inc in incidencias:
+            numero_inc = str(
+                numero_inc or ""
+            ).strip()
+
+            if not numero_inc:
+                continue
+
+            descripcion = ""
+
+            try:
+                cur.execute(_sql("""
+                    SELECT descripcion
+                    FROM ordenes_trabajo
+                    WHERE numero_ot = ?
+                    LIMIT 1
+                """), (
+                    numero_inc,
+                ))
+
+                fila = cur.fetchone()
+
+                if fila:
+                    descripcion = str(
+                        fila[0] or ""
+                    ).strip()
+
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+            if not descripcion:
+                try:
+                    cur.execute(_sql("""
+                        SELECT descripcion
+                        FROM historico_ordenes
+                        WHERE numero_ot = ?
+                        LIMIT 1
+                    """), (
+                        numero_inc,
+                    ))
+
+                    fila = cur.fetchone()
+
+                    if fila:
+                        descripcion = str(
+                            fila[0] or ""
+                        ).strip()
+
+                except Exception:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+
+            descripcion_norm = _normalizar_cuadro_txt(
+                descripcion
+            )
+
+            if (
+                descripcion_norm
+                and (
+                    descripcion_norm == punto_norm
+                    or descripcion_norm.startswith(
+                        punto_norm + ":"
+                    )
+                    or descripcion_norm.startswith(
+                        punto_norm + " -"
+                    )
+                    or descripcion_norm.startswith(
+                        punto_norm + " "
+                    )
+                )
+            ):
+                return numero_inc
+
+        return ""
+
+    finally:
+        conn.close()
+
+
 def crear_incidencia_desde_revision_cuadro(
     numero_ot_preventiva,
     descripcion,
     fotos=None,
+    punto_revision="",
 ):
     revision = obtener_revision_preventiva_cuadro(
         numero_ot_preventiva
@@ -1272,6 +1390,26 @@ def crear_incidencia_desde_revision_cuadro(
     descripcion_limpia = str(
         descripcion or ""
     ).strip()
+
+    punto_revision = str(
+        punto_revision or ""
+    ).strip()
+
+    if punto_revision:
+        numero_existente = obtener_incidencia_existente_para_punto(
+            numero_ot_preventiva=numero_ot_preventiva,
+            punto_revision=punto_revision,
+        )
+
+        if numero_existente:
+            return (
+                False,
+                (
+                    "Este punto ya tiene una incidencia vinculada "
+                    f"a esta revisión: {numero_existente}."
+                ),
+                numero_existente,
+            )
 
     if not descripcion_limpia:
         return (
