@@ -12,11 +12,20 @@ CATALOGO_BASE_AULAS = [
     ("Mobiliario", "Papelera", "Equipamiento"),
     ("Mobiliario", "Perchero", "Equipamiento"),
 
+    # Iluminación
+    ("Iluminación", "Iluminación", "Electricidad"),
+    ("Iluminación", "Downlight", "Electricidad"),
+    ("Iluminación", "Ojo de buey", "Electricidad"),
+    ("Iluminación", "Plafón", "Electricidad"),
+    ("Iluminación", "Luminaria LED", "Electricidad"),
+    ("Iluminación", "Tubo LED", "Electricidad"),
+    ("Iluminación", "Panel LED", "Electricidad"),
+    ("Iluminación", "Pantalla fluorescente", "Electricidad"),
+    ("Iluminación", "Luminaria estanca", "Electricidad"),
+    ("Iluminación", "Luminaria exterior", "Electricidad"),
+    ("Iluminación", "Proyector / Foco", "Electricidad"),
+
     # Electricidad
-    ("Electricidad", "Iluminación", "Electricidad"),
-    ("Electricidad", "Luminaria LED", "Electricidad"),
-    ("Electricidad", "Tubo LED", "Electricidad"),
-    ("Electricidad", "Panel LED", "Electricidad"),
     ("Electricidad", "Interruptor", "Electricidad"),
     ("Electricidad", "Conmutador", "Electricidad"),
     ("Electricidad", "Pulsador", "Electricidad"),
@@ -38,16 +47,22 @@ CATALOGO_BASE_AULAS = [
 
     # Carpintería
     ("Carpintería", "Puerta", "Carpintería"),
+    ("Carpintería", "Puerta de madera", "Carpintería"),
+    ("Carpintería", "Puerta de aluminio", "Carpintería"),
     ("Carpintería", "Puerta cortafuegos", "Carpintería"),
-    ("Carpintería", "Maneta", "Carpintería"),
-    ("Carpintería", "Cerradura", "Carpintería"),
-    ("Carpintería", "Bombín", "Carpintería"),
-    ("Carpintería", "Cierrapuertas", "Carpintería"),
-    ("Carpintería", "Bisagra", "Carpintería"),
     ("Carpintería", "Ventana", "Carpintería"),
     ("Carpintería", "Persiana", "Carpintería"),
     ("Carpintería", "Cortina", "Carpintería"),
     ("Carpintería", "Cristal", "Carpintería"),
+
+    # Cerrajería
+    ("Cerrajería", "Maneta", "Cerrajería"),
+    ("Cerrajería", "Cerradura", "Cerrajería"),
+    ("Cerrajería", "Bombín", "Cerrajería"),
+    ("Cerrajería", "Cierrapuertas", "Cerrajería"),
+    ("Cerrajería", "Bisagra", "Cerrajería"),
+    ("Cerrajería", "Cerrojo", "Cerrajería"),
+    ("Cerrajería", "Candado", "Cerrajería"),
 
     # Construcción
     ("Construcción", "Pared", "Construcción"),
@@ -71,6 +86,7 @@ CATALOGO_BASE_AULAS = [
     # Fontanería / WC
     ("Fontanería", "Lavabo", "Fontanería"),
     ("Fontanería", "Grifo", "Fontanería"),
+    ("Fontanería", "Grifo temporizado", "Fontanería"),
     ("Fontanería", "Grifo mezclador de bañera", "Fontanería"),
     ("Fontanería", "Desagüe", "Fontanería"),
     ("Fontanería", "Sifón", "Fontanería"),
@@ -82,6 +98,7 @@ CATALOGO_BASE_AULAS = [
     ("Fontanería", "Bañera", "Fontanería"),
     ("Fontanería", "Mampara", "Fontanería"),
     ("Fontanería", "Fluxor", "Fontanería"),
+    ("Fontanería", "Cisterna", "Fontanería"),
     ("Fontanería", "Llave de paso", "Fontanería"),
 
     # Complementos WC
@@ -98,6 +115,13 @@ CATALOGO_BASE_AULAS = [
     ("Seguridad", "Detector humo", "Seguridad"),
     ("Seguridad", "Pulsador alarma", "Seguridad"),
     ("Seguridad", "Señalización", "Seguridad"),
+
+    # Equipamiento
+    ("Equipamiento", "Pizarra", "Equipamiento"),
+    ("Equipamiento", "Pantalla", "Equipamiento"),
+    ("Equipamiento", "Reloj", "Equipamiento"),
+    ("Equipamiento", "Tablón de anuncios", "Equipamiento"),
+    ("Equipamiento", "Dispensador", "Equipamiento"),
 
     # Cocina
     ("Cocina", "Fregadero", "Fontanería"),
@@ -119,9 +143,36 @@ CATALOGO_BASE_AULAS = [
     ("ACS / Legionella", "Intercambiador", "ACS"),
     ("ACS / Legionella", "Grupo de presión", "Fontanería"),
 
+    # Exterior / Jardinería
+    ("Exterior / Jardinería", "Banco exterior", "Equipamiento"),
+    ("Exterior / Jardinería", "Papelera exterior", "Equipamiento"),
+    ("Exterior / Jardinería", "Fuente", "Fontanería"),
+    ("Exterior / Jardinería", "Jardinera", "Jardinería"),
+    ("Exterior / Jardinería", "Riego", "Jardinería"),
+    ("Exterior / Jardinería", "Aspersor", "Jardinería"),
+    ("Exterior / Jardinería", "Sumidero", "Fontanería"),
+    ("Exterior / Jardinería", "Rejilla desagüe", "Fontanería"),
+    ("Exterior / Jardinería", "Foco exterior", "Electricidad"),
+
     # Otros
     ("Otros", "Otro", "Equipamiento"),
 ]
+
+
+# Elementos antiguos que ya pueden existir en la base de datos.
+# Se reclasifican de forma idempotente para no dejar duplicados
+# en las categorías anteriores al actualizar el catálogo.
+RECLASIFICACION_CATEGORIAS = {
+    "Iluminación": "Iluminación",
+    "Luminaria LED": "Iluminación",
+    "Tubo LED": "Iluminación",
+    "Panel LED": "Iluminación",
+    "Maneta": "Cerrajería",
+    "Cerradura": "Cerrajería",
+    "Bombín": "Cerrajería",
+    "Cierrapuertas": "Cerrajería",
+    "Bisagra": "Cerrajería",
+}
 
 
 def crear_tabla_catalogo_aulas():
@@ -148,6 +199,20 @@ def sembrar_catalogo_aulas():
     conn = conectar()
     cur = conn.cursor()
 
+    # Primero recolocamos los elementos antiguos si ya existían.
+    for elemento, categoria_nueva in RECLASIFICACION_CATEGORIAS.items():
+        cur.execute(_sql("""
+            UPDATE catalogo_aulas
+            SET categoria = ?
+            WHERE elemento = ?
+              AND categoria <> ?
+        """), (
+            categoria_nueva,
+            elemento,
+            categoria_nueva,
+        ))
+
+    # Después añadimos solo lo que todavía no exista.
     for categoria, elemento, area in CATALOGO_BASE_AULAS:
         cur.execute(_sql("""
             SELECT COUNT(*)
