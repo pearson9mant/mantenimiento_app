@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from ui.ui_graficos_gerencia import pantalla_demo_graficos_gerencia
+from ui.ui_cuadros_electricos import pantalla_cuadros_electricos
 
 from database.db import conectar, _sql, _es_postgres
 from modules.colegio import obtener_estado_espacio, icono_estado_espacio
@@ -3390,6 +3391,7 @@ def pantalla_configuracion():
             "💧 Legionella",
             "✅ Checklist preventivo",
             "🧩 Modelo aulas",
+            "⚡ Cuadros eléctricos",
             "🧠 Inteligencia",
             "📊 Gráficos",
             "🧹 Borrados",
@@ -3409,6 +3411,10 @@ def pantalla_configuracion():
 
     if seccion == "🧩 Modelo aulas":
         pantalla_modelo_preventivo_aula_config()
+        return
+
+    if seccion == "⚡ Cuadros eléctricos":
+        pantalla_cuadros_electricos()
         return
 
     if seccion == "🧠 Inteligencia":
