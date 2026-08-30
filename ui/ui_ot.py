@@ -31,6 +31,7 @@ from modules.preventivo_aulas import (
     ESTADOS_REVISION_AULA,
     obtener_estado_revision_general_aula,
     guardar_inventario_inicial_revision_aula,
+    guardar_inventario_inicial_flexible_revision_aula,
     marcar_revision_general_aula_completada,
     crear_incidencia_desde_revision_aula,
 )
@@ -1022,40 +1023,64 @@ def mostrar_preventivo_aula_operario(
             "En los próximos preventivos solo verás las cantidades."
         )
 
-        cantidades = {}
-        categoria_anterior = None
+        st.caption(
+            "La plantilla es solo una ayuda. Puedes cambiar nombres, "
+            "eliminar filas y añadir todos los elementos que realmente "
+            "existan en este espacio."
+        )
 
-        for item in inventariables:
-            item_id = int(
-                item[0]
-            )
-            elemento = str(
-                item[2] or ""
-            )
-            categoria = str(
-                item[8] or "General"
-            ).strip()
+        lineas_propuestas = [
+            {
+                "categoria": str(item[8] or "General").strip(),
+                "elemento": str(item[2] or "").strip(),
+                "cantidad": int(item[11] or 0),
+            }
+            for item in inventariables
+        ]
 
-            if categoria != categoria_anterior:
-                st.markdown(
-                    f"#### {categoria}"
-                )
-                categoria_anterior = categoria
-
-            cantidades[item_id] = int(
-                st.number_input(
-                    elemento,
+        inventario_editado = st.data_editor(
+            lineas_propuestas,
+            num_rows="dynamic",
+            use_container_width=True,
+            hide_index=True,
+            column_order=[
+                "categoria",
+                "elemento",
+                "cantidad",
+            ],
+            column_config={
+                "categoria": st.column_config.TextColumn(
+                    "Categoría",
+                    help=(
+                        "Ej.: Electricidad, Fontanería, "
+                        "Carpintería, Mobiliario..."
+                    ),
+                ),
+                "elemento": st.column_config.TextColumn(
+                    "Elemento real",
+                    help=(
+                        "Concreta el tipo real: Downlight, "
+                        "Ojo de buey, Puerta de aluminio..."
+                    ),
+                    required=True,
+                ),
+                "cantidad": st.column_config.NumberColumn(
+                    "Cantidad",
                     min_value=0,
                     step=1,
-                    value=int(
-                        item[11] or 0
-                    ),
-                    key=(
-                        f"ot_aula_censo_"
-                        f"{num_ot}_{item_id}"
-                    ),
-                )
-            )
+                    format="%d",
+                    required=True,
+                ),
+            },
+            key=f"ot_espacio_censo_flexible_{num_ot}",
+        )
+
+        st.caption(
+            "Ejemplo: puedes borrar ‘Luminarias’ y crear "
+            "‘Downlight · 3’ + ‘Ojo de buey · 3’; o sustituir "
+            "‘Puerta’ por ‘Puerta de aluminio · 1’ y "
+            "‘Puerta de madera · 2’."
+        )
 
         if st.button(
             "💾 Guardar inventario inicial",
@@ -1067,9 +1092,18 @@ def mostrar_preventivo_aula_operario(
             type="primary",
         ):
             try:
-                guardar_inventario_inicial_revision_aula(
+                if hasattr(inventario_editado, "to_dict"):
+                    lineas_guardar = inventario_editado.to_dict(
+                        orient="records"
+                    )
+                else:
+                    lineas_guardar = list(
+                        inventario_editado or []
+                    )
+
+                guardar_inventario_inicial_flexible_revision_aula(
                     revision_id=revision_id,
-                    cantidades_totales=cantidades,
+                    lineas_inventario=lineas_guardar,
                 )
 
             except Exception as error:
@@ -1083,9 +1117,9 @@ def mostrar_preventivo_aula_operario(
 
             else:
                 st.success(
-                    "Inventario inicial guardado. "
-                    "No tendrás que volver a hacerlo "
-                    "en el siguiente preventivo."
+                    "Inventario inicial real guardado. "
+                    "A partir de ahora este será el inventario vivo "
+                    "del espacio."
                 )
                 st.rerun()
 
