@@ -1445,6 +1445,171 @@ def guardar_inventario_inicial_revision_aula(
     return True
 
 
+def guardar_inventario_inicial_flexible_revision_aula(
+    revision_id,
+    lineas_inventario,
+):
+    """
+    Guarda el primer censo REAL del espacio.
+
+    La plantilla de la revisión es solo una propuesta: el operario puede
+    renombrar, eliminar y añadir elementos antes de guardar. El resultado
+    sustituye únicamente las líneas inventariables de ESTA revisión y se
+    sincroniza con el inventario vivo del espacio.
+
+    No modifica comprobaciones técnicas ni el flujo PREV -> INC.
+    """
+    crear_tablas_preventivo_aulas()
+
+    revision = obtener_revision_aula(revision_id)
+    if not revision:
+        raise ValueError("No se encuentra la revisión preventiva.")
+
+    (
+        _revision_id,
+        _fecha,
+        centro,
+        edificio,
+        espacio,
+        operario,
+        _estado,
+        _observaciones,
+        _numero_ot,
+        _planta,
+    ) = revision
+
+    limpias = []
+    vistos = set()
+
+    for linea in list(lineas_inventario or []):
+        if isinstance(linea, dict):
+            categoria = str(linea.get("categoria") or "General").strip()
+            elemento = str(linea.get("elemento") or "").strip()
+            cantidad = linea.get("cantidad", 0)
+        else:
+            try:
+                categoria, elemento, cantidad = linea[:3]
+            except Exception:
+                continue
+            categoria = str(categoria or "General").strip()
+            elemento = str(elemento or "").strip()
+
+        if not elemento:
+            continue
+
+        try:
+            cantidad = max(0, int(cantidad or 0))
+        except Exception:
+            raise ValueError(
+                f"{elemento}: la cantidad debe ser un número entero."
+            )
+
+        clave = normalizar_texto(elemento)
+        if clave in vistos:
+            raise ValueError(
+                f"El elemento '{elemento}' está repetido. "
+                "Déjalo una sola vez y pon la cantidad total."
+            )
+
+        vistos.add(clave)
+        limpias.append((categoria or "General", elemento, cantidad))
+
+    if not limpias:
+        raise ValueError(
+            "Añade al menos un elemento al inventario antes de guardarlo."
+        )
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        # Solo sustituimos las líneas inventariables de esta revisión.
+        # Las comprobaciones técnicas, si existen, permanecen intactas.
+        cur.execute(_sql("""
+            DELETE FROM preventivo_aulas_items
+            WHERE revision_id = ?
+              AND TRIM(COALESCE(tipo_linea, '')) = 'Elemento inventariable'
+        """), (revision_id,))
+
+        for categoria, elemento, cantidad in limpias:
+            cur.execute(_sql("""
+                INSERT INTO preventivo_aulas_items
+                (
+                    revision_id,
+                    elemento,
+                    estado,
+                    observaciones,
+                    foto,
+                    crear_correctivo,
+                    numero_ot_correctiva,
+                    categoria,
+                    tipo_linea,
+                    pide_cantidad,
+                    cantidad_total,
+                    cantidad_correcta,
+                    cantidad_afectada,
+                    modelo_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """), (
+                revision_id,
+                elemento,
+                "Correcto",
+                "",
+                "",
+                0,
+                "",
+                categoria,
+                "Elemento inventariable",
+                1,
+                cantidad,
+                cantidad,
+                0,
+                0,
+            ))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    if guardar_o_actualizar_espacio is None:
+        raise RuntimeError(
+            "No está disponible la sincronización con Inventario espacios."
+        )
+
+    for _categoria, elemento, cantidad in limpias:
+        ok = guardar_o_actualizar_espacio(
+            centro=centro,
+            edificio=edificio,
+            espacio=espacio,
+            elemento=elemento,
+            cantidad=cantidad,
+            cantidad_afectada=0,
+            estado="Correcto",
+            ancho=0,
+            alto=0,
+            fondo=0,
+            unidad="ud",
+            observaciones="",
+            foto="",
+            operario=operario,
+        )
+
+        if not ok:
+            raise RuntimeError(
+                f"No se ha podido guardar '{elemento}' "
+                "en Inventario espacios."
+            )
+
+    marcar_inventario_inicial_aula_completado(revision_id)
+    return True
+
+
 def guardar_inventario_revision_aula(
     revision_id,
     cantidades,
