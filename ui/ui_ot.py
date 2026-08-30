@@ -21,6 +21,17 @@ from modules.inventario import (
 from modules.preventivo import checklist_preventivo_completo
 from modules.ficha_espacio import obtener_inventario_espacio
 
+from modules.cuadros_electricos import (
+    COMPROBACIONES_PREVENTIVO_CUADRO,
+    obtener_revision_preventiva_cuadro,
+    obtener_mecanismos_cuadro,
+    guardar_comprobaciones_revision_cuadro,
+    comprobaciones_revision_cuadro_completas,
+    marcar_revision_cuadro_completada,
+    revision_cuadro_lista_para_cerrar,
+    crear_incidencia_desde_revision_cuadro,
+)
+
 from modules.preventivo_aulas import (
     obtener_revision_aula_por_ot,
     obtener_contexto_revision_aula_por_ot,
@@ -378,6 +389,415 @@ def descomponer_orden_operario(fila):
         foto, tipo_solicitante, observaciones_estado,
     )
 
+
+
+def es_preventivo_cuadro_ot(area, descripcion, numero_ot=""):
+    numero_txt = str(
+        numero_ot or ""
+    ).strip().upper()
+
+    if not numero_txt.startswith(
+        "PREV-"
+    ):
+        return False
+
+    desc_txt = normalizar_txt(
+        descripcion
+    )
+
+    return (
+        "preventivo cuadro" in desc_txt
+    )
+
+
+def mostrar_preventivo_cuadro_operario(
+    num_ot,
+    operario,
+):
+    revision = obtener_revision_preventiva_cuadro(
+        num_ot
+    )
+
+    st.markdown(
+        "### ⚡ Revisión preventiva del cuadro"
+    )
+
+    if not revision:
+        st.error(
+            "Esta OT está marcada como preventivo de cuadro eléctrico, "
+            "pero no se encuentra su revisión vinculada."
+        )
+        return
+
+    st.caption(
+        f"📍 {revision['centro'] or '-'} · "
+        f"{revision['edificio'] or '-'} · "
+        f"{revision['planta'] or '-'} · "
+        f"{revision['espacio'] or '-'}"
+    )
+
+    st.markdown(
+        f"#### ⚡ {revision['codigo']} · {revision['nombre']}"
+    )
+
+    # -----------------------------------------------------
+    # INVENTARIO TÉCNICO VIVO
+    # -----------------------------------------------------
+    st.markdown(
+        "### 📦 Inventario técnico actual"
+    )
+
+    mecanismos = obtener_mecanismos_cuadro(
+        revision["cuadro_id"],
+        solo_activos=True,
+    )
+
+    if not mecanismos:
+        st.warning(
+            "Este cuadro todavía no tiene mecanismos inventariados. "
+            "Completa primero su inventario en "
+            "Configuración → Cuadros eléctricos."
+        )
+    else:
+        lineas = []
+
+        for fila in mecanismos:
+            (
+                id_mecanismo,
+                cuadro_id,
+                mecanismo,
+                caracteristicas,
+                cantidad,
+                circuito,
+                fabricante,
+                modelo,
+                observaciones,
+                activo,
+                fecha_creacion,
+                fecha_actualizacion,
+                identificador,
+            ) = fila
+
+            partes = []
+
+            if identificador:
+                partes.append(
+                    str(identificador)
+                )
+
+            partes.append(
+                str(mecanismo or "-")
+            )
+
+            if caracteristicas:
+                partes.append(
+                    str(caracteristicas)
+                )
+
+            texto = " · ".join(
+                partes
+            )
+
+            if circuito:
+                texto += (
+                    f" · **{circuito}**"
+                )
+
+            texto += (
+                f" · {int(cantidad or 0)} ud"
+                f"{'s' if int(cantidad or 0) != 1 else ''}"
+            )
+
+            lineas.append(
+                f"- {texto}"
+            )
+
+        st.markdown(
+            "\n".join(
+                lineas
+            )
+        )
+
+    # -----------------------------------------------------
+    # CHECKLIST TÉCNICO BREVE
+    # -----------------------------------------------------
+    st.markdown(
+        "---"
+    )
+    st.markdown(
+        "### 👀 Revisión técnica"
+    )
+
+    st.info(
+        "Revisión visual y funcional básica del cuadro. "
+        "No sustituye mediciones reglamentarias ni trabajos que "
+        "requieran procedimientos eléctricos específicos."
+    )
+
+    comprobaciones_guardadas = dict(
+        revision.get(
+            "comprobaciones",
+            {},
+        )
+        or {}
+    )
+
+    comprobaciones_nuevas = {}
+
+    for indice, punto in enumerate(
+        COMPROBACIONES_PREVENTIVO_CUADRO,
+        start=1,
+    ):
+        comprobaciones_nuevas[punto] = st.checkbox(
+            punto,
+            value=bool(
+                comprobaciones_guardadas.get(
+                    punto,
+                    False,
+                )
+            ),
+            key=(
+                f"prev_cuadro_check_"
+                f"{num_ot}_{indice}"
+            ),
+        )
+
+    observaciones_revision = st.text_area(
+        "Observaciones de la revisión",
+        value=str(
+            revision.get(
+                "observaciones",
+                "",
+            )
+            or ""
+        ),
+        key=f"prev_cuadro_obs_{num_ot}",
+    )
+
+    if st.button(
+        "💾 Guardar revisión técnica",
+        key=f"prev_cuadro_guardar_check_{num_ot}",
+        use_container_width=True,
+    ):
+        if guardar_comprobaciones_revision_cuadro(
+            numero_ot=num_ot,
+            comprobaciones=comprobaciones_nuevas,
+            observaciones=observaciones_revision,
+        ):
+            st.success(
+                "Revisión técnica guardada."
+            )
+            st.rerun()
+        else:
+            st.error(
+                "No se ha podido guardar la revisión técnica."
+            )
+
+    checks_completos = all(
+        bool(
+            comprobaciones_nuevas.get(
+                punto,
+                False,
+            )
+        )
+        for punto in COMPROBACIONES_PREVENTIVO_CUADRO
+    )
+
+    if not checks_completos:
+        st.warning(
+            "Completa todos los puntos de la revisión técnica "
+            "antes de cerrar el preventivo."
+        )
+        return
+
+    # -----------------------------------------------------
+    # ANOMALÍAS → INC NORMALES
+    # -----------------------------------------------------
+    st.markdown(
+        "---"
+    )
+    st.markdown(
+        "### 🚨 Resultado"
+    )
+
+    incidencias_creadas = list(
+        revision.get(
+            "incidencias",
+            [],
+        )
+        or []
+    )
+
+    if incidencias_creadas:
+        st.success(
+            "🔧 Incidencias creadas: "
+            + ", ".join(
+                incidencias_creadas
+            )
+        )
+
+    if revision.get(
+        "completada"
+    ):
+        st.success(
+            "✅ Revisión preventiva terminada. "
+            "La OT ya puede finalizarse."
+        )
+        return
+
+    respuesta = st.radio(
+        "¿Has detectado alguna anomalía?",
+        [
+            "No",
+            "Sí",
+        ],
+        index=None,
+        horizontal=True,
+        key=f"prev_cuadro_anomalia_{num_ot}",
+    )
+
+    if respuesta == "No":
+        if st.button(
+            "✅ Guardar revisión sin anomalías",
+            key=f"prev_cuadro_sin_anomalias_{num_ot}",
+            use_container_width=True,
+            type="primary",
+        ):
+            guardar_comprobaciones_revision_cuadro(
+                numero_ot=num_ot,
+                comprobaciones=comprobaciones_nuevas,
+                observaciones=observaciones_revision,
+            )
+
+            if marcar_revision_cuadro_completada(
+                num_ot,
+                True,
+            ):
+                st.success(
+                    "Revisión preventiva registrada."
+                )
+                st.rerun()
+            else:
+                st.error(
+                    "No se ha podido completar la revisión."
+                )
+
+    elif respuesta == "Sí":
+        st.markdown(
+            "#### 🔧 Anomalía detectada"
+        )
+
+        st.caption(
+            "Se creará una incidencia normal de Electricidad "
+            "con la ubicación del cuadro ya asignada. "
+            "Puedes indicar Q1, ID1, KM1, etc. en la descripción."
+        )
+
+        contador = int(
+            st.session_state.get(
+                f"prev_cuadro_contador_inc_{num_ot}",
+                1,
+            )
+            or 1
+        )
+
+        descripcion = st.text_area(
+            "¿Qué ocurre?",
+            placeholder=(
+                "Ej.: Q1 presenta signos de calentamiento "
+                "en el borne de salida."
+            ),
+            height=110,
+            key=(
+                f"prev_cuadro_desc_inc_"
+                f"{num_ot}_{contador}"
+            ),
+        )
+
+        fotos = st.file_uploader(
+            "📷 Fotografías de la anomalía (opcional)",
+            type=[
+                "jpg",
+                "jpeg",
+                "png",
+            ],
+            accept_multiple_files=True,
+            key=(
+                f"prev_cuadro_fotos_inc_"
+                f"{num_ot}_{contador}"
+            ),
+            help=(
+                "Máximo 5 fotografías y 5 MB por foto."
+            ),
+        )
+
+        if st.button(
+            "➕ Crear incidencia",
+            key=(
+                f"prev_cuadro_crear_inc_"
+                f"{num_ot}_{contador}"
+            ),
+            use_container_width=True,
+            type="primary",
+        ):
+            guardar_comprobaciones_revision_cuadro(
+                numero_ot=num_ot,
+                comprobaciones=comprobaciones_nuevas,
+                observaciones=observaciones_revision,
+            )
+
+            ok, mensaje, numero_inc = (
+                crear_incidencia_desde_revision_cuadro(
+                    numero_ot_preventiva=num_ot,
+                    descripcion=descripcion,
+                    fotos=fotos,
+                )
+            )
+
+            if not ok:
+                st.error(
+                    mensaje
+                )
+            else:
+                st.session_state[
+                    f"prev_cuadro_contador_inc_{num_ot}"
+                ] = contador + 1
+
+                st.success(
+                    mensaje
+                )
+                st.rerun()
+
+        if incidencias_creadas:
+            st.caption(
+                "Puedes crear otra incidencia. "
+                "Cuando estén todas registradas, "
+                "termina la revisión."
+            )
+
+            if st.button(
+                "✅ Terminar revisión preventiva",
+                key=f"prev_cuadro_terminar_{num_ot}",
+                use_container_width=True,
+            ):
+                guardar_comprobaciones_revision_cuadro(
+                    numero_ot=num_ot,
+                    comprobaciones=comprobaciones_nuevas,
+                    observaciones=observaciones_revision,
+                )
+
+                if marcar_revision_cuadro_completada(
+                    num_ot,
+                    True,
+                ):
+                    st.success(
+                        "Revisión preventiva terminada."
+                    )
+                    st.rerun()
+                else:
+                    st.error(
+                        "No se ha podido completar la revisión."
+                    )
 
 
 def es_preventivo_aulas_ot(area, descripcion, numero_ot=""):
@@ -1456,6 +1876,15 @@ def mostrar_preventivo_aula_operario(
         )
 
 def puede_finalizar_preventivo(num_ot, origen, desc, area=''):
+    if es_preventivo_cuadro_ot(
+        area,
+        desc,
+        num_ot
+    ):
+        return revision_cuadro_lista_para_cerrar(
+            num_ot
+        )
+
     if es_preventivo_aulas_ot(
         area,
         desc,
@@ -2360,7 +2789,17 @@ def mostrar_tarjeta_ot(
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
-        if es_preventivo_aulas_ot(
+        if es_preventivo_cuadro_ot(
+            area,
+            desc,
+            num_ot
+        ):
+            mostrar_preventivo_cuadro_operario(
+                num_ot=num_ot,
+                operario=operario,
+            )
+
+        elif es_preventivo_aulas_ot(
             area,
             desc,
             num_ot
