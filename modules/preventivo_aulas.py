@@ -1,4 +1,4 @@
-from datetime import datetime
+
 
 from database.db import conectar, _sql
 from modules.ordenes import (
@@ -7,6 +7,8 @@ from modules.ordenes import (
     vincular_origen_ot,
     guardar_foto_ot,
 )
+
+from modules.espacios import obtener_espacios as obtener_espacios_catalogo
 
 try:
     from modules.inventario_aulas import (
@@ -229,6 +231,223 @@ def crear_tablas_preventivo_aulas():
 
     conn.close()
     _ESTRUCTURA_PREVENTIVO_AULAS_ASEGURADA = True
+
+
+# =====================================================
+# TIPO DE ESPACIO + MODELO BASE GENÉRICO
+# =====================================================
+
+def obtener_tipo_espacio_revision(centro, edificio, planta, espacio):
+    """
+    Obtiene el tipo real desde el catálogo central de espacios.
+
+    Si un espacio antiguo no está catalogado, usa únicamente su nombre como
+    respaldo. No modifica el catálogo ni el inventario.
+    """
+    try:
+        for fila in obtener_espacios_catalogo(activos=True) or []:
+            try:
+                (
+                    _id,
+                    centro_f,
+                    edificio_f,
+                    planta_f,
+                    espacio_f,
+                    tipo_f,
+                    _activo,
+                ) = fila
+            except Exception:
+                continue
+
+            if (
+                str(centro_f or "").strip() == str(centro or "").strip()
+                and str(edificio_f or "").strip() == str(edificio or "").strip()
+                and str(planta_f or "").strip() == str(planta or "").strip()
+                and str(espacio_f or "").strip() == str(espacio or "").strip()
+            ):
+                tipo = str(tipo_f or "").strip()
+                if tipo:
+                    return tipo
+    except Exception:
+        pass
+
+    texto = normalizar_texto(espacio)
+
+    if any(x in texto for x in ["wc", "bano", "aseo", "vestuario"]):
+        return "WC"
+    if "secretar" in texto or "administr" in texto or "despacho" in texto:
+        return "Despacho"
+    if "informat" in texto or "tic" in texto:
+        return "Informática"
+    if "cocina" in texto:
+        return "Cocina"
+    if "comedor" in texto:
+        return "Comedor"
+    if "biblioteca" in texto:
+        return "Biblioteca"
+    if "laboratorio" in texto:
+        return "Laboratorio"
+    if "gimnas" in texto:
+        return "Gimnasio"
+    if "almacen" in texto:
+        return "Almacén"
+    if "pasillo" in texto:
+        return "Pasillo"
+    if "patio" in texto or "exterior" in texto or "terrado" in texto:
+        return "Exterior"
+    if "aula" in texto or texto.startswith("i"):
+        return "Aula"
+
+    return "Otro"
+
+
+def _linea_modelo_espacio(categoria, elemento, cantidad=0):
+    return (
+        0,
+        categoria,
+        elemento,
+        "Elemento inventariable",
+        1,
+        max(0, int(cantidad or 0)),
+        0,
+    )
+
+
+def obtener_modelo_base_por_tipo_espacio(tipo_espacio, espacio=""):
+    """
+    Modelo inicial únicamente cuando el espacio todavía NO tiene inventario.
+
+    Las cantidades son sugerencias de primer censo. Una vez creado el
+    inventario vivo, los preventivos posteriores leen sus cantidades reales.
+    """
+    tipo = normalizar_texto(tipo_espacio)
+    nombre = normalizar_texto(espacio)
+
+    if tipo == "aula":
+        return obtener_modelo_aula_activo()
+
+    if tipo == "wc" or any(x in nombre for x in ["wc", "bano", "aseo", "vestuario"]):
+        datos = [
+            ("Fontanería", "WC / Inodoro", 0),
+            ("Fontanería", "Fluxor / Cisterna", 0),
+            ("Fontanería", "Lavabo", 0),
+            ("Fontanería", "Grifo", 0),
+            ("Equipamiento", "Espejo", 0),
+            ("Equipamiento", "Dispensador de jabón", 0),
+            ("Equipamiento", "Portarrollos", 0),
+            ("Equipamiento", "Secamanos", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Luz de emergencia", 0),
+            ("Carpintería / Cerramientos", "Puerta", 1),
+        ]
+    elif tipo in {"despacho", "oficina"} or "secretar" in nombre or "administr" in nombre:
+        datos = [
+            ("Mobiliario", "Mesa de trabajo", 0),
+            ("Mobiliario", "Silla de trabajo", 0),
+            ("Mobiliario", "Sillas de visita", 0),
+            ("Mobiliario", "Armario / Archivador", 0),
+            ("Informática / Audiovisual", "Ordenador", 0),
+            ("Informática / Audiovisual", "Monitor", 0),
+            ("Informática / Audiovisual", "Impresora", 0),
+            ("Informática / Audiovisual", "Teléfono", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Climatización", "Aire acondicionado", 0),
+            ("Carpintería / Cerramientos", "Puerta", 1),
+            ("Carpintería / Cerramientos", "Ventanas", 0),
+        ]
+    elif tipo == "informatica" or "informat" in nombre or "tic" in nombre:
+        datos = [
+            ("Informática / Audiovisual", "Ordenador", 0),
+            ("Informática / Audiovisual", "Monitor", 0),
+            ("Informática / Audiovisual", "Teclado", 0),
+            ("Informática / Audiovisual", "Ratón", 0),
+            ("Informática / Audiovisual", "Switch", 0),
+            ("Informática / Audiovisual", "Rack", 0),
+            ("Informática / Audiovisual", "SAI", 0),
+            ("Informática / Audiovisual", "Proyector / Pantalla", 0),
+            ("Informática / Audiovisual", "Tomas de red", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Climatización", "Aire acondicionado", 0),
+            ("Electricidad", "Luminarias", 0),
+        ]
+    elif tipo == "cocina":
+        datos = [
+            ("Fontanería", "Fregadero", 0),
+            ("Fontanería", "Grifo", 0),
+            ("Equipamiento", "Lavavajillas", 0),
+            ("Equipamiento", "Horno", 0),
+            ("Equipamiento", "Campana extractora", 0),
+            ("Equipamiento", "Cocina industrial", 0),
+            ("Equipamiento", "Nevera", 0),
+            ("Equipamiento", "Congelador", 0),
+            ("Equipamiento", "Mesas de trabajo", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Electricidad", "Luminarias", 0),
+        ]
+    elif tipo == "comedor":
+        datos = [
+            ("Mobiliario", "Mesas", 0),
+            ("Mobiliario", "Sillas", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Carpintería / Cerramientos", "Puertas", 0),
+        ]
+    elif tipo == "biblioteca":
+        datos = [
+            ("Mobiliario", "Estanterías", 0),
+            ("Mobiliario", "Mesas", 0),
+            ("Mobiliario", "Sillas", 0),
+            ("Informática / Audiovisual", "Ordenadores", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Climatización", "Aire acondicionado", 0),
+        ]
+    elif tipo == "laboratorio":
+        datos = [
+            ("Mobiliario", "Mesas de laboratorio", 0),
+            ("Mobiliario", "Taburetes / Sillas", 0),
+            ("Fontanería", "Fregaderos", 0),
+            ("Fontanería", "Grifos", 0),
+            ("Mobiliario", "Armarios / Vitrinas", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Electricidad", "Luminarias", 0),
+        ]
+    elif tipo == "gimnasio":
+        datos = [
+            ("Equipamiento", "Canastas", 0),
+            ("Equipamiento", "Porterías", 0),
+            ("Equipamiento", "Espalderas", 0),
+            ("Equipamiento", "Colchonetas", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Luz de emergencia", 0),
+        ]
+    elif tipo == "almacen":
+        datos = [
+            ("Mobiliario", "Estanterías", 0),
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Carpintería / Cerramientos", "Puerta", 1),
+        ]
+    elif tipo == "pasillo":
+        datos = [
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Luces de emergencia", 0),
+            ("Carpintería / Cerramientos", "Puertas", 0),
+        ]
+    else:
+        datos = [
+            ("Electricidad", "Luminarias", 0),
+            ("Electricidad", "Enchufes", 0),
+            ("Carpintería / Cerramientos", "Puerta", 1),
+            ("Carpintería / Cerramientos", "Ventanas", 0),
+            ("Climatización", "Aire acondicionado", 0),
+        ]
+
+    return [
+        _linea_modelo_espacio(categoria, elemento, cantidad)
+        for categoria, elemento, cantidad in datos
+    ]
 
 
 # =====================================================
@@ -476,19 +695,43 @@ def crear_revision_aula(
     """
     crear_tablas_preventivo_aulas()
 
-    modelo = obtener_modelo_aula_activo()
-
-    if not modelo:
-        raise ValueError(
-            "El Modelo aulas está vacío. "
-            "Ve a Configuración > Modelo aulas y carga o activa elementos."
-        )
-
     inventario_actual = _inventario_actual_por_elemento(
         centro,
         edificio,
         espacio,
     )
+
+    tipo_espacio = obtener_tipo_espacio_revision(
+        centro=centro,
+        edificio=edificio,
+        planta=planta,
+        espacio=espacio,
+    )
+
+    # Aula: conserva exactamente el modelo configurable existente.
+    # Resto de espacios: usa su modelo base únicamente en el primer censo.
+    # Si ya existe inventario vivo, se revisan sus elementos reales.
+    if normalizar_texto(tipo_espacio) == "aula":
+        modelo = obtener_modelo_aula_activo()
+    elif inventario_actual:
+        modelo = [
+            _linea_modelo_espacio(
+                "Inventario existente",
+                datos["elemento"],
+                datos["cantidad"],
+            )
+            for datos in inventario_actual.values()
+        ]
+    else:
+        modelo = obtener_modelo_base_por_tipo_espacio(
+            tipo_espacio,
+            espacio=espacio,
+        )
+
+    if not modelo:
+        raise ValueError(
+            "No se ha podido preparar el modelo inicial de este espacio."
+        )
 
     numero_ot_preventiva = str(
         numero_ot_preventiva or ""
@@ -1028,7 +1271,7 @@ def crear_incidencia_desde_revision_aula(
     revision = obtener_revision_aula(revision_id)
 
     if not revision:
-        return False, "No se ha encontrado la revisión de aula.", ""
+        return False, "No se ha encontrado la revisión del espacio.", ""
 
     (
         _id,
@@ -1083,7 +1326,7 @@ def crear_incidencia_desde_revision_aula(
     fecha_origen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     observaciones_origen = (
-        "Incidencia detectada durante una revisión preventiva de aula.\n"
+        "Incidencia detectada durante una revisión preventiva del espacio.\n"
         f"Revisión ID: {revision_id}\n"
         f"OT preventiva origen: {numero_ot_preventiva or '-'}\n"
         f"Planta: {planta or '-'}"
