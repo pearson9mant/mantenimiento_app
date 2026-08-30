@@ -822,7 +822,7 @@ def crear_revision_preventiva_cuadro(
 
         comprobaciones = json.dumps(
             {
-                punto: False
+                punto: ""
                 for punto in COMPROBACIONES_PREVENTIVO_CUADRO
             },
             ensure_ascii=False,
@@ -923,11 +923,38 @@ def obtener_revision_preventiva_cuadro(numero_ot):
         ) = fila
 
         try:
-            comprobaciones = json.loads(
+            comprobaciones_raw = json.loads(
                 comprobaciones_json or "{}"
             )
         except Exception:
-            comprobaciones = {}
+            comprobaciones_raw = {}
+
+        comprobaciones = {}
+
+        for punto in COMPROBACIONES_PREVENTIVO_CUADRO:
+            valor = comprobaciones_raw.get(
+                punto,
+                "",
+            )
+
+            if valor is True:
+                valor = "correcto"
+            elif valor is False:
+                valor = ""
+            else:
+                valor = str(
+                    valor or ""
+                ).strip().lower()
+
+            if valor not in [
+                "",
+                "correcto",
+                "anomalia",
+                "no_aplica",
+            ]:
+                valor = ""
+
+            comprobaciones[punto] = valor
 
         try:
             incidencias = json.loads(
@@ -965,15 +992,26 @@ def guardar_comprobaciones_revision_cuadro(
 ):
     asegurar_tablas_cuadros_electricos()
 
-    mapa = {
-        punto: bool(
+    mapa = {}
+
+    for punto in COMPROBACIONES_PREVENTIVO_CUADRO:
+        valor = str(
             comprobaciones.get(
                 punto,
-                False,
+                "",
             )
-        )
-        for punto in COMPROBACIONES_PREVENTIVO_CUADRO
-    }
+            or ""
+        ).strip().lower()
+
+        if valor not in [
+            "",
+            "correcto",
+            "anomalia",
+            "no_aplica",
+        ]:
+            valor = ""
+
+        mapa[punto] = valor
 
     conn = conectar()
     cur = conn.cursor()
@@ -1020,14 +1058,46 @@ def comprobaciones_revision_cuadro_completas(numero_ot):
     )
 
     return all(
-        bool(
+        str(
             comprobaciones.get(
                 punto,
-                False,
+                "",
             )
-        )
+            or ""
+        ).strip().lower()
+        in [
+            "correcto",
+            "anomalia",
+            "no_aplica",
+        ]
         for punto in COMPROBACIONES_PREVENTIVO_CUADRO
     )
+
+
+def obtener_puntos_anomalia_revision_cuadro(numero_ot):
+    revision = obtener_revision_preventiva_cuadro(
+        numero_ot
+    )
+
+    if not revision:
+        return []
+
+    comprobaciones = revision.get(
+        "comprobaciones",
+        {},
+    )
+
+    return [
+        punto
+        for punto in COMPROBACIONES_PREVENTIVO_CUADRO
+        if str(
+            comprobaciones.get(
+                punto,
+                "",
+            )
+            or ""
+        ).strip().lower() == "anomalia"
+    ]
 
 
 def marcar_revision_cuadro_completada(
@@ -1041,6 +1111,29 @@ def marcar_revision_cuadro_completada(
         )
     ):
         return False
+
+    if completada:
+        revision = obtener_revision_preventiva_cuadro(
+            numero_ot
+        )
+
+        if not revision:
+            return False
+
+        anomalias = obtener_puntos_anomalia_revision_cuadro(
+            numero_ot
+        )
+
+        incidencias = list(
+            revision.get(
+                "incidencias",
+                [],
+            )
+            or []
+        )
+
+        if anomalias and not incidencias:
+            return False
 
     conn = conectar()
     cur = conn.cursor()
