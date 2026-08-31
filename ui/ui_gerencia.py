@@ -3487,6 +3487,42 @@ def _finalizadas_mes_gerencia(datos):
     ].copy()
 
 
+def _finalizadas_curso_mapa_gerencia(datos):
+    """
+    Acumulado del 💙 del mapa operativo.
+
+    El curso visual empieza el 1 de agosto y termina el 31 de agosto
+    del año siguiente. No modifica ningún indicador mensual de Gerencia.
+    """
+    if datos.empty:
+        return datos
+
+    cerradas = datos[es_cerrada(datos)].copy()
+
+    if cerradas.empty:
+        return cerradas
+
+    fecha_ref = cerradas["fecha_cierre_dt"].copy()
+    fecha_ref = fecha_ref.where(
+        fecha_ref.notna(),
+        cerradas["fecha_dt"],
+    )
+
+    hoy = pd.Timestamp.today()
+
+    # El curso se mantiene hasta finalizar agosto.
+    # Ejemplo: 01/08/2026 -> 31/08/2027.
+    anio_inicio = hoy.year if hoy.month >= 9 else hoy.year - 1
+    inicio = pd.Timestamp(year=anio_inicio, month=8, day=1)
+    fin_exclusivo = pd.Timestamp(year=anio_inicio + 1, month=9, day=1)
+
+    return cerradas[
+        fecha_ref.notna()
+        & (fecha_ref >= inicio)
+        & (fecha_ref < fin_exclusivo)
+    ].copy()
+
+
 def _carga_total_planta(df, centro, edificio, planta):
     datos = filtrar_por_ubicacion_gerencia(
         df,
@@ -3496,7 +3532,7 @@ def _carga_total_planta(df, centro, edificio, planta):
     )
 
     pendientes = _todas_activas_gerencia(datos)
-    finalizadas = _finalizadas_mes_gerencia(datos)
+    finalizadas = _finalizadas_curso_mapa_gerencia(datos)
 
     return int(len(pendientes)), int(len(finalizadas))
 
@@ -4381,7 +4417,7 @@ def mostrar_colegio_vivo_gerencia(
 
             st.caption(
                 "Pulsa una planta o zona para ver sus datos. "
-                "🔴 = actuaciones pendientes · 💙 = actuaciones finalizadas este mes. "
+                "🔴 = actuaciones pendientes · 💙 = actuaciones finalizadas este curso. "
                 "El semáforo sigue reflejando únicamente el riesgo correctivo real."
             )
 
