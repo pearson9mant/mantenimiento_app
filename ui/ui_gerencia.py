@@ -3377,11 +3377,28 @@ def _coincide_zona_externa_p22_gerencia(valor, zona):
 
     for alias in aliases:
         alias_n = normalizar_busqueda(alias)
-        if texto == alias_n or alias_n in texto:
+
+        # La zona exterior debe coincidir como ubicación real.
+        # Así evitamos que un espacio físico como "Pasillo exterior"
+        # se convierta por error en "Acceso Pearson 22".
+        if texto == alias_n:
             return True
 
     return False
 
+
+def _es_planta_fisica_p22_gerencia(valor):
+    planta_n = _normalizar_planta(valor)
+
+    return planta_n in {
+        "terrado",
+        "planta 0",
+        "planta 1",
+        "planta 2",
+        "planta 3",
+        "planta 4",
+        "planta 5",
+    }
 
 def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     if df.empty:
@@ -3436,22 +3453,30 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     # igual que en Colegio Vivo del operario. No se modifica ninguna OT:
     # solo se reconoce su ubicación mediante los mismos aliases.
     if centro == "Pearson 22" and edificio == "Zonas exteriores":
-        apoyo = (
-            datos["planta"].fillna("").astype(str)
-            + " "
-            + datos["espacio"].fillna("").astype(str)
-            + " "
-            + datos["edificio"].fillna("").astype(str)
-            + " "
-            + datos["descripcion"].fillna("").astype(str)
+        # Si la OT ya pertenece a una planta física, manda esa planta.
+        # El nombre del espacio no puede sacarla de allí aunque contenga
+        # palabras como "exterior".
+        planta_fisica = datos["planta"].fillna("").astype(str).apply(
+            _es_planta_fisica_p22_gerencia
         )
 
-        mascara = apoyo.apply(
+        # Para exteriores solo se usan campos de ubicación.
+        # Nunca la descripción de la avería ni el nombre del edificio.
+        mascara_planta = datos["planta"].fillna("").astype(str).apply(
             lambda valor: _coincide_zona_externa_p22_gerencia(
                 valor,
                 planta,
             )
         )
+
+        mascara_espacio = datos["espacio"].fillna("").astype(str).apply(
+            lambda valor: _coincide_zona_externa_p22_gerencia(
+                valor,
+                planta,
+            )
+        )
+
+        mascara = (~planta_fisica) & (mascara_planta | mascara_espacio)
 
         return datos[mascara].copy()
 
@@ -3631,16 +3656,25 @@ def _urgentes_gerencia(datos):
 def _estado_planta(df, centro, edificio, planta):
     datos = filtrar_por_ubicacion_gerencia(df, centro, edificio, planta)
     activas = _activas_gerencia(datos)
+    todas_activas = _todas_activas_gerencia(datos)
     urgentes = _urgentes_gerencia(activas)
     cantidad = len(activas)
+    total_pendientes = len(todas_activas)
+
     if len(urgentes) > 0:
         return "🔴", cantidad, 3
     if cantidad >= 3:
         return "🟠", cantidad, 2
     if cantidad > 0:
         return "🟡", cantidad, 1
-    return "🟢", 0, 0
 
+    # Verde significa ahora literalmente que no queda ninguna
+    # actuación pendiente en la planta. La actividad técnica sin
+    # correctivas se mantiene en amarillo, sin elevar el riesgo.
+    if total_pendientes > 0:
+        return "🟡", 0, 1
+
+    return "🟢", 0, 0
 
 def _seleccion_mas_relevante(df, centro_objetivo=None):
     if centro_objetivo in EDIFICIOS_GERENCIA:
@@ -4589,7 +4623,7 @@ def mostrar_colegio_vivo_gerencia(
             st.caption(
                 "Pulsa una planta o zona para ver sus datos. "
                 "🔴 = actuaciones pendientes · 💙 = actuaciones finalizadas este curso. "
-                "El semáforo sigue reflejando únicamente el riesgo correctivo real."
+                "🟢 = sin actuaciones pendientes; el nivel de riesgo sigue priorizando la carga correctiva real."
             )
 
             mostrar_mapa_visual_centro_gerencia(
