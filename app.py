@@ -74,6 +74,7 @@ from ui.ui_historicos import pantalla_historicos
 from ui.ui_evolucion import pantalla_evolucion
 from ui.ui_activos_colegio import pantalla_activos_colegio
 from ui.ui_inteligencia_mantenimiento import pantalla_inteligencia_mantenimiento
+from modules.accesos_gerencia import registrar_acceso_gerencia
 
 APP_VERSION = "v1.0 PRO"
 APP_NAME = "Sistema Integral de Mantenimiento"
@@ -989,6 +990,15 @@ login_portada()
 
 perfil = st.session_state.get("perfil", "")
 operario_activo = st.session_state.get("operario_activo", "")
+
+# Una entrada real de Gerencia = una sesión.
+# Los rerun y la entrada de Administración a Gerencia no cuentan.
+if perfil == "gerencia" and not st.session_state.get("acceso_gerencia_registrado", False):
+    if registrar_acceso_gerencia(
+        usuario=st.session_state.get("usuario", ""),
+        centro="",
+    ):
+        st.session_state["acceso_gerencia_registrado"] = True
 
 
 modo_operario_compacto = es_modo_operario_compacto()
