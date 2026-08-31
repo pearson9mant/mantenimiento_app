@@ -912,7 +912,26 @@ def crear_ot_legionella(
         planta,
     )
 
-    numero_creado = crear_orden(datos_orden) or numero_ot
+    numero_creado = crear_orden(datos_orden)
+
+    # La planificación solo puede avanzar si la OT existe realmente
+    # en la tabla de órdenes activas. Evita dar por creada una OT
+    # si la inserción no ha dejado una fila persistida.
+    if not numero_creado:
+        return False
+
+    df_ot_creada = leer_df(
+        """
+        SELECT numero_ot
+        FROM ordenes_trabajo
+        WHERE numero_ot = ?
+        LIMIT 1
+        """,
+        (str(numero_creado),),
+    )
+
+    if df_ot_creada.empty:
+        return False
 
     if punto_id:
         vincular_origen_ot(
