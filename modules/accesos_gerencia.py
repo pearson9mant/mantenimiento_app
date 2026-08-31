@@ -205,4 +205,5 @@ def obtener_resumen_accesos_gerencia(limite_ultimos=20):
         "inicio_curso": inicio_curso,
         "fin_curso": fin_curso,
         "ultimos": ultimos,
+        "registros": ultimos,
     }
