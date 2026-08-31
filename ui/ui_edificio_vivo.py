@@ -4,7 +4,7 @@ import unicodedata
 
 import streamlit as st
 
-from modules.espacios import obtener_plantas_config
+from modules.espacios import obtener_plantas_config, obtener_espacios
 
 
 # =========================================================
@@ -862,6 +862,98 @@ def _icono_zona_externa_p22(nombre):
     return "📍"
 
 
+def _planta_catalogo_ot_p22(ot_dict):
+    """
+    Resuelve la planta real de una OT de Pearson 22 usando el catálogo
+    central de espacios.
+
+    Es solo lectura. No modifica la OT ni la base de datos.
+
+    Regla de seguridad:
+    si el espacio pertenece a una planta física, esa planta manda y la OT
+    nunca puede aparecer también dentro de "Accesos y exteriores".
+    """
+    centro_ot = normalizar_centro(
+        ot_dict.get("centro")
+        or ot_dict.get("_centro_normalizado")
+        or ""
+    )
+
+    if centro_ot != "Pearson 22":
+        return ""
+
+    edificio_ot = normalizar_edificio(
+        ot_dict.get("edificio")
+        or ot_dict.get("_edificio_normalizado")
+        or "",
+        centro_ot,
+    )
+
+    espacio_ot = str(
+        ot_dict.get("espacio")
+        or ot_dict.get("aula")
+        or ot_dict.get("ubicacion")
+        or ""
+    ).strip()
+
+    if not espacio_ot:
+        return ""
+
+    centro_n = _norm(centro_ot)
+    edificio_n = _norm(edificio_ot)
+    espacio_n = _norm(espacio_ot)
+
+    try:
+        filas = obtener_espacios(
+            activos=True
+        )
+    except Exception:
+        filas = []
+
+    coincidencias = []
+
+    for fila in filas or []:
+        try:
+            (
+                _id,
+                centro,
+                edificio,
+                planta,
+                espacio,
+                _tipo,
+                _activo,
+            ) = fila
+        except Exception:
+            continue
+
+        if _norm(centro) != centro_n:
+            continue
+
+        if _norm(espacio) != espacio_n:
+            continue
+
+        if edificio_n and _norm(edificio) != edificio_n:
+            continue
+
+        planta_n = normalizar_planta(
+            planta
+        )
+
+        if planta_n:
+            coincidencias.append(
+                planta_n
+            )
+
+    coincidencias = list(
+        dict.fromkeys(coincidencias)
+    )
+
+    if len(coincidencias) == 1:
+        return coincidencias[0]
+
+    return ""
+
+
 def _datos_zona_externa_p22(
     resumen,
     zona,
@@ -888,7 +980,34 @@ def _datos_zona_externa_p22(
     ]
 
     def _coincide_zona_ot(ot_dict):
+        # 1) Si Colegio Vivo ya conoce una planta física, esa planta manda.
+        planta_normalizada = normalizar_planta(
+            ot_dict.get("_planta_normalizada")
+            or ot_dict.get("planta")
+            or ""
+        )
+
+        if _es_planta_fisica_p22(
+            planta_normalizada
+        ):
+            return False
+
+        # 2) Si la OT no guarda planta, la recuperamos del catálogo real.
+        #    Evita falsos positivos como "Pasillo exterior" de Planta 2.
+        planta_catalogo = _planta_catalogo_ot_p22(
+            ot_dict
+        )
+
+        if _es_planta_fisica_p22(
+            planta_catalogo
+        ):
+            return False
+
+        # 3) Solo aceptamos una zona externa por coincidencia EXACTA
+        #    de los campos de ubicación. La palabra "exterior" dentro de
+        #    otro espacio ya no basta para mover una OT.
         valores = [
+            ot_dict.get("_planta_normalizada"),
             ot_dict.get("planta"),
             ot_dict.get("espacio"),
             ot_dict.get("aula"),
@@ -904,12 +1023,8 @@ def _datos_zona_externa_p22(
             if valor_n == zona_n:
                 return True
 
-            for alias_n in aliases_zona:
-                if (
-                    valor_n == alias_n
-                    or alias_n in valor_n
-                ):
-                    return True
+            if valor_n in aliases_zona:
+                return True
 
         return False
 
