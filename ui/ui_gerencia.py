@@ -3331,6 +3331,58 @@ def _coincide_zona_anexo_gerencia(espacio, zona):
     return False
 
 
+# Zonas externas de Pearson 22. Se mantienen exactamente las mismas
+# referencias visuales que utiliza Colegio Vivo del operario.
+ZONAS_EXTERNAS_P22_GERENCIA = [
+    ("Acceso Pearson 22", "🚪"),
+    ("Acceso Patio Fútbol", "⚽"),
+    ("Parking", "🚗"),
+]
+
+ALIASES_ZONAS_EXTERNAS_P22_GERENCIA = {
+    "Acceso Pearson 22": [
+        "acceso pearson 22",
+        "entrada pearson 22",
+        "acceso principal",
+        "entrada principal",
+        "patio exterior",
+        "patio/exterior",
+        "exterior",
+    ],
+    "Acceso Patio Fútbol": [
+        "acceso patio futbol",
+        "entrada patio futbol",
+        "acceso campo futbol",
+        "entrada campo futbol",
+        "patio futbol",
+        "campo futbol",
+    ],
+    "Parking": [
+        "parking",
+        "parquing",
+        "aparcamiento",
+    ],
+}
+
+
+def _coincide_zona_externa_p22_gerencia(valor, zona):
+    texto = normalizar_busqueda(valor)
+    if not texto:
+        return False
+
+    aliases = ALIASES_ZONAS_EXTERNAS_P22_GERENCIA.get(
+        zona,
+        [zona],
+    )
+
+    for alias in aliases:
+        alias_n = normalizar_busqueda(alias)
+        if texto == alias_n or alias_n in texto:
+            return True
+
+    return False
+
+
 def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     if df.empty:
         return df.copy()
@@ -3374,6 +3426,32 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
                     planta,
                 )
             )
+
+        return datos[mascara].copy()
+
+    # -------------------------------------------------
+    # ACCESOS Y EXTERIORES · PEARSON 22
+    # -------------------------------------------------
+    # Estas zonas se representan fuera de Infantil/Primaria y Llar,
+    # igual que en Colegio Vivo del operario. No se modifica ninguna OT:
+    # solo se reconoce su ubicación mediante los mismos aliases.
+    if centro == "Pearson 22" and edificio == "Zonas exteriores":
+        apoyo = (
+            datos["planta"].fillna("").astype(str)
+            + " "
+            + datos["espacio"].fillna("").astype(str)
+            + " "
+            + datos["edificio"].fillna("").astype(str)
+            + " "
+            + datos["descripcion"].fillna("").astype(str)
+        )
+
+        mascara = apoyo.apply(
+            lambda valor: _coincide_zona_externa_p22_gerencia(
+                valor,
+                planta,
+            )
+        )
 
         return datos[mascara].copy()
 
@@ -3592,6 +3670,27 @@ def _seleccion_mas_relevante(df, centro_objetivo=None):
                         centro,
                         edificio,
                         planta,
+                    )
+                    mejor_peso = peso
+
+        # Pearson 22 tiene además tres zonas físicas exteriores,
+        # visibles y seleccionables igual que en Colegio Vivo del operario.
+        if centro == "Pearson 22":
+            for zona, _icono in ZONAS_EXTERNAS_P22_GERENCIA:
+                _, cantidad, nivel = _estado_planta(
+                    df,
+                    "Pearson 22",
+                    "Zonas exteriores",
+                    zona,
+                )
+
+                peso = nivel * 1000 + cantidad
+
+                if peso > mejor_peso:
+                    mejor = (
+                        "Pearson 22",
+                        "Zonas exteriores",
+                        zona,
                     )
                     mejor_peso = peso
 
@@ -3855,6 +3954,76 @@ def _pintar_anexo_visual_gerencia(df):
                 )
 
 
+def _pintar_zonas_externas_p22_gerencia(df):
+    """
+    Dibuja en Gerencia los mismos accesos y exteriores que ve el operario.
+
+    Mantiene los criterios propios de Gerencia:
+    - semáforo = riesgo correctivo real;
+    - 🔴 = todas las actuaciones activas;
+    - 💙 = finalizadas acumuladas del curso.
+    """
+    st.markdown(
+        (
+            '<div class="cv-map-annex-wrap">'
+            '<div class="cv-map-annex-title">'
+            'ACCESOS Y EXTERIORES'
+            '</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
+    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
+    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
+
+    with st.container(key="gerencia_zonas_externas_p22"):
+        columnas = st.columns(
+            len(ZONAS_EXTERNAS_P22_GERENCIA),
+            gap="small",
+        )
+
+        for columna, (zona, icono_zona) in zip(
+            columnas,
+            ZONAS_EXTERNAS_P22_GERENCIA,
+        ):
+            icono_estado, _, _ = _estado_planta(
+                df,
+                "Pearson 22",
+                "Zonas exteriores",
+                zona,
+            )
+
+            pendientes, finalizadas = _carga_total_planta(
+                df,
+                "Pearson 22",
+                "Zonas exteriores",
+                zona,
+            )
+
+            seleccionada = (
+                seleccionado_centro == "Pearson 22"
+                and seleccionado_edificio == "Zonas exteriores"
+                and seleccionado_planta == zona
+            )
+
+            with columna:
+                st.button(
+                    f"{icono_estado} {icono_zona} {zona}\n"
+                    f"🔴 {pendientes}  💙 {finalizadas}",
+                    key=f"cv_visual_p22_exterior_{zona}",
+                    use_container_width=True,
+                    on_click=_seleccionar_planta_cv,
+                    args=(
+                        "Pearson 22",
+                        "Zonas exteriores",
+                        zona,
+                    ),
+                    type="primary" if seleccionada else "secondary",
+                )
+
+
 def mostrar_mapa_visual_centro_gerencia(
     df,
     centro,
@@ -3863,7 +4032,7 @@ def mostrar_mapa_visual_centro_gerencia(
     Mapa visual compacto para Gerencia.
 
     Pearson 22:
-      Infantil/Primaria + Llar, como edificios reales.
+      Infantil/Primaria + Llar y, debajo, Accesos y Exteriores.
 
     Pearson 9:
       A + B + C en una fila y Anexo Servicios debajo.
@@ -3932,6 +4101,8 @@ def mostrar_mapa_visual_centro_gerencia(
                     "Pearson 22"
                 ]["Llar"],
             )
+
+        _pintar_zonas_externas_p22_gerencia(df)
 
 
 def _cerradas_mes_planta(datos):
