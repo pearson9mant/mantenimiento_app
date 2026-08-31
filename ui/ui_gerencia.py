@@ -2621,19 +2621,48 @@ def _ubicacion_historico_canonica_gerencia(fila, centro):
 
 
 def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
-    """Histórico de OT por espacio. Vista solo de lectura."""
-    st.markdown("### 📚 Histórico por espacio")
+    """
+    Histórico de OT de la ubicación física seleccionada en Colegio Vivo.
+
+    La jerarquía es la misma que en el colegio real:
+    centro -> edificio -> planta/zona -> espacio.
+
+    Ejemplo Pearson 22:
+    Infantil / Primaria -> Acceso Pearson 22 -> Acometida general de agua.
+
+    El Histórico nunca mezcla actuaciones de otra planta/zona y no modifica
+    ningún dato guardado en las OT.
+    """
+    st.markdown("### 📚 Histórico de la ubicación seleccionada")
     st.caption(
-        "Curso actual · usa la misma ubicación y el mismo periodo que el 💙 del mapa."
+        "Curso actual · sigue exactamente la planta o zona seleccionada en el mapa."
     )
 
     if df.empty:
         st.info("No hay histórico disponible.")
         return
 
+    centro_mapa = str(
+        st.session_state.get("gerencia_cv_centro") or centro or ""
+    ).strip()
+    edificio_mapa = str(
+        st.session_state.get("gerencia_cv_edificio") or ""
+    ).strip()
+    planta_mapa = str(
+        st.session_state.get("gerencia_cv_planta") or ""
+    ).strip()
+
+    # La pestaña pertenece al centro que Gerencia está consultando.
+    # Si por cualquier motivo la selección guardada es de otro centro,
+    # no se reutiliza esa ubicación.
+    if centro_mapa != str(centro or "").strip():
+        centro_mapa = str(centro or "").strip()
+        edificio_mapa = ""
+        planta_mapa = ""
+
     datos = df[
         df["centro"].fillna("").astype(str).str.strip()
-        == str(centro or "").strip()
+        == centro_mapa
     ].copy()
 
     historico = datos[es_cerrada(datos)].copy()
@@ -2664,124 +2693,76 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
         st.info("Todavía no hay OT finalizadas en el curso actual.")
         return
 
-    historico["espacio_limpio"] = (
-        historico["espacio"].fillna("").astype(str).str.strip()
-    )
-
-    # El Histórico utiliza la misma identidad física de zona que el mapa.
-    # Para zonas especiales se tienen en cuenta planta y espacio, igual que
-    # en el contador 💙; no se modifica ningún dato guardado en la OT.
-    historico["espacio_visual"] = historico.apply(
-        lambda fila: _ubicacion_historico_canonica_gerencia(
-            fila,
-            centro,
-        ),
-        axis=1,
-    )
-
-    historico = historico[
-        ~historico["espacio_visual"].fillna("").astype(str).str.strip().str.lower().isin(
-            ["", "-", "sin espacio", "nan", "none"]
-        )
-    ].copy()
-
-    if historico.empty:
-        st.info("No hay espacios válidos informados en el histórico.")
-        return
-
-    edificios = sorted({
-        str(v).strip()
-        for v in historico["edificio"].fillna("").tolist()
-        if str(v or "").strip()
-    })
-
-    c1, c2 = st.columns([1, 1.6])
-
-    with c1:
-        edificio_sel = st.selectbox(
-            "Edificio",
-            ["Todos"] + edificios,
-            key=f"gerencia_hist_edificio_{centro}_{key_sufijo}",
-        )
-
-    with c2:
-        buscar = st.text_input(
-            "Buscar espacio",
-            placeholder="Ejemplo: I4B, WC chicos, comedor...",
-            key=f"gerencia_hist_buscar_{centro}_{key_sufijo}",
-        ).strip()
-
-    filtrado = historico.copy()
-
-    if edificio_sel != "Todos":
-        filtrado = filtrado[
-            filtrado["edificio"].fillna("").astype(str).str.strip()
-            == edificio_sel
-        ].copy()
-
-    if buscar:
-        filtrado = filtrado[
-            filtrado.apply(
-                lambda fila: (
-                    coincide_busqueda_flexible(
-                        buscar,
-                        fila.get("espacio_limpio", ""),
-                    )
-                    or coincide_busqueda_flexible(
-                        buscar,
-                        fila.get("espacio_visual", ""),
-                    )
-                ),
-                axis=1,
-            )
-        ].copy()
-
-    espacios = sorted({
-        str(v).strip()
-        for v in filtrado["espacio_visual"].tolist()
-        if str(v or "").strip()
-    })
-
-    if not espacios:
-        st.info("No hay espacios que coincidan con la búsqueda.")
-        return
-
-    espacio_sel = st.selectbox(
-        "Espacio",
-        espacios,
-        key=f"gerencia_hist_espacio_{centro}_{key_sufijo}",
-    )
-
-    if centro == "Pearson 22" and espacio_sel in {
-        zona for zona, _icono in ZONAS_EXTERNAS_P22_GERENCIA
-    }:
-        detalle = filtrar_por_ubicacion_gerencia(
+    # -------------------------------------------------
+    # MISMA UBICACIÓN QUE EL MAPA
+    # -------------------------------------------------
+    if edificio_mapa and planta_mapa:
+        detalle_ubicacion = filtrar_por_ubicacion_gerencia(
             historico,
-            centro,
-            "Zonas exteriores",
-            espacio_sel,
+            centro_mapa,
+            edificio_mapa,
+            planta_mapa,
         )
-    elif centro == "Pearson 9" and espacio_sel in ZONAS_ANEXO_GERENCIA:
-        detalle = filtrar_por_ubicacion_gerencia(
-            historico,
-            centro,
-            "Anexo Servicios",
-            espacio_sel,
+
+        edificio_visual = edificio_mapa
+        if edificio_mapa == "Zonas exteriores" and centro_mapa == "Pearson 22":
+            # En catálogo estas zonas cuelgan físicamente de Infantil / Primaria.
+            edificio_visual = "Infantil / Primaria"
+
+        st.info(
+            f"📍 **{centro_mapa} · {edificio_visual} · {planta_mapa}**"
         )
     else:
-        detalle = historico[
-            historico["espacio_visual"] == espacio_sel
-        ].copy()
+        # Seguridad para sesiones antiguas sin selección de mapa.
+        detalle_ubicacion = historico.copy()
+        st.caption("Selecciona una planta o zona en el mapa para acotar el histórico.")
 
-    if edificio_sel != "Todos":
+    if detalle_ubicacion.empty:
+        st.info(
+            "No hay OT finalizadas este curso en la planta o zona seleccionada."
+        )
+        return
+
+    # Los espacios son los elementos reales contenidos dentro de esa planta/zona.
+    detalle_ubicacion["espacio_limpio"] = (
+        detalle_ubicacion["espacio"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    espacios = sorted({
+        valor
+        for valor in detalle_ubicacion["espacio_limpio"].tolist()
+        if valor and valor.lower() not in {"-", "sin espacio", "nan", "none"}
+    })
+
+    if espacios:
+        espacio_sel = st.selectbox(
+            "Espacio dentro de esta planta / zona",
+            ["Todos"] + espacios,
+            key=f"gerencia_hist_espacio_{centro}_{key_sufijo}",
+        )
+    else:
+        espacio_sel = "Todos"
+
+    detalle = detalle_ubicacion.copy()
+
+    if espacio_sel != "Todos":
         detalle = detalle[
-            detalle["edificio"].fillna("").astype(str).str.strip()
-            == edificio_sel
+            detalle["espacio_limpio"] == espacio_sel
         ].copy()
 
-    fecha_ref = detalle["fecha_cierre_dt"].copy()
-    fecha_ref = fecha_ref.where(fecha_ref.notna(), detalle["fecha_dt"])
-    ultima = fecha_ref.max()
+    if detalle.empty:
+        st.info("No hay OT finalizadas para este espacio.")
+        return
+
+    fecha_ref_detalle = detalle["fecha_cierre_dt"].copy()
+    fecha_ref_detalle = fecha_ref_detalle.where(
+        fecha_ref_detalle.notna(),
+        detalle["fecha_dt"],
+    )
+    ultima = fecha_ref_detalle.max()
 
     areas = {
         str(v).strip()
@@ -2809,24 +2790,18 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
 
     columnas = [c for c in columnas if c in detalle.columns]
 
-    # En la tabla se muestra la zona física unificada seleccionada.
-    # Los valores originales permanecen intactos en la base de datos.
-    detalle_tabla = detalle.copy()
-    if "espacio" in detalle_tabla.columns:
-        detalle_tabla["espacio"] = detalle_tabla["espacio_visual"]
-
-    detalle_tabla = detalle_tabla.sort_values(
+    detalle_tabla = detalle.sort_values(
         ["fecha_cierre_dt", "fecha_dt"],
         ascending=[False, False],
         na_position="last",
-    )
+    ).copy()
 
     renombrar = {
         "numero_ot": "OT",
         "fecha_creacion": "Fecha alta",
         "fecha_cierre": "Fecha cierre",
         "edificio": "Edificio",
-        "planta": "Planta",
+        "planta": "Planta / zona",
         "espacio": "Espacio",
         "descripcion": "Descripción",
         "area": "Área",
@@ -2843,8 +2818,6 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
         hide_index=True,
         height=min(500, 45 + len(detalle_tabla) * 35),
     )
-
-
 
 def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     datos = obtener_df_tarjeta(df, centro, tipo)
