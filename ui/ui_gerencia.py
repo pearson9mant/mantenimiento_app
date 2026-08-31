@@ -2589,12 +2589,42 @@ def _espacio_historico_canonico_gerencia(centro, espacio):
     return str(espacio or "").strip()
 
 
+def _ubicacion_historico_canonica_gerencia(fila, centro):
+    """
+    Devuelve la identidad física que usa el mapa de Gerencia.
+
+    Para las zonas especiales no mira solo ``espacio``: también respeta
+    ``planta``, igual que ``filtrar_por_ubicacion_gerencia``. De este modo
+    una OT antigua guardada como planta="Acceso Pearson 22" y otra guardada
+    como espacio="Entrada Pearson 22" pertenecen a la misma zona.
+    """
+    espacio = str(fila.get("espacio") or "").strip()
+    planta = str(fila.get("planta") or "").strip()
+
+    if centro == "Pearson 22" and not _es_planta_fisica_p22_gerencia(planta):
+        for zona, _icono in ZONAS_EXTERNAS_P22_GERENCIA:
+            if (
+                _coincide_zona_externa_p22_gerencia(planta, zona)
+                or _coincide_zona_externa_p22_gerencia(espacio, zona)
+            ):
+                return zona
+
+    if centro == "Pearson 9":
+        for zona in ZONAS_ANEXO_GERENCIA:
+            if _coincide_zona_anexo_gerencia(espacio, zona):
+                return zona
+
+    return _espacio_historico_canonico_gerencia(
+        centro,
+        espacio,
+    )
+
+
 def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
     """Histórico de OT por espacio. Vista solo de lectura."""
     st.markdown("### 📚 Histórico por espacio")
     st.caption(
-        "Busca un aula o zona para consultar las OT realizadas "
-        "y su historial de mantenimiento."
+        "Curso actual · usa la misma ubicación y el mismo periodo que el 💙 del mapa."
     )
 
     if df.empty:
@@ -2612,25 +2642,48 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
         st.info("Todavía no hay OT finalizadas para consultar.")
         return
 
+    # Mismo periodo que utiliza el 💙 del mapa.
+    fecha_ref = historico["fecha_cierre_dt"].copy()
+    fecha_ref = fecha_ref.where(
+        fecha_ref.notna(),
+        historico["fecha_dt"],
+    )
+
+    hoy = pd.Timestamp.today()
+    anio_inicio = hoy.year if hoy.month >= 8 else hoy.year - 1
+    inicio_curso = pd.Timestamp(year=anio_inicio, month=8, day=1)
+    fin_curso_exclusivo = pd.Timestamp(year=anio_inicio + 1, month=9, day=1)
+
+    historico = historico[
+        fecha_ref.notna()
+        & (fecha_ref >= inicio_curso)
+        & (fecha_ref < fin_curso_exclusivo)
+    ].copy()
+
+    if historico.empty:
+        st.info("Todavía no hay OT finalizadas en el curso actual.")
+        return
+
     historico["espacio_limpio"] = (
         historico["espacio"].fillna("").astype(str).str.strip()
     )
 
+    # El Histórico utiliza la misma identidad física de zona que el mapa.
+    # Para zonas especiales se tienen en cuenta planta y espacio, igual que
+    # en el contador 💙; no se modifica ningún dato guardado en la OT.
+    historico["espacio_visual"] = historico.apply(
+        lambda fila: _ubicacion_historico_canonica_gerencia(
+            fila,
+            centro,
+        ),
+        axis=1,
+    )
+
     historico = historico[
-        ~historico["espacio_limpio"].str.lower().isin(
+        ~historico["espacio_visual"].fillna("").astype(str).str.strip().str.lower().isin(
             ["", "-", "sin espacio", "nan", "none"]
         )
     ].copy()
-
-    # El Histórico utiliza la misma identidad física de zona que el mapa.
-    # Ejemplo: Entrada Pearson 22 y Acceso Pearson 22 se consultan juntos
-    # como una única zona, sin alterar los nombres guardados en las OT.
-    historico["espacio_visual"] = historico["espacio_limpio"].apply(
-        lambda valor: _espacio_historico_canonico_gerencia(
-            centro,
-            valor,
-        )
-    )
 
     if historico.empty:
         st.info("No hay espacios válidos informados en el histórico.")
@@ -2699,9 +2752,26 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
         key=f"gerencia_hist_espacio_{centro}_{key_sufijo}",
     )
 
-    detalle = historico[
-        historico["espacio_visual"] == espacio_sel
-    ].copy()
+    if centro == "Pearson 22" and espacio_sel in {
+        zona for zona, _icono in ZONAS_EXTERNAS_P22_GERENCIA
+    }:
+        detalle = filtrar_por_ubicacion_gerencia(
+            historico,
+            centro,
+            "Zonas exteriores",
+            espacio_sel,
+        )
+    elif centro == "Pearson 9" and espacio_sel in ZONAS_ANEXO_GERENCIA:
+        detalle = filtrar_por_ubicacion_gerencia(
+            historico,
+            centro,
+            "Anexo Servicios",
+            espacio_sel,
+        )
+    else:
+        detalle = historico[
+            historico["espacio_visual"] == espacio_sel
+        ].copy()
 
     if edificio_sel != "Todos":
         detalle = detalle[
@@ -3678,7 +3748,7 @@ def _finalizadas_curso_mapa_gerencia(datos):
 
     # El curso se mantiene hasta finalizar agosto.
     # Ejemplo: 01/08/2026 -> 31/08/2027.
-    anio_inicio = hoy.year if hoy.month >= 9 else hoy.year - 1
+    anio_inicio = hoy.year if hoy.month >= 8 else hoy.year - 1
     inicio = pd.Timestamp(year=anio_inicio, month=8, day=1)
     fin_exclusivo = pd.Timestamp(year=anio_inicio + 1, month=9, day=1)
 
