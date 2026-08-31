@@ -40,6 +40,7 @@ from modules.ordenes import (
     aplicar_reclasificacion_areas,
 )
 from modules.areas import AREAS_OT
+from modules.accesos_gerencia import obtener_resumen_accesos_gerencia
 
 
 TIPOS_PUNTO_LEGIONELLA = [
@@ -3370,6 +3371,43 @@ def pantalla_configuracion_espacios():
 
 
 
+
+# =====================================================
+# USO GERENCIA
+# =====================================================
+
+def pantalla_uso_gerencia():
+    st.markdown("### 👁️ Uso Gerencia")
+    st.caption(
+        "Registro interno de entradas reales del perfil Gerencia. "
+        "Los rerun de Streamlit y las visitas desde Administración no suman."
+    )
+
+    try:
+        resumen = obtener_resumen_accesos_gerencia()
+    except Exception as e:
+        st.error(f"No se pudo consultar el uso de Gerencia: {e}")
+        return
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Entradas hoy", int(resumen.get("hoy", 0)))
+    c2.metric("Entradas este mes", int(resumen.get("mes", 0)))
+    c3.metric("Entradas totales", int(resumen.get("total", 0)))
+
+    registros = resumen.get("registros", [])
+
+    if not registros:
+        st.info("Todavía no se ha registrado ninguna entrada de Gerencia.")
+        return
+
+    st.markdown("#### Últimas entradas")
+    st.dataframe(
+        pd.DataFrame(registros).head(100),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 # =====================================================
 # PANTALLA CONFIGURACIÓN
 # =====================================================
@@ -3393,6 +3431,7 @@ def pantalla_configuracion():
             "🧩 Modelo aulas",
             "⚡ Cuadros eléctricos",
             "🧠 Inteligencia",
+            "👁️ Uso Gerencia",
             "📊 Gráficos",
             "🧹 Borrados",
         ],
@@ -3419,6 +3458,10 @@ def pantalla_configuracion():
 
     if seccion == "🧠 Inteligencia":
         mostrar_reclasificacion_areas_ot()
+        return
+
+    if seccion == "👁️ Uso Gerencia":
+        pantalla_uso_gerencia()
         return
 
     if seccion == "📊 Gráficos":
