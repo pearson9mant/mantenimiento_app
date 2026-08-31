@@ -406,13 +406,11 @@ def _icono_estado(estado):
 
 def _texto_contador(datos):
     total = int(datos.get("total") or 0)
-    ejecutables = int(datos.get("ejecutables") or 0)
 
     if total == 0:
         return "✓"
 
-    cantidad = ejecutables if ejecutables > 0 else total
-    return f"({cantidad})"
+    return f"({total})"
 
 
 # =========================================================
