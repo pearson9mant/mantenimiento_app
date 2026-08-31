@@ -2552,6 +2552,43 @@ def mostrar_menu_centro(df, centro):
 
 
 
+def _espacio_historico_canonico_gerencia(centro, espacio):
+    """
+    Unifica en Histórico los nombres antiguos que representan la misma
+    zona física del mapa de Gerencia.
+
+    Es solo una normalización visual/de consulta: no modifica ninguna OT.
+    """
+    centro_n = str(centro or "").strip()
+    espacio_n = normalizar_busqueda(espacio)
+
+    if not espacio_n:
+        return str(espacio or "").strip()
+
+    if centro_n == "Pearson 22":
+        for zona, aliases in ALIASES_ZONAS_EXTERNAS_P22_GERENCIA.items():
+            candidatos = [zona] + list(aliases or [])
+
+            for alias in candidatos:
+                if espacio_n == normalizar_busqueda(alias):
+                    return zona
+
+    if centro_n == "Pearson 9":
+        for zona, aliases in ZONAS_ANEXO_GERENCIA.items():
+            candidatos = [zona] + list(aliases or [])
+
+            for alias in candidatos:
+                alias_n = normalizar_busqueda(alias)
+
+                if (
+                    espacio_n == alias_n
+                    or alias_n in espacio_n
+                ):
+                    return zona
+
+    return str(espacio or "").strip()
+
+
 def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
     """Histórico de OT por espacio. Vista solo de lectura."""
     st.markdown("### 📚 Histórico por espacio")
@@ -2584,6 +2621,16 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
             ["", "-", "sin espacio", "nan", "none"]
         )
     ].copy()
+
+    # El Histórico utiliza la misma identidad física de zona que el mapa.
+    # Ejemplo: Entrada Pearson 22 y Acceso Pearson 22 se consultan juntos
+    # como una única zona, sin alterar los nombres guardados en las OT.
+    historico["espacio_visual"] = historico["espacio_limpio"].apply(
+        lambda valor: _espacio_historico_canonico_gerencia(
+            centro,
+            valor,
+        )
+    )
 
     if historico.empty:
         st.info("No hay espacios válidos informados en el histórico.")
@@ -2621,14 +2668,24 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
 
     if buscar:
         filtrado = filtrado[
-            filtrado["espacio_limpio"].apply(
-                lambda valor: coincide_busqueda_flexible(buscar, valor)
+            filtrado.apply(
+                lambda fila: (
+                    coincide_busqueda_flexible(
+                        buscar,
+                        fila.get("espacio_limpio", ""),
+                    )
+                    or coincide_busqueda_flexible(
+                        buscar,
+                        fila.get("espacio_visual", ""),
+                    )
+                ),
+                axis=1,
             )
         ].copy()
 
     espacios = sorted({
         str(v).strip()
-        for v in filtrado["espacio_limpio"].tolist()
+        for v in filtrado["espacio_visual"].tolist()
         if str(v or "").strip()
     })
 
@@ -2643,7 +2700,7 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
     )
 
     detalle = historico[
-        historico["espacio_limpio"] == espacio_sel
+        historico["espacio_visual"] == espacio_sel
     ].copy()
 
     if edificio_sel != "Todos":
@@ -2682,7 +2739,13 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
 
     columnas = [c for c in columnas if c in detalle.columns]
 
-    detalle = detalle.sort_values(
+    # En la tabla se muestra la zona física unificada seleccionada.
+    # Los valores originales permanecen intactos en la base de datos.
+    detalle_tabla = detalle.copy()
+    if "espacio" in detalle_tabla.columns:
+        detalle_tabla["espacio"] = detalle_tabla["espacio_visual"]
+
+    detalle_tabla = detalle_tabla.sort_values(
         ["fecha_cierre_dt", "fecha_dt"],
         ascending=[False, False],
         na_position="last",
@@ -2705,10 +2768,10 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
     }
 
     st.dataframe(
-        detalle[columnas].rename(columns=renombrar),
+        detalle_tabla[columnas].rename(columns=renombrar),
         use_container_width=True,
         hide_index=True,
-        height=min(500, 45 + len(detalle) * 35),
+        height=min(500, 45 + len(detalle_tabla) * 35),
     )
 
 
