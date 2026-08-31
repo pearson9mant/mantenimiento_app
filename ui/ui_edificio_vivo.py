@@ -375,14 +375,14 @@ def _estado_planta(datos):
     altas = int(datos.get("altas") or 0)
     en_curso = int(datos.get("en_curso") or 0)
 
-    if en_curso > 0:
-        return "curso"
-
     if urgentes > 0:
         return "critica"
 
     if altas > 0 or ejecutables >= 3:
         return "atencion"
+
+    if en_curso > 0:
+        return "curso"
 
     if ejecutables > 0:
         return "seguimiento"
