@@ -1026,7 +1026,8 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
 
     elif tipo_control_punto == "Depósitos solares":
         return [
-            "Control depósitos solares"
+            "Control depósitos solares",
+            "Purga",
         ]
 
     else:
@@ -1036,6 +1037,7 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
     
         elif tipo_punto == "acumulador_solar":
             tareas.insert(0, "Control depósitos solares")
+            tareas.insert(1, "Purga")
     
         elif tipo_punto == "retorno":
             tareas.insert(0, "Temperatura retorno")
@@ -3423,9 +3425,14 @@ def pantalla_legionella():
                 elif tarea == "Control depósitos solares":
                     tipo_control = "Control depósitos solares"
                     unidad = "ºC"
-                
+
                     st.markdown("#### ☀️ Control conjunto de depósitos solares")
-                
+                    st.caption(
+                        "Este control registra únicamente las temperaturas. "
+                        "La purga de fondo se registra en la tarea semanal "
+                        "independiente «Purga»."
+                    )
+
                     valor = st.number_input(
                         "Temperatura depósito solar 1 ºC",
                         min_value=0.0,
@@ -3434,7 +3441,7 @@ def pantalla_legionella():
                         step=0.1,
                         key="temperatura_deposito_solar_1"
                     )
-                
+
                     valor_2 = st.number_input(
                         "Temperatura depósito solar 2 ºC",
                         min_value=0.0,
@@ -3443,44 +3450,20 @@ def pantalla_legionella():
                         step=0.1,
                         key="temperatura_deposito_solar_2"
                     )
-                
+
                     valor_3 = abs(float(valor) - float(valor_2))
-                
+
                     st.metric(
                         "Diferencia entre depósitos",
                         f"{valor_3:.1f} ºC"
                     )
-                
+
                     if valor_3 <= 5:
                         st.success("🟢 Diferencia térmica normal")
                     elif valor_3 <= 10:
                         st.warning("🟡 Diferencia térmica a revisar")
                     else:
                         st.error("🔴 Diferencia térmica elevada")
-                
-                    purga_solar = st.selectbox(
-                        "Purga",
-                        [
-                            "No necesaria",
-                            "Realizada",
-                            "No realizada"
-                        ],
-                        key="purga_depositos_solares"
-                    )
-                
-                    resultado_purga_solar = ""
-                
-                    if purga_solar == "Realizada":
-                        resultado_purga_solar = st.selectbox(
-                            "Resultado de la purga",
-                            [
-                                "Correcta",
-                                "Salida de aire",
-                                "Agua con partículas",
-                                "Otro"
-                            ],
-                            key="resultado_purga_depositos_solares"
-                        )
 
                 elif tarea == "Control AFS":
                     tipo_control = "Control AFS"
@@ -3756,14 +3739,9 @@ def pantalla_legionella():
                                 f"Temperatura depósito solar 1: {valor:.1f} ºC",
                                 f"Temperatura depósito solar 2: {valor_2:.1f} ºC",
                                 f"Diferencia térmica: {valor_3:.1f} ºC",
-                                f"Purga: {purga_solar}",
+                                "Purga de fondo: controlada en tarea semanal independiente",
                             ]
-                        
-                            if purga_solar == "Realizada" and resultado_purga_solar:
-                                datos_solares.append(
-                                    f"Resultado de la purga: {resultado_purga_solar}"
-                                )
-                        
+
                             observaciones_finales = (
                                 observaciones_finales
                                 + "\nControl depósitos solares: "
