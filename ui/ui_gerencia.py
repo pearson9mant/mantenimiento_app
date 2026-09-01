@@ -4591,6 +4591,7 @@ def mostrar_panel_planta_cv(df):
         columnas = [
             "numero_ot",
             "Tipo",
+            "espacio",
             "descripcion",
             "area",
             "prioridad",
@@ -4610,6 +4611,7 @@ def mostrar_panel_planta_cv(df):
         vista.columns = [
             "OT",
             "Tipo",
+            "Espacio",
             "Descripción",
             "Área",
             "Prioridad",
