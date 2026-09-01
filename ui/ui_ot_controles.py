@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date, datetime
+from pathlib import Path
 
 from modules.ordenes import (
     obtener_vinculacion_ot,
@@ -81,6 +82,67 @@ def extraer_datos_ot_legionella(descripcion, espacio):
 
     return tarea, punto
 
+
+
+def mostrar_plano_legionella_ot(centro, id_orden):
+    """
+    Muestra el plano general de puntos de control del centro solo
+    cuando el operario lo solicita desde la OT.
+
+    Reutiliza exactamente los PDF ya existentes en
+    assets/planos_legionella. No crea copias ni toca la base de datos.
+    """
+    planos = {
+        "Pearson 22": (
+            Path("assets/planos_legionella/Puntos_control_legionela.pdf"),
+            "Puntos_control_legionela.pdf",
+        ),
+        "Pearson 9": (
+            Path("assets/planos_legionella/Puntos_control_legionela_Pearson_9_v2.pdf"),
+            "Puntos_control_legionela_Pearson_9_v2.pdf",
+        ),
+    }
+
+    centro_txt = str(centro or "").strip()
+
+    if centro_txt not in planos:
+        return
+
+    clave = f"legionella_ver_plano_ot_{id_orden}"
+    mostrar = bool(st.session_state.get(clave, False))
+
+    if not mostrar:
+        if st.button(
+            "🗺️ Ver plano de ubicación",
+            key=f"legionella_boton_ver_plano_ot_{id_orden}",
+            use_container_width=True,
+        ):
+            st.session_state[clave] = True
+            st.rerun()
+        return
+
+    ruta, nombre = planos[centro_txt]
+
+    if ruta.exists():
+        with open(ruta, "rb") as archivo_plano:
+            st.download_button(
+                f"📄 Abrir plano Legionella · {centro_txt}",
+                data=archivo_plano.read(),
+                file_name=nombre,
+                mime="application/pdf",
+                key=f"legionella_abrir_plano_ot_{id_orden}",
+                use_container_width=True,
+            )
+    else:
+        st.warning("No se encuentra el plano de ubicación de este centro.")
+
+    if st.button(
+        "🙈 Ocultar plano",
+        key=f"legionella_ocultar_plano_ot_{id_orden}",
+        use_container_width=True,
+    ):
+        st.session_state[clave] = False
+        st.rerun()
 
 def mostrar_ejecucion_legionella_operario(
     id_orden,
@@ -277,6 +339,11 @@ def mostrar_ejecucion_legionella_operario(
         f"{planta or '-'} · {punto_nombre}"
     )
     st.caption(f"🧪 Tarea: {tarea}")
+
+    mostrar_plano_legionella_ot(
+        centro=centro,
+        id_orden=id_orden,
+    )
 
     terminales = int(punto.get("numero_terminales", 1) or 1)
 
