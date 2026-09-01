@@ -582,7 +582,8 @@ def obtener_numero_ot_preventiva_abierta(
 
         # 3) Último respaldo para la OT creada justo antes de una excepción:
         # misma ubicación + misma tarea preventiva.
-        descripcion_espacio = f"[PREVENTIVO ESPACIO] {tarea}"
+        descripcion_espacio = f"[PREVENTIVO ESPACIO] {espacio} · {tarea}"
+        descripcion_espacio_anterior = f"[PREVENTIVO ESPACIO] {tarea}"
         descripcion_legacy = f"[PREVENTIVO] {tarea}"
         cursor.execute(_sql("""
             SELECT numero_ot
@@ -591,7 +592,7 @@ def obtener_numero_ot_preventiva_abierta(
               AND edificio = ?
               AND espacio = ?
               AND COALESCE(planta, '') = ?
-              AND descripcion IN (?, ?)
+              AND descripcion IN (?, ?, ?)
               AND LOWER(COALESCE(estado, '')) NOT IN (?, ?, ?, ?, ?, ?)
             ORDER BY id DESC
             LIMIT 1
@@ -601,6 +602,7 @@ def obtener_numero_ot_preventiva_abierta(
             espacio,
             str(planta or ""),
             descripcion_espacio,
+            descripcion_espacio_anterior,
             descripcion_legacy,
             *estados_cierre,
         ))
@@ -1181,7 +1183,7 @@ def generar_ots_preventivo_si_toca():
             if es_revision_cuadro:
                 descripcion = f"[PREVENTIVO CUADRO] {tarea}"
             elif es_revision_general_espacio:
-                descripcion = f"[PREVENTIVO ESPACIO] {tarea}"
+                descripcion = f"[PREVENTIVO ESPACIO] {espacio} · {tarea}"
             else:
                 descripcion = f"[PREVENTIVO] {tarea}"
 
