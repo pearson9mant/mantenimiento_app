@@ -316,6 +316,88 @@ def mostrar_ruta_semanal_purgas_p9(id_orden):
     )
 
 
+
+def mostrar_revision_trimestral_acumulador_acs(id_orden):
+    st.markdown("#### 🔧 Revisión trimestral acumulador ACS")
+    st.caption(
+        "Revisión del estado físico y de conservación del acumulador. "
+        "La purga semanal se controla en una tarea independiente."
+    )
+
+    estado_general_ok = st.checkbox(
+        "Estado exterior general correcto",
+        key=f"rev_trim_estado_{id_orden}"
+    )
+    sin_fugas = st.checkbox(
+        "Sin fugas visibles",
+        key=f"rev_trim_fugas_{id_orden}"
+    )
+    sin_corrosion = st.checkbox(
+        "Sin corrosión visible",
+        key=f"rev_trim_corrosion_{id_orden}"
+    )
+    sin_incrustaciones = st.checkbox(
+        "Sin incrustaciones o deterioro visible",
+        key=f"rev_trim_incrustaciones_{id_orden}"
+    )
+    aislamiento_ok = st.checkbox(
+        "Aislamiento exterior en buen estado",
+        key=f"rev_trim_aislamiento_{id_orden}"
+    )
+    conexiones_ok = st.checkbox(
+        "Conexiones, válvulas y elementos accesibles en buen estado",
+        key=f"rev_trim_conexiones_{id_orden}"
+    )
+
+    revision_ok = all([
+        estado_general_ok,
+        sin_fugas,
+        sin_corrosion,
+        sin_incrustaciones,
+        aislamiento_ok,
+        conexiones_ok,
+    ])
+
+    if revision_ok:
+        st.success("✅ Revisión visual del acumulador correcta")
+    else:
+        st.warning(
+            "⚠️ La revisión quedará con incidencia mientras exista "
+            "algún punto sin confirmar."
+        )
+
+    checklist = [
+        "Estado exterior general: Correcto"
+        if estado_general_ok
+        else "Estado exterior general: Deficiencia",
+        "Fugas visibles: No"
+        if sin_fugas
+        else "Fugas visibles: Sí / revisar",
+        "Corrosión visible: No"
+        if sin_corrosion
+        else "Corrosión visible: Sí / revisar",
+        "Incrustaciones/deterioro visible: No"
+        if sin_incrustaciones
+        else "Incrustaciones/deterioro visible: Sí / revisar",
+        "Aislamiento exterior: Correcto"
+        if aislamiento_ok
+        else "Aislamiento exterior: Revisar",
+        "Conexiones/válvulas accesibles: Correctas"
+        if conexiones_ok
+        else "Conexiones/válvulas accesibles: Revisar",
+        "Purga semanal: controlada en tarea independiente",
+    ]
+
+    return _base(
+        "Revisión trimestral acumulador ACS",
+        "OK/KO",
+        1 if revision_ok else 0,
+        None,
+        None,
+        "Revisión trimestral acumulador ACS: " + " | ".join(checklist),
+    )
+
+
 def mostrar_revision_visual(id_orden):
     correcto = st.radio(
         "Resultado revisión visual",
