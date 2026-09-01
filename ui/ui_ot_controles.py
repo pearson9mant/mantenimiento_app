@@ -19,6 +19,7 @@ from ui.procedimientos_legionella import (
     mostrar_control_acs_terminal,
     mostrar_control_terminal_completo,
     mostrar_control_depositos_solares,
+    mostrar_control_valvula_termostatica,
     mostrar_revision_trimestral_acumulador_acs,
     mostrar_revision_visual,
     mostrar_purga,
@@ -375,6 +376,11 @@ def mostrar_ejecucion_legionella_operario(
 
     elif tarea == "Control depósitos solares":
         resultado_procedimiento = mostrar_control_depositos_solares(
+            id_orden
+        )
+
+    elif tarea == "Control válvula termostática":
+        resultado_procedimiento = mostrar_control_valvula_termostatica(
             id_orden
         )
         
