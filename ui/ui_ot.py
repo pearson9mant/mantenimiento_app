@@ -67,6 +67,8 @@ from modules.espacios import (
     obtener_espacios_por_planta,
 )
 
+from ui.ui_pedido_ot import mostrar_pedido_material_desde_ot
+
 
 MAX_FOTOS_CIERRE_OT = 5
 MAX_MB_FOTO_OT = 5
@@ -2927,6 +2929,22 @@ def mostrar_tarjeta_ot(
                     operario=operario,
                     planta=planta_mostrar,
                 )
+
+        # -------------------------------------------------
+        # PEDIDO DE MATERIAL VINCULADO A ESTA OT
+        # -------------------------------------------------
+        if es_operario():
+            mostrar_pedido_material_desde_ot(
+                id_orden=id_orden,
+                numero_ot=num_ot,
+                descripcion_ot=desc,
+                centro=centro_mostrar,
+                edificio=edificio_mostrar,
+                planta=planta_mostrar,
+                espacio=espacio_mostrar,
+                operario=operario,
+                prioridad=prioridad or "Media",
+            )
 
         # -------------------------------------------------
         # PENDIENTE MATERIAL · REAPERTURA POR EL OPERARIO
