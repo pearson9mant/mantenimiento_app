@@ -359,28 +359,12 @@ def mostrar_purga(id_orden, punto):
     unidad = ""
 
     # ------------------------------------------------
-    # ACS / ACUMULADORES
-    # ------------------------------------------------
-
-    if es_acumulador:
-
-        unidad = "ºC"
-
-        valor = st.number_input(
-            "🌡 Temperatura del agua durante el control",
-            min_value=0.0,
-            max_value=100.0,
-            value=55.0,
-            step=0.1,
-            key=f"purga_temp_{id_orden}"
-        )
-
-    # ------------------------------------------------
     # AFCH
     # ------------------------------------------------
 
-    else:
-
+    # En acumuladores/depósitos, la purga semanal de fondo no duplica
+    # el control de temperatura, que se registra en su tarea específica.
+    if not es_acumulador:
         unidad = "mg/L"
 
         valor = st.number_input(
@@ -430,14 +414,10 @@ def mostrar_purga(id_orden, punto):
 
     # La purga tiene dos datos distintos:
     # - valor: confirma si se ha realizado (1/0)
-    # - valor_2: conserva la medición real (temperatura o cloro)
+    # - valor_2: conserva el cloro cuando corresponde a una purga AFCH
     medicion = valor
 
-    if unidad == "ºC":
-        observaciones_extra += (
-            f" | Temperatura del agua: {float(medicion):.1f} ºC"
-        )
-    elif unidad == "mg/L":
+    if unidad == "mg/L":
         observaciones_extra += (
             f" | Cloro residual: {float(medicion):.2f} mg/L"
         )
