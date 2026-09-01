@@ -18,6 +18,7 @@ from ui.procedimientos_legionella import (
     mostrar_control_acs_terminal,
     mostrar_control_terminal_completo,
     mostrar_control_depositos_solares,
+    mostrar_revision_trimestral_acumulador_acs,
     mostrar_revision_visual,
     mostrar_purga,
     mostrar_ruta_semanal_purgas_p9,
@@ -312,6 +313,11 @@ def mostrar_ejecucion_legionella_operario(
         
     elif tarea == "Choque térmico":
         resultado_procedimiento = mostrar_procedimiento_choque_termico(id_orden, terminales)
+
+    elif tarea == "Revisión trimestral acumulador ACS":
+        resultado_procedimiento = mostrar_revision_trimestral_acumulador_acs(
+            id_orden
+        )
 
     elif tarea == "Revisión visual":
         resultado_procedimiento = mostrar_revision_visual(id_orden)
@@ -902,6 +908,7 @@ def mostrar_checklist_preventivo_operario(num_ot, desc, operario):
         incidencias_creadas.append(numero_incidencia)
         st.session_state[clave_incidencias] = incidencias_creadas
         st.session_state[f"prev_contador_anomalia_{num_ot}"] = contador + 1
+        st.session_state["recalcular_corazon"] = True
         st.success(mensaje)
         st.rerun()
 
