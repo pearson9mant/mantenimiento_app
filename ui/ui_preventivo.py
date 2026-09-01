@@ -116,6 +116,11 @@ TAREAS_PREVENTIVAS_POR_AREA = {
         "Otra",
     ],
 
+    "Mantenimiento general": [
+        "Revisión visual general",
+        "Otra",
+    ],
+
     "General": [
         "Revisión visual general",
         "Comprobación de funcionamiento",
@@ -221,9 +226,13 @@ def obtener_areas_preventivo():
     areas = list(AREAS)
 
     area_aulas = "Mantenimiento general aulas"
+    area_general = "Mantenimiento general"
 
     if area_aulas not in areas:
         areas.append(area_aulas)
+
+    if area_general not in areas:
+        areas.append(area_general)
 
     return areas
 
