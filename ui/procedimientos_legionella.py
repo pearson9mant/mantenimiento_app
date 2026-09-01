@@ -127,8 +127,13 @@ def mostrar_control_acs_terminal(id_orden, terminales):
 
     return _base("Control ACS terminal", "ºC", valor, None, None, obs)
 
+
 def mostrar_control_depositos_solares(id_orden):
     st.markdown("#### ☀️ Control conjunto de depósitos solares")
+    st.caption(
+        "Este control registra únicamente las temperaturas de los depósitos solares. "
+        "La purga de fondo se realiza y registra en su tarea semanal independiente."
+    )
 
     col1, col2 = st.columns(2)
 
@@ -169,45 +174,13 @@ def mostrar_control_depositos_solares(id_orden):
         estado_diferencia = "Elevada"
         st.error("🔴 Diferencia térmica elevada")
 
-
-    st.markdown("#### 💨 Purga")
-
-    purga_solar = st.selectbox(
-        "¿Ha sido necesaria la purga?",
-        [
-            "No",
-            "Sí",
-            "No ha sido posible"
-        ],
-        key=f"leg_solar_purga_{id_orden}"
-    )
-
-    resultado_purga = ""
-
-    if purga_solar == "Realizada":
-        resultado_purga = st.selectbox(
-            "Resultado de la purga",
-            [
-                "Correcta",
-                "Salida de aire",
-                "Agua con partículas",
-                "Otro"
-            ],
-            key=f"leg_solar_resultado_purga_{id_orden}"
-        )
-
     datos_observaciones = [
         f"Temperatura depósito solar 1: {temperatura_1:.1f} ºC",
         f"Temperatura depósito solar 2: {temperatura_2:.1f} ºC",
         f"Diferencia térmica: {diferencia:.1f} ºC",
         f"Valoración diferencia: {estado_diferencia}",
-        f"Purga: {purga_solar}",
+        "Purga de fondo: controlada en tarea semanal independiente",
     ]
-
-    if purga_solar == "Realizada" and resultado_purga:
-        datos_observaciones.append(
-            f"Resultado de la purga: {resultado_purga}"
-        )
 
     return {
         "tipo_control": "Control depósitos solares",
@@ -361,13 +334,23 @@ def mostrar_purga(id_orden, punto):
     tipo_punto = str(punto.get("tipo_punto", "") or "").lower()
     instalacion = str(punto.get("instalacion", "") or "").upper()
 
+    es_acumulador = (
+        "acs" in instalacion
+        or tipo_punto in [
+            "acumulador",
+            "acumulador_solar",
+            "deposito",
+            "deposito_solar",
+        ]
+    )
+
     purga_realizada = st.checkbox(
-        "☑ Purga realizada",
+        "☑ Purga de fondo realizada" if es_acumulador else "☑ Purga realizada",
         key=f"purga_realizada_{id_orden}"
     )
 
     agua_transparente = st.checkbox(
-        "☑ Agua transparente",
+        "☑ Agua transparente / sin anomalías",
         value=True,
         key=f"purga_agua_{id_orden}"
     )
@@ -376,20 +359,15 @@ def mostrar_purga(id_orden, punto):
     unidad = ""
 
     # ------------------------------------------------
-    # ACS
+    # ACS / ACUMULADORES
     # ------------------------------------------------
 
-    if "acs" in instalacion or tipo_punto in [
-        "acumulador",
-        "acumulador_solar",
-        "deposito",
-        "deposito_solar"
-    ]:
+    if es_acumulador:
 
         unidad = "ºC"
 
         valor = st.number_input(
-            "🌡 Temperatura alcanzada",
+            "🌡 Temperatura del agua durante el control",
             min_value=0.0,
             max_value=100.0,
             value=55.0,
@@ -428,14 +406,23 @@ def mostrar_purga(id_orden, punto):
     errores = []
 
     if not purga_realizada:
-        errores.append("Debe confirmar que la purga se ha realizado.")
+        errores.append(
+            "Debe confirmar que la purga de fondo se ha realizado."
+            if es_acumulador
+            else "Debe confirmar que la purga se ha realizado."
+        )
 
     if not agua_transparente:
-        errores.append("El agua no es transparente.")
+        errores.append("El agua presenta una anomalía. Indícala en observaciones.")
 
     observaciones_extra = (
-        f"Purga realizada: {'Sí' if purga_realizada else 'No'} | "
-        f"Agua transparente: {'Sí' if agua_transparente else 'No'}"
+        (
+            f"Purga de fondo realizada: {'Sí' if purga_realizada else 'No'}"
+            if es_acumulador
+            else f"Purga realizada: {'Sí' if purga_realizada else 'No'}"
+        )
+        + " | "
+        + f"Agua transparente / sin anomalías: {'Sí' if agua_transparente else 'No'}"
     )
 
     if observaciones:
@@ -448,7 +435,7 @@ def mostrar_purga(id_orden, punto):
 
     if unidad == "ºC":
         observaciones_extra += (
-            f" | Temperatura alcanzada: {float(medicion):.1f} ºC"
+            f" | Temperatura del agua: {float(medicion):.1f} ºC"
         )
     elif unidad == "mg/L":
         observaciones_extra += (
