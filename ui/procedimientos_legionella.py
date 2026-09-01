@@ -317,6 +317,84 @@ def mostrar_ruta_semanal_purgas_p9(id_orden):
 
 
 
+def mostrar_control_valvula_termostatica(id_orden):
+    st.markdown("#### 🌡️ Control válvula termostática")
+    st.caption(
+        "Comprueba la temperatura de entrada de ACS y la salida mezclada, "
+        "además del estado visible y la estabilidad de regulación de la válvula."
+    )
+
+    entrada_acs = st.number_input(
+        "Temperatura entrada ACS a la válvula ºC",
+        min_value=0.0,
+        max_value=100.0,
+        value=60.0,
+        step=0.1,
+        key=f"leg_valvula_entrada_{id_orden}",
+    )
+
+    salida_mezclada = st.number_input(
+        "Temperatura salida mezclada ºC",
+        min_value=0.0,
+        max_value=100.0,
+        value=45.0,
+        step=0.1,
+        key=f"leg_valvula_salida_{id_orden}",
+    )
+
+    sin_fugas = st.checkbox(
+        "Sin fugas visibles",
+        key=f"leg_valvula_fugas_{id_orden}",
+    )
+    cabezal_ok = st.checkbox(
+        "Válvula / cabezal en buen estado",
+        key=f"leg_valvula_cabezal_{id_orden}",
+    )
+    regulacion_ok = st.checkbox(
+        "Regulación estable",
+        key=f"leg_valvula_regulacion_{id_orden}",
+    )
+    accesible_ok = st.checkbox(
+        "Conexiones y elementos accesibles en buen estado",
+        key=f"leg_valvula_acceso_{id_orden}",
+    )
+
+    revision_visual_ok = all([
+        sin_fugas,
+        cabezal_ok,
+        regulacion_ok,
+        accesible_ok,
+    ])
+
+    if revision_visual_ok:
+        st.success("✅ Comprobación visual de la válvula correcta")
+    else:
+        st.warning(
+            "⚠️ Hay comprobaciones visuales pendientes o con anomalía. "
+            "Déjalo reflejado en Observaciones Legionella antes de guardar."
+        )
+
+    obs = " | ".join([
+        f"Entrada ACS válvula: {float(entrada_acs):.1f} ºC",
+        f"Salida mezclada: {float(salida_mezclada):.1f} ºC",
+        "Sin fugas visibles: Sí" if sin_fugas else "Sin fugas visibles: No / revisar",
+        "Válvula/cabezal: Correcto" if cabezal_ok else "Válvula/cabezal: Revisar",
+        "Regulación estable: Sí" if regulacion_ok else "Regulación estable: No / revisar",
+        "Conexiones/elementos accesibles: Correctos"
+        if accesible_ok
+        else "Conexiones/elementos accesibles: Revisar",
+    ])
+
+    return _base(
+        "Control válvula termostática",
+        "ºC",
+        entrada_acs,
+        salida_mezclada,
+        None,
+        obs,
+    )
+
+
 def mostrar_revision_trimestral_acumulador_acs(id_orden):
     st.markdown("#### 🔧 Revisión trimestral acumulador ACS")
     st.caption(
