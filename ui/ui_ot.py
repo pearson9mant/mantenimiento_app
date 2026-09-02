@@ -92,27 +92,6 @@ def codigo_ot_no_traducible(numero_ot):
     )
 
 
-def preparar_nueva_captura_foto_ot(clave_version):
-    """
-    Prepara una instancia limpia de cámara/subida para la siguiente foto.
-
-    Se usa como callback para que el cambio de clave ocurra antes del
-    rerun automático de Streamlit, evitando encadenar un segundo rerun
-    justo después de capturar/guardar una fotografía.
-    """
-    version_actual = int(
-        st.session_state.get(
-            clave_version,
-            0,
-        )
-        or 0
-    )
-
-    st.session_state[
-        clave_version
-    ] = version_actual + 1
-
-
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "")
 
@@ -2929,62 +2908,25 @@ def mostrar_tarjeta_ot(
             expanded=False,
         ):
             st.caption(
-                "La fotografía se guarda directamente en esta OT. "
-                "No cambia su estado ni la finaliza."
+                "Haz la foto con la cámara del móvil o elige una imagen "
+                "ya guardada. Se guarda directamente en esta OT y no "
+                "cambia su estado ni la finaliza."
             )
 
-            clave_version_foto_ot = (
-                f"{modo}_version_foto_ot_{id_orden}"
-            )
-
-            version_foto_ot = int(
-                st.session_state.get(
-                    clave_version_foto_ot,
-                    0,
-                )
-                or 0
-            )
-
-            clave_version_guardada = (
-                f"{modo}_version_foto_guardada_ot_{id_orden}"
-            )
-
-            version_guardada = st.session_state.get(
-                clave_version_guardada
-            )
-
-            foto_camara = st.camera_input(
-                "📸 Hacer foto ahora",
-                key=(
-                    f"{modo}_camara_ot_{id_orden}_"
-                    f"{version_foto_ot}"
-                ),
-            )
-
-            foto_archivo = st.file_uploader(
-                "🖼️ O elegir una foto del dispositivo",
+            foto_nueva = st.file_uploader(
+                "📸 Hacer o elegir foto",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=False,
-                key=(
-                    f"{modo}_anadir_foto_ot_{id_orden}_"
-                    f"{version_foto_ot}"
-                ),
+                key=f"{modo}_foto_directa_ot_{id_orden}",
                 help=f"Máximo {MAX_MB_FOTO_OT} MB.",
             )
-
-            foto_nueva = foto_camara or foto_archivo
 
             error_foto_nueva = ""
 
             if foto_nueva is not None:
                 try:
                     tamano_foto_nueva = int(
-                        getattr(
-                            foto_nueva,
-                            "size",
-                            0,
-                        )
-                        or 0
+                        getattr(foto_nueva, "size", 0) or 0
                     )
                 except Exception:
                     tamano_foto_nueva = 0
@@ -2993,33 +2935,16 @@ def mostrar_tarjeta_ot(
                     error_foto_nueva = (
                         f"La fotografía supera {MAX_MB_FOTO_OT} MB."
                     )
-                    st.error(
-                        error_foto_nueva
-                    )
-
-            foto_actual_guardada = (
-                foto_nueva is not None
-                and version_guardada == version_foto_ot
-            )
-
-            if foto_actual_guardada:
-                st.success(
-                    "Fotografía guardada en la OT. "
-                    "Puedes preparar otra captura."
-                )
+                    st.error(error_foto_nueva)
 
             if st.button(
                 "💾 Guardar foto en la OT",
-                key=(
-                    f"{modo}_guardar_foto_ot_{id_orden}_"
-                    f"{version_foto_ot}"
-                ),
+                key=f"{modo}_guardar_foto_directa_ot_{id_orden}",
                 use_container_width=True,
                 type="primary",
                 disabled=(
                     foto_nueva is None
                     or bool(error_foto_nueva)
-                    or foto_actual_guardada
                 ),
             ):
                 try:
@@ -3030,20 +2955,11 @@ def mostrar_tarjeta_ot(
                             f"La fotografía supera {MAX_MB_FOTO_OT} MB."
                         )
                     else:
-                        nombres_existentes = obtener_nombres_fotos_ot(
-                            num_ot
-                        )
-
-                        secuencia = len(
-                            nombres_existentes
-                        ) + 1
+                        nombres_existentes = obtener_nombres_fotos_ot(num_ot)
+                        secuencia = len(nombres_existentes) + 1
 
                         nombre_original = limpiar_nombre_archivo(
-                            getattr(
-                                foto_nueva,
-                                "name",
-                                "foto.jpg",
-                            )
+                            getattr(foto_nueva, "name", "foto.jpg")
                         )
 
                         nombre_foto_nueva = limpiar_nombre_archivo(
@@ -3064,16 +2980,11 @@ def mostrar_tarjeta_ot(
                             foto_data=contenido_foto,
                         )
 
-                        st.session_state[
-                            clave_fotos_ot
-                        ] = True
-
-                        st.session_state[
-                            clave_version_guardada
-                        ] = version_foto_ot
+                        st.session_state[clave_fotos_ot] = True
 
                         st.success(
-                            "Fotografía guardada en la OT."
+                            "Fotografía guardada en la OT. "
+                            "Puedes seleccionar otra fotografía."
                         )
 
                 except Exception as error:
@@ -3081,24 +2992,6 @@ def mostrar_tarjeta_ot(
                         "No se ha podido guardar la fotografía: "
                         f"{error}"
                     )
-
-            if (
-                st.session_state.get(
-                    clave_version_guardada
-                ) == version_foto_ot
-            ):
-                st.button(
-                    "📸 Preparar otra foto",
-                    key=(
-                        f"{modo}_otra_foto_ot_{id_orden}_"
-                        f"{version_foto_ot}"
-                    ),
-                    use_container_width=True,
-                    on_click=preparar_nueva_captura_foto_ot,
-                    args=(
-                        clave_version_foto_ot,
-                    ),
-                )
 
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
