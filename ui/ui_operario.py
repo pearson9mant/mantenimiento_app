@@ -927,12 +927,14 @@ def mostrar_resumen_ot_operario(fila):
             f"### {icono_estado} {numero_ot or '-'}"
         )
 
+        es_falta_material = normalizar_txt(estado_txt) in [
+            "pendiente material",
+            "esperando material",
+        ]
+
         estado_visual = (
-            "📦 PENDIENTE MATERIAL"
-            if normalizar_txt(estado_txt) in [
-                "pendiente material",
-                "esperando material",
-            ]
+            "📦 FALTA MATERIAL"
+            if es_falta_material
             else (estado_txt or "-")
         )
 
@@ -940,6 +942,11 @@ def mostrar_resumen_ot_operario(fila):
             f"{icono_prioridad} **{prioridad_txt or '-'}** · "
             f"**{estado_visual}**"
         )
+
+        if es_falta_material:
+            st.warning(
+                "📦 **FALTA MATERIAL** · Esperando material para continuar."
+            )
 
         st.caption(
             f"🏢 {centro_ot or '-'} · "
@@ -1291,18 +1298,19 @@ def _mostrar_fila_jornada_operario(fila):
             f"{descripcion}"
         )
 
-        estado_visual = (
-            "📦 PENDIENTE MATERIAL"
-            if normalizar_txt(estado) in [
-                "pendiente material",
-                "esperando material",
-            ]
-            else estado
-        )
+        es_falta_material = normalizar_txt(estado) in [
+            "pendiente material",
+            "esperando material",
+        ]
 
-        st.caption(
-            f"Estado: {estado_visual}"
-        )
+        if es_falta_material:
+            st.warning(
+                "📦 **FALTA MATERIAL** · Esperando material para continuar."
+            )
+        else:
+            st.caption(
+                f"Estado: {estado}"
+            )
 
     with col_abrir:
         estado_normalizado = normalizar_txt(estado)
