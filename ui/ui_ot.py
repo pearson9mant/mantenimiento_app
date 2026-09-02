@@ -92,6 +92,27 @@ def codigo_ot_no_traducible(numero_ot):
     )
 
 
+def preparar_nueva_captura_foto_ot(clave_version):
+    """
+    Prepara una instancia limpia de cámara/subida para la siguiente foto.
+
+    Se usa como callback para que el cambio de clave ocurra antes del
+    rerun automático de Streamlit, evitando encadenar un segundo rerun
+    justo después de capturar/guardar una fotografía.
+    """
+    version_actual = int(
+        st.session_state.get(
+            clave_version,
+            0,
+        )
+        or 0
+    )
+
+    st.session_state[
+        clave_version
+    ] = version_actual + 1
+
+
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "")
 
@@ -2912,16 +2933,42 @@ def mostrar_tarjeta_ot(
                 "No cambia su estado ni la finaliza."
             )
 
+            clave_version_foto_ot = (
+                f"{modo}_version_foto_ot_{id_orden}"
+            )
+
+            version_foto_ot = int(
+                st.session_state.get(
+                    clave_version_foto_ot,
+                    0,
+                )
+                or 0
+            )
+
+            clave_version_guardada = (
+                f"{modo}_version_foto_guardada_ot_{id_orden}"
+            )
+
+            version_guardada = st.session_state.get(
+                clave_version_guardada
+            )
+
             foto_camara = st.camera_input(
                 "📸 Hacer foto ahora",
-                key=f"{modo}_camara_ot_{id_orden}",
+                key=(
+                    f"{modo}_camara_ot_{id_orden}_"
+                    f"{version_foto_ot}"
+                ),
             )
 
             foto_archivo = st.file_uploader(
                 "🖼️ O elegir una foto del dispositivo",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=False,
-                key=f"{modo}_anadir_foto_ot_{id_orden}",
+                key=(
+                    f"{modo}_anadir_foto_ot_{id_orden}_"
+                    f"{version_foto_ot}"
+                ),
                 help=f"Máximo {MAX_MB_FOTO_OT} MB.",
             )
 
@@ -2950,14 +2997,29 @@ def mostrar_tarjeta_ot(
                         error_foto_nueva
                     )
 
+            foto_actual_guardada = (
+                foto_nueva is not None
+                and version_guardada == version_foto_ot
+            )
+
+            if foto_actual_guardada:
+                st.success(
+                    "Fotografía guardada en la OT. "
+                    "Puedes preparar otra captura."
+                )
+
             if st.button(
                 "💾 Guardar foto en la OT",
-                key=f"{modo}_guardar_foto_ot_{id_orden}",
+                key=(
+                    f"{modo}_guardar_foto_ot_{id_orden}_"
+                    f"{version_foto_ot}"
+                ),
                 use_container_width=True,
                 type="primary",
                 disabled=(
                     foto_nueva is None
                     or bool(error_foto_nueva)
+                    or foto_actual_guardada
                 ),
             ):
                 try:
@@ -3006,16 +3068,37 @@ def mostrar_tarjeta_ot(
                             clave_fotos_ot
                         ] = True
 
+                        st.session_state[
+                            clave_version_guardada
+                        ] = version_foto_ot
+
                         st.success(
                             "Fotografía guardada en la OT."
                         )
-                        st.rerun()
 
                 except Exception as error:
                     st.error(
                         "No se ha podido guardar la fotografía: "
                         f"{error}"
                     )
+
+            if (
+                st.session_state.get(
+                    clave_version_guardada
+                ) == version_foto_ot
+            ):
+                st.button(
+                    "📸 Preparar otra foto",
+                    key=(
+                        f"{modo}_otra_foto_ot_{id_orden}_"
+                        f"{version_foto_ot}"
+                    ),
+                    use_container_width=True,
+                    on_click=preparar_nueva_captura_foto_ot,
+                    args=(
+                        clave_version_foto_ot,
+                    ),
+                )
 
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
