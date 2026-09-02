@@ -4594,7 +4594,6 @@ def mostrar_panel_planta_cv(df):
             "espacio",
             "descripcion",
             "area",
-            "prioridad",
             "estado",
         ]
 
@@ -4614,17 +4613,35 @@ def mostrar_panel_planta_cv(df):
             "Espacio",
             "Descripción",
             "Área",
-            "Prioridad",
             "Estado",
         ]
 
-        vista["Estado"] = vista["Estado"].apply(
-            lambda estado: (
-                "📦 PENDIENTE MATERIAL"
-                if normalizar_busqueda(estado)
-                in ["pendiente material", "esperando material"]
-                else estado
-            )
+        mascara_material = vista["Estado"].apply(
+            lambda estado: normalizar_busqueda(estado)
+            in ["pendiente material", "esperando material"]
+        )
+
+        vista.loc[
+            mascara_material,
+            "Tipo",
+        ] = "📦 PENDIENTE MATERIAL"
+
+        vista.loc[
+            mascara_material,
+            "Estado",
+        ] = "📦 FALTA MATERIAL"
+
+        def _resaltar_falta_material(fila):
+            if str(fila.get("Estado") or "").strip() == "📦 FALTA MATERIAL":
+                return [
+                    "background-color: #fff7ed; color: #c2410c; font-weight: 700"
+                ] * len(fila)
+
+            return [""] * len(fila)
+
+        vista_estilada = vista.style.apply(
+            _resaltar_falta_material,
+            axis=1,
         )
 
         altura_tabla = min(
@@ -4633,7 +4650,7 @@ def mostrar_panel_planta_cv(df):
         )
 
         st.dataframe(
-            vista,
+            vista_estilada,
             use_container_width=True,
             hide_index=True,
             height=altura_tabla,
