@@ -74,6 +74,24 @@ MAX_FOTOS_CIERRE_OT = 5
 MAX_MB_FOTO_OT = 5
 
 
+def codigo_ot_no_traducible(numero_ot):
+    """
+    Evita que la traducción automática del navegador modifique
+    identificadores técnicos como LEG, INC, PREV o PED-MAT.
+    """
+    import html
+
+    codigo = html.escape(
+        str(numero_ot or "").strip()
+    )
+
+    return (
+        '<span translate="no" class="notranslate">'
+        f'{codigo}'
+        '</span>'
+    )
+
+
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "")
 
@@ -2732,7 +2750,11 @@ def mostrar_tarjeta_ot(
     )
 
     with st.expander(titulo, expanded=False):
-        st.markdown(f"### {estado_icono} {num_ot}")
+        st.markdown(
+            f"### {estado_icono} "
+            f"{codigo_ot_no_traducible(num_ot)}",
+            unsafe_allow_html=True,
+        )
         st.markdown(f"**{prioridad}** | {area or '-'}")
         st.markdown(f"{desc}")
         st.caption(
