@@ -862,7 +862,10 @@ def _icono_zona_externa_p22(nombre):
     return "📍"
 
 
-def _planta_catalogo_ot_p22(ot_dict):
+def _planta_catalogo_ot_p22(
+    ot_dict,
+    filas_espacios=None,
+):
     """
     Resuelve la planta real de una OT de Pearson 22 usando el catálogo
     central de espacios.
@@ -903,12 +906,15 @@ def _planta_catalogo_ot_p22(ot_dict):
     edificio_n = _norm(edificio_ot)
     espacio_n = _norm(espacio_ot)
 
-    try:
-        filas = obtener_espacios(
-            activos=True
-        )
-    except Exception:
-        filas = []
+    if filas_espacios is None:
+        try:
+            filas = obtener_espacios(
+                activos=True
+            )
+        except Exception:
+            filas = []
+    else:
+        filas = filas_espacios
 
     coincidencias = []
 
@@ -958,6 +964,7 @@ def _datos_zona_externa_p22(
     resumen,
     zona,
     edificio_config="",
+    filas_espacios=None,
 ):
     """
     Recupera las OT de una zona externa usando los datos que ya recibe
@@ -995,7 +1002,8 @@ def _datos_zona_externa_p22(
         # 2) Si la OT no guarda planta, la recuperamos del catálogo real.
         #    Evita falsos positivos como "Pasillo exterior" de Planta 2.
         planta_catalogo = _planta_catalogo_ot_p22(
-            ot_dict
+            ot_dict,
+            filas_espacios=filas_espacios,
         )
 
         if _es_planta_fisica_p22(
@@ -1175,6 +1183,13 @@ def _pintar_zonas_externas_p22(
     El dibujo físico de los edificios no se modifica.
     Si no hay zonas externas configuradas, no muestra nada.
     """
+    try:
+        filas_espacios = obtener_espacios(
+            activos=True
+        )
+    except Exception:
+        filas_espacios = []
+
     zonas = _zonas_externas_configuradas_p22()
 
     if not zonas:
@@ -1209,6 +1224,7 @@ def _pintar_zonas_externas_p22(
                 resumen,
                 zona,
                 edificio_config=edificio_config,
+                filas_espacios=filas_espacios,
             )
 
             estado = _estado_planta(
