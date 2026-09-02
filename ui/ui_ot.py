@@ -2745,7 +2745,7 @@ def mostrar_tarjeta_ot(
         desc_corta = desc_corta[:45] + "..."
 
     titulo = (
-        f"{estado_icono} {num_ot} | {prioridad} | "
+        f"{estado_icono} `{num_ot}` | {prioridad} | "
         f"{centro or '-'} · {espacio or '-'} | {desc_corta}"
     )
 
