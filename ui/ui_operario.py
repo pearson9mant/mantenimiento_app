@@ -927,9 +927,18 @@ def mostrar_resumen_ot_operario(fila):
             f"### {icono_estado} {numero_ot or '-'}"
         )
 
+        estado_visual = (
+            "📦 PENDIENTE MATERIAL"
+            if normalizar_txt(estado_txt) in [
+                "pendiente material",
+                "esperando material",
+            ]
+            else (estado_txt or "-")
+        )
+
         st.markdown(
             f"{icono_prioridad} **{prioridad_txt or '-'}** · "
-            f"{estado_txt or '-'}"
+            f"**{estado_visual}**"
         )
 
         st.caption(
@@ -1282,8 +1291,17 @@ def _mostrar_fila_jornada_operario(fila):
             f"{descripcion}"
         )
 
+        estado_visual = (
+            "📦 PENDIENTE MATERIAL"
+            if normalizar_txt(estado) in [
+                "pendiente material",
+                "esperando material",
+            ]
+            else estado
+        )
+
         st.caption(
-            f"Estado: {estado}"
+            f"Estado: {estado_visual}"
         )
 
     with col_abrir:
