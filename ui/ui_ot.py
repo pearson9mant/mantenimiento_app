@@ -2749,7 +2749,7 @@ def mostrar_tarjeta_ot(
         f"{centro or '-'} · {espacio or '-'} | {desc_corta}"
     )
 
-    with st.expander(titulo, expanded=False):
+    with st.expander(titulo, expanded=True):
         st.markdown(
             f"### {estado_icono} "
             f"{codigo_ot_no_traducible(num_ot)}",
