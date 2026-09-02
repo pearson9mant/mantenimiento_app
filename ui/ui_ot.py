@@ -2878,6 +2878,123 @@ def mostrar_tarjeta_ot(
                     f"{error}"
                 )
 
+        # -------------------------------------------------
+        # AÑADIR FOTO A LA OT · SIN FINALIZARLA
+        # -------------------------------------------------
+        with st.expander(
+            "📸 Añadir foto a esta OT",
+            expanded=False,
+        ):
+            st.caption(
+                "La fotografía se guarda directamente en esta OT. "
+                "No cambia su estado ni la finaliza."
+            )
+
+            foto_camara = st.camera_input(
+                "📸 Hacer foto ahora",
+                key=f"{modo}_camara_ot_{id_orden}",
+            )
+
+            foto_archivo = st.file_uploader(
+                "🖼️ O elegir una foto del dispositivo",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=False,
+                key=f"{modo}_anadir_foto_ot_{id_orden}",
+                help=f"Máximo {MAX_MB_FOTO_OT} MB.",
+            )
+
+            foto_nueva = foto_camara or foto_archivo
+
+            error_foto_nueva = ""
+
+            if foto_nueva is not None:
+                try:
+                    tamano_foto_nueva = int(
+                        getattr(
+                            foto_nueva,
+                            "size",
+                            0,
+                        )
+                        or 0
+                    )
+                except Exception:
+                    tamano_foto_nueva = 0
+
+                if tamano_foto_nueva > MAX_MB_FOTO_OT * 1024 * 1024:
+                    error_foto_nueva = (
+                        f"La fotografía supera {MAX_MB_FOTO_OT} MB."
+                    )
+                    st.error(
+                        error_foto_nueva
+                    )
+
+            if st.button(
+                "💾 Guardar foto en la OT",
+                key=f"{modo}_guardar_foto_ot_{id_orden}",
+                use_container_width=True,
+                type="primary",
+                disabled=(
+                    foto_nueva is None
+                    or bool(error_foto_nueva)
+                ),
+            ):
+                try:
+                    contenido_foto = foto_nueva.getvalue()
+
+                    if len(contenido_foto) > MAX_MB_FOTO_OT * 1024 * 1024:
+                        st.error(
+                            f"La fotografía supera {MAX_MB_FOTO_OT} MB."
+                        )
+                    else:
+                        nombres_existentes = obtener_nombres_fotos_ot(
+                            num_ot
+                        )
+
+                        secuencia = len(
+                            nombres_existentes
+                        ) + 1
+
+                        nombre_original = limpiar_nombre_archivo(
+                            getattr(
+                                foto_nueva,
+                                "name",
+                                "foto.jpg",
+                            )
+                        )
+
+                        nombre_foto_nueva = limpiar_nombre_archivo(
+                            f"{num_ot}_OT_{id_orden}_"
+                            f"{secuencia}_{nombre_original}"
+                        )
+
+                        while nombre_foto_nueva in nombres_existentes:
+                            secuencia += 1
+                            nombre_foto_nueva = limpiar_nombre_archivo(
+                                f"{num_ot}_OT_{id_orden}_"
+                                f"{secuencia}_{nombre_original}"
+                            )
+
+                        guardar_foto_ot(
+                            numero_ot=num_ot,
+                            nombre_foto=nombre_foto_nueva,
+                            foto_data=contenido_foto,
+                        )
+
+                        st.session_state[
+                            clave_fotos_ot
+                        ] = True
+
+                        st.success(
+                            "Fotografía guardada en la OT."
+                        )
+                        st.rerun()
+
+                except Exception as error:
+                    st.error(
+                        "No se ha podido guardar la fotografía: "
+                        f"{error}"
+                    )
+
         # -----------------------------
         # CONTROLES INTELIGENTES DE OT
         # -----------------------------
