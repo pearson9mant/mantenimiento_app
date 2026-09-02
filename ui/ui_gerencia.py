@@ -4618,6 +4618,15 @@ def mostrar_panel_planta_cv(df):
             "Estado",
         ]
 
+        vista["Estado"] = vista["Estado"].apply(
+            lambda estado: (
+                "📦 PENDIENTE MATERIAL"
+                if normalizar_busqueda(estado)
+                in ["pendiente material", "esperando material"]
+                else estado
+            )
+        )
+
         altura_tabla = min(
             420,
             42 + (len(vista) * 35),
