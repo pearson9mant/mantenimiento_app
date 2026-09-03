@@ -776,7 +776,7 @@ def dibujar_pegatina_espacio(
             pdf,
             planta_visible,
             x_centro,
-            y + alto - 34.2 * mm,
+            y + alto - 33.2 * mm,
             fuente="Helvetica-Bold",
             tamano=8.2,
             color=AZUL_OSCURO,
@@ -803,7 +803,7 @@ def dibujar_pegatina_espacio(
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 24 * mm
+    y_qr = y + 22 * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
@@ -1372,7 +1372,6 @@ def pantalla_qr_aulas():
                         use_container_width=True,
                         key=f"descargar_qr_{codigo}",
                     )
-
             
 
             
