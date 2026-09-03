@@ -447,8 +447,8 @@ def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
     ancho_pagina, alto_pagina = A4
     ancho_pegatina = 90 * mm
     alto_pegatina = 120 * mm
-    separacion_x = 5 * mm
-    separacion_y = 5 * mm
+    separacion_x = 0 * mm
+    separacion_y = 0 * mm
 
     ancho_bloque = (2 * ancho_pegatina) + separacion_x
     alto_bloque = (2 * alto_pegatina) + separacion_y
