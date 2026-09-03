@@ -768,14 +768,18 @@ def dibujar_pegatina_espacio(
             color=GRIS,
         )
 
+        planta_visible = str(
+            planta or "-"
+        ).strip().upper()
+
         dibujar_texto_centrado(
             pdf,
-            planta or "-",
+            planta_visible,
             x_centro,
-            y + alto - 33.5 * mm,
+            y + alto - 34.2 * mm,
             fuente="Helvetica-Bold",
-            tamano=5.8,
-            color=GRIS,
+            tamano=8.2,
+            color=AZUL_OSCURO,
         )
 
     # QR real del espacio seleccionado
