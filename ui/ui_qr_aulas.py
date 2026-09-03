@@ -376,6 +376,11 @@ def generar_pdf_pegatina_individual(fila, configuracion):
     configuracion_espacio["tipo_espacio"] = tipo_espacio
     configuracion_espacio["marcas_corte"] = False
 
+    # Composición específica para la placa individual real 90 x 120 mm.
+    # No afecta al PDF A4 ni a la vista previa habitual.
+    configuracion_espacio["tamano_qr_individual"] = 38
+    configuracion_espacio["posicion_qr_y_individual"] = 33
+
     dibujar_pegatina_espacio(
         pdf,
         0,
@@ -879,12 +884,22 @@ def dibujar_pegatina_espacio(
     )
 
     tamano_qr = min(
-        float(tamano_qr_config) * mm,
+        float(
+            configuracion.get(
+                "tamano_qr_individual",
+                tamano_qr_config,
+            )
+        ) * mm,
         ancho - 21 * mm,
     )
 
     x_qr = x + (ancho - tamano_qr) / 2
-    y_qr = y + 22 * mm
+    y_qr = y + float(
+        configuracion.get(
+            "posicion_qr_y_individual",
+            22,
+        )
+    ) * mm
 
     pdf.setFillColor(white)
     pdf.setStrokeColor(AZUL_OSCURO)
