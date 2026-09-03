@@ -2951,7 +2951,10 @@ def mostrar_compartir_ot(
         )
 
         asunto = f"OT {numero_ot} · Mantenimiento"
-        whatsapp_url = "https://wa.me/?text=" + quote(texto)
+        whatsapp_url = (
+            "https://web.whatsapp.com/send?text="
+            + quote(texto)
+        )
         email_url = (
             "mailto:?subject="
             + quote(asunto)
