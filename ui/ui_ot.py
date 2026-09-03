@@ -2652,6 +2652,358 @@ def selector_material_inteligente(
 
 
 
+def _valor_ot_compartir(datos, *nombres):
+    for nombre in nombres:
+        valor = datos.get(nombre)
+        if valor not in [None, ""]:
+            return valor
+    return ""
+
+
+def obtener_datos_compartir_ot(numero_ot):
+    """
+    Lee la OT por número tanto si sigue activa como si ya está en histórico.
+    No modifica ningún dato.
+    """
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return {}, []
+
+    conn = conectar()
+    cur = conn.cursor()
+    datos = {}
+    materiales = []
+
+    try:
+        for tabla in ["ordenes_trabajo", "historico_ordenes"]:
+            try:
+                cur.execute(
+                    _sql(f"SELECT * FROM {tabla} WHERE numero_ot = ?"),
+                    (numero_ot,),
+                )
+                fila = cur.fetchone()
+
+                if fila:
+                    columnas = [
+                        str(columna[0])
+                        for columna in cur.description
+                    ]
+                    datos = dict(zip(columnas, fila))
+                    datos["_tabla_origen"] = tabla
+                    break
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        try:
+            cur.execute(_sql("""
+                SELECT codigo_material, material, cantidad,
+                       tipo_movimiento, fecha_movimiento
+                FROM movimientos_inventario
+                WHERE numero_ot = ?
+                ORDER BY id ASC
+            """), (numero_ot,))
+
+            materiales = [
+                {
+                    "codigo": fila[0],
+                    "material": fila[1],
+                    "cantidad": fila[2],
+                    "tipo": fila[3],
+                    "fecha": fila[4],
+                }
+                for fila in cur.fetchall()
+            ]
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            materiales = []
+
+    finally:
+        conn.close()
+
+    return datos, materiales
+
+
+def construir_texto_compartir_ot(
+    datos,
+    materiales,
+    numero_ot,
+    valores_fallback=None,
+):
+    valores_fallback = dict(valores_fallback or {})
+    datos = dict(datos or {})
+
+    def valor(*nombres, fallback=""):
+        encontrado = _valor_ot_compartir(datos, *nombres)
+        if encontrado not in [None, ""]:
+            return str(encontrado).strip()
+
+        for nombre in nombres:
+            encontrado = valores_fallback.get(nombre)
+            if encontrado not in [None, ""]:
+                return str(encontrado).strip()
+
+        return str(fallback or "").strip()
+
+    estado = valor("estado", fallback="-")
+    prioridad = valor("prioridad", fallback="-")
+    centro = valor("centro", fallback="-")
+    edificio = valor("edificio", fallback="-")
+    planta = valor("planta", fallback="-")
+    espacio = valor("espacio", fallback="-")
+    area = valor("area", fallback="-")
+    descripcion = valor("descripcion", fallback="Sin descripción")
+    operario = valor("operario", fallback="-")
+    fecha = valor("fecha", "fecha_origen", fallback="-")
+    fecha_realizacion = valor(
+        "fecha_realizacion",
+        "fecha_finalizacion",
+        "fecha_cierre",
+    )
+    observacion_estado = valor("observaciones_estado")
+    observacion_cierre = valor(
+        "observaciones_cierre",
+        "observaciones_fin",
+        "observaciones_finales",
+    )
+    trabajo_realizado = valor("trabajo_realizado")
+
+    lineas = [
+        f"OT {numero_ot}",
+        f"Estado: {estado}",
+        f"Prioridad: {prioridad}",
+        f"Ubicación: {centro} · {edificio} · {planta} · {espacio}",
+        f"Área: {area}",
+        f"Incidencia / trabajo: {descripcion}",
+        f"Operario: {operario}",
+        f"Fecha: {fecha}",
+    ]
+
+    if fecha_realizacion:
+        lineas.append(f"Fecha realización/cierre: {fecha_realizacion}")
+
+    if observacion_estado:
+        lineas.extend(["", "Observaciones de estado:", observacion_estado])
+
+    if trabajo_realizado:
+        lineas.extend(["", "Trabajo realizado:", trabajo_realizado])
+
+    if observacion_cierre:
+        lineas.extend(["", "Observaciones de cierre:", observacion_cierre])
+
+    materiales_salida = [
+        material
+        for material in materiales or []
+        if normalizar_txt(material.get("tipo")) == "salida"
+    ]
+
+    if materiales_salida:
+        lineas.extend(["", "Material utilizado:"])
+        for material in materiales_salida:
+            nombre = str(
+                material.get("material")
+                or material.get("codigo")
+                or "Material"
+            ).strip()
+            cantidad = material.get("cantidad")
+            lineas.append(f"- {nombre}: {cantidad:g}" if isinstance(cantidad, (int, float)) else f"- {nombre}: {cantidad}")
+
+    return "\n".join(lineas).strip()
+
+
+def generar_pdf_compartir_ot(texto, numero_ot, fotos=None):
+    """Genera un PDF sencillo de la OT, incluyendo las fotos disponibles."""
+    import io
+    from xml.sax.saxutils import escape
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Image,
+        PageBreak,
+    )
+
+    buffer = io.BytesIO()
+    documento = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+        title=f"OT {numero_ot}",
+    )
+
+    estilos = getSampleStyleSheet()
+    titulo = ParagraphStyle(
+        "TituloOT",
+        parent=estilos["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=17,
+        leading=21,
+        textColor=colors.HexColor("#17365D"),
+        spaceAfter=10,
+    )
+    normal = ParagraphStyle(
+        "NormalOT",
+        parent=estilos["BodyText"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=13,
+        spaceAfter=4,
+    )
+
+    contenido = [
+        Paragraph("INFORME DE ORDEN DE TRABAJO", titulo),
+        Paragraph(f"<b>{escape(str(numero_ot))}</b>", normal),
+        Spacer(1, 4 * mm),
+    ]
+
+    for linea in str(texto or "").splitlines():
+        if not linea.strip():
+            contenido.append(Spacer(1, 2.5 * mm))
+            continue
+        contenido.append(Paragraph(escape(linea), normal))
+
+    fotos_validas = []
+    for nombre_foto, foto_data in fotos or []:
+        if not foto_data:
+            continue
+        try:
+            imagen_buffer = io.BytesIO(bytes(foto_data))
+            imagen = Image(imagen_buffer)
+            max_ancho = 165 * mm
+            max_alto = 105 * mm
+            escala = min(
+                max_ancho / float(imagen.imageWidth),
+                max_alto / float(imagen.imageHeight),
+                1.0,
+            )
+            imagen.drawWidth = float(imagen.imageWidth) * escala
+            imagen.drawHeight = float(imagen.imageHeight) * escala
+            fotos_validas.append((nombre_foto, imagen))
+        except Exception:
+            continue
+
+    if fotos_validas:
+        contenido.extend([
+            PageBreak(),
+            Paragraph("FOTOGRAFÍAS DE LA OT", titulo),
+            Spacer(1, 3 * mm),
+        ])
+        for indice, (nombre_foto, imagen) in enumerate(fotos_validas, start=1):
+            contenido.append(imagen)
+            contenido.append(
+                Paragraph(
+                    escape(str(nombre_foto or f"Foto {indice}")),
+                    normal,
+                )
+            )
+            contenido.append(Spacer(1, 5 * mm))
+
+    documento.build(contenido)
+    return buffer.getvalue()
+
+
+def mostrar_compartir_ot(
+    numero_ot,
+    id_orden,
+    modo,
+    valores_fallback=None,
+):
+    """
+    Compartir es solo lectura: no cambia estado, Corazón ni contenido de la OT.
+    WhatsApp/email reciben el resumen; el PDF incorpora también las fotos.
+    """
+    from urllib.parse import quote
+
+    with st.expander("📤 Compartir OT", expanded=False):
+        st.caption(
+            "Puedes compartirla esté abierta o finalizada. "
+            "Esta acción no modifica la OT."
+        )
+
+        datos, materiales = obtener_datos_compartir_ot(numero_ot)
+        texto = construir_texto_compartir_ot(
+            datos=datos,
+            materiales=materiales,
+            numero_ot=numero_ot,
+            valores_fallback=valores_fallback,
+        )
+
+        st.text_area(
+            "Resumen que se enviará",
+            value=texto,
+            height=260,
+            key=f"{modo}_texto_compartir_ot_{id_orden}",
+            disabled=True,
+        )
+
+        asunto = f"OT {numero_ot} · Mantenimiento"
+        whatsapp_url = "https://wa.me/?text=" + quote(texto)
+        email_url = (
+            "mailto:?subject="
+            + quote(asunto)
+            + "&body="
+            + quote(texto)
+        )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.link_button(
+                "🟢 Enviar por WhatsApp",
+                whatsapp_url,
+                use_container_width=True,
+            )
+
+        with c2:
+            st.link_button(
+                "✉️ Enviar por email",
+                email_url,
+                use_container_width=True,
+            )
+
+        st.caption(
+            "WhatsApp y email abren el mensaje ya preparado. "
+            "Para enviar también las fotografías, descarga el PDF y adjúntalo."
+        )
+
+        try:
+            fotos_pdf = obtener_fotos_ot(numero_ot)
+        except Exception:
+            fotos_pdf = []
+
+        try:
+            pdf_ot = generar_pdf_compartir_ot(
+                texto=texto,
+                numero_ot=numero_ot,
+                fotos=fotos_pdf,
+            )
+        except Exception as error:
+            st.caption(f"No se ha podido preparar el PDF: {error}")
+        else:
+            st.download_button(
+                "📄 Descargar informe PDF de la OT",
+                data=pdf_ot,
+                file_name=f"OT_{limpiar_nombre_archivo(numero_ot)}.pdf",
+                mime="application/pdf",
+                key=f"{modo}_pdf_compartir_ot_{id_orden}",
+                use_container_width=True,
+            )
+
+
 def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
     """
     Libera la OT finalizada y solicita al Corazón una nueva misión.
@@ -2776,6 +3128,27 @@ def mostrar_tarjeta_ot(
 
         if fecha_origen:
             st.caption(f"Fecha origen: {fecha_origen}")
+
+        mostrar_compartir_ot(
+            numero_ot=num_ot,
+            id_orden=id_orden,
+            modo=modo,
+            valores_fallback={
+                "estado": est,
+                "prioridad": prioridad,
+                "centro": centro_mostrar,
+                "edificio": edificio_mostrar,
+                "planta": planta_mostrar,
+                "espacio": espacio_mostrar,
+                "area": area,
+                "descripcion": desc,
+                "operario": operario,
+                "fecha": fecha,
+                "fecha_origen": fecha_origen,
+                "observaciones_estado": observaciones_estado,
+            },
+        )
+
         mostrar_correccion_ubicacion_ot(
             id_orden=id_orden,
             modo=modo,
