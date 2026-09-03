@@ -433,6 +433,85 @@ def generar_zip_pegatinas_individuales(aulas, configuracion):
     return buffer_zip.getvalue()
 
 
+def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
+    """
+    Genera un PDF A4 listo para imprimir en hojas adhesivas.
+
+    Distribución fija: 4 placas por hoja (2 x 2), cada una a tamaño
+    real 90 x 120 mm. Reutiliza exactamente la composición equilibrada
+    de la pegatina individual de imprenta.
+    """
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+
+    ancho_pagina, alto_pagina = A4
+    ancho_pegatina = 90 * mm
+    alto_pegatina = 120 * mm
+    separacion_x = 5 * mm
+    separacion_y = 5 * mm
+
+    ancho_bloque = (2 * ancho_pegatina) + separacion_x
+    alto_bloque = (2 * alto_pegatina) + separacion_y
+
+    margen_x = (ancho_pagina - ancho_bloque) / 2
+    margen_y = (alto_pagina - alto_bloque) / 2
+
+    for indice, fila in enumerate(aulas):
+        if indice > 0 and indice % 4 == 0:
+            pdf.showPage()
+
+        posicion = indice % 4
+        columna = posicion % 2
+        fila_pagina = posicion // 2
+
+        x = margen_x + columna * (
+            ancho_pegatina + separacion_x
+        )
+
+        y = (
+            alto_pagina
+            - margen_y
+            - alto_pegatina
+            - fila_pagina * (
+                alto_pegatina + separacion_y
+            )
+        )
+
+        (
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            tipo_espacio,
+        ) = fila
+
+        configuracion_espacio = dict(configuracion)
+        configuracion_espacio["tipo_espacio"] = tipo_espacio
+        configuracion_espacio["marcas_corte"] = False
+
+        # Misma composición validada para la placa individual 90 x 120 mm.
+        configuracion_espacio["tamano_qr_individual"] = 38
+        configuracion_espacio["posicion_qr_y_individual"] = 33
+
+        dibujar_pegatina_espacio(
+            pdf,
+            x,
+            y,
+            ancho_pegatina,
+            alto_pegatina,
+            codigo,
+            centro,
+            edificio,
+            planta,
+            espacio,
+            configuracion_espacio,
+        )
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
 def generar_pdf_pegatinas(aulas, configuracion):
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
@@ -1464,6 +1543,37 @@ def pantalla_qr_aulas():
             key="descargar_pdf_qr_espacios",
         )
 
+        pdf_a4_cuatro = generar_pdf_a4_cuatro_pegatinas(
+            resultados_imprimir,
+            configuracion,
+        )
+
+        st.download_button(
+            f"🖨️ Descargar A4 · 4 placas por hoja · "
+            f"{len(resultados_imprimir)} placa(s)",
+            data=pdf_a4_cuatro,
+            file_name=(
+                limpiar_nombre_archivo(
+                    "_".join(nombre_partes)
+                    + "_A4_4_PLACAS_90x120mm"
+                )
+                + ".pdf"
+            ),
+            mime="application/pdf",
+            use_container_width=True,
+            key="descargar_qr_a4_4_placas",
+            help=(
+                "PDF A4 con 4 placas distintas por hoja, "
+                "cada una a tamaño real 90 × 120 mm. "
+                "Imprime al 100 % / Tamaño real, sin ajustar a página."
+            ),
+        )
+
+        st.caption(
+            "🖨️ Impresión propia: 4 placas de 90 × 120 mm por hoja A4. "
+            "En la impresora selecciona **Tamaño real / 100 %** y no "
+            "\"Ajustar a página\"."
+        )
         zip_imprenta = generar_zip_pegatinas_individuales(
             resultados_imprimir,
             configuracion,
