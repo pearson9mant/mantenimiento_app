@@ -1261,42 +1261,112 @@ def pantalla_qr_aulas():
     st.markdown("### 📄 Placas para imprimir")
 
     st.caption(
-        f"El PDF incluye {configuracion['por_pagina']} placas "
-        "por página A4."
+        "Marca únicamente los espacios que quieras incluir en este PDF. "
+        "Esta selección no activa ni desactiva ningún QR del colegio."
     )
 
-    nombre_partes = ["QR_Espacios"]
-
-    if centro_filtro != "Todos":
-        nombre_partes.append(
-            centro_filtro
-        )
-
-    if edificio_filtro != "Todos":
-        nombre_partes.append(
-            edificio_filtro
-        )
-
-    nombre_pdf = (
-        limpiar_nombre_archivo(
-            "_".join(nombre_partes)
-        )
-        + ".pdf"
+    df_impresion = pd.DataFrame(
+        [
+            {
+                "Imprimir": False,
+                "Código": fila[0],
+                "Planta": fila[3],
+                "Espacio": fila[4],
+                "Tipo": fila[5],
+            }
+            for fila in resultados
+        ]
     )
 
-    pdf_bytes = generar_pdf_pegatinas(
-        resultados,
-        configuracion,
-    )
-
-    st.download_button(
-        "📄 Descargar PDF de placas",
-        data=pdf_bytes,
-        file_name=nombre_pdf,
-        mime="application/pdf",
+    tabla_impresion = st.data_editor(
+        df_impresion,
         use_container_width=True,
-        key="descargar_pdf_qr_espacios",
+        hide_index=True,
+        disabled=[
+            "Código",
+            "Planta",
+            "Espacio",
+            "Tipo",
+        ],
+        column_config={
+            "Imprimir": st.column_config.CheckboxColumn(
+                "✓ Imprimir",
+                help="Marca solo las placas que quieras generar ahora.",
+                default=False,
+            ),
+        },
+        key=(
+            f"qr_impresion_editor_"
+            f"{centro_filtro}_{edificio_filtro}"
+        ),
     )
+
+    indices_imprimir = (
+        tabla_impresion.index[
+            tabla_impresion["Imprimir"] == True
+        ].tolist()
+    )
+
+    resultados_imprimir = [
+        resultados[indice]
+        for indice in indices_imprimir
+        if 0 <= indice < len(resultados)
+    ]
+
+    st.caption(
+        f"Seleccionadas para imprimir: "
+        f"**{len(resultados_imprimir)}** de {len(resultados)}."
+    )
+
+    if not resultados_imprimir:
+        st.info(
+            "Marca al menos una casilla para preparar el PDF."
+        )
+
+    else:
+        st.caption(
+            f"El PDF incluirá únicamente estas "
+            f"{len(resultados_imprimir)} placas, "
+            f"con {configuracion['por_pagina']} por página A4."
+        )
+
+        nombre_partes = ["QR_Espacios"]
+
+        if centro_filtro != "Todos":
+            nombre_partes.append(
+                centro_filtro
+            )
+
+        if edificio_filtro != "Todos":
+            nombre_partes.append(
+                edificio_filtro
+            )
+
+        nombre_partes.append(
+            f"{len(resultados_imprimir)}_seleccionadas"
+        )
+
+        nombre_pdf = (
+            limpiar_nombre_archivo(
+                "_".join(nombre_partes)
+            )
+            + ".pdf"
+        )
+
+        pdf_bytes = generar_pdf_pegatinas(
+            resultados_imprimir,
+            configuracion,
+        )
+
+        st.download_button(
+            f"📄 Descargar PDF · "
+            f"{len(resultados_imprimir)} placa(s)",
+            data=pdf_bytes,
+            file_name=nombre_pdf,
+            mime="application/pdf",
+            use_container_width=True,
+            key="descargar_pdf_qr_espacios",
+        )
 
     st.markdown("---")
 
