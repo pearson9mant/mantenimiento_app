@@ -2305,6 +2305,41 @@ def pantalla_operario(modo="ordenes"):
                 )
 
             # ---------------------------------------------
+            # COMPARTIR OT FINALIZADA
+            # Reutiliza exactamente el mismo sistema de ui_ot.py:
+            # WhatsApp Web de empresa, email y PDF con fotografías.
+            # Solo lectura: no modifica la OT ni el histórico.
+            # ---------------------------------------------
+            try:
+                from ui.ui_ot import mostrar_compartir_ot
+
+                mostrar_compartir_ot(
+                    numero_ot=num_ot_hist,
+                    id_orden=id_hist,
+                    modo="historico",
+                    valores_fallback={
+                        "estado": estado_hist or "Finalizada",
+                        "prioridad": prioridad_hist,
+                        "centro": centro_hist,
+                        "edificio": edificio_hist,
+                        "espacio": espacio_hist,
+                        "area": area_hist,
+                        "descripcion": desc_hist,
+                        "operario": operario_hist,
+                        "fecha": fecha_hist,
+                        "fecha_origen": fecha_origen_hist,
+                        "fecha_cierre": fecha_cierre_hist,
+                        "observaciones_cierre": observaciones_cierre_hist,
+                    },
+                )
+
+            except Exception as error:
+                st.caption(
+                    "📤 No se ha podido preparar Compartir OT: "
+                    f"{error}"
+                )
+
+            # ---------------------------------------------
             # LAS FOTOS NO SE CONSULTAN AUTOMÁTICAMENTE
             # Solo al pulsar el botón
             # ---------------------------------------------
