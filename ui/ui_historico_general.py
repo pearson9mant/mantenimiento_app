@@ -6,6 +6,7 @@ from modules.inventario import (
     obtener_materiales_para_select,
     registrar_movimiento_inventario,
 )
+from ui.ui_ot import mostrar_compartir_ot
 
 
 COLUMNAS_EVENTO = [
@@ -625,6 +626,29 @@ def pantalla_historico_general():
 
         _mostrar_material_olvidado_historico_general(
             row_sel
+        )
+
+        st.markdown("---")
+        st.markdown("### 📤 Compartir esta OT finalizada")
+        st.caption(
+            "WhatsApp Web de empresa, email o PDF completo. "
+            "Compartir no modifica la OT ni el histórico."
+        )
+
+        mostrar_compartir_ot(
+            numero_ot=_texto(row_sel.get("numero_ot")),
+            id_orden=_texto(row_sel.get("id_fuente")),
+            modo="historico_general",
+            valores_fallback={
+                "estado": "Finalizada",
+                "centro": _texto(row_sel.get("centro")),
+                "edificio": _texto(row_sel.get("edificio")),
+                "planta": _texto(row_sel.get("planta")),
+                "espacio": _texto(row_sel.get("espacio")),
+                "descripcion": _texto(row_sel.get("actuacion")),
+                "operario": _texto(row_sel.get("operario")),
+                "fecha_cierre": row_sel.get("fecha"),
+            },
         )
 
     with st.expander("🔍 Ver detalle de los últimos registros filtrados", expanded=False):
