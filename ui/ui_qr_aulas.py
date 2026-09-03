@@ -1,5 +1,6 @@
 import io
 import re
+import zipfile
 from urllib.parse import quote
 
 import pandas as pd
@@ -345,6 +346,86 @@ def dibujar_marcas_corte(
         x + ancho,
         y + alto + separacion + largo,
     )
+
+
+
+def generar_pdf_pegatina_individual(fila, configuracion):
+    """
+    Genera una sola placa a tamaño real 90 x 120 mm.
+    Pensado para imprenta: una pegatina = un PDF.
+    """
+    ancho_pegatina = 90 * mm
+    alto_pegatina = 120 * mm
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(
+        buffer,
+        pagesize=(ancho_pegatina, alto_pegatina),
+    )
+
+    (
+        codigo,
+        centro,
+        edificio,
+        planta,
+        espacio,
+        tipo_espacio,
+    ) = fila
+
+    configuracion_espacio = dict(configuracion)
+    configuracion_espacio["tipo_espacio"] = tipo_espacio
+    configuracion_espacio["marcas_corte"] = False
+
+    dibujar_pegatina_espacio(
+        pdf,
+        0,
+        0,
+        ancho_pegatina,
+        alto_pegatina,
+        codigo,
+        centro,
+        edificio,
+        planta,
+        espacio,
+        configuracion_espacio,
+    )
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generar_zip_pegatinas_individuales(aulas, configuracion):
+    """
+    Devuelve un ZIP con un PDF independiente por cada placa seleccionada.
+    """
+    buffer_zip = io.BytesIO()
+
+    with zipfile.ZipFile(
+        buffer_zip,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+    ) as archivo_zip:
+        for indice, fila in enumerate(aulas, start=1):
+            codigo = str(fila[0] or "").strip()
+            espacio = str(fila[4] or "").strip()
+
+            nombre_base = limpiar_nombre_archivo(
+                f"{indice:03d}_{codigo}_{espacio}"
+            )
+
+            pdf_individual = generar_pdf_pegatina_individual(
+                fila,
+                configuracion,
+            )
+
+            archivo_zip.writestr(
+                f"{nombre_base}.pdf",
+                pdf_individual,
+            )
+
+    buffer_zip.seek(0)
+    return buffer_zip.getvalue()
 
 
 def generar_pdf_pegatinas(aulas, configuracion):
@@ -1366,6 +1447,36 @@ def pantalla_qr_aulas():
             mime="application/pdf",
             use_container_width=True,
             key="descargar_pdf_qr_espacios",
+        )
+
+        zip_imprenta = generar_zip_pegatinas_individuales(
+            resultados_imprimir,
+            configuracion,
+        )
+
+        st.download_button(
+            f"🏷️ Descargar para imprenta · "
+            f"{len(resultados_imprimir)} PDF individuales",
+            data=zip_imprenta,
+            file_name=(
+                limpiar_nombre_archivo(
+                    "_".join(nombre_partes)
+                    + "_IMPRENTA_90x120mm"
+                )
+                + ".zip"
+            ),
+            mime="application/zip",
+            use_container_width=True,
+            key="descargar_qr_imprenta_individual",
+            help=(
+                "Descarga un ZIP con una placa por archivo PDF, "
+                "cada una a tamaño real 90 × 120 mm."
+            ),
+        )
+
+        st.caption(
+            "Para imprenta: el ZIP contiene una pegatina por PDF, "
+            "a tamaño real 90 × 120 mm, sin la hoja A4 de 6 placas."
         )
 
     st.markdown("---")
