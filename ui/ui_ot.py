@@ -2730,6 +2730,94 @@ def obtener_datos_compartir_ot(numero_ot):
     return datos, materiales
 
 
+
+def obtener_pedidos_material_compartir_ot(numero_ot):
+    """
+    Recupera los pedidos de material vinculados a una OT y sus líneas.
+    Solo lectura: no crea ni modifica pedidos, estados o inventario.
+    """
+    numero_ot = str(numero_ot or "").strip()
+
+    if not numero_ot:
+        return []
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT
+                p.id,
+                p.numero_pedido,
+                p.estado,
+                p.fecha,
+                p.prioridad,
+                p.observaciones
+            FROM pedidos_material p
+            INNER JOIN pedidos_material_ot po
+                ON po.pedido_id = p.id
+            WHERE po.numero_ot = ?
+            ORDER BY p.id ASC
+        """), (
+            numero_ot,
+        ))
+
+        cabeceras = cur.fetchall()
+        pedidos = []
+
+        for cabecera in cabeceras:
+            pedido_id = cabecera[0]
+
+            cur.execute(_sql("""
+                SELECT
+                    codigo_material,
+                    material,
+                    cantidad,
+                    estado,
+                    observaciones,
+                    link_material
+                FROM pedidos_material_lineas
+                WHERE pedido_id = ?
+                ORDER BY id ASC
+            """), (
+                pedido_id,
+            ))
+
+            lineas = [
+                {
+                    "codigo": fila[0] or "",
+                    "material": fila[1] or "",
+                    "cantidad": fila[2],
+                    "estado": fila[3] or "",
+                    "observaciones": fila[4] or "",
+                    "link": fila[5] or "",
+                }
+                for fila in cur.fetchall()
+            ]
+
+            pedidos.append({
+                "id": pedido_id,
+                "numero_pedido": cabecera[1] or "",
+                "estado": cabecera[2] or "",
+                "fecha": cabecera[3] or "",
+                "prioridad": cabecera[4] or "",
+                "observaciones": cabecera[5] or "",
+                "lineas": lineas,
+            })
+
+        return pedidos
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+        return []
+
+    finally:
+        conn.close()
+
 def construir_texto_compartir_ot(
     datos,
     materiales,
@@ -2813,6 +2901,82 @@ def construir_texto_compartir_ot(
             ).strip()
             cantidad = material.get("cantidad")
             lineas.append(f"- {nombre}: {cantidad:g}" if isinstance(cantidad, (int, float)) else f"- {nombre}: {cantidad}")
+
+    pedidos_material = obtener_pedidos_material_compartir_ot(
+        numero_ot
+    )
+
+    if pedidos_material:
+        lineas.extend(["", "Material solicitado:"])
+
+        for pedido in pedidos_material:
+            numero_pedido = str(
+                pedido.get("numero_pedido")
+                or "Pedido"
+            ).strip()
+            estado_pedido = str(
+                pedido.get("estado")
+                or "-"
+            ).strip()
+
+            lineas.append(
+                f"{numero_pedido} · Estado: {estado_pedido}"
+            )
+
+            observaciones_pedido = str(
+                pedido.get("observaciones")
+                or ""
+            ).strip()
+
+            if observaciones_pedido:
+                lineas.append(
+                    f"Observaciones: {observaciones_pedido}"
+                )
+
+            for material in pedido.get("lineas", []) or []:
+                nombre = str(
+                    material.get("material")
+                    or material.get("codigo")
+                    or "Material"
+                ).strip()
+                cantidad = material.get("cantidad")
+
+                if isinstance(cantidad, (int, float)):
+                    texto_cantidad = f"{cantidad:g}"
+                else:
+                    texto_cantidad = str(cantidad or "-")
+
+                estado_linea = str(
+                    material.get("estado")
+                    or ""
+                ).strip()
+
+                detalle = f"- {nombre}: {texto_cantidad}"
+
+                if estado_linea:
+                    detalle += f" · {estado_linea}"
+
+                lineas.append(detalle)
+
+                observaciones_linea = str(
+                    material.get("observaciones")
+                    or ""
+                ).strip()
+
+                if observaciones_linea:
+                    lineas.append(
+                        f"  Obs.: {observaciones_linea}"
+                    )
+
+                link_material = str(
+                    material.get("link")
+                    or ""
+                ).strip()
+
+                if link_material:
+                    lineas.append(
+                        f"  Enlace / referencia: {link_material}"
+                    )
 
     return "\n".join(lineas).strip()
 
