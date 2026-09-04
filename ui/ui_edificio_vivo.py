@@ -1283,6 +1283,105 @@ def _pintar_zonas_externas_p22(
                 )
 
 
+
+# =========================================================
+# SUMATORIO COMPACTO DE ÓRDENES ABIERTAS
+# =========================================================
+
+def _sumatorio_ordenes_abiertas(resumen, centro):
+    """
+    Cuenta sobre las OT que Colegio Vivo ya tiene cargadas.
+    No consulta la base de datos ni modifica estados.
+
+    Devuelve únicamente las tres familias solicitadas:
+    incidencias, Legionella y preventivo.
+    """
+    ordenes_unicas = {}
+    estados_cierre = {
+        "finalizada",
+        "finalizado",
+        "cerrada",
+        "cerrado",
+        "cancelada",
+        "cancelado",
+    }
+
+    for clave, datos in (resumen or {}).items():
+        try:
+            centro_clave = normalizar_centro(clave[0])
+        except Exception:
+            continue
+
+        if centro_clave != centro:
+            continue
+
+        for ot in datos.get("ordenes", []) or []:
+            try:
+                ot_dict = dict(ot)
+            except Exception:
+                continue
+
+            if _norm(ot_dict.get("estado")) in estados_cierre:
+                continue
+
+            clave_ot = _clave_ot_visual(ot_dict)
+            ordenes_unicas[clave_ot] = ot_dict
+
+    incidencias = 0
+    legionella = 0
+    preventivo = 0
+
+    for ot in ordenes_unicas.values():
+        numero = str(
+            ot.get("numero_ot")
+            or ot.get("numero")
+            or ""
+        ).strip().upper()
+
+        origen = str(
+            ot.get("origen")
+            or ""
+        ).strip().upper()
+
+        if numero.startswith("INC-"):
+            incidencias += 1
+        elif numero.startswith("LEG-") or origen == "LEGIONELLA":
+            legionella += 1
+        elif numero.startswith("PREV-") or origen == "PREVENTIVO":
+            preventivo += 1
+
+    return {
+        "incidencias": incidencias,
+        "legionella": legionella,
+        "preventivo": preventivo,
+        "total": incidencias + legionella + preventivo,
+    }
+
+
+def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
+    datos = _sumatorio_ordenes_abiertas(
+        resumen,
+        centro,
+    )
+
+    st.markdown(
+        f"""
+        <div class="cv-open-summary-wrap">
+            <div class="cv-open-summary">
+                <div class="cv-open-summary-title">📊 ABIERTAS</div>
+                <div><span>Incidencias</span><b>{datos["incidencias"]}</b></div>
+                <div><span>Legionella</span><b>{datos["legionella"]}</b></div>
+                <div><span>Preventivo</span><b>{datos["preventivo"]}</b></div>
+                <div class="cv-open-summary-total">
+                    <span>Total</span><b>{datos["total"]}</b>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # =========================================================
 # CSS
 # =========================================================
@@ -1291,6 +1390,56 @@ def css_edificio_vivo():
     st.markdown(
         """
         <style>
+
+        .cv-open-summary-wrap{
+            width:min(100%,1180px);
+            height:0;
+            margin:0 auto;
+            position:relative;
+            z-index:5;
+            pointer-events:none;
+        }
+
+        .cv-open-summary{
+            position:absolute;
+            right:2px;
+            top:-3px;
+            width:142px;
+            padding:7px 9px 6px;
+            border:1px solid #d6deea;
+            border-radius:8px;
+            background:rgba(255,255,255,.96);
+            box-shadow:0 2px 8px rgba(15,39,71,.08);
+            color:#334155;
+            font-size:10px;
+            line-height:1.35;
+        }
+
+        .cv-open-summary > div:not(.cv-open-summary-title){
+            display:flex;
+            justify-content:space-between;
+            gap:8px;
+        }
+
+        .cv-open-summary-title{
+            margin-bottom:3px;
+            color:#0f2747;
+            font-size:10px;
+            font-weight:950;
+            letter-spacing:.2px;
+        }
+
+        .cv-open-summary b{
+            color:#0f2747;
+            font-weight:950;
+        }
+
+        .cv-open-summary-total{
+            margin-top:3px;
+            padding-top:3px;
+            border-top:1px solid #e2e8f0;
+        }
+
         .cv-campus-title{
             width:min(100%,1180px);
             margin:2px auto 4px;
@@ -1476,6 +1625,21 @@ def css_edificio_vivo():
         }
 
         @media(max-width:760px){
+
+            .cv-open-summary{
+                right:2px;
+                top:-4px;
+                width:118px;
+                padding:5px 7px 4px;
+                font-size:8.5px;
+                line-height:1.25;
+            }
+
+            .cv-open-summary-title{
+                margin-bottom:2px;
+                font-size:8.5px;
+            }
+
             /*
             Los edificios A/B/C continúan en una sola fila.
             Solo el Anexo Servicios pasa a 2 x 2 en móvil.
@@ -1727,6 +1891,11 @@ def pintar_campus_operario(
             f"No hay plantas visibles configuradas para {centro}."
         )
         return
+
+    _pintar_sumatorio_ordenes_abiertas(
+        resumen,
+        centro,
+    )
 
     st.markdown(
         (
