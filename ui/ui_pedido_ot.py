@@ -150,6 +150,8 @@ def _nueva_linea(id_orden):
         "observaciones": "",
         "link_material": "",
         "es_compra": False,
+        "categoria": "",
+        "precio_unitario": None,
     }
 
 
@@ -257,6 +259,60 @@ def _mostrar_selector_material(
 
         st.caption(
             "🛒 Material no catalogado / compra."
+        )
+
+        categorias_compra = [
+            "Electricidad",
+            "Iluminación",
+            "Fontanería",
+            "Climatización",
+            "Ferretería",
+            "Pintura",
+            "Limpieza",
+            "Cerrajería",
+            "Informática",
+            "Seguridad",
+            "ACS",
+            "Equipamiento",
+            "Jardinería",
+            "Otros",
+        ]
+
+        categoria_actual = str(
+            linea.get("categoria", "") or ""
+        ).strip()
+        opciones_categoria = ["Selecciona categoría"] + categorias_compra
+        indice_categoria = (
+            opciones_categoria.index(categoria_actual)
+            if categoria_actual in opciones_categoria
+            else 0
+        )
+
+        categoria_compra = st.selectbox(
+            "Categoría",
+            opciones_categoria,
+            index=indice_categoria,
+            key=f"{base}_categoria_{uid}",
+        )
+        linea["categoria"] = (
+            ""
+            if categoria_compra == "Selecciona categoría"
+            else categoria_compra
+        )
+
+        precio_actual = linea.get("precio_unitario")
+        precio_compra = st.number_input(
+            "Precio unitario (€) · opcional",
+            min_value=0.0,
+            step=0.01,
+            value=float(precio_actual or 0.0),
+            key=f"{base}_precio_{uid}",
+            help="Si todavía no conoces el precio, déjalo en 0,00 €.",
+        )
+        linea["precio_unitario"] = (
+            float(precio_compra)
+            if float(precio_compra) > 0
+            else None
         )
 
         if st.button(
@@ -710,11 +766,31 @@ def mostrar_pedido_material_desde_ot(
                         "link_material",
                         "",
                     ),
+                    "categoria": str(
+                        linea.get("categoria", "") or ""
+                    ).strip(),
+                    "precio_unitario": linea.get(
+                        "precio_unitario"
+                    ),
                 })
+
+            compras_sin_categoria = [
+                linea
+                for linea in st.session_state[_lineas_key(id_orden)]
+                if str(linea.get("material", "") or "").strip()
+                and linea.get("es_compra", False)
+                and not str(linea.get("categoria", "") or "").strip()
+            ]
 
             if not lineas_validas:
                 st.warning(
                     "Añade al menos un material al pedido."
+                )
+
+            elif compras_sin_categoria:
+                st.warning(
+                    "Selecciona la categoría del material a comprar "
+                    "para poder crear su código de inventario."
                 )
 
             elif not fotos_validas:
