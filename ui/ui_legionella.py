@@ -564,9 +564,6 @@ def evaluar_resultado(
         except Exception:
             return "INCIDENCIA", "Temperaturas de válvula no válidas"
 
-        if entrada < 60:
-            return "RIESGO", "Entrada ACS a válvula inferior a 60 ºC"
-
         if salida < 38 or salida > 50:
             return "RIESGO", "Salida mezclada de válvula fuera de rango 38-50 ºC"
 
