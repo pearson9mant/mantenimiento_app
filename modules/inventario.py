@@ -342,6 +342,7 @@ def prefijo_codigo_categoria(categoria):
 
     equivalencias = {
         "electricidad": "ELECTRICIDAD",
+        "iluminacion": "ILUMINACION",
         "fontaneria": "FONTANERIA",
         "climatizacion": "CLIMATIZACION",
         "cerrajeria": "CERRAJERIA",
@@ -857,6 +858,149 @@ def crear_material_inventario(
         conn.rollback()
         return False, f"Error al crear material: {e}"
 
+    finally:
+        conn.close()
+
+
+# =====================================================
+# ALTA AUTOMÁTICA DESDE PEDIDOS DE MATERIAL
+# =====================================================
+
+def obtener_o_crear_material_para_pedido(
+    material,
+    categoria,
+    centro="",
+    edificio="",
+    precio_unitario=None,
+    unidad="ud",
+    numero_pedido="",
+):
+    """
+    Deja preparado en Inventario un material que se va a comprar.
+
+    - Si ya existe exactamente, reutiliza su código y conserva el stock.
+    - Si no existe, crea la ficha con stock 0.
+    - El precio es opcional y no bloquea el alta.
+    - No registra una entrada de stock: eso ocurre al recibir físicamente.
+    """
+    material = str(material or "").strip()
+    categoria = str(categoria or "").strip()
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
+    unidad = str(unidad or "ud").strip() or "ud"
+
+    if not material:
+        return False, "", "Falta el nombre del material."
+
+    if not categoria:
+        return False, "", "Falta la categoría del material."
+
+    precio = 0.0
+    if precio_unitario not in (None, ""):
+        try:
+            precio = float(precio_unitario)
+        except Exception:
+            return False, "", "El precio unitario no es válido."
+        if precio < 0:
+            return False, "", "El precio unitario no puede ser negativo."
+
+    duplicado = buscar_material_duplicado_exacto(
+        material,
+        categoria,
+        unidad,
+    )
+
+    if duplicado:
+        codigo = str(duplicado.get("codigo") or "").strip()
+        if precio > 0 and codigo:
+            conn = conectar()
+            cursor = conn.cursor()
+            p = _ph(conn)
+            try:
+                cursor.execute(f"""
+                    UPDATE inventario
+                    SET precio_unitario = {p}
+                    WHERE codigo = {p}
+                """, (precio, codigo))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+            finally:
+                conn.close()
+
+        return True, codigo, "Material ya existente en Inventario."
+
+    codigo = generar_codigo_material(material, categoria)
+
+    observacion = "Alta automática desde pedido de material"
+    if numero_pedido:
+        observacion += f" {numero_pedido}"
+
+    ok, mensaje = crear_material_inventario(
+        codigo=codigo,
+        material=material,
+        categoria=categoria,
+        unidad=unidad,
+        stock_actual=0,
+        stock_minimo=0,
+        centro=centro,
+        edificio=edificio,
+        ubicacion="",
+        proveedor="",
+        observaciones=observacion,
+        precio_unitario=precio,
+        coste_total=0,
+    )
+
+    if ok:
+        return True, codigo, "Material creado en Inventario con stock 0."
+
+    # Protección ante una creación simultánea o un duplicado detectado
+    # entre la comprobación y el INSERT.
+    duplicado = buscar_material_duplicado_exacto(
+        material,
+        categoria,
+        unidad,
+    )
+    if duplicado:
+        return (
+            True,
+            str(duplicado.get("codigo") or "").strip(),
+            "Material ya existente en Inventario.",
+        )
+
+    return False, "", mensaje
+
+
+def actualizar_precio_material_desde_pedido(codigo, precio_unitario):
+    """Actualiza el precio de un material cuando el dato está disponible."""
+    codigo = str(codigo or "").strip()
+    if not codigo or precio_unitario in (None, ""):
+        return True
+
+    try:
+        precio = float(precio_unitario)
+    except Exception:
+        return False
+
+    if precio < 0:
+        return False
+
+    asegurar_columnas_inventario()
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+    try:
+        cursor.execute(f"""
+            UPDATE inventario
+            SET precio_unitario = {p}
+            WHERE codigo = {p}
+        """, (precio, codigo))
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        return False
     finally:
         conn.close()
 
