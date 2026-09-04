@@ -1403,7 +1403,7 @@ def css_edificio_vivo():
         .cv-open-summary{
             position:absolute;
             right:2px;
-            top:-3px;
+            top:-82px;
             width:142px;
             padding:7px 9px 6px;
             border:1px solid #d6deea;
@@ -1628,7 +1628,7 @@ def css_edificio_vivo():
 
             .cv-open-summary{
                 right:2px;
-                top:-4px;
+                top:-68px;
                 width:118px;
                 padding:5px 7px 4px;
                 font-size:8.5px;
