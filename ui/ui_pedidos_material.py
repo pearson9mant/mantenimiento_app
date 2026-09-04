@@ -9,6 +9,8 @@ from modules.pedidos_material import (
     crear_pedido_material_multiple,
     obtener_pedidos_material,
     obtener_lineas_pedido,
+    obtener_datos_recepcion_linea,
+    registrar_recepcion_linea_pedido,
     cambiar_estado_pedido,
     cambiar_estado_linea_pedido,
     guardar_fotos_pedido_material,
@@ -17,7 +19,10 @@ from modules.pedidos_material import (
 )
 
 from modules.ordenes import obtener_fotos_ot
-from modules.inventario import obtener_materiales_para_select
+from modules.inventario import (
+    obtener_materiales_para_select,
+    categorias_inventario_disponibles,
+)
 
 
 PRIORIDADES = [
@@ -26,6 +31,18 @@ PRIORIDADES = [
     "Alta",
     "Urgente",
 ]
+
+
+def categorias_pedido_material():
+    categorias = categorias_inventario_disponibles()
+
+    if "Iluminación" not in categorias:
+        categorias.insert(
+            1,
+            "Iluminación",
+        )
+
+    return categorias
 
 
 def usuario_actual():
@@ -107,6 +124,8 @@ def _nueva_linea():
         "cantidad": 1.0,
         "observaciones": "",
         "link_material": "",
+        "categoria": "",
+        "precio_unitario": "",
         "es_compra": False,
     }
 
@@ -137,6 +156,14 @@ def inicializar_lineas_pedido():
         )
         linea.setdefault(
             "codigo_material",
+            "",
+        )
+        linea.setdefault(
+            "categoria",
+            "",
+        )
+        linea.setdefault(
+            "precio_unitario",
             "",
         )
         linea.setdefault(
@@ -543,6 +570,25 @@ def mostrar_lineas_pedido(
             else 0
         )
 
+        datos_recepcion = None
+
+        try:
+            datos_recepcion = obtener_datos_recepcion_linea(
+                id_linea
+            )
+        except Exception:
+            datos_recepcion = None
+
+        es_compra = bool(
+            int(
+                (datos_recepcion or {}).get(
+                    "es_compra",
+                    0,
+                )
+                or 0
+            )
+        )
+
         icono = icono_estado(
             estado
         )
@@ -573,7 +619,12 @@ def mostrar_lineas_pedido(
                         stock = actual["stock"]
                         unidad = actual["unidad"]
 
-                        if stock <= 0:
+                        if es_compra:
+                            st.caption(
+                                f"🛒 Compra · Stock recibido: "
+                                f"{stock:g} {unidad}"
+                            )
+                        elif stock <= 0:
                             st.error(
                                 f"Stock actual: "
                                 f"{stock:g} {unidad}"
@@ -593,7 +644,7 @@ def mostrar_lineas_pedido(
                                 f"{stock:g} {unidad}"
                             )
 
-                    if descontado:
+                    if descontado and not es_compra:
                         st.caption(
                             "✅ Salida de inventario registrada."
                         )
@@ -621,6 +672,86 @@ def mostrar_lineas_pedido(
                     "Cantidad",
                     cantidad,
                 )
+
+            if (
+                not modo_abel
+                and es_compra
+                and datos_recepcion
+                and codigo_material
+            ):
+                cantidad_pedida = float(
+                    datos_recepcion.get(
+                        "cantidad",
+                        0,
+                    )
+                    or 0
+                )
+                cantidad_recibida = float(
+                    datos_recepcion.get(
+                        "cantidad_recibida",
+                        0,
+                    )
+                    or 0
+                )
+                pendiente = max(
+                    cantidad_pedida - cantidad_recibida,
+                    0,
+                )
+
+                st.caption(
+                    f"Recibido: {cantidad_recibida:g} de "
+                    f"{cantidad_pedida:g} · "
+                    f"Pendiente: {pendiente:g}"
+                )
+
+                if pendiente > 0:
+                    cantidad_ahora = st.number_input(
+                        "Cantidad recibida ahora",
+                        min_value=0.0,
+                        max_value=float(
+                            pendiente
+                        ),
+                        value=0.0,
+                        step=1.0,
+                        key=(
+                            f"cantidad_recepcion_"
+                            f"{id_linea}"
+                        ),
+                    )
+
+                    if st.button(
+                        "📦 Registrar recepción",
+                        key=(
+                            f"registrar_recepcion_"
+                            f"{id_linea}"
+                        ),
+                        use_container_width=True,
+                    ):
+                        if cantidad_ahora <= 0:
+                            st.warning(
+                                "Indica la cantidad que has recibido."
+                            )
+                        else:
+                            ok, mensaje = (
+                                registrar_recepcion_linea_pedido(
+                                    id_linea,
+                                    cantidad_ahora,
+                                )
+                            )
+
+                            if ok:
+                                st.success(
+                                    mensaje
+                                )
+                                st.rerun()
+                            else:
+                                st.error(
+                                    mensaje
+                                )
+                else:
+                    st.success(
+                        "✅ Material recibido completamente."
+                    )
 
             if modo_abel:
                 nuevo_estado_linea = st.selectbox(
@@ -813,9 +944,63 @@ def _mostrar_selector_material(
             "material"
         ] = material_compra
 
+        categorias = categorias_pedido_material()
+        categoria_actual = str(
+            linea.get(
+                "categoria",
+                "",
+            )
+            or ""
+        ).strip()
+
+        opciones_categoria = [
+            "— Selecciona categoría —",
+            *categorias,
+        ]
+
+        indice_categoria = (
+            opciones_categoria.index(
+                categoria_actual
+            )
+            if categoria_actual in opciones_categoria
+            else 0
+        )
+
+        categoria_sel = st.selectbox(
+            "Categoría",
+            opciones_categoria,
+            index=indice_categoria,
+            key=f"categoria_compra_{uid}",
+        )
+
+        linea[
+            "categoria"
+        ] = (
+            ""
+            if categoria_sel == "— Selecciona categoría —"
+            else categoria_sel
+        )
+
+        precio_unitario = st.text_input(
+            "Precio unitario (€) · opcional",
+            value=str(
+                linea.get(
+                    "precio_unitario",
+                    "",
+                )
+                or ""
+            ),
+            placeholder="Ej.: 4,80",
+            key=f"precio_compra_{uid}",
+        )
+
+        linea[
+            "precio_unitario"
+        ] = precio_unitario
+
         st.caption(
-            "🛒 Se guardará como material no catalogado. "
-            "No modificará el inventario al entregarse."
+            "🛒 Al enviar el pedido, este material quedará creado "
+            "en Inventario con stock 0 y su código de categoría."
         )
 
         if st.button(
@@ -830,6 +1015,12 @@ def _mostrar_selector_material(
             ] = ""
             linea[
                 "busqueda"
+            ] = ""
+            linea[
+                "categoria"
+            ] = ""
+            linea[
+                "precio_unitario"
             ] = ""
 
             st.session_state.pop(
@@ -908,6 +1099,12 @@ def _mostrar_selector_material(
                 linea[
                     "es_compra"
                 ] = False
+                linea[
+                    "categoria"
+                ] = ""
+                linea[
+                    "precio_unitario"
+                ] = ""
 
                 st.rerun()
 
@@ -1160,6 +1357,57 @@ def ui_pedidos_operario(
             if not material:
                 continue
 
+            es_compra = bool(
+                linea.get(
+                    "es_compra",
+                    False,
+                )
+            )
+
+            categoria = str(
+                linea.get(
+                    "categoria",
+                    "",
+                )
+                or ""
+            ).strip()
+
+            if es_compra and not categoria:
+                st.warning(
+                    f"Selecciona la categoría de «{material}»."
+                )
+                return
+
+            precio_texto = str(
+                linea.get(
+                    "precio_unitario",
+                    "",
+                )
+                or ""
+            ).strip()
+
+            precio_unitario = None
+
+            if precio_texto:
+                try:
+                    precio_unitario = float(
+                        precio_texto.replace(
+                            ",",
+                            ".",
+                        )
+                    )
+                except Exception:
+                    st.warning(
+                        f"El precio de «{material}» no es válido."
+                    )
+                    return
+
+                if precio_unitario < 0:
+                    st.warning(
+                        f"El precio de «{material}» no puede ser negativo."
+                    )
+                    return
+
             lineas_validas.append({
                 "codigo_material": str(
                     linea.get(
@@ -1169,6 +1417,8 @@ def ui_pedidos_operario(
                     or ""
                 ).strip(),
                 "material": material,
+                "categoria": categoria,
+                "precio_unitario": precio_unitario,
                 "cantidad": float(
                     linea.get(
                         "cantidad",
