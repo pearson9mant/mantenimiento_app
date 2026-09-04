@@ -437,24 +437,25 @@ def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
     """
     Genera un PDF A4 listo para imprimir en hojas adhesivas.
 
-    Distribución fija: 4 placas por hoja (2 x 2), cada una a tamaño
-    real 90 x 120 mm. Reutiliza exactamente la composición equilibrada
-    de la pegatina individual de imprenta.
+    Distribución fija: 4 etiquetas por hoja (2 x 2), ocupando
+    exactamente los cuatro cuadrantes de un A4. Cada etiqueta mide
+    105 x 148,5 mm, igual que la hoja adhesiva precortada.
     """
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
 
     ancho_pagina, alto_pagina = A4
-    ancho_pegatina = 90 * mm
-    alto_pegatina = 120 * mm
-    separacion_x = 0 * mm
-    separacion_y = 0 * mm
 
-    ancho_bloque = (2 * ancho_pegatina) + separacion_x
-    alto_bloque = (2 * alto_pegatina) + separacion_y
-
-    margen_x = (ancho_pagina - ancho_bloque) / 2
-    margen_y = (alto_pagina - alto_bloque) / 2
+    # Hoja adhesiva precortada 4 por A4:
+    # 210 / 2 = 105 mm de ancho por etiqueta.
+    # 297 / 2 = 148,5 mm de alto por etiqueta.
+    # Sin márgenes ni separación: el corte coincide con el centro exacto del A4.
+    ancho_pegatina = ancho_pagina / 2
+    alto_pegatina = alto_pagina / 2
+    margen_x = 0
+    margen_y = 0
+    separacion_x = 0
+    separacion_y = 0
 
     for indice, fila in enumerate(aulas):
         if indice > 0 and indice % 4 == 0:
@@ -1555,7 +1556,7 @@ def pantalla_qr_aulas():
             file_name=(
                 limpiar_nombre_archivo(
                     "_".join(nombre_partes)
-                    + "_A4_4_PLACAS_90x120mm"
+                    + "_A4_4_ETIQUETAS_105x148_5mm"
                 )
                 + ".pdf"
             ),
@@ -1563,15 +1564,16 @@ def pantalla_qr_aulas():
             use_container_width=True,
             key="descargar_qr_a4_4_placas",
             help=(
-                "PDF A4 con 4 placas distintas por hoja, "
-                "cada una a tamaño real 90 × 120 mm. "
+                "PDF A4 para hojas adhesivas precortadas de 4 etiquetas: "
+                "cada cuadrante mide exactamente 105 × 148,5 mm. "
                 "Imprime al 100 % / Tamaño real, sin ajustar a página."
             ),
         )
 
         st.caption(
-            "🖨️ Impresión propia: 4 placas de 90 × 120 mm por hoja A4. "
-            "En la impresora selecciona **Tamaño real / 100 %** y no "
+            "🖨️ Impresión propia: hoja A4 precortada en 4 etiquetas de "
+            "105 × 148,5 mm. El PDF ocupa exactamente cada cuadrante, sin "
+            "márgenes ni separación. Imprime a **Tamaño real / 100 %** y no "
             "\"Ajustar a página\"."
         )
         zip_imprenta = generar_zip_pegatinas_individuales(
