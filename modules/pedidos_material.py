@@ -3,7 +3,9 @@ from datetime import datetime
 from database.db import conectar, _sql
 from modules.ordenes import guardar_foto_ot
 from modules.inventario import (
+    actualizar_precio_material_desde_pedido,
     obtener_material_por_codigo,
+    obtener_o_crear_material_para_pedido,
     registrar_movimiento_inventario,
 )
 
@@ -175,7 +177,11 @@ def crear_tabla_pedidos_material():
                 link_material TEXT,
                 fecha_preparado TEXT,
                 fecha_entrega TEXT,
-                inventario_descontado INTEGER DEFAULT 0
+                inventario_descontado INTEGER DEFAULT 0,
+                categoria TEXT,
+                precio_unitario REAL DEFAULT 0,
+                cantidad_recibida REAL DEFAULT 0,
+                es_compra INTEGER DEFAULT 0
             )
         """))
 
@@ -195,6 +201,10 @@ def crear_tabla_pedidos_material():
                 "inventario_descontado",
                 "INTEGER DEFAULT 0",
             ),
+            ("categoria", "TEXT"),
+            ("precio_unitario", "REAL DEFAULT 0"),
+            ("cantidad_recibida", "REAL DEFAULT 0"),
+            ("es_compra", "INTEGER DEFAULT 0"),
         ]
 
         for columna, tipo in columnas_lineas:
@@ -390,16 +400,43 @@ def crear_pedido_material_multiple(
         if cantidad <= 0:
             continue
 
+        codigo_original = str(
+            linea.get(
+                "codigo_material",
+                "",
+            )
+            or ""
+        ).strip()
+
+        precio_linea = linea.get(
+            "precio_unitario",
+            None,
+        )
+        if precio_linea not in (None, ""):
+            try:
+                precio_linea = float(precio_linea)
+            except Exception:
+                raise ValueError(
+                    f"Precio no válido para {material}."
+                )
+            if precio_linea < 0:
+                raise ValueError(
+                    f"El precio de {material} no puede ser negativo."
+                )
+
         lineas_validas.append({
-            "codigo_material": str(
+            "codigo_material": codigo_original,
+            "material": material,
+            "cantidad": cantidad,
+            "categoria": str(
                 linea.get(
-                    "codigo_material",
+                    "categoria",
                     "",
                 )
                 or ""
             ).strip(),
-            "material": material,
-            "cantidad": cantidad,
+            "precio_unitario": precio_linea,
+            "es_compra": 0 if codigo_original else 1,
             "observaciones": str(
                 linea.get(
                     "observaciones",
@@ -504,6 +541,31 @@ def crear_pedido_material_multiple(
         ))
 
         for linea in lineas_validas:
+            codigo_material = linea["codigo_material"]
+
+            # Material nuevo de compra: queda dado de alta desde ya con stock 0.
+            # Si la interfaz antigua todavía no envía categoría, se conserva
+            # exactamente el comportamiento anterior y no se fuerza el alta.
+            if (
+                linea["es_compra"]
+                and linea["categoria"]
+            ):
+                ok_inv, codigo_inv, mensaje_inv = (
+                    obtener_o_crear_material_para_pedido(
+                        material=linea["material"],
+                        categoria=linea["categoria"],
+                        centro=centro,
+                        edificio=edificio,
+                        precio_unitario=linea["precio_unitario"],
+                        numero_pedido=numero_pedido,
+                    )
+                )
+
+                if not ok_inv:
+                    raise RuntimeError(mensaje_inv)
+
+                codigo_material = codigo_inv
+
             cur.execute(_sql("""
                 INSERT INTO pedidos_material_lineas
                 (
@@ -514,17 +576,24 @@ def crear_pedido_material_multiple(
                     estado,
                     observaciones,
                     link_material,
-                    inventario_descontado
+                    inventario_descontado,
+                    categoria,
+                    precio_unitario,
+                    cantidad_recibida,
+                    es_compra
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0, ?)
             """), (
                 id_pedido,
-                linea["codigo_material"],
+                codigo_material,
                 linea["material"],
                 linea["cantidad"],
                 "Pendiente",
                 linea["observaciones"],
                 linea["link_material"],
+                linea["categoria"],
+                float(linea["precio_unitario"] or 0),
+                int(linea["es_compra"]),
             ))
 
         conn.commit()
@@ -549,6 +618,8 @@ def crear_pedido_material(
     foto="postgres_fotos",
     estado=None,
     creado_por=None,
+    categoria="",
+    precio_unitario=None,
 ):
     """
     Compatibilidad con llamadas antiguas.
@@ -586,6 +657,8 @@ def crear_pedido_material(
                 "codigo_material": "",
                 "material": material,
                 "cantidad": cantidad,
+                "categoria": categoria,
+                "precio_unitario": precio_unitario,
                 "observaciones": observaciones,
                 "link_material": link_material,
             }
@@ -1011,7 +1084,8 @@ def _obtener_linea_para_estado(
                 material,
                 cantidad,
                 estado,
-                inventario_descontado
+                inventario_descontado,
+                es_compra
             FROM pedidos_material_lineas
             WHERE id = ?
         """), (
@@ -1114,6 +1188,7 @@ def cambiar_estado_linea_pedido(
         cantidad,
         estado_anterior,
         inventario_descontado,
+        es_compra,
     ) = linea
 
     # Datos del pedido para trazabilidad.
@@ -1154,6 +1229,7 @@ def cambiar_estado_linea_pedido(
     if (
         nuevo_estado == "Entregado"
         and str(codigo_material or "").strip()
+        and not int(es_compra or 0)
         and not bool(inventario_descontado)
     ):
         ok_stock, mensaje_stock = (
@@ -1277,6 +1353,185 @@ def cambiar_estado_linea_pedido(
             if nuevo_estado != "Entregado"
             else "Material entregado correctamente."
         ),
+    )
+
+
+# =====================================================
+# RECEPCIÓN DE MATERIAL COMPRADO
+# =====================================================
+
+def obtener_datos_recepcion_linea(id_linea):
+    """Datos ampliados para la futura interfaz de recepción del operario."""
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        cur.execute(_sql("""
+            SELECT
+                l.id,
+                l.pedido_id,
+                l.codigo_material,
+                l.material,
+                l.cantidad,
+                l.cantidad_recibida,
+                l.categoria,
+                l.precio_unitario,
+                l.es_compra,
+                l.estado,
+                p.numero_pedido,
+                p.operario,
+                p.centro,
+                p.edificio
+            FROM pedidos_material_lineas l
+            JOIN pedidos_material p
+              ON p.id = l.pedido_id
+            WHERE l.id = ?
+        """), (id_linea,))
+
+        fila = cur.fetchone()
+        if not fila:
+            return None
+
+        columnas = [d[0] for d in cur.description]
+        return dict(zip(columnas, fila))
+    finally:
+        conn.close()
+
+
+def registrar_recepcion_linea_pedido(
+    id_linea,
+    cantidad_recibida,
+    precio_unitario=None,
+):
+    """
+    Registra únicamente lo que físicamente ha llegado.
+
+    Ejemplo: pedido 10, llegan 5 -> Inventario +5.
+    Una segunda recepción de 3 -> Inventario +3.
+    """
+    datos = obtener_datos_recepcion_linea(id_linea)
+    if not datos:
+        return False, "No se ha encontrado la línea del pedido."
+
+    if not int(datos.get("es_compra") or 0):
+        return False, "Esta línea corresponde a material de almacén, no a una compra."
+
+    codigo = str(datos.get("codigo_material") or "").strip()
+    if not codigo:
+        return False, "El material de compra todavía no tiene código de Inventario."
+
+    try:
+        cantidad_ahora = float(cantidad_recibida or 0)
+    except Exception:
+        return False, "La cantidad recibida no es válida."
+
+    if cantidad_ahora <= 0:
+        return False, "Indica una cantidad recibida mayor que 0."
+
+    cantidad_pedida = float(datos.get("cantidad") or 0)
+    cantidad_anterior = float(datos.get("cantidad_recibida") or 0)
+    pendiente = max(cantidad_pedida - cantidad_anterior, 0)
+
+    if pendiente <= 0:
+        return False, "Esta línea ya está recibida completamente."
+
+    if cantidad_ahora > pendiente:
+        return False, f"Quedan pendientes {pendiente:g} unidades."
+
+    if precio_unitario not in (None, ""):
+        try:
+            precio = float(precio_unitario)
+        except Exception:
+            return False, "El precio unitario no es válido."
+        if precio < 0:
+            return False, "El precio unitario no puede ser negativo."
+    else:
+        precio = None
+
+    ok_mov, mensaje_mov = registrar_movimiento_inventario(
+        codigo_material=codigo,
+        tipo_movimiento="Entrada",
+        cantidad=cantidad_ahora,
+        motivo=f"Recepción pedido {datos.get('numero_pedido') or ''}",
+        numero_ot="",
+        operario=str(datos.get("operario") or ""),
+    )
+
+    if not ok_mov:
+        return False, mensaje_mov
+
+    if precio is not None:
+        actualizar_precio_material_desde_pedido(
+            codigo,
+            precio,
+        )
+
+    nueva_recibida = cantidad_anterior + cantidad_ahora
+    completa = nueva_recibida >= cantidad_pedida
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        if completa:
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET cantidad_recibida = ?,
+                    precio_unitario = CASE
+                        WHEN ? IS NULL THEN precio_unitario
+                        ELSE ?
+                    END,
+                    estado = 'Entregado',
+                    fecha_entrega = ?
+                WHERE id = ?
+            """), (
+                nueva_recibida,
+                precio,
+                precio,
+                ahora,
+                id_linea,
+            ))
+        else:
+            cur.execute(_sql("""
+                UPDATE pedidos_material_lineas
+                SET cantidad_recibida = ?,
+                    precio_unitario = CASE
+                        WHEN ? IS NULL THEN precio_unitario
+                        ELSE ?
+                    END
+                WHERE id = ?
+            """), (
+                nueva_recibida,
+                precio,
+                precio,
+                id_linea,
+            ))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        # El stock ya se ha registrado; dejamos un aviso claro en lugar de
+        # repetir automáticamente la entrada y arriesgar un duplicado.
+        return False, (
+            "La entrada de stock se registró, pero no se pudo actualizar "
+            f"el pedido: {e}"
+        )
+    finally:
+        conn.close()
+
+    recalcular_estado_pedido(datos["pedido_id"])
+
+    pendiente_final = max(cantidad_pedida - nueva_recibida, 0)
+    if completa:
+        return True, (
+            f"Recepción registrada: +{cantidad_ahora:g}. "
+            "Línea recibida completamente."
+        )
+
+    return True, (
+        f"Recepción registrada: +{cantidad_ahora:g}. "
+        f"Quedan {pendiente_final:g} pendientes."
     )
 
 
