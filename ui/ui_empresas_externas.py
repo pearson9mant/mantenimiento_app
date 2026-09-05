@@ -166,7 +166,12 @@ def pantalla_empresas_externas():
                motivo_gestion_externa
         FROM ordenes_trabajo
         WHERE LOWER(TRIM(COALESCE(gestor_externo, ''))) = 'abel vasquez'
-          AND estado NOT IN ('Finalizada', 'Cerrado')
+          AND estado IN ('Pendiente proveedor', 'Pendiente presupuesto')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM empresas_externas ee
+              WHERE ee.id_orden = ordenes_trabajo.id
+          )
         ORDER BY fecha_envio_gestion_externa DESC, id DESC
     """)
 
