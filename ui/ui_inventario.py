@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 from modules.inventario import (
     generar_codigo_material,
@@ -14,6 +15,7 @@ from modules.inventario import (
     categorias_inventario_disponibles,
     sugerir_categoria_material,
     prefijo_codigo_categoria,
+    normalizar_codigo_material,
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -955,8 +957,66 @@ def pantalla_inventario():
                 nuevas_observaciones = st.text_area(
                     "Observaciones",
                     value=str(observaciones or ""),
-                    key=f"abel_edit_obs_{codigo}"
+                    key=f"abel_edit_obs_{codigo}",
+                    help=(
+                        "Guarda aquí marca, modelo, referencia, medidas, "
+                        "compatibilidades o cualquier dato técnico útil."
+                    )
                 )
+
+                prefijo_normalizado = prefijo_codigo_categoria(nueva_categoria)
+                codigo_ya_normalizado = bool(
+                    re.fullmatch(
+                        rf"{re.escape(prefijo_normalizado)}-\d{{3}}",
+                        str(codigo or "").strip().upper(),
+                    )
+                )
+
+                st.markdown("##### 🏷️ Código del material")
+
+                if codigo_ya_normalizado:
+                    st.caption(f"✅ Código normalizado: `{codigo}`")
+                else:
+                    st.caption(
+                        f"Código actual: `{codigo}` · "
+                        f"Formato nuevo: `{prefijo_normalizado}-###`"
+                    )
+
+                    confirmar_codigo = st.checkbox(
+                        "Quiero normalizar también este código",
+                        key=f"abel_confirmar_codigo_{codigo}",
+                        help=(
+                            "Se actualizará el código del material y sus "
+                            "referencias históricas. No cambia el stock."
+                        ),
+                    )
+
+                    if confirmar_codigo:
+                        st.warning(
+                            "Haz primero cualquier cambio de nombre, categoría "
+                            "u observaciones con «Guardar cambios». Después "
+                            "normaliza el código."
+                        )
+
+                        if st.button(
+                            "🏷️ Normalizar código",
+                            key=f"abel_normalizar_codigo_{codigo}",
+                            use_container_width=True,
+                        ):
+                            ok_codigo, nuevo_codigo, mensaje_codigo = (
+                                normalizar_codigo_material(
+                                    codigo,
+                                    nueva_categoria,
+                                )
+                            )
+
+                            if ok_codigo:
+                                st.success(
+                                    f"{mensaje_codigo} {codigo} → {nuevo_codigo}"
+                                )
+                                st.rerun()
+                            else:
+                                st.error(mensaje_codigo)
 
                 nueva_foto = st.file_uploader(
                     "Cambiar foto",
