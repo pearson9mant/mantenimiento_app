@@ -536,12 +536,47 @@ def pantalla_empresas_externas():
                     mapa_estado_ot = {
                         "Avisado": "Avisado",
                         "Pendiente presupuesto": "Pendiente presupuesto",
-                        "Aprobado": "En ejecución",
+                        "Aprobado": "Pendiente proveedor",
                         "En ejecución": "En ejecución",
+                        "Finalizado": "Abierta",
+                        "Cancelado": "Abierta",
                     }
+
                     estado_ot_sincronizado = mapa_estado_ot.get(nuevo_estado)
+
                     if estado_ot_sincronizado:
-                        actualizar_estado(int(id_orden_vinculada), estado_ot_sincronizado, nuevas_obs)
+                        observacion_ot = str(nuevas_obs or "").strip()
+
+                        if nuevo_estado == "Aprobado":
+                            nota_sistema = (
+                                "Gestión externa aprobada. "
+                                "Pendiente de inicio por la empresa."
+                            )
+                        elif nuevo_estado == "Finalizado":
+                            nota_sistema = (
+                                "La empresa externa ha finalizado su actuación. "
+                                "OT devuelta al técnico original para revisión y cierre."
+                            )
+                        elif nuevo_estado == "Cancelado":
+                            nota_sistema = (
+                                "Gestión externa cancelada. "
+                                "OT devuelta al técnico original para decidir la siguiente actuación."
+                            )
+                        else:
+                            nota_sistema = ""
+
+                        if nota_sistema:
+                            observacion_ot = (
+                                f"{nota_sistema}\n{observacion_ot}"
+                                if observacion_ot
+                                else nota_sistema
+                            )
+
+                        actualizar_estado(
+                            int(id_orden_vinculada),
+                            estado_ot_sincronizado,
+                            observacion_ot,
+                        )
 
                 st.success("Intervención actualizada.")
                 st.rerun()
