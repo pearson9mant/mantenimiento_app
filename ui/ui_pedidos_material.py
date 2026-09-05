@@ -704,6 +704,24 @@ def mostrar_lineas_pedido(
                     f"Pendiente: {pendiente:g}"
                 )
 
+                precio_guardado = float(
+                    datos_recepcion.get(
+                        "precio_unitario",
+                        0,
+                    )
+                    or 0
+                )
+
+                if precio_guardado > 0:
+                    st.caption(
+                        f"💶 Precio unitario actual: "
+                        f"{precio_guardado:.2f} €"
+                    )
+                else:
+                    st.caption(
+                        "💶 Precio todavía no informado."
+                    )
+
                 if pendiente > 0:
                     cantidad_ahora = st.number_input(
                         "Cantidad recibida ahora",
@@ -716,6 +734,27 @@ def mostrar_lineas_pedido(
                         key=(
                             f"cantidad_recepcion_"
                             f"{id_linea}"
+                        ),
+                    )
+
+                    precio_recepcion = st.number_input(
+                        "Precio unitario (€) · opcional",
+                        min_value=0.0,
+                        value=float(
+                            precio_guardado
+                            if precio_guardado > 0
+                            else 0.0
+                        ),
+                        step=0.01,
+                        format="%.2f",
+                        key=(
+                            f"precio_recepcion_"
+                            f"{id_linea}"
+                        ),
+                        help=(
+                            "Si conoces ahora el precio real, indícalo. "
+                            "Si no, déjalo en 0,00 € y podrás añadirlo "
+                            "más adelante desde Inventario."
                         ),
                     )
 
@@ -732,10 +771,17 @@ def mostrar_lineas_pedido(
                                 "Indica la cantidad que has recibido."
                             )
                         else:
+                            precio_para_guardar = (
+                                float(precio_recepcion)
+                                if float(precio_recepcion) > 0
+                                else None
+                            )
+
                             ok, mensaje = (
                                 registrar_recepcion_linea_pedido(
                                     id_linea,
                                     cantidad_ahora,
+                                    precio_unitario=precio_para_guardar,
                                 )
                             )
 
