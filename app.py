@@ -339,6 +339,9 @@ def etiqueta_perfil(perfil):
     if perfil == "inventario":
         return "Inventario"
 
+    if perfil == "abel":
+        return "Gestión mantenimiento"
+
     if perfil == "comunicacion":
         return "Comunicación"
 
@@ -768,6 +771,32 @@ def mostrar_menu_operario():
         "<div class='section-title'>Menú de trabajo</div>",
         unsafe_allow_html=True
     )
+
+    # ===========================
+    # PERFIL ABEL
+    # ===========================
+    if perfil == "abel":
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button(
+                "📦\nPedidos material",
+                key="btn_pedidos_abel",
+                use_container_width=True
+            ):
+                st.session_state["seccion_actual"] = "Pedidos material"
+                st.rerun()
+
+        with col2:
+            if st.button(
+                "📞\nGestiones externas",
+                key="btn_gestiones_externas_abel",
+                use_container_width=True
+            ):
+                st.session_state["seccion_actual"] = "Gestiones externas"
+                st.rerun()
+
+        return
 
     # ===========================
     # PERFIL INVENTARIO
@@ -1226,6 +1255,16 @@ else:
         st.caption(f"👷 {operario_activo}")
 
     # -----------------------------------------------------
+    # SEGURIDAD DEL PERFIL ABEL
+    # -----------------------------------------------------
+    if perfil == "abel" and seccion not in [
+        "Pedidos material",
+        "Gestiones externas",
+    ]:
+        st.warning("Este usuario solo tiene acceso a Pedidos material y Gestiones externas.")
+        st.stop()
+
+    # -----------------------------------------------------
     # SEGURIDAD DEL PERFIL INVENTARIO
     # -----------------------------------------------------
     if perfil == "inventario" and seccion not in [
@@ -1252,6 +1291,9 @@ else:
 
     elif seccion == "Pedidos material":
         ui_pedidos_material()
+
+    elif seccion == "Gestiones externas":
+        pantalla_empresas_externas()
 
     elif seccion == "Histórico":
         pantalla_operario(modo="historico")
