@@ -18,6 +18,15 @@ ESTADOS_PEDIDO = [
     "Cancelado",
 ]
 
+ESTADOS_GESTION_COMPRA = [
+    "Pendiente de enviar a Noemí",
+    "Pendiente de aprobación",
+    "Aprobado",
+    "Pedido",
+    "Pagado",
+    "Cancelado",
+]
+
 _ESTRUCTURA_PEDIDOS_ASEGURADA = False
 
 
@@ -134,7 +143,16 @@ def crear_tabla_pedidos_material():
                 link_material TEXT,
                 foto TEXT,
                 fecha_preparado TEXT,
-                fecha_entrega TEXT
+                fecha_entrega TEXT,
+                estado_gestion TEXT DEFAULT 'Pendiente de enviar a Noemí',
+                fecha_envio_noemi TEXT,
+                fecha_aprobacion_noemi TEXT,
+                proveedor TEXT,
+                referencia_compra TEXT,
+                fecha_pedido TEXT,
+                pagado INTEGER DEFAULT 0,
+                fecha_pago TEXT,
+                observaciones_gestion TEXT
             )
         """))
 
@@ -155,6 +173,18 @@ def crear_tabla_pedidos_material():
             ("foto", "TEXT"),
             ("fecha_preparado", "TEXT"),
             ("fecha_entrega", "TEXT"),
+            (
+                "estado_gestion",
+                "TEXT DEFAULT 'Pendiente de enviar a Noemí'",
+            ),
+            ("fecha_envio_noemi", "TEXT"),
+            ("fecha_aprobacion_noemi", "TEXT"),
+            ("proveedor", "TEXT"),
+            ("referencia_compra", "TEXT"),
+            ("fecha_pedido", "TEXT"),
+            ("pagado", "INTEGER DEFAULT 0"),
+            ("fecha_pago", "TEXT"),
+            ("observaciones_gestion", "TEXT"),
         ]
 
         for columna, tipo in columnas_cabecera:
@@ -1533,6 +1563,204 @@ def registrar_recepcion_linea_pedido(
         f"Recepción registrada: +{cantidad_ahora:g}. "
         f"Quedan {pendiente_final:g} pendientes."
     )
+
+
+def obtener_gestion_pedido_material(
+    id_pedido,
+):
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT
+                estado_gestion,
+                fecha_envio_noemi,
+                fecha_aprobacion_noemi,
+                proveedor,
+                referencia_compra,
+                fecha_pedido,
+                pagado,
+                fecha_pago,
+                observaciones_gestion
+            FROM pedidos_material
+            WHERE id = ?
+        """), (
+            id_pedido,
+        ))
+
+        fila = cur.fetchone()
+
+        if not fila:
+            return None
+
+        return {
+            "estado_gestion": (
+                fila[0]
+                or "Pendiente de enviar a Noemí"
+            ),
+            "fecha_envio_noemi": fila[1] or "",
+            "fecha_aprobacion_noemi": fila[2] or "",
+            "proveedor": fila[3] or "",
+            "referencia_compra": fila[4] or "",
+            "fecha_pedido": fila[5] or "",
+            "pagado": bool(
+                int(
+                    fila[6]
+                    or 0
+                )
+            ),
+            "fecha_pago": fila[7] or "",
+            "observaciones_gestion": fila[8] or "",
+        }
+
+    finally:
+        conn.close()
+
+
+def actualizar_gestion_pedido_material(
+    id_pedido,
+    estado_gestion=None,
+    proveedor=None,
+    referencia_compra=None,
+    observaciones_gestion=None,
+):
+    crear_tabla_pedidos_material()
+
+    datos_actuales = obtener_gestion_pedido_material(
+        id_pedido
+    )
+
+    if not datos_actuales:
+        return False, "No se ha encontrado el pedido."
+
+    estado_nuevo = (
+        str(
+            estado_gestion
+            if estado_gestion is not None
+            else datos_actuales["estado_gestion"]
+        )
+        .strip()
+        or "Pendiente de enviar a Noemí"
+    )
+
+    if estado_nuevo not in ESTADOS_GESTION_COMPRA:
+        return False, "Estado de gestión no válido."
+
+    proveedor_nuevo = (
+        str(
+            proveedor
+            if proveedor is not None
+            else datos_actuales["proveedor"]
+        )
+        .strip()
+    )
+
+    referencia_nueva = (
+        str(
+            referencia_compra
+            if referencia_compra is not None
+            else datos_actuales["referencia_compra"]
+        )
+        .strip()
+    )
+
+    observaciones_nuevas = (
+        str(
+            observaciones_gestion
+            if observaciones_gestion is not None
+            else datos_actuales["observaciones_gestion"]
+        )
+        .strip()
+    )
+
+    ahora = datetime.now().strftime(
+        "%Y-%m-%d %H:%M"
+    )
+
+    fecha_envio_noemi = datos_actuales[
+        "fecha_envio_noemi"
+    ]
+    fecha_aprobacion_noemi = datos_actuales[
+        "fecha_aprobacion_noemi"
+    ]
+    fecha_pedido = datos_actuales[
+        "fecha_pedido"
+    ]
+    fecha_pago = datos_actuales[
+        "fecha_pago"
+    ]
+    pagado = 1 if datos_actuales["pagado"] else 0
+
+    if (
+        estado_nuevo == "Pendiente de aprobación"
+        and not fecha_envio_noemi
+    ):
+        fecha_envio_noemi = ahora
+
+    if (
+        estado_nuevo == "Aprobado"
+        and not fecha_aprobacion_noemi
+    ):
+        fecha_aprobacion_noemi = ahora
+
+    if (
+        estado_nuevo == "Pedido"
+        and not fecha_pedido
+    ):
+        fecha_pedido = ahora
+
+    if estado_nuevo == "Pagado":
+        pagado = 1
+
+        if not fecha_pago:
+            fecha_pago = ahora
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE pedidos_material
+            SET
+                estado_gestion = ?,
+                fecha_envio_noemi = ?,
+                fecha_aprobacion_noemi = ?,
+                proveedor = ?,
+                referencia_compra = ?,
+                fecha_pedido = ?,
+                pagado = ?,
+                fecha_pago = ?,
+                observaciones_gestion = ?
+            WHERE id = ?
+        """), (
+            estado_nuevo,
+            fecha_envio_noemi,
+            fecha_aprobacion_noemi,
+            proveedor_nuevo,
+            referencia_nueva,
+            fecha_pedido,
+            pagado,
+            fecha_pago,
+            observaciones_nuevas,
+            id_pedido,
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        return False, (
+            "No se pudo actualizar la gestión del pedido: "
+            f"{e}"
+        )
+
+    finally:
+        conn.close()
+
+    return True, "Gestión del pedido actualizada."
 
 
 def cambiar_estado_pedido(
