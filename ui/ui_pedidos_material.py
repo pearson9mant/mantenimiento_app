@@ -1753,6 +1753,24 @@ def ui_pedidos_abel():
         pedidos_filtrados = []
 
         for p in pedidos:
+            datos_pedido = leer_pedido(
+                p
+            )
+
+            estado_real = str(
+                datos_pedido.get(
+                    "estado",
+                    "",
+                )
+                or ""
+            ).strip()
+
+            if estado_real in [
+                "Entregado",
+                "Cancelado",
+            ]:
+                continue
+
             gestion = obtener_gestion_pedido_material(
                 p[0]
             )
