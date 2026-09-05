@@ -674,7 +674,7 @@ def mostrar_lineas_pedido(
                 )
 
             if (
-                (not modo_abel or es_admin())
+                not modo_abel
                 and es_compra
                 and datos_recepcion
                 and codigo_material
