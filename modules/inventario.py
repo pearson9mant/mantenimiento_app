@@ -1518,6 +1518,123 @@ def obtener_material_por_codigo(codigo):
 
 
 # =====================================================
+# NORMALIZAR CÓDIGO MANUALMENTE
+# =====================================================
+
+def normalizar_codigo_material(codigo_actual, categoria):
+    """
+    Cambia manualmente un código antiguo al formato actual de su categoría.
+
+    Actualiza en la misma transacción:
+    - inventario.codigo
+    - movimientos_inventario.codigo_material
+    - pedidos_material_lineas.codigo_material, si existe
+
+    No toca stock, cantidades, estados ni códigos de otros materiales.
+    """
+    asegurar_columnas_inventario()
+
+    codigo_actual = str(codigo_actual or "").strip()
+    categoria = str(categoria or "").strip()
+
+    if not codigo_actual:
+        return False, "", "Falta el código actual."
+
+    if not categoria:
+        return False, "", "Falta la categoría."
+
+    prefijo = prefijo_codigo_categoria(categoria)
+
+    # Si ya está en el formato vigente de esa categoría, no hacemos nada.
+    if re.fullmatch(rf"{re.escape(prefijo)}-\d{{3}}", codigo_actual.upper()):
+        return True, codigo_actual, "El código ya está normalizado."
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute(
+            f"SELECT id FROM inventario WHERE codigo = {p}",
+            (codigo_actual,)
+        )
+        if not cursor.fetchone():
+            return False, "", "No existe el material que se quiere normalizar."
+
+        cursor.execute(
+            f"""
+            SELECT codigo
+            FROM inventario
+            WHERE UPPER(COALESCE(codigo, '')) LIKE {p}
+            """,
+            (f"{prefijo}-%",)
+        )
+        existentes = [
+            str(fila[0] or "").strip().upper()
+            for fila in cursor.fetchall()
+        ]
+
+        numeros = []
+        for codigo in existentes:
+            try:
+                numeros.append(int(codigo.rsplit("-", 1)[-1]))
+            except Exception:
+                pass
+
+        siguiente = max(numeros) + 1 if numeros else 1
+        nuevo_codigo = f"{prefijo}-{siguiente:03d}"
+
+        cursor.execute(
+            f"SELECT id FROM inventario WHERE codigo = {p}",
+            (nuevo_codigo,)
+        )
+        if cursor.fetchone():
+            return False, "", f"Ya existe el código {nuevo_codigo}."
+
+        cursor.execute(
+            f"UPDATE inventario SET codigo = {p} WHERE codigo = {p}",
+            (nuevo_codigo, codigo_actual)
+        )
+
+        cursor.execute(
+            f"""
+            UPDATE movimientos_inventario
+            SET codigo_material = {p}
+            WHERE codigo_material = {p}
+            """,
+            (nuevo_codigo, codigo_actual)
+        )
+
+        # Los pedidos pueden conservar referencias al material. La tabla o la
+        # columna pueden no existir en instalaciones antiguas; en ese caso no
+        # bloqueamos la normalización del inventario.
+        try:
+            cursor.execute(
+                f"""
+                UPDATE pedidos_material_lineas
+                SET codigo_material = {p}
+                WHERE codigo_material = {p}
+                """,
+                (nuevo_codigo, codigo_actual)
+            )
+        except Exception as e:
+            _log_inventario_warning(
+                f"Actualizando código {codigo_actual} en pedidos_material_lineas",
+                e
+            )
+
+        conn.commit()
+        return True, nuevo_codigo, "Código normalizado correctamente."
+
+    except Exception as e:
+        conn.rollback()
+        return False, "", f"Error al normalizar el código: {e}"
+
+    finally:
+        conn.close()
+
+
+# =====================================================
 # ACTIVAR / DESACTIVAR
 # =====================================================
 
