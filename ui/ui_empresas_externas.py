@@ -5,6 +5,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from database.db import conectar
+from modules.ordenes import actualizar_estado
 
 
 def adaptar_sql(sql):
@@ -115,6 +116,21 @@ def asegurar_tabla_empresas_externas():
             )
         """)
 
+    # Enlace seguro con una OT existente.
+    # Se añaden también a instalaciones ya creadas.
+    for columna, tipo in [
+        ("id_orden", "INTEGER"),
+        ("numero_ot", "TEXT"),
+        ("tecnico_origen", "TEXT"),
+        ("motivo_solicitud", "TEXT"),
+    ]:
+        try:
+            ejecutar(
+                f"ALTER TABLE empresas_externas ADD COLUMN {columna} {tipo}"
+            )
+        except Exception:
+            pass
+
 
 def pantalla_empresas_externas():
     asegurar_tabla_empresas_externas()
@@ -140,7 +156,114 @@ def pantalla_empresas_externas():
     c3.metric("En ejecución", ejecucion)
     c4.metric("Coste final", f"{coste_total:,.2f} €")
 
-    with st.expander("➕ Nueva intervención externa", expanded=True):
+    # =====================================================
+    # SOLICITUDES RECIBIDAS DESDE LAS OT
+    # =====================================================
+    solicitudes = leer_df("""
+        SELECT id, numero_ot, descripcion, estado, fecha_creacion,
+               centro, edificio, espacio, area, prioridad, operario,
+               gestor_externo, fecha_envio_gestion_externa,
+               motivo_gestion_externa
+        FROM ordenes_trabajo
+        WHERE LOWER(TRIM(COALESCE(gestor_externo, ''))) = 'abel vasquez'
+          AND estado NOT IN ('Finalizada', 'Cerrado')
+        ORDER BY fecha_envio_gestion_externa DESC, id DESC
+    """)
+
+    st.markdown("### 📥 Solicitudes recibidas")
+
+    if solicitudes.empty:
+        st.info("No hay gestiones externas pendientes enviadas por los operarios.")
+    else:
+        st.caption(
+            f"{len(solicitudes)} OT enviada(s) a Gestiones externas. "
+            "La OT mantiene siempre su técnico original."
+        )
+
+        for _, solicitud in solicitudes.iterrows():
+            id_ot = int(solicitud["id"])
+            numero_ot = str(solicitud["numero_ot"] or "")
+            tecnico = str(solicitud["operario"] or "")
+            motivo = str(solicitud["motivo_gestion_externa"] or "")
+            estado_ot = str(solicitud["estado"] or "")
+
+            ya_registrada = False
+            if not df.empty and "id_orden" in df.columns:
+                ids_vinculados = pd.to_numeric(
+                    df["id_orden"], errors="coerce"
+                ).dropna().astype(int).tolist()
+                ya_registrada = id_ot in ids_vinculados
+
+            titulo = (
+                f"📞 {numero_ot} · {solicitud['centro']} · "
+                f"{solicitud['espacio'] or solicitud['edificio'] or '-'} · {estado_ot}"
+            )
+
+            with st.expander(titulo, expanded=not ya_registrada):
+                st.markdown(f"**Avería:** {solicitud['descripcion'] or '-'}")
+                st.markdown(f"**Técnico:** {tecnico or '-'}")
+                st.markdown(f"**Área:** {solicitud['area'] or '-'} · **Prioridad:** {solicitud['prioridad'] or '-'}")
+                st.markdown(f"**Indicación recibida:** {motivo or '-'}")
+
+                if solicitud["fecha_envio_gestion_externa"]:
+                    st.caption(f"Enviada a Abel: {solicitud['fecha_envio_gestion_externa']}")
+
+                if ya_registrada:
+                    st.success("Esta solicitud ya está vinculada a una intervención externa.")
+                    continue
+
+                st.markdown("#### Registrar el aviso a la empresa")
+                a1, a2 = st.columns(2)
+
+                with a1:
+                    empresa_aviso = st.text_input("Empresa externa", key=f"sol_ext_empresa_{id_ot}")
+                    servicio_aviso = st.selectbox(
+                        "Tipo de servicio",
+                        TIPOS_SERVICIO,
+                        index=(TIPOS_SERVICIO.index(solicitud["area"]) if solicitud["area"] in TIPOS_SERVICIO else len(TIPOS_SERVICIO) - 1),
+                        key=f"sol_ext_servicio_{id_ot}"
+                    )
+                    contacto_aviso = st.text_input("Contacto", key=f"sol_ext_contacto_{id_ot}")
+
+                with a2:
+                    telefono_aviso = st.text_input("Teléfono", key=f"sol_ext_telefono_{id_ot}")
+                    email_aviso = st.text_input("Email", key=f"sol_ext_email_{id_ot}")
+                    observacion_aviso = st.text_area("Observación de Abel", key=f"sol_ext_obs_{id_ot}")
+
+                if st.button("📞 Empresa avisada · Registrar gestión", key=f"registrar_sol_ext_{id_ot}", use_container_width=True):
+                    if not str(empresa_aviso or "").strip():
+                        st.error("Indica la empresa a la que has avisado.")
+                    else:
+                        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        fecha_hoy = date.today().strftime("%Y-%m-%d")
+                        estado_nuevo_ot = "Pendiente presupuesto" if estado_ot == "Pendiente presupuesto" else "Avisado"
+
+                        ejecutar("""
+                            INSERT INTO empresas_externas
+                            (fecha_registro, empresa, servicio, contacto, telefono, email,
+                             centro, edificio, espacio, descripcion, estado, prioridad,
+                             fecha_aviso, fecha_prevista, fecha_realizacion, presupuesto,
+                             coste_final, pdf, observaciones, id_orden, numero_ot,
+                             tecnico_origen, motivo_solicitud)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            fecha_actual, str(empresa_aviso).strip(), servicio_aviso,
+                            str(contacto_aviso or "").strip(), str(telefono_aviso or "").strip(),
+                            str(email_aviso or "").strip(), solicitud["centro"], solicitud["edificio"],
+                            solicitud["espacio"], solicitud["descripcion"], estado_nuevo_ot,
+                            solicitud["prioridad"], fecha_hoy, fecha_hoy, "", 0.0, 0.0, "",
+                            str(observacion_aviso or "").strip(), id_ot, numero_ot, tecnico, motivo
+                        ))
+
+                        actualizar_estado(
+                            id_ot, estado_nuevo_ot,
+                            f"Gestión externa: empresa {str(empresa_aviso).strip()} avisada por Abel Vasquez el {fecha_actual}."
+                            + (f" {str(observacion_aviso).strip()}" if str(observacion_aviso or "").strip() else "")
+                        )
+                        st.success(f"Gestión registrada. {numero_ot} continúa asignada a {tecnico}.")
+                        st.rerun()
+
+    with st.expander("➕ Nueva intervención externa", expanded=False):
         col1, col2 = st.columns(2)
 
         with col1:
@@ -401,6 +524,19 @@ def pantalla_empresas_externas():
                     nuevas_obs,
                     int(row["id"])
                 ))
+
+                # Si procede de una OT, mantenemos ambos estados coordinados.
+                id_orden_vinculada = row.get("id_orden")
+                if pd.notna(id_orden_vinculada):
+                    mapa_estado_ot = {
+                        "Avisado": "Avisado",
+                        "Pendiente presupuesto": "Pendiente presupuesto",
+                        "Aprobado": "En ejecución",
+                        "En ejecución": "En ejecución",
+                    }
+                    estado_ot_sincronizado = mapa_estado_ot.get(nuevo_estado)
+                    if estado_ot_sincronizado:
+                        actualizar_estado(int(id_orden_vinculada), estado_ot_sincronizado, nuevas_obs)
 
                 st.success("Intervención actualizada.")
                 st.rerun()
