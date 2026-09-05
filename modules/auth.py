@@ -22,7 +22,7 @@ USUARIOS = {
 
     "abel": {
         "password": "abel2026",
-        "perfil": "inventario",
+        "perfil": "abel",
         "nombre": "Abel Vasquez"
     },
 
