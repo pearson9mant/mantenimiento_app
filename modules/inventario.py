@@ -61,6 +61,7 @@ PALABRAS_IGNORAR_MATERIAL = {
 
 CATEGORIAS_INVENTARIO_INTELIGENTE = [
     "Electricidad",
+    "Iluminación",
     "Fontanería",
     "Climatización",
     "Cerrajería",
@@ -83,12 +84,16 @@ def categorias_inventario_disponibles():
 # Palabras con peso. Las palabras que identifican el TIPO de objeto
 # tienen más peso que palabras de composición como hierro, acero o plástico.
 _REGLAS_CATEGORIA_MATERIAL = {
-    "Electricidad": {
+    "Iluminación": {
         "downlight": 18,
         "foco": 14,
         "lampara": 14,
         "bombilla": 14,
         "led": 10,
+        "fluorescente": 16,
+        "driver": 15,
+    },
+    "Electricidad": {
         "interruptor": 18,
         "enchufe": 18,
         "base enchufe": 20,
@@ -99,8 +104,6 @@ _REGLAS_CATEGORIA_MATERIAL = {
         "cable": 12,
         "manguera electrica": 16,
         "regleta": 14,
-        "fluorescente": 16,
-        "driver": 15,
         "fuente alimentacion": 16,
         "transformador": 18,
         "sensor movimiento": 15,
