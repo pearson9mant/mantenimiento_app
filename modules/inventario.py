@@ -472,20 +472,107 @@ def _termino_coincide_busqueda(termino, texto_fila):
     return False
 
 
+def _historial_busqueda_materiales():
+    """
+    Devuelve texto técnico/histórico por código de material.
+
+    Se usa únicamente cuando hay búsqueda libre. Permite localizar un material
+    por espacios y OTs donde ya se utilizó, sin duplicar materiales ni guardar
+    ubicaciones dentro del código.
+    """
+    asegurar_columnas_inventario()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                codigo_material,
+                material,
+                motivo,
+                numero_ot,
+                descripcion_ot,
+                centro_ot,
+                edificio_ot,
+                espacio_ot,
+                area_ot,
+                prioridad_ot,
+                estado_ot,
+                origen_ot
+            FROM movimientos_inventario
+            WHERE COALESCE(codigo_material, '') <> ''
+        """)
+
+        historial = {}
+
+        for fila in cursor.fetchall():
+            codigo = str(fila[0] or "").strip()
+            if not codigo:
+                continue
+
+            partes = [
+                str(valor or "")
+                for valor in fila[1:]
+            ]
+
+            historial.setdefault(codigo, []).extend(partes)
+
+        return {
+            codigo: normalizar_texto_material(" ".join(partes))
+            for codigo, partes in historial.items()
+        }
+
+    except Exception as e:
+        _log_inventario_warning(
+            "Construyendo búsqueda histórica de materiales",
+            e
+        )
+        return {}
+
+    finally:
+        conn.close()
+
+
 def _filtrar_filas_inventario_por_texto(filas, filtro_texto):
     """
-    Todas las palabras deben coincidir, pero pueden estar repartidas entre
-    material, código, categoría, centro, edificio, ubicación, proveedor y notas.
+    Todas las palabras deben coincidir y pueden estar repartidas entre:
+
+    - código, material y categoría;
+    - centro, edificio, ubicación, proveedor y observaciones;
+    - espacios y datos de las OTs donde ese material ya fue utilizado.
+
+    Ejemplo:
+        "fluorescente 4A"
+    puede encontrar un fluorescente por su nombre y por haber salido
+    anteriormente en una OT del espacio 4A.
     """
     terminos = terminos_busqueda_material(filtro_texto)
     if not terminos:
         return list(filas)
 
+    historial_por_codigo = _historial_busqueda_materiales()
+
     resultado = []
     for fila in filas:
         texto_fila = _texto_busqueda_fila_inventario(fila)
-        if all(_termino_coincide_busqueda(t, texto_fila) for t in terminos):
+
+        try:
+            codigo = str(fila[1] or "").strip()
+        except Exception:
+            codigo = ""
+
+        texto_historial = historial_por_codigo.get(codigo, "")
+        texto_total = normalizar_texto_material(
+            f"{texto_fila} {texto_historial}"
+        )
+
+        if all(
+            _termino_coincide_busqueda(termino, texto_total)
+            for termino in terminos
+        ):
             resultado.append(fila)
+
     return resultado
 
 
@@ -1639,6 +1726,94 @@ def normalizar_codigo_material(codigo_actual, categoria):
     except Exception as e:
         conn.rollback()
         return False, "", f"Error al normalizar el código: {e}"
+
+    finally:
+        conn.close()
+
+
+# =====================================================
+# BORRADO DEFINITIVO DE MATERIAL
+# =====================================================
+
+def eliminar_material_inventario(codigo):
+    """
+    Elimina definitivamente una ficha de Inventario.
+
+    Uso pensado para altas de prueba o materiales innecesarios.
+
+    - Borra los movimientos de inventario del material.
+    - Desvincula su código de líneas de pedidos, conservando el pedido.
+    - Borra la ficha de inventario.
+    - No toca otras OTs ni pedidos.
+    """
+    asegurar_columnas_inventario()
+
+    codigo = str(codigo or "").strip()
+    if not codigo:
+        return False, "Falta el código del material."
+
+    conn = conectar()
+    cursor = conn.cursor()
+    p = _ph(conn)
+
+    try:
+        cursor.execute(
+            f"""
+            SELECT material, stock_actual
+            FROM inventario
+            WHERE codigo = {p}
+            """,
+            (codigo,)
+        )
+        fila = cursor.fetchone()
+
+        if not fila:
+            return False, "El material ya no existe en Inventario."
+
+        material, stock_actual = fila
+
+        # Conservamos el pedido, pero quitamos el vínculo al código que deja de existir.
+        try:
+            cursor.execute(
+                f"""
+                UPDATE pedidos_material_lineas
+                SET codigo_material = NULL
+                WHERE codigo_material = {p}
+                """,
+                (codigo,)
+            )
+        except Exception as e:
+            _log_inventario_warning(
+                f"Desvinculando {codigo} de pedidos_material_lineas",
+                e
+            )
+
+        cursor.execute(
+            f"""
+            DELETE FROM movimientos_inventario
+            WHERE codigo_material = {p}
+            """,
+            (codigo,)
+        )
+
+        cursor.execute(
+            f"""
+            DELETE FROM inventario
+            WHERE codigo = {p}
+            """,
+            (codigo,)
+        )
+
+        conn.commit()
+
+        return True, (
+            f"Material eliminado definitivamente: {material} "
+            f"({codigo})."
+        )
+
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error al eliminar material: {e}"
 
     finally:
         conn.close()
