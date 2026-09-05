@@ -16,6 +16,7 @@ from modules.inventario import (
     sugerir_categoria_material,
     prefijo_codigo_categoria,
     normalizar_codigo_material,
+    eliminar_material_inventario,
 )
 
 from modules.ubicaciones import CENTROS, obtener_edificios, obtener_espacios
@@ -594,14 +595,19 @@ def pantalla_inventario():
     filtro_texto = st.text_input(
         "Buscar material",
         placeholder=(
-            "Ej.: ele · cerr taq · mesa hie · grifo p22 · eletricidad..."
+            "Ej.: iluminación · fluorescente 1200 · fontanería · 4A · WC profesores..."
         ),
         help=(
-            "Admite fragmentos, varias palabras, acentos y pequeños errores. "
-            "Busca en código, material, categoría, centro, edificio, ubicación, "
-            "proveedor y observaciones."
+            "Busca por código, categoría, nombre, características, centro, edificio, "
+            "ubicación, proveedor y observaciones. También encuentra materiales por "
+            "los espacios y OTs donde se utilizaron anteriormente."
         ),
         key="filtro_texto_inventario"
+    )
+
+    st.caption(
+        "💡 Puedes combinar términos: `fluorescente 4A`, `fontanería WC profesores` "
+        "o `iluminación Pearson 22`. El historial de uso también cuenta."
     )
 
     f1, f2 = st.columns(2)
@@ -1094,6 +1100,45 @@ def pantalla_inventario():
                                 st.rerun()
                             else:
                                 st.error(mensaje)
+
+            if puede_borrar_inventario():
+                with st.expander("🗑️ Borrar definitivamente"):
+                    st.warning(
+                        "Úsalo solo para materiales de prueba, duplicados o altas "
+                        "que no deban existir. Se borrará también su historial de "
+                        "movimientos de Inventario. Los pedidos se conservan, pero "
+                        "quedarán desvinculados de este código."
+                    )
+
+                    confirmar_borrado = st.checkbox(
+                        f"Confirmo el borrado definitivo de {codigo}",
+                        key=f"confirmar_borrado_definitivo_{codigo}",
+                    )
+
+                    if confirmar_borrado:
+                        texto_confirmacion = st.text_input(
+                            "Escribe BORRAR para confirmar",
+                            key=f"texto_borrado_definitivo_{codigo}",
+                        )
+
+                        if st.button(
+                            f"🗑️ Borrar {codigo}",
+                            key=f"borrar_definitivo_{codigo}",
+                            use_container_width=True,
+                            type="primary",
+                        ):
+                            if texto_confirmacion.strip().upper() != "BORRAR":
+                                st.error("Escribe BORRAR para confirmar.")
+                            else:
+                                ok_borrar, mensaje_borrar = (
+                                    eliminar_material_inventario(codigo)
+                                )
+
+                                if ok_borrar:
+                                    st.success(mensaje_borrar)
+                                    st.rerun()
+                                else:
+                                    st.error(mensaje_borrar)
 
             with st.expander(f"📊 Historial {codigo}"):
                 mostrar_historial_material(codigo)
