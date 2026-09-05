@@ -11,6 +11,8 @@ from modules.ordenes import (
     obtener_fotos_ot,
     guardar_foto_ot,
     crear_correctiva_desde_ot,
+    obtener_gestion_externa_ot,
+    enviar_a_gestiones_externas,
 )
 
 from modules.inventario import (
@@ -3631,6 +3633,123 @@ def mostrar_tarjeta_ot(
 
                 st.session_state["recalcular_corazon"] = True
                 st.rerun()
+
+        # -------------------------------------------------
+        # GESTIONES EXTERNAS · AVISO A ABEL
+        # -------------------------------------------------
+        if es_operario():
+            gestion_externa = obtener_gestion_externa_ot(id_orden)
+            gestor_externo = str(
+                gestion_externa.get("gestor_externo") or ""
+            ).strip()
+
+            if st.session_state.pop(
+                f"{modo}_gestion_externa_enviada_{id_orden}",
+                False,
+            ):
+                st.success(
+                    "📞 Gestión externa enviada a Abel Vasquez. "
+                    "La OT continúa asignada a su técnico original."
+                )
+
+            titulo_gestion = (
+                "📞 Gestión externa · Abel Vasquez"
+                if gestor_externo
+                else "📞 Enviar a Gestiones externas"
+            )
+
+            with st.expander(titulo_gestion):
+                if gestor_externo:
+                    fecha_gestion = str(
+                        gestion_externa.get(
+                            "fecha_envio_gestion_externa"
+                        ) or ""
+                    ).strip()
+                    motivo_gestion = str(
+                        gestion_externa.get(
+                            "motivo_gestion_externa"
+                        ) or ""
+                    ).strip()
+
+                    st.info(
+                        f"Gestor: {gestor_externo} · "
+                        f"Solicitud: {motivo_gestion or '-'}"
+                        + (
+                            f" · Enviada: {fecha_gestion}"
+                            if fecha_gestion
+                            else ""
+                        )
+                    )
+
+                opciones_gestion = [
+                    "Avisar a empresa externa",
+                    "Pedir presupuesto",
+                    "Otra gestión externa",
+                ]
+
+                motivo_actual = str(
+                    gestion_externa.get(
+                        "motivo_gestion_externa"
+                    ) or ""
+                ).strip()
+
+                indice_gestion = (
+                    opciones_gestion.index(motivo_actual)
+                    if motivo_actual in opciones_gestion
+                    else 0
+                )
+
+                tipo_gestion = st.selectbox(
+                    "Qué necesita gestionar Abel",
+                    opciones_gestion,
+                    index=indice_gestion,
+                    key=f"{modo}_tipo_gestion_externa_{id_orden}",
+                )
+
+                indicacion_gestion = st.text_area(
+                    "Indicación para Abel",
+                    placeholder=(
+                        "Ejemplo: Hay que avisar a la empresa de "
+                        "climatización para revisar la UTA del aula."
+                    ),
+                    key=f"{modo}_indicacion_gestion_externa_{id_orden}",
+                )
+
+                texto_boton_gestion = (
+                    "📞 Actualizar gestión externa"
+                    if gestor_externo
+                    else "📞 Enviar a Abel"
+                )
+
+                if st.button(
+                    texto_boton_gestion,
+                    key=f"{modo}_enviar_gestion_externa_{id_orden}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    if not str(indicacion_gestion or "").strip():
+                        st.warning(
+                            "Indica brevemente qué tiene que gestionar Abel."
+                        )
+                    else:
+                        resultado_gestion = enviar_a_gestiones_externas(
+                            id_orden=id_orden,
+                            tipo_gestion=tipo_gestion,
+                            observacion=indicacion_gestion,
+                            gestor_externo="Abel Vasquez",
+                        )
+
+                        if resultado_gestion.get("ok"):
+                            st.session_state[
+                                f"{modo}_gestion_externa_enviada_{id_orden}"
+                            ] = True
+                            st.session_state["recalcular_corazon"] = True
+                            st.rerun()
+                        else:
+                            st.error(
+                                "No se ha podido enviar la OT a "
+                                "Gestiones externas."
+                            )
 
         st.markdown("### 📝 Estado y observaciones")
 
