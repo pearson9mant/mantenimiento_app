@@ -72,6 +72,11 @@ def asegurar_columnas_observaciones_estado():
         ("coste_final", "REAL DEFAULT 0"),
         ("foto", "TEXT"),
 
+        # GESTIONES EXTERNAS SIN PERDER EL OPERARIO TÉCNICO ORIGINAL
+        ("gestor_externo", "TEXT"),
+        ("fecha_envio_gestion_externa", "TEXT"),
+        ("motivo_gestion_externa", "TEXT"),
+
         # VINCULACIÓN SEGURA DEL CORAZÓN DEL SISTEMA
         ("origen_tabla", "TEXT"),
         ("origen_id", "INTEGER"),
@@ -1137,6 +1142,151 @@ def actualizar_estado(id_orden, nuevo_estado, observaciones_estado=None):
         conn.close()
 
 
+def obtener_gestion_externa_ot(id_orden):
+    """Devuelve la gestión externa vinculada a una OT activa."""
+    asegurar_columnas_observaciones_estado()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT gestor_externo,
+                   fecha_envio_gestion_externa,
+                   motivo_gestion_externa,
+                   estado
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
+
+        fila = cursor.fetchone()
+
+    finally:
+        conn.close()
+
+    if not fila:
+        return {
+            "gestor_externo": "",
+            "fecha_envio_gestion_externa": "",
+            "motivo_gestion_externa": "",
+            "estado": "",
+        }
+
+    return {
+        "gestor_externo": fila[0] or "",
+        "fecha_envio_gestion_externa": fila[1] or "",
+        "motivo_gestion_externa": fila[2] or "",
+        "estado": fila[3] or "",
+    }
+
+
+def enviar_a_gestiones_externas(
+    id_orden,
+    tipo_gestion,
+    observacion="",
+    gestor_externo="Abel Vasquez",
+):
+    """
+    Envía una OT a Gestiones externas sin cambiar su operario técnico.
+
+    - mantiene número de OT, operario, origen y prioridad;
+    - asigna un gestor externo separado del técnico;
+    - deja trazabilidad en observaciones_estado;
+    - usa estados ya existentes en la aplicación.
+    """
+    asegurar_columnas_observaciones_estado()
+
+    tipos_estado = {
+        "Avisar a empresa externa": "Pendiente proveedor",
+        "Pedir presupuesto": "Pendiente presupuesto",
+        "Otra gestión externa": "Pendiente proveedor",
+    }
+
+    tipo_gestion = str(tipo_gestion or "").strip()
+    observacion = str(observacion or "").strip()
+    gestor_externo = str(gestor_externo or "Abel Vasquez").strip()
+
+    if tipo_gestion not in tipos_estado:
+        return {
+            "ok": False,
+            "motivo": "tipo_gestion_no_valido",
+        }
+
+    nuevo_estado = tipos_estado[tipo_gestion]
+    fecha_envio = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_sql("""
+            SELECT numero_ot, operario, observaciones_estado
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
+
+        orden = cursor.fetchone()
+
+        if not orden:
+            return {
+                "ok": False,
+                "motivo": "orden_no_encontrada",
+            }
+
+        numero_ot, operario, observaciones_previas = orden
+
+        nota = (
+            f"Gestión externa enviada a {gestor_externo} el {fecha_envio}. "
+            f"Solicitud: {tipo_gestion}."
+        )
+
+        if observacion:
+            nota += f" Indicación: {observacion}"
+
+        observaciones_previas = str(observaciones_previas or "").strip()
+        observaciones_nuevas = (
+            f"{observaciones_previas}\n{nota}"
+            if observaciones_previas
+            else nota
+        )
+
+        cursor.execute(_sql("""
+            UPDATE ordenes_trabajo
+            SET gestor_externo = ?,
+                fecha_envio_gestion_externa = ?,
+                motivo_gestion_externa = ?,
+                estado = ?,
+                observaciones_estado = ?
+            WHERE id = ?
+        """), (
+            gestor_externo,
+            fecha_envio,
+            tipo_gestion,
+            nuevo_estado,
+            observaciones_nuevas,
+            id_orden,
+        ))
+
+        conn.commit()
+
+        return {
+            "ok": True,
+            "id_orden": id_orden,
+            "numero_ot": numero_ot,
+            "operario": operario,
+            "gestor_externo": gestor_externo,
+            "estado": nuevo_estado,
+            "fecha_envio": fecha_envio,
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
 def actualizar_observaciones_estado(id_orden, observaciones_estado):
     asegurar_columnas_observaciones_estado()
 
@@ -1224,6 +1374,7 @@ def finalizar_orden(id_orden, observaciones=""):
                    trabajo_a_realizar, trabajo_realizado, firma_operario,
                    fecha_firma_operario, coste_estimado, coste_final,
                    observaciones_estado,
+                   gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
                    origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
                    id_preventivo, id_incidencia,
                    planta
@@ -1249,6 +1400,7 @@ def finalizar_orden(id_orden, observaciones=""):
             trabajo_a_realizar, trabajo_realizado, firma_operario,
             fecha_firma_operario, coste_estimado, coste_final,
             observaciones_estado,
+            gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
             origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
             id_preventivo, id_incidencia,
             planta
@@ -1294,10 +1446,11 @@ def finalizar_orden(id_orden, observaciones=""):
                 fecha_aviso_empresa, fecha_realizacion, trabajo_a_realizar,
                 trabajo_realizado, firma_operario, fecha_firma_operario,
                 coste_estimado, coste_final, observaciones_estado,
+                gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
                 origen_tabla, origen_id, id_punto_legionella,
                 id_tarea_legionella, id_preventivo, id_incidencia, planta
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot, descripcion, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
@@ -1307,6 +1460,7 @@ def finalizar_orden(id_orden, observaciones=""):
             fecha_aviso_empresa, fecha_realizacion, trabajo_a_realizar,
             trabajo_realizado, firma_operario, fecha_firma_operario,
             coste_estimado, coste_final, observaciones_estado,
+            gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
             origen_tabla, origen_id, id_punto_legionella,
             id_tarea_legionella, id_preventivo, id_incidencia, planta
         ))
