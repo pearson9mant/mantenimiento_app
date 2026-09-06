@@ -491,9 +491,10 @@ def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
         configuracion_espacio["tipo_espacio"] = tipo_espacio
         configuracion_espacio["marcas_corte"] = False
 
-        # Misma composición validada para la placa individual 90 x 120 mm.
-        configuracion_espacio["tamano_qr_individual"] = 38
-        configuracion_espacio["posicion_qr_y_individual"] = 33
+        # Composición específica para A4 de 4 etiquetas (105 x 148,5 mm).
+        # Aprovecha el mayor espacio disponible sin afectar a otros formatos.
+        configuracion_espacio["tamano_qr_individual"] = 58
+        configuracion_espacio["posicion_qr_y_individual"] = 31
 
         dibujar_pegatina_espacio(
             pdf,
