@@ -284,19 +284,17 @@ def pantalla_inventario():
 
     operario = st.session_state.get("operario_activo", "")
 
-    if operario == "Abel Vasquez":
-
-        tab_crear_material, tab_crear_pedido = st.tabs([
-            "➕ Crear material",
-            "📦 Crear pedido"
-        ])
+    if operario == "J.A. Almeda":
 
         abrir_crear_material = st.session_state.pop(
             "inventario_abrir_crear_material",
             False
         )
 
-        with tab_crear_material:
+        with st.expander(
+            "➕ Crear material",
+            expanded=abrir_crear_material
+        ):
 
             if st.session_state.pop("inventario_material_creado_ok", False):
                 st.success("Material creado correctamente. Formulario limpio para crear otro.")
@@ -339,7 +337,7 @@ def pantalla_inventario():
                 CATEGORIAS_INVENTARIO_UI,
                 index=CATEGORIAS_INVENTARIO_UI.index(categoria_actual),
                 key="crear_categoria_material",
-                help="La app propone una categoría, pero Abel siempre puede corregirla.",
+                help="La app propone una categoría, pero puedes corregirla manualmente.",
             )
 
             if material.strip():
@@ -509,86 +507,6 @@ def pantalla_inventario():
                         st.rerun()
                     else:
                         st.error(mensaje)
-
-        with tab_crear_pedido:
-
-            st.subheader("📦 Crear pedido de material")
-
-            if st.session_state.pop("abel_pedido_creado_ok", False):
-                st.success("Pedido creado correctamente. Formulario limpio para crear otro.")
-
-            operario_destino = st.selectbox(
-                "Pedido para",
-                ["J.A. Almeda", "Luis Lozano", "Abel Vasquez", "Otro"],
-                key="abel_pedido_operario"
-            )
-
-            centro_pedido = st.selectbox(
-                "Centro",
-                CENTROS,
-                key="abel_pedido_centro"
-            )
-
-            material_pedido = st.text_input(
-                "Material solicitado",
-                key="abel_pedido_material"
-            )
-
-            cantidad_pedido = st.number_input(
-                "Cantidad",
-                min_value=1,
-                step=1,
-                key="abel_pedido_cantidad"
-            )
-
-            prioridad_pedido = st.selectbox(
-                "Prioridad",
-                ["Baja", "Media", "Alta", "Urgente"],
-                index=1,
-                key="abel_pedido_prioridad"
-            )
-
-            estado_pedido = st.selectbox(
-                "Estado inicial",
-                ["Pendiente", "Preparado", "Sin stock"],
-                key="abel_pedido_estado"
-            )
-
-            observaciones_pedido = st.text_area(
-                "Observaciones",
-                placeholder="Ejemplo: pedido recibido por teléfono",
-                key="abel_pedido_observaciones"
-            )
-
-            if st.button("💾 Crear pedido", use_container_width=True, key="abel_btn_crear_pedido"):
-
-                if not material_pedido.strip():
-                    st.warning("Indica el material solicitado.")
-
-                else:
-                    try:
-                        crear_pedido_material(
-                            operario=operario_destino,
-                            centro=centro_pedido,
-                            material=material_pedido,
-                            cantidad=cantidad_pedido,
-                            prioridad=prioridad_pedido,
-                            estado=estado_pedido,
-                            observaciones=observaciones_pedido,
-                            creado_por="Abel Vasquez"
-                        )
-                    except TypeError:
-                        crear_pedido_material(
-                            operario=operario_destino,
-                            centro=centro_pedido,
-                            material=material_pedido,
-                            cantidad=cantidad_pedido,
-                            prioridad=prioridad_pedido,
-                            observaciones=f"{observaciones_pedido} | Estado inicial: {estado_pedido} | Creado por: Abel Vasquez"
-                        )
-
-                    limpiar_formulario_pedido_abel()
-                    st.rerun()
 
     st.markdown("### 🔎 Buscar material")
 
