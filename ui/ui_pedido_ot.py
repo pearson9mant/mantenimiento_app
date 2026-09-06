@@ -9,6 +9,9 @@ from modules.pedidos_material import (
     crear_pedido_material_multiple,
     obtener_numero_pedido,
     guardar_fotos_pedido_material,
+    obtener_lineas_pedido,
+    obtener_datos_recepcion_linea,
+    registrar_recepcion_linea_pedido,
 )
 from modules.pedidos_ot import (
     vincular_pedido_a_ot,
@@ -468,7 +471,7 @@ def mostrar_pedido_material_desde_ot(
         )
 
         for (
-            _id_pedido,
+            id_pedido,
             numero_pedido,
             estado,
             fecha,
@@ -479,6 +482,121 @@ def mostrar_pedido_material_desde_ot(
                 f"{estado or '-'} · "
                 f"{fecha or '-'}"
             )
+
+            try:
+                lineas_pedido = obtener_lineas_pedido(
+                    id_pedido
+                )
+            except Exception:
+                lineas_pedido = []
+
+            for linea_pedido in lineas_pedido:
+                id_linea = linea_pedido[0]
+
+                try:
+                    datos_recepcion = obtener_datos_recepcion_linea(
+                        id_linea
+                    )
+                except Exception:
+                    datos_recepcion = None
+
+                if not datos_recepcion:
+                    continue
+
+                material_pedido = str(
+                    datos_recepcion.get("material") or "Material"
+                ).strip()
+                cantidad_pedida = float(
+                    datos_recepcion.get("cantidad") or 0
+                )
+                cantidad_recibida = float(
+                    datos_recepcion.get("cantidad_recibida") or 0
+                )
+                pendiente = max(
+                    cantidad_pedida - cantidad_recibida,
+                    0,
+                )
+                es_compra = bool(
+                    int(datos_recepcion.get("es_compra") or 0)
+                )
+
+                if es_compra:
+                    st.markdown(
+                        f"**{material_pedido}** · "
+                        f"Pedidas: {cantidad_pedida:g} · "
+                        f"Recibidas: {cantidad_recibida:g} · "
+                        f"Pendientes: {pendiente:g}"
+                    )
+
+                    if pendiente > 0:
+                        cantidad_a_recibir = st.number_input(
+                            "Cantidad recibida ahora",
+                            min_value=0.0,
+                            max_value=float(pendiente),
+                            value=float(pendiente),
+                            step=1.0,
+                            key=(
+                                f"{base}_recibir_cantidad_"
+                                f"{id_linea}"
+                            ),
+                        )
+
+                        precio_actual = float(
+                            datos_recepcion.get("precio_unitario") or 0
+                        )
+                        precio_recepcion = st.number_input(
+                            "Precio unitario (€) · opcional",
+                            min_value=0.0,
+                            step=0.01,
+                            value=precio_actual,
+                            key=(
+                                f"{base}_recibir_precio_"
+                                f"{id_linea}"
+                            ),
+                        )
+
+                        if st.button(
+                            "📦 Registrar recepción",
+                            key=(
+                                f"{base}_registrar_recepcion_"
+                                f"{id_linea}"
+                            ),
+                            use_container_width=True,
+                            disabled=float(cantidad_a_recibir) <= 0,
+                        ):
+                            ok_recepcion, mensaje_recepcion = (
+                                registrar_recepcion_linea_pedido(
+                                    id_linea=id_linea,
+                                    cantidad_recibida=cantidad_a_recibir,
+                                    precio_unitario=(
+                                        precio_recepcion
+                                        if float(precio_recepcion) > 0
+                                        else None
+                                    ),
+                                )
+                            )
+
+                            if ok_recepcion:
+                                st.session_state[
+                                    f"{base}_recepcion_ok"
+                                ] = mensaje_recepcion
+                                st.rerun()
+                            else:
+                                st.error(mensaje_recepcion)
+                else:
+                    st.caption(
+                        f"↳ {material_pedido} · "
+                        f"Cantidad: {cantidad_pedida:g} · "
+                        f"Estado: {datos_recepcion.get('estado') or '-'}"
+                    )
+
+        mensaje_recepcion_ok = st.session_state.pop(
+            f"{base}_recepcion_ok",
+            "",
+        )
+
+        if mensaje_recepcion_ok:
+            st.success(mensaje_recepcion_ok)
 
     clave_abrir = f"{base}_abierto"
 
