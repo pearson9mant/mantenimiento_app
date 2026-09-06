@@ -284,7 +284,7 @@ def pantalla_inventario():
 
     operario = st.session_state.get("operario_activo", "")
 
-    if operario == "J.A. Almeda":
+    if puede_borrar_inventario():
 
         abrir_crear_material = st.session_state.pop(
             "inventario_abrir_crear_material",
