@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from database.db import conectar, _sql, _add_column
 from modules.areas import sugerir_area_ot
 
@@ -1349,6 +1349,87 @@ def finalizar_trabajo_externo(
 # FINALIZAR
 # =====================================================
 
+def _actualizar_planificacion_preventiva_al_finalizar(
+    cursor,
+    id_preventivo,
+    fecha_realizacion,
+):
+    """
+    Al cerrar una OT preventiva, recalcula su siguiente vencimiento
+    desde la fecha real de ejecución, no desde la fecha programada.
+    """
+    if not id_preventivo:
+        return False
+
+    cursor.execute(_sql("""
+        SELECT frecuencia
+        FROM preventivo_tareas
+        WHERE id = ?
+        LIMIT 1
+    """), (
+        int(id_preventivo),
+    ))
+
+    fila = cursor.fetchone()
+
+    if not fila:
+        return False
+
+    frecuencia = str(
+        fila[0] or ""
+    ).strip().lower()
+
+    equivalencias = {
+        "semanal": 7,
+        "mensual": 30,
+        "trimestral": 90,
+        "semestral": 180,
+        "anual": 365,
+    }
+
+    try:
+        dias = int(
+            float(
+                frecuencia.replace(",", ".")
+            )
+        )
+    except (TypeError, ValueError):
+        dias = 30
+
+        for nombre, dias_equivalentes in equivalencias.items():
+            if nombre in frecuencia:
+                dias = dias_equivalentes
+                break
+
+    dias = max(
+        1,
+        int(dias),
+    )
+
+    fecha_base = datetime.strptime(
+        str(fecha_realizacion)[:10],
+        "%Y-%m-%d",
+    ).date()
+
+    proxima_fecha = (
+        fecha_base
+        + timedelta(days=dias)
+    ).strftime("%Y-%m-%d")
+
+    cursor.execute(_sql("""
+        UPDATE preventivo_tareas
+        SET ultima_fecha = ?,
+            proxima_fecha = ?
+        WHERE id = ?
+    """), (
+        fecha_base.strftime("%Y-%m-%d"),
+        proxima_fecha,
+        int(id_preventivo),
+    ))
+
+    return True
+
+
 def finalizar_orden(id_orden, observaciones=""):
     """
     Finaliza una OT de forma transaccional y segura.
@@ -1464,6 +1545,21 @@ def finalizar_orden(id_orden, observaciones=""):
             origen_tabla, origen_id, id_punto_legionella,
             id_tarea_legionella, id_preventivo, id_incidencia, planta
         ))
+
+        id_preventivo_real = id_preventivo
+
+        if (
+            not id_preventivo_real
+            and str(origen_tabla or "").strip() == "preventivo_tareas"
+        ):
+            id_preventivo_real = origen_id
+
+        if id_preventivo_real:
+            _actualizar_planificacion_preventiva_al_finalizar(
+                cursor=cursor,
+                id_preventivo=id_preventivo_real,
+                fecha_realizacion=datetime.now().strftime("%Y-%m-%d"),
+            )
 
         cursor.execute(
             _sql("DELETE FROM ordenes_trabajo WHERE id = ?"),
