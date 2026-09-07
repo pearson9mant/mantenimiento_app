@@ -1014,9 +1014,9 @@ def generar_ots_preventivo_si_toca():
     - Vincula estructuralmente la OT con preventivo_tareas.
     - Guarda la información preventiva en observaciones_estado,
       no en solicitante.
-    - Si la planificación lleva retraso, genera una sola OT y
-      avanza la próxima fecha hasta el siguiente vencimiento futuro,
-      manteniendo el calendario anclado.
+    - Si la planificación lleva retraso, genera una sola OT.
+    - La próxima fecha NO avanza al crear la OT: se recalcula
+      al finalizarla desde la fecha real de ejecución.
     """
     asegurar_estructura_preventivo()
 
@@ -1323,29 +1323,10 @@ Fecha límite: {fecha_limite or '-'}
                 operario
             ))
 
-            # Mantener el calendario anclado, pero sin crear
-            # una cascada de OT atrasadas una detrás de otra.
-            nueva_proxima = sumar_frecuencia(
-                fecha_programada,
-                frecuencia
-            )
-
-            while nueva_proxima <= hoy:
-                nueva_proxima = sumar_frecuencia(
-                    nueva_proxima,
-                    frecuencia
-                )
-
-            cursor.execute(_sql("""
-                UPDATE preventivo_tareas
-                SET ultima_fecha = ?,
-                    proxima_fecha = ?
-                WHERE id = ?
-            """), (
-                hoy,
-                nueva_proxima,
-                tarea_id
-            ))
+            # La planificación no avanza al crear la OT.
+            # Mientras siga abierta, existe_ot_preventiva_abierta()
+            # evita duplicados. Al finalizarla se recalcula la próxima
+            # fecha desde la ejecución real.
 
             generadas += 1
 
