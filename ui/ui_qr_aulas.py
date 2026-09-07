@@ -496,12 +496,18 @@ def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
         configuracion_espacio["tamano_qr_individual"] = 54
         configuracion_espacio["posicion_qr_y_individual"] = 32
 
+        # Zona segura de impresión dentro de cada precorte.
+        # La etiqueta sigue midiendo 105 x 148,5 mm, pero todo el diseño
+        # queda ligeramente recogido para evitar los márgenes no imprimibles.
+        margen_seguro_x = 2 * mm
+        margen_seguro_y = 3 * mm
+
         dibujar_pegatina_espacio(
             pdf,
-            x,
-            y,
-            ancho_pegatina,
-            alto_pegatina,
+            x + margen_seguro_x,
+            y + margen_seguro_y,
+            ancho_pegatina - (2 * margen_seguro_x),
+            alto_pegatina - (2 * margen_seguro_y),
             codigo,
             centro,
             edificio,
