@@ -493,8 +493,8 @@ def generar_pdf_a4_cuatro_pegatinas(aulas, configuracion):
 
         # Composición específica para A4 de 4 etiquetas (105 x 148,5 mm).
         # Aprovecha el mayor espacio disponible sin afectar a otros formatos.
-        configuracion_espacio["tamano_qr_individual"] = 58
-        configuracion_espacio["posicion_qr_y_individual"] = 31
+        configuracion_espacio["tamano_qr_individual"] = 54
+        configuracion_espacio["posicion_qr_y_individual"] = 32
 
         dibujar_pegatina_espacio(
             pdf,
