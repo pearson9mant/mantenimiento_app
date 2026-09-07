@@ -2080,76 +2080,19 @@ def registrar_control(
                     or dias_frecuencia(tarea)
                 )
 
-                generar_ot_plan = int(
-                    df_plan.iloc[0].get("generar_ot", 1)
-                    or 0
+                # La próxima fecha se calcula siempre desde la fecha real
+                # en la que se ha ejecutado el control.
+                # Así, si una OT planificada se realiza antes o después
+                # de la fecha prevista, la siguiente frecuencia parte
+                # de la ejecución real y no del calendario anterior.
+                proxima = ajustar_proxima_fecha_legionella(
+                    fecha_registro,
+                    frecuencia
                 )
 
-                proxima_actual = str(
-                    df_plan.iloc[0].get("proxima_fecha")
-                    or ""
-                ).strip()
-
-                if generar_ot_plan == 1:
-                    # La generación de la OT ya avanza la fecha
-                    # desde la fecha MAESTRA planificada.
-                    # Al registrar el control no la desplazamos
-                    # a la fecha real de ejecución.
-                    proxima_txt = proxima_actual
-
-                    # Respaldo: si por cualquier motivo todavía
-                    # no hubiera quedado una fecha futura, la avanzamos
-                    # desde la fecha planificada existente.
-                    if (
-                        not proxima_txt
-                        or pd.to_datetime(
-                            proxima_txt,
-                            errors="coerce"
-                        ) <= pd.to_datetime(
-                            fecha_registro,
-                            errors="coerce"
-                        )
-                    ):
-                        base = (
-                            proxima_txt
-                            if proxima_txt
-                            else fecha_registro
-                        )
-
-                        proxima = ajustar_proxima_fecha_legionella(
-                            base,
-                            frecuencia
-                        )
-
-                        fecha_registro_dt = pd.to_datetime(
-                            fecha_registro,
-                            errors="coerce"
-                        )
-
-                        while (
-                            pd.notna(fecha_registro_dt)
-                            and proxima <= fecha_registro_dt
-                        ):
-                            proxima = ajustar_proxima_fecha_legionella(
-                                proxima,
-                                frecuencia
-                            )
-
-                        proxima_txt = proxima.strftime(
-                            "%Y-%m-%d"
-                        )
-
-                else:
-                    # Controles manuales (por ejemplo Control sala ACS)
-                    # sí avanzan desde la fecha real registrada.
-                    proxima = ajustar_proxima_fecha_legionella(
-                        fecha_registro,
-                        frecuencia
-                    )
-
-                    proxima_txt = proxima.strftime(
-                        "%Y-%m-%d"
-                    )
+                proxima_txt = proxima.strftime(
+                    "%Y-%m-%d"
+                )
 
                 ejecutar("""
                     UPDATE legionella_tareas
