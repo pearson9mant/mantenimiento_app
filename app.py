@@ -460,10 +460,10 @@ def pintar_barra_operario_compacta():
         unsafe_allow_html=True,
     )
 
-    col_usuario, col_salir = st.columns(
+    col_usuario, col_acciones = st.columns(
         [8.7, 1.3],
         gap="small",
-        vertical_alignment="center",
+        vertical_alignment="top",
     )
 
     with col_usuario:
@@ -476,13 +476,21 @@ def pintar_barra_operario_compacta():
             unsafe_allow_html=True,
         )
 
-    with col_salir:
+    with col_acciones:
         st.button(
             "⏻ Salir",
             key="barra_operario_salir",
             use_container_width=True,
             on_click=_accion_salir_operario,
         )
+
+        if st.button(
+            "📦 Material",
+            key="barra_operario_material",
+            use_container_width=True,
+        ):
+            st.session_state["seccion_actual"] = "Pedidos material"
+            st.rerun()
 
 
 def pintar_footer():
