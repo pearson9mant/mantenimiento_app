@@ -2159,6 +2159,42 @@ def cambiar_estado_pedido(
     )
 
 
+
+def archivar_pedido_material(
+    id_pedido,
+):
+    """
+    Quita un pedido antiguo de Pendientes sin tocar OT,
+    Inventario, líneas ni recepciones.
+    """
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE pedidos_material
+            SET estado = 'Archivado'
+            WHERE id = ?
+        """), (
+            id_pedido,
+        ))
+
+        conn.commit()
+        return True, "Pedido archivado."
+
+    except Exception as e:
+        conn.rollback()
+        return False, (
+            "No se pudo archivar el pedido: "
+            f"{e}"
+        )
+
+    finally:
+        conn.close()
+
+
 def borrar_pedido_material(
     id_pedido,
 ):
