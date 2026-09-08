@@ -1255,6 +1255,42 @@ def cambiar_estado_linea_pedido(
         else ""
     )
 
+    # Una compra solo puede quedar Entregada mediante la recepción física
+    # registrada por el operario. Evita que Abel o un flujo genérico salten
+    # la entrada real de stock en Inventario.
+    if (
+        nuevo_estado == "Entregado"
+        and int(es_compra or 0)
+    ):
+        datos_recepcion = obtener_datos_recepcion_linea(
+            id_linea
+        )
+
+        cantidad_pedida = float(
+            (datos_recepcion or {}).get(
+                "cantidad",
+                0,
+            )
+            or 0
+        )
+        cantidad_recibida = float(
+            (datos_recepcion or {}).get(
+                "cantidad_recibida",
+                0,
+            )
+            or 0
+        )
+
+        if cantidad_recibida < cantidad_pedida:
+            return (
+                False,
+                (
+                    "Las compras no se marcan como Entregado manualmente. "
+                    "El operario debe registrar la recepción física para "
+                    "que el stock entre en Inventario."
+                ),
+            )
+
     # Descuento físico solo una vez y solo al entregar.
     if (
         nuevo_estado == "Entregado"
@@ -1786,6 +1822,47 @@ def cambiar_estado_pedido(
             id_pedido
         )
 
+        # No permitir que un cambio general a Entregado sustituya la
+        # recepción física de las líneas compradas.
+        for linea in lineas:
+            datos_recepcion = obtener_datos_recepcion_linea(
+                linea[0]
+            )
+
+            if not int(
+                (datos_recepcion or {}).get(
+                    "es_compra",
+                    0,
+                )
+                or 0
+            ):
+                continue
+
+            cantidad_pedida = float(
+                (datos_recepcion or {}).get(
+                    "cantidad",
+                    0,
+                )
+                or 0
+            )
+            cantidad_recibida = float(
+                (datos_recepcion or {}).get(
+                    "cantidad_recibida",
+                    0,
+                )
+                or 0
+            )
+
+            if cantidad_recibida < cantidad_pedida:
+                return (
+                    False,
+                    (
+                        "El pedido contiene compras pendientes de recepción. "
+                        "El operario debe registrar primero lo recibido para "
+                        "que entre en Inventario."
+                    ),
+                )
+
         # Precomprobación de stock para evitar entregas parciales
         # por falta de existencias.
         necesidades = {}
@@ -1802,9 +1879,23 @@ def cambiar_estado_pedido(
                 else 0
             )
 
+            datos_recepcion = obtener_datos_recepcion_linea(
+                linea[0]
+            )
+            es_compra_linea = bool(
+                int(
+                    (datos_recepcion or {}).get(
+                        "es_compra",
+                        0,
+                    )
+                    or 0
+                )
+            )
+
             if (
                 codigo
                 and not descontado
+                and not es_compra_linea
             ):
                 necesidades[codigo] = (
                     necesidades.get(
