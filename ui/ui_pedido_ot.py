@@ -12,6 +12,7 @@ from modules.pedidos_material import (
     obtener_lineas_pedido,
     obtener_datos_recepcion_linea,
     registrar_recepcion_linea_pedido,
+    anular_recepcion_linea_pedido,
 )
 from modules.pedidos_ot import (
     vincular_pedido_a_ot,
@@ -527,6 +528,52 @@ def mostrar_pedido_material_desde_ot(
                         f"Recibidas: {cantidad_recibida:g} · "
                         f"Pendientes: {pendiente:g}"
                     )
+
+                    if cantidad_recibida > 0:
+                        with st.expander(
+                            "↩️ Anular recepción registrada"
+                        ):
+                            st.caption(
+                                "Úsalo solo si registraste una recepción "
+                                "por error. Se descontará esa cantidad "
+                                "del Inventario y volverá a quedar pendiente."
+                            )
+
+                            cantidad_a_anular = st.number_input(
+                                "Cantidad a anular",
+                                min_value=0.0,
+                                max_value=float(cantidad_recibida),
+                                value=float(cantidad_recibida),
+                                step=1.0,
+                                key=(
+                                    f"{base}_anular_cantidad_"
+                                    f"{id_linea}"
+                                ),
+                            )
+
+                            if st.button(
+                                "↩️ Confirmar anulación",
+                                key=(
+                                    f"{base}_anular_recepcion_"
+                                    f"{id_linea}"
+                                ),
+                                use_container_width=True,
+                                disabled=float(cantidad_a_anular) <= 0,
+                            ):
+                                ok_anular, mensaje_anular = (
+                                    anular_recepcion_linea_pedido(
+                                        id_linea=id_linea,
+                                        cantidad_anular=cantidad_a_anular,
+                                    )
+                                )
+
+                                if ok_anular:
+                                    st.session_state[
+                                        f"{base}_recepcion_ok"
+                                    ] = mensaje_anular
+                                    st.rerun()
+                                else:
+                                    st.error(mensaje_anular)
 
                     if pendiente > 0:
                         cantidad_a_recibir = st.number_input(
