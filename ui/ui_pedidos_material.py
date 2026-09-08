@@ -1,7 +1,5 @@
 import re
 import unicodedata
-from urllib.parse import quote
-
 import streamlit as st
 
 from config import CENTROS
@@ -12,14 +10,7 @@ from modules.pedidos_material import (
     obtener_lineas_pedido,
     obtener_datos_recepcion_linea,
     registrar_recepcion_linea_pedido,
-    cambiar_estado_pedido,
-    cambiar_estado_linea_pedido,
     guardar_fotos_pedido_material,
-    borrar_pedido_material,
-    obtener_gestion_pedido_material,
-    actualizar_gestion_pedido_material,
-    ESTADOS_PEDIDO,
-    ESTADOS_GESTION_COMPRA,
 )
 
 from modules.ordenes import obtener_fotos_ot
@@ -678,6 +669,49 @@ def mostrar_lineas_pedido(
                 )
 
             if (
+                modo_abel
+                and es_compra
+                and datos_recepcion
+            ):
+                cantidad_pedida = float(
+                    datos_recepcion.get(
+                        "cantidad",
+                        0,
+                    )
+                    or 0
+                )
+                cantidad_recibida = float(
+                    datos_recepcion.get(
+                        "cantidad_recibida",
+                        0,
+                    )
+                    or 0
+                )
+                pendiente = max(
+                    cantidad_pedida - cantidad_recibida,
+                    0,
+                )
+                precio_guardado = float(
+                    datos_recepcion.get(
+                        "precio_unitario",
+                        0,
+                    )
+                    or 0
+                )
+
+                st.caption(
+                    f"📦 Recibido por el operario: "
+                    f"{cantidad_recibida:g} de {cantidad_pedida:g} · "
+                    f"Pendiente: {pendiente:g}"
+                )
+
+                if precio_guardado > 0:
+                    st.caption(
+                        f"💶 Precio unitario: "
+                        f"{precio_guardado:.2f} €"
+                    )
+
+            if (
                 not modo_abel
                 and es_compra
                 and datos_recepcion
@@ -803,78 +837,7 @@ def mostrar_lineas_pedido(
                         "✅ Material recibido completamente."
                     )
 
-            if modo_abel:
-                estados_linea_disponibles = (
-                    [
-                        estado_opcion
-                        for estado_opcion in ESTADOS_PEDIDO
-                        if estado_opcion != "Entregado"
-                    ]
-                    if es_compra
-                    else ESTADOS_PEDIDO
-                )
 
-                if es_compra:
-                    st.caption(
-                        "📦 La recepción física de una compra la registra "
-                        "el operario; Abel no puede marcarla como Entregado."
-                    )
-
-                nuevo_estado_linea = st.selectbox(
-                    "Estado línea",
-                    estados_linea_disponibles,
-                    index=(
-                        estados_linea_disponibles.index(
-                            estado
-                        )
-                        if estado in estados_linea_disponibles
-                        else 0
-                    ),
-                    key=(
-                        f"estado_linea_pedido_"
-                        f"{id_linea}"
-                    ),
-                )
-
-                if st.button(
-                    "💾 Guardar línea",
-                    key=(
-                        f"guardar_linea_pedido_"
-                        f"{id_linea}"
-                    ),
-                    use_container_width=True,
-                ):
-                    resultado = (
-                        cambiar_estado_linea_pedido(
-                            id_linea,
-                            nuevo_estado_linea,
-                        )
-                    )
-
-                    if isinstance(
-                        resultado,
-                        tuple,
-                    ):
-                        ok, mensaje = resultado
-                    else:
-                        ok = bool(
-                            resultado
-                        )
-                        mensaje = (
-                            "Línea actualizada."
-                            if ok
-                            else "No se pudo actualizar."
-                        )
-
-                    if ok:
-                        st.success(
-                            mensaje
-                        )
-                        st.rerun()
-                    else:
-                        st.error(
-                            mensaje
-                        )
 
 
 def ui_pedidos_material():
@@ -1636,109 +1599,15 @@ def ui_pedidos_operario(
             )
 
 
-def _mensaje_noemi_pedido(
-    numero_pedido,
-    operario,
-    centro,
-    prioridad,
-    observaciones,
-    id_pedido,
-):
-    lineas = obtener_lineas_pedido(
-        id_pedido
-    )
-
-    detalle = []
-
-    total_estimado = 0.0
-    hay_precio = False
-
-    for linea in lineas:
-        material = str(
-            linea[3]
-            or "Material"
-        ).strip()
-        cantidad = float(
-            linea[4]
-            or 0
-        )
-
-        datos_linea = None
-
-        try:
-            datos_linea = obtener_datos_recepcion_linea(
-                linea[0]
-            )
-        except Exception:
-            datos_linea = None
-
-        precio = float(
-            (datos_linea or {}).get(
-                "precio_unitario",
-                0,
-            )
-            or 0
-        )
-
-        texto = (
-            f"- {material} · {cantidad:g} ud."
-        )
-
-        if precio > 0:
-            subtotal = cantidad * precio
-            total_estimado += subtotal
-            hay_precio = True
-            texto += (
-                f" · {precio:.2f} €/ud."
-                f" · {subtotal:.2f} €"
-            )
-
-        detalle.append(
-            texto
-        )
-
-    partes = [
-        "Solicitud de compra de mantenimiento",
-        f"Pedido: {numero_pedido}",
-        f"Solicita: {operario}",
-        f"Centro: {centro}",
-        f"Prioridad: {prioridad}",
-        "",
-        "Material solicitado:",
-        *detalle,
-    ]
-
-    if hay_precio:
-        partes.extend([
-            "",
-            f"Importe estimado: {total_estimado:.2f} €",
-        ])
-
-    if observaciones:
-        partes.extend([
-            "",
-            f"Motivo / observaciones: {observaciones}",
-        ])
-
-    partes.extend([
-        "",
-        "¿Das el OK para realizar la compra?",
-    ])
-
-    return "\n".join(
-        partes
-    )
-
-
 def ui_pedidos_abel():
     st.subheader(
-        "📦 Gestión de pedidos"
+        "📥 Solicitudes de material"
     )
 
     st.caption(
-        "Revisa las solicitudes de mantenimiento, envíalas a Noemí "
-        "para aprobación y gestiona la compra. La recepción física "
-        "la registran los operarios."
+        "Aquí ves los materiales solicitados por los operarios. "
+        "No tienes que marcar estados ni gestionar aprobaciones en la app. "
+        "La recepción física la registra el operario desde su OT."
     )
 
     catalogo = _catalogo_inventario()
@@ -1747,16 +1616,12 @@ def ui_pedidos_abel():
     )
 
     filtro = st.selectbox(
-        "Filtro",
+        "Mostrar",
         [
-            "Pendientes de gestión",
+            "Pendientes",
             "Todos",
         ],
         key="filtro_pedidos_abel",
-    )
-
-    solo_pendientes = (
-        filtro == "Pendientes de gestión"
     )
 
     pedidos = obtener_pedidos_material(
@@ -1765,52 +1630,26 @@ def ui_pedidos_abel():
         limite=300,
     )
 
-    if solo_pendientes:
-        pedidos_filtrados = []
-
-        for p in pedidos:
-            datos_pedido = leer_pedido(
-                p
-            )
-
-            estado_real = str(
-                datos_pedido.get(
+    if filtro == "Pendientes":
+        pedidos = [
+            p
+            for p in pedidos
+            if str(
+                leer_pedido(p).get(
                     "estado",
                     "",
                 )
                 or ""
             ).strip()
-
-            if estado_real in [
+            not in [
                 "Entregado",
                 "Cancelado",
-            ]:
-                continue
-
-            gestion = obtener_gestion_pedido_material(
-                p[0]
-            )
-
-            estado_gestion = (
-                (gestion or {}).get(
-                    "estado_gestion",
-                    "Pendiente de enviar a Noemí",
-                )
-            )
-
-            if estado_gestion not in [
-                "Pagado",
-                "Cancelado",
-            ]:
-                pedidos_filtrados.append(
-                    p
-                )
-
-        pedidos = pedidos_filtrados
+            ]
+        ]
 
     if not pedidos:
         st.info(
-            "No hay pedidos de material."
+            "No hay solicitudes de material."
         )
         return
 
@@ -1838,33 +1677,10 @@ def ui_pedidos_abel():
             "observaciones"
         ]
 
-        gestion = obtener_gestion_pedido_material(
-            id_pedido
-        ) or {}
-
-        estado_gestion = gestion.get(
-            "estado_gestion",
-            "Pendiente de enviar a Noemí",
-        )
-
-        iconos_gestion = {
-            "Pendiente de enviar a Noemí": "🟡",
-            "Pendiente de aprobación": "📤",
-            "Aprobado": "✅",
-            "Pedido": "🛒",
-            "Pagado": "💳",
-            "Cancelado": "⚫",
-        }
-
-        icono = iconos_gestion.get(
-            estado_gestion,
-            "⚪",
-        )
-
         titulo = (
-            f"{icono} {numero_pedido} · "
+            f"📦 {numero_pedido} · "
             f"{material or 'Pedido material'} · "
-            f"{operario} · {estado_gestion}"
+            f"{operario}"
         )
 
         with st.expander(
@@ -1877,7 +1693,7 @@ def ui_pedidos_abel():
                     f"**Fecha:** {fecha}"
                 )
                 st.write(
-                    f"**Operario:** {operario}"
+                    f"**Solicita:** {operario}"
                 )
                 st.write(
                     f"**Centro:** {centro}"
@@ -1888,28 +1704,12 @@ def ui_pedidos_abel():
                     f"**Prioridad:** {prioridad}"
                 )
                 st.write(
-                    f"**Gestión:** {estado_gestion}"
+                    f"**Situación del pedido:** {estado}"
                 )
-
-                if gestion.get(
-                    "fecha_envio_noemi"
-                ):
-                    st.caption(
-                        "📤 Enviado a Noemí: "
-                        f"{gestion['fecha_envio_noemi']}"
-                    )
-
-                if gestion.get(
-                    "fecha_aprobacion_noemi"
-                ):
-                    st.caption(
-                        "✅ Aprobado: "
-                        f"{gestion['fecha_aprobacion_noemi']}"
-                    )
 
             if observaciones:
                 st.write(
-                    f"**Observaciones:** {observaciones}"
+                    f"**OT / observaciones:** {observaciones}"
                 )
 
             mostrar_lineas_pedido(
@@ -1923,189 +1723,8 @@ def ui_pedidos_abel():
                 contexto="abel",
             )
 
-            st.divider()
-            st.markdown(
-                "### 📤 Aprobación de Noemí"
+            st.caption(
+                "ℹ️ Solo información. Si el material llega, "
+                "el operario registra la recepción desde la OT."
             )
-
-            mensaje_noemi = _mensaje_noemi_pedido(
-                numero_pedido=numero_pedido,
-                operario=operario,
-                centro=centro,
-                prioridad=prioridad,
-                observaciones=observaciones,
-                id_pedido=id_pedido,
-            )
-
-            st.text_area(
-                "Mensaje preparado",
-                value=mensaje_noemi,
-                height=220,
-                key=f"mensaje_noemi_{id_pedido}",
-                disabled=True,
-            )
-
-            enlace_whatsapp = (
-                "https://wa.me/?text="
-                + quote(
-                    mensaje_noemi
-                )
-            )
-
-            st.link_button(
-                "📲 Enviar a Noemí por WhatsApp",
-                enlace_whatsapp,
-                use_container_width=True,
-            )
-
-            if st.button(
-                "✅ Marcar como enviado a Noemí",
-                key=f"marcar_enviado_noemi_{id_pedido}",
-                use_container_width=True,
-            ):
-                ok, mensaje = (
-                    actualizar_gestion_pedido_material(
-                        id_pedido,
-                        estado_gestion="Pendiente de aprobación",
-                    )
-                )
-
-                if ok:
-                    st.success(
-                        "Pedido marcado como pendiente de aprobación."
-                    )
-                    st.rerun()
-                else:
-                    st.error(
-                        mensaje
-                    )
-
-            st.divider()
-            st.markdown(
-                "### 🧾 Gestión de compra"
-            )
-
-            opciones_estado = ESTADOS_GESTION_COMPRA
-
-            indice_estado = (
-                opciones_estado.index(
-                    estado_gestion
-                )
-                if estado_gestion in opciones_estado
-                else 0
-            )
-
-            estado_nuevo = st.selectbox(
-                "Estado de gestión",
-                opciones_estado,
-                index=indice_estado,
-                key=f"estado_gestion_abel_{id_pedido}",
-            )
-
-            proveedor = st.text_input(
-                "Proveedor",
-                value=str(
-                    gestion.get(
-                        "proveedor",
-                        "",
-                    )
-                    or ""
-                ),
-                key=f"proveedor_abel_{id_pedido}",
-            )
-
-            referencia_compra = st.text_input(
-                "Referencia / nº pedido / factura",
-                value=str(
-                    gestion.get(
-                        "referencia_compra",
-                        "",
-                    )
-                    or ""
-                ),
-                key=f"referencia_compra_abel_{id_pedido}",
-            )
-
-            observaciones_gestion = st.text_area(
-                "Observaciones de gestión",
-                value=str(
-                    gestion.get(
-                        "observaciones_gestion",
-                        "",
-                    )
-                    or ""
-                ),
-                key=f"obs_gestion_abel_{id_pedido}",
-            )
-
-            if gestion.get(
-                "fecha_pedido"
-            ):
-                st.caption(
-                    f"🛒 Pedido realizado: "
-                    f"{gestion['fecha_pedido']}"
-                )
-
-            if gestion.get(
-                "fecha_pago"
-            ):
-                st.caption(
-                    f"💳 Pagado: "
-                    f"{gestion['fecha_pago']}"
-                )
-
-            if st.button(
-                "💾 Guardar gestión",
-                key=f"guardar_gestion_abel_{id_pedido}",
-                type="primary",
-                use_container_width=True,
-            ):
-                ok, mensaje = (
-                    actualizar_gestion_pedido_material(
-                        id_pedido=id_pedido,
-                        estado_gestion=estado_nuevo,
-                        proveedor=proveedor,
-                        referencia_compra=referencia_compra,
-                        observaciones_gestion=observaciones_gestion,
-                    )
-                )
-
-                if ok:
-                    st.success(
-                        mensaje
-                    )
-                    st.rerun()
-                else:
-                    st.error(
-                        mensaje
-                    )
-
-            st.divider()
-
-            confirmar_borrado = st.checkbox(
-                "Confirmar borrado",
-                key=(
-                    f"confirmar_borrado_pedido_"
-                    f"{id_pedido}"
-                ),
-            )
-
-            if st.button(
-                "🗑️ Borrar pedido",
-                key=f"borrar_pedido_{id_pedido}",
-            ):
-                if confirmar_borrado:
-                    borrar_pedido_material(
-                        id_pedido
-                    )
-
-                    st.warning(
-                        "Pedido eliminado."
-                    )
-                    st.rerun()
-
-                else:
-                    st.error(
-                        "Debes confirmar el borrado."
-                    )
 
