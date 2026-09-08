@@ -8,6 +8,7 @@ from modules.pedidos_material import (
     crear_pedido_material_multiple,
     obtener_pedidos_material,
     obtener_lineas_pedido,
+    archivar_pedido_material,
     obtener_datos_recepcion_linea,
     registrar_recepcion_linea_pedido,
     guardar_fotos_pedido_material,
@@ -1644,6 +1645,7 @@ def ui_pedidos_abel():
             not in [
                 "Entregado",
                 "Cancelado",
+                "Archivado",
             ]
         ]
 
@@ -1727,4 +1729,31 @@ def ui_pedidos_abel():
                 "ℹ️ Solo información. Si el material llega, "
                 "el operario registra la recepción desde la OT."
             )
+
+            if estado not in [
+                "Entregado",
+                "Cancelado",
+                "Archivado",
+            ]:
+                if st.button(
+                    "📁 Quitar de pendientes",
+                    key=f"archivar_pedido_abel_{id_pedido}",
+                    use_container_width=True,
+                ):
+                    ok_archivar, mensaje_archivar = (
+                        archivar_pedido_material(
+                            id_pedido
+                        )
+                    )
+
+                    if ok_archivar:
+                        st.success(
+                            "Pedido quitado de Pendientes. "
+                            "Sigue disponible en Todos."
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            mensaje_archivar
+                        )
 
