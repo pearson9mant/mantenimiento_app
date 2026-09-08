@@ -1601,6 +1601,129 @@ def registrar_recepcion_linea_pedido(
     )
 
 
+def anular_recepcion_linea_pedido(
+    id_linea,
+    cantidad_anular,
+):
+    """
+    Deshace una recepción registrada por error.
+
+    Resta la cantidad de Inventario y vuelve a dejar esa cantidad
+    pendiente en el pedido. La trazabilidad queda como una Salida.
+    """
+    datos = obtener_datos_recepcion_linea(id_linea)
+    if not datos:
+        return False, "No se ha encontrado la línea del pedido."
+
+    if not int(datos.get("es_compra") or 0):
+        return False, "Esta línea no corresponde a una compra."
+
+    codigo = str(datos.get("codigo_material") or "").strip()
+    if not codigo:
+        return False, "El material no tiene código de Inventario."
+
+    try:
+        cantidad = float(cantidad_anular or 0)
+    except Exception:
+        return False, "La cantidad a anular no es válida."
+
+    if cantidad <= 0:
+        return False, "Indica una cantidad a anular mayor que 0."
+
+    cantidad_recibida = float(
+        datos.get("cantidad_recibida") or 0
+    )
+
+    if cantidad_recibida <= 0:
+        return False, "Esta línea no tiene ninguna recepción que anular."
+
+    if cantidad > cantidad_recibida:
+        return False, (
+            f"Solo constan {cantidad_recibida:g} unidades recibidas."
+        )
+
+    material_inv = obtener_material_por_codigo(codigo)
+    if not material_inv:
+        return False, (
+            f"El material {codigo} ya no existe en Inventario."
+        )
+
+    stock_actual = float(
+        material_inv.get("stock_actual", 0) or 0
+    )
+
+    if stock_actual < cantidad:
+        return False, (
+            "No se puede anular la recepción porque el stock actual "
+            f"es {stock_actual:g} y habría que retirar {cantidad:g}."
+        )
+
+    numero_pedido = str(
+        datos.get("numero_pedido") or ""
+    ).strip()
+
+    ok_mov, mensaje_mov = registrar_movimiento_inventario(
+        codigo_material=codigo,
+        tipo_movimiento="Salida",
+        cantidad=cantidad,
+        motivo=f"Anulación recepción pedido {numero_pedido}",
+        numero_ot="",
+        operario=str(datos.get("operario") or ""),
+    )
+
+    if not ok_mov:
+        return False, mensaje_mov
+
+    nueva_recibida = max(
+        cantidad_recibida - cantidad,
+        0,
+    )
+    cantidad_pedida = float(
+        datos.get("cantidad") or 0
+    )
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE pedidos_material_lineas
+            SET cantidad_recibida = ?,
+                estado = 'Pendiente',
+                fecha_entrega = NULL
+            WHERE id = ?
+        """), (
+            nueva_recibida,
+            id_linea,
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        return False, (
+            "La salida de Inventario se registró, pero no se pudo "
+            f"actualizar el pedido: {e}"
+        )
+
+    finally:
+        conn.close()
+
+    recalcular_estado_pedido(
+        datos["pedido_id"]
+    )
+
+    pendiente = max(
+        cantidad_pedida - nueva_recibida,
+        0,
+    )
+
+    return True, (
+        f"Recepción anulada: -{cantidad:g} de Inventario. "
+        f"Recibidas: {nueva_recibida:g} · Pendientes: {pendiente:g}."
+    )
+
+
 def obtener_gestion_pedido_material(
     id_pedido,
 ):
