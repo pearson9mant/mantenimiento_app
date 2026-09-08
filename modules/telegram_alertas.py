@@ -7,6 +7,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID_GENERAL = os.getenv("TELEGRAM_CHAT_ID")
 TELEGRAM_CHAT_ID_JUAN = os.getenv("TELEGRAM_CHAT_ID_JUAN")
 TELEGRAM_CHAT_ID_LUIS = os.getenv("TELEGRAM_CHAT_ID_LUIS")
+TELEGRAM_CHAT_ID_ABEL = os.getenv("TELEGRAM_CHAT_ID_ABEL")
 
 
 def obtener_chat_id(centro):
@@ -58,4 +59,27 @@ def enviar_telegram(mensaje, centro=None):
 
     except Exception as e:
         print("ERROR TELEGRAM:", e)
+        return False
+
+
+def enviar_telegram_abel(mensaje):
+
+    try:
+
+        if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID_ABEL:
+            return False
+
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID_ABEL,
+            "text": mensaje
+        }
+
+        r = requests.post(url, data=payload, timeout=10)
+
+        return r.status_code == 200
+
+    except Exception as e:
+        print("ERROR TELEGRAM ABEL:", e)
         return False
