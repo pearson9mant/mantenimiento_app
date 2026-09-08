@@ -804,14 +804,30 @@ def mostrar_lineas_pedido(
                     )
 
             if modo_abel:
+                estados_linea_disponibles = (
+                    [
+                        estado_opcion
+                        for estado_opcion in ESTADOS_PEDIDO
+                        if estado_opcion != "Entregado"
+                    ]
+                    if es_compra
+                    else ESTADOS_PEDIDO
+                )
+
+                if es_compra:
+                    st.caption(
+                        "📦 La recepción física de una compra la registra "
+                        "el operario; Abel no puede marcarla como Entregado."
+                    )
+
                 nuevo_estado_linea = st.selectbox(
                     "Estado línea",
-                    ESTADOS_PEDIDO,
+                    estados_linea_disponibles,
                     index=(
-                        ESTADOS_PEDIDO.index(
+                        estados_linea_disponibles.index(
                             estado
                         )
-                        if estado in ESTADOS_PEDIDO
+                        if estado in estados_linea_disponibles
                         else 0
                     ),
                     key=(
