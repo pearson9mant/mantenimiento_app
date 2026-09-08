@@ -501,7 +501,17 @@ def pintar_footer():
 
 
 def volver_menu():
-    st.session_state["seccion_actual"] = None
+    perfil_actual = str(
+        st.session_state.get("perfil")
+        or st.session_state.get("rol")
+        or ""
+    ).strip().lower()
+
+    if perfil_actual == "operario":
+        st.session_state["seccion_actual"] = "Colegio Vivo"
+    else:
+        st.session_state["seccion_actual"] = None
+
     st.rerun()
 
 
