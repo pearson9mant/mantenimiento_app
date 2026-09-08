@@ -8,6 +8,7 @@ from modules.inventario import (
     obtener_o_crear_material_para_pedido,
     registrar_movimiento_inventario,
 )
+from modules.telegram_alertas import enviar_telegram_abel
 
 
 ESTADOS_PEDIDO = [
@@ -627,6 +628,37 @@ def crear_pedido_material_multiple(
             ))
 
         conn.commit()
+
+        # Telegram es solo un aviso para Abel.
+        # Si falla, el pedido ya queda creado y el flujo normal continúa.
+        try:
+            materiales_telegram = "\n".join(
+                (
+                    f"• {linea['material']} x "
+                    f"{float(linea['cantidad']):g}"
+                )
+                for linea in lineas_validas
+            )
+
+            mensaje_telegram = (
+                "📦 NUEVO PEDIDO DE MATERIAL\n"
+                f"{numero_pedido}\n"
+                f"Solicita: {operario}\n"
+                f"Centro: {centro}\n"
+                f"Prioridad: {prioridad}\n"
+                f"{materiales_telegram}"
+            )
+
+            enviar_telegram_abel(
+                mensaje_telegram
+            )
+
+        except Exception as e:
+            _log_pedidos_warning(
+                "Avisando a Abel por Telegram",
+                e,
+            )
+
         return id_pedido
 
     except Exception:
