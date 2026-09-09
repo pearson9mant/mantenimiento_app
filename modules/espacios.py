@@ -42,6 +42,9 @@ PLANTAS_BASE = {
             "Planta 1",
             "Planta 0",
         ],
+        "Entrada general": [
+            "Exterior",
+        ],
     },
 }
 
