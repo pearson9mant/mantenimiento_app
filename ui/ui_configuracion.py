@@ -116,7 +116,16 @@ def obtener_puntos_legionella():
     return datos
 
 
-def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, observaciones):
+def crear_punto_legionella(
+    centro,
+    edificio,
+    instalacion,
+    tipo_punto,
+    nombre_punto,
+    ubicacion,
+    observaciones,
+    planta="",
+):
     nombre_punto = str(nombre_punto or "").strip()
     instalacion = str(instalacion or "").strip()
 
@@ -143,11 +152,22 @@ def crear_punto_legionella(centro, edificio, instalacion, tipo_punto, nombre_pun
 
     cursor.execute(_sql("""
         INSERT INTO legionella_puntos
-        (centro, edificio, instalacion, tipo_punto, nombre_punto, ubicacion, activo, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        (
+            centro,
+            edificio,
+            planta,
+            instalacion,
+            tipo_punto,
+            nombre_punto,
+            ubicacion,
+            activo,
+            observaciones
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
     """), (
         centro,
         edificio,
+        str(planta or "").strip(),
         instalacion,
         tipo_punto,
         nombre_punto,
@@ -3519,6 +3539,24 @@ def pantalla_configuracion():
             key="cfg_leg_edificio",
         )
 
+        plantas_leg = obtener_plantas_catalogo_config(
+            centro_leg,
+            edificio_leg,
+        )
+
+        if plantas_leg:
+            planta_leg = st.selectbox(
+                "Planta / zona",
+                plantas_leg,
+                key="cfg_leg_planta",
+            )
+        else:
+            planta_leg = st.text_input(
+                "Planta / zona",
+                placeholder="Ejemplo: Planta 1, Exterior, Sala técnica...",
+                key="cfg_leg_planta_manual",
+            )
+
         instalacion = st.selectbox(
             "Instalación",
             INSTALACIONES_LEGIONELLA,
@@ -3573,6 +3611,7 @@ def pantalla_configuracion():
                 nombre_punto=nombre_punto,
                 ubicacion=ubicacion,
                 observaciones=observaciones,
+                planta=planta_leg,
             )
 
             if ok:
