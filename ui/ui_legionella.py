@@ -826,6 +826,58 @@ def existe_ot_legionella_abierta(centro, edificio, descripcion, planta=""):
     return total > 0
 
 
+def existe_incidencia_seguimiento_afs_p9_abierta():
+    df = leer_df(
+        """
+        SELECT COUNT(*) AS total
+        FROM legionella_incidencias
+        WHERE centro = ?
+          AND tarea = ?
+          AND LOWER(COALESCE(estado, '')) NOT IN (
+                'cerrada',
+                'cerrado',
+                'finalizada',
+                'finalizado',
+                'cancelada',
+                'cancelado'
+          )
+        """,
+        ("Pearson 9", "SEGUIMIENTO AFS P9"),
+    )
+
+    if df.empty:
+        return False
+
+    return int(df.iloc[0]["total"] or 0) > 0
+
+
+def existe_ot_seguimiento_afs_p9_abierta():
+    df = leer_df(
+        """
+        SELECT COUNT(*) AS total
+        FROM ordenes_trabajo
+        WHERE centro = ?
+          AND area = 'Legionella'
+          AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
+          AND descripcion LIKE ?
+          AND LOWER(COALESCE(estado, '')) NOT IN (
+                'finalizada',
+                'finalizado',
+                'cerrada',
+                'cerrado',
+                'cancelada',
+                'cancelado'
+          )
+        """,
+        ("Pearson 9", "%SEGUIMIENTO AFS P9%"),
+    )
+
+    if df.empty:
+        return False
+
+    return int(df.iloc[0]["total"] or 0) > 0
+
+
 def crear_ot_legionella(
     centro,
     edificio,
@@ -2109,6 +2161,65 @@ def registrar_control(
             f"[LEGIONELLA] No se pudo actualizar planificación "
             f"tras registrar control: {type(e).__name__}: {e}"
         )
+
+    es_seguimiento_afs_p9 = (
+        centro == "Pearson 9"
+        and str(tipo_control or "").strip() == "Control AFS"
+        and estado == "RIESGO"
+    )
+
+    if es_seguimiento_afs_p9:
+        incidencia_existente = existe_incidencia_seguimiento_afs_p9_abierta()
+        ot_existente = existe_ot_seguimiento_afs_p9_abierta()
+        incidencia_creada = False
+        ot_creada = False
+
+        if not incidencia_existente:
+            ejecutar(
+                """
+                INSERT INTO legionella_incidencias
+                (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
+                VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+                """,
+                (
+                    centro,
+                    edificio,
+                    planta,
+                    punto_nombre,
+                    "SEGUIMIENTO AFS P9",
+                    (
+                        "Desviación conocida AFS Pearson 9 en seguimiento. "
+                        + resultado
+                        + (" | " + observaciones if observaciones else "")
+                    ),
+                    operario,
+                ),
+            )
+            incidencia_creada = True
+
+        if not ot_existente:
+            ot_creada = crear_ot_legionella(
+                centro,
+                edificio,
+                punto_nombre,
+                "CORRECTIVO LEGIONELLA - SEGUIMIENTO AFS P9",
+                operario,
+                punto_id=punto_id,
+                planta=planta,
+            )
+
+        if incidencia_creada or ot_creada:
+            resultado_salida = (
+                f"{resultado} · Desviación AFS Pearson 9 abierta en seguimiento. "
+                "Se mantiene una única actuación activa para controlar esta situación."
+            )
+        else:
+            resultado_salida = (
+                f"{resultado} · Desviación AFS Pearson 9 conocida y en seguimiento. "
+                "Se guarda la medición real sin generar un nuevo correctivo."
+            )
+
+        return "SEGUIMIENTO", resultado_salida
 
     if estado in ["RIESGO", "INCIDENCIA"]:
         if centro and edificio and punto_nombre and tarea:
@@ -3793,6 +3904,15 @@ def pantalla_legionella():
 
                         if estado == "OK":
                             st.success(f"✅ Control guardado correctamente: {resultado}")
+
+                        elif estado == "SEGUIMIENTO":
+                            st.warning(f"🟡 DESVIACIÓN CONOCIDA EN SEGUIMIENTO: {resultado}")
+                            st.info(
+                                "Los valores reales quedan registrados. "
+                                "No se duplican incidencias ni correctivos mientras exista "
+                                "la actuación AFS de Pearson 9 abierta."
+                            )
+                            st.toast("🟡 AFS Pearson 9 en seguimiento", icon="🟡")
 
                         elif estado == "RIESGO":
                             st.error(f"🚨 RIESGO LEGIONELLA: {resultado}")
