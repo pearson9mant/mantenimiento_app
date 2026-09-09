@@ -55,6 +55,14 @@ CENTROS = {
         "Edif. C": [
             ("AFCH", "Grifo representativo", "grifo", "Edif. C"),
         ],
+        "Entrada general": [
+            (
+                "AFCH",
+                "Entrada general AFS",
+                "grifo",
+                "Justo después del contador general de agua",
+            ),
+        ],
     },
 }
 
@@ -2164,6 +2172,8 @@ def registrar_control(
 
     es_seguimiento_afs_p9 = (
         centro == "Pearson 9"
+        and str(edificio or "").strip() == "Entrada general"
+        and str(punto_nombre or "").strip() == "Entrada general AFS"
         and str(tipo_control or "").strip() == "Control AFS"
         and estado == "RIESGO"
     )
@@ -2188,7 +2198,7 @@ def registrar_control(
                     punto_nombre,
                     "SEGUIMIENTO AFS P9",
                     (
-                        "Desviación conocida AFS Pearson 9 en seguimiento. "
+                        "Desviación conocida AFS en Entrada general de Pearson 9 en seguimiento. "
                         + resultado
                         + (" | " + observaciones if observaciones else "")
                     ),
@@ -2210,12 +2220,12 @@ def registrar_control(
 
         if incidencia_creada or ot_creada:
             resultado_salida = (
-                f"{resultado} · Desviación AFS Pearson 9 abierta en seguimiento. "
+                f"{resultado} · Desviación AFS de Entrada general Pearson 9 abierta en seguimiento. "
                 "Se mantiene una única actuación activa para controlar esta situación."
             )
         else:
             resultado_salida = (
-                f"{resultado} · Desviación AFS Pearson 9 conocida y en seguimiento. "
+                f"{resultado} · Desviación AFS de Entrada general Pearson 9 conocida y en seguimiento. "
                 "Se guarda la medición real sin generar un nuevo correctivo."
             )
 
@@ -3910,9 +3920,9 @@ def pantalla_legionella():
                             st.info(
                                 "Los valores reales quedan registrados. "
                                 "No se duplican incidencias ni correctivos mientras exista "
-                                "la actuación AFS de Pearson 9 abierta."
+                                "la actuación AFS de Entrada general de Pearson 9 abierta."
                             )
-                            st.toast("🟡 AFS Pearson 9 en seguimiento", icon="🟡")
+                            st.toast("🟡 AFS Entrada general P9 en seguimiento", icon="🟡")
 
                         elif estado == "RIESGO":
                             st.error(f"🚨 RIESGO LEGIONELLA: {resultado}")
