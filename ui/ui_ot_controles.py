@@ -1028,56 +1028,73 @@ def mostrar_checklist_correctivo_legionella_operario(
 
     checklist = obtener_checklist_correctivo_legionella(num_ot) or {}
 
+    desc_txt = str(desc or "").upper()
+    es_correctivo_afs = "AFS" in desc_txt
+
+    if es_correctivo_afs:
+        st.info(
+            "Correctivo de AFS: la nueva medición será correcta cuando "
+            "la temperatura final sea ≤ 25 °C."
+        )
+
     revisar_consigna = st.checkbox(
-        "Revisar consigna acumulador",
+        "No aplica en AFS · Revisar consigna acumulador" if es_correctivo_afs else "Revisar consigna acumulador",
         value=bool(checklist.get("revisar_consigna", 0)),
-        key=f"leg_consigna_op_{num_ot}"
+        key=f"leg_consigna_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     revisar_termostato = st.checkbox(
-        "Revisar termostato",
+        "No aplica en AFS · Revisar termostato" if es_correctivo_afs else "Revisar termostato",
         value=bool(checklist.get("revisar_termostato", 0)),
-        key=f"leg_termostato_op_{num_ot}"
+        key=f"leg_termostato_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     revisar_caldera = st.checkbox(
-        "Revisar caldera",
+        "No aplica en AFS · Revisar caldera" if es_correctivo_afs else "Revisar caldera",
         value=bool(checklist.get("revisar_caldera", 0)),
-        key=f"leg_caldera_op_{num_ot}"
+        key=f"leg_caldera_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     revisar_resistencia = st.checkbox(
         "Revisar resistencia eléctrica",
         value=bool(checklist.get("revisar_resistencia", 0)),
-        key=f"leg_resistencia_op_{num_ot}"
+        key=f"leg_resistencia_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     revisar_recirculacion = st.checkbox(
         "Revisar recirculación",
         value=bool(checklist.get("revisar_recirculacion", 0)),
-        key=f"leg_recirculacion_op_{num_ot}"
+        key=f"leg_recirculacion_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     revisar_bomba = st.checkbox(
         "Revisar bomba retorno",
         value=bool(checklist.get("revisar_bomba", 0)),
-        key=f"leg_bomba_op_{num_ot}"
+        key=f"leg_bomba_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     purgar_aire = st.checkbox(
         "Purgar aire circuito",
         value=bool(checklist.get("purgar_aire", 0)),
-        key=f"leg_aire_op_{num_ot}"
+        key=f"leg_aire_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     esperar_recuperacion = st.checkbox(
         "Esperar recuperación térmica",
         value=bool(checklist.get("esperar_recuperacion", 0)),
-        key=f"leg_recuperacion_op_{num_ot}"
+        key=f"leg_recuperacion_op_{num_ot}",
+        disabled=es_correctivo_afs,
     )
 
     nueva_medicion = st.checkbox(
-        "Realizar nueva medición",
+        "Realizar nueva medición de AFS" if es_correctivo_afs else "Realizar nueva medición",
         value=bool(checklist.get("nueva_medicion", 0)),
         key=f"leg_medicion_op_{num_ot}"
     )
@@ -1104,13 +1121,19 @@ def mostrar_checklist_correctivo_legionella_operario(
     )
 
     temperatura_final = st.number_input(
-        "Temperatura final ºC",
+        "Temperatura final AFS ºC" if es_correctivo_afs else "Temperatura final ºC",
         min_value=0.0,
         max_value=100.0,
         value=float(checklist.get("temperatura_final", 0) or 0),
         step=0.1,
         key=f"leg_temp_op_{num_ot}"
     )
+
+    if es_correctivo_afs and nueva_medicion and temperatura_final > 0:
+        if temperatura_final <= 25:
+            st.success("✅ Temperatura AFS dentro de criterio: ≤ 25 °C.")
+        else:
+            st.error("⚠️ La temperatura AFS sigue por encima de 25 °C.")
 
     empresa_externa_leg = st.text_input(
         "Empresa externa / técnico",
