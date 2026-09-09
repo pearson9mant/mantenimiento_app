@@ -141,6 +141,17 @@ def normalizar_centro(valor):
 def normalizar_edificio(valor, centro=""):
     texto = _norm(valor)
 
+    # Pearson 9 tiene una entrada general exterior independiente
+    # de los edificios A/B/C y del Anexo Servicios.
+    if centro == "Pearson 9" and any(
+        alias in texto
+        for alias in [
+            "entrada general",
+            "entrada general afs",
+        ]
+    ):
+        return "Entrada general"
+
     # Pearson 9 tiene un anexo de servicios independiente de A/B/C.
     # Nunca debe confundirse con la Llar de Pearson 22.
     if centro == "Pearson 9":
@@ -698,6 +709,74 @@ def _pintar_anexo_servicios_p9(resumen):
                         datos.get("ordenes_ejecutables", []),
                     ),
                 )
+
+
+# =========================================================
+# ENTRADA GENERAL · EXTERIOR · PEARSON 9
+# =========================================================
+
+def _datos_entrada_general_p9(resumen):
+    """
+    Recupera las OT de Pearson 9 ubicadas en Entrada general · Exterior.
+    No modifica la base de datos ni mueve órdenes.
+    """
+    datos = (resumen or {}).get(
+        ("Pearson 9", "Entrada general", "Exterior"),
+        {},
+    )
+
+    return {
+        "total": int(datos.get("total") or 0),
+        "ejecutables": int(datos.get("ejecutables") or 0),
+        "bloqueadas": int(datos.get("bloqueadas") or 0),
+        "en_curso": int(datos.get("en_curso") or 0),
+        "urgentes": int(datos.get("urgentes") or 0),
+        "altas": int(datos.get("altas") or 0),
+        "ordenes": list(datos.get("ordenes", []) or []),
+        "ordenes_ejecutables": list(
+            datos.get("ordenes_ejecutables", []) or []
+        ),
+        "ordenes_bloqueadas": list(
+            datos.get("ordenes_bloqueadas", []) or []
+        ),
+    }
+
+
+def _pintar_entrada_general_p9(resumen):
+    datos = _datos_entrada_general_p9(resumen)
+
+    estado = _estado_planta(datos)
+    icono_estado = _icono_estado(estado)
+    contador = _texto_contador(datos)
+
+    zona_activa = (
+        st.session_state.get("colegio_vivo_ultima_centro") == "Pearson 9"
+        and st.session_state.get("colegio_vivo_ultimo_edificio") == "Entrada general"
+        and st.session_state.get("colegio_vivo_ultima_planta") == "Exterior"
+    )
+
+    st.markdown(
+        '<div class="cv-annex-wrap">'
+        '<div class="cv-annex-title">🚰 ENTRADA GENERAL · EXTERIOR</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="cv_entrada_general_p9"):
+        st.button(
+            f"{icono_estado} 🚰 Entrada general AFS {contador}",
+            key="cv_entrada_general_p9_exterior",
+            type="primary" if zona_activa else "secondary",
+            use_container_width=True,
+            on_click=_abrir_planta,
+            args=(
+                "Pearson 9",
+                "Entrada general",
+                "Exterior",
+                datos.get("ordenes", []),
+                datos.get("ordenes_ejecutables", []),
+            ),
+        )
 
 
 # =========================================================
@@ -1905,6 +1984,12 @@ def pintar_campus_operario(
         ),
         unsafe_allow_html=True,
     )
+
+    # Pearson 9: la entrada general exterior queda arriba de A/B/C.
+    if centro == "Pearson 9":
+        _pintar_entrada_general_p9(
+            resumen,
+        )
 
     columnas = st.columns(
         len(edificios_visibles),
