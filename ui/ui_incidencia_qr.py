@@ -184,7 +184,11 @@ def pantalla_incidencia_qr():
         return
 
     clave_envio = f"incidencia_qr_enviada_{codigo_espacio}"
+    clave_procesando = f"incidencia_qr_procesando_{codigo_espacio}"
     incidencia_enviada = st.session_state.get(clave_envio, "")
+    envio_procesando = bool(
+        st.session_state.get(clave_procesando, False)
+    )
 
     st.markdown(
         """
@@ -358,14 +362,23 @@ def pantalla_incidencia_qr():
         key=f"qr_enviar_{codigo_espacio}",
         use_container_width=True,
         type="primary",
+        disabled=envio_procesando,
     ):
+        if st.session_state.get(clave_procesando, False):
+            st.info("El aviso ya se está enviando. Espera un momento.")
+            return
+
+        st.session_state[clave_procesando] = True
+
         descripcion_limpia = str(descripcion or "").strip()
 
         if not descripcion_limpia:
+            st.session_state.pop(clave_procesando, None)
             st.warning("Describe brevemente qué ocurre.")
             return
 
         if error_fotos:
+            st.session_state.pop(clave_procesando, None)
             st.error("Revisa las fotografías antes de enviar.")
             return
 
@@ -427,6 +440,7 @@ def pantalla_incidencia_qr():
                 )
 
         except Exception as error:
+            st.session_state.pop(clave_procesando, None)
             st.error(
                 "No se ha podido crear la incidencia: "
                 f"{error}"
@@ -480,4 +494,12 @@ def pantalla_incidencia_qr():
                 None,
             )
 
-        st.rerun()
+        st.session_state.pop(
+            clave_procesando,
+            None,
+        )
+
+        st.success("✓ Aviso enviado correctamente")
+        st.info(f"Número de referencia: {numero_ot}")
+        st.caption("No es necesario volver a enviar el mismo aviso.")
+        st.stop()
