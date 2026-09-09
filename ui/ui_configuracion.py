@@ -26,6 +26,7 @@ from modules.espacios import (
     actualizar_espacio,
     obtener_arbol_espacios,
     icono_tipo_espacio,
+    obtener_edificios_espacios,
     obtener_plantas_config,
     obtener_plantas_config_ubicacion,
     crear_planta_configurable,
@@ -3508,7 +3509,7 @@ def pantalla_configuracion():
             key="cfg_leg_centro",
         )
 
-        edificios_leg = obtener_edificios(
+        edificios_leg = obtener_edificios_espacios(
             centro_leg
         )
 
