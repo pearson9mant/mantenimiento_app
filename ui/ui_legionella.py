@@ -16,6 +16,7 @@ from modules.inteligencia_legionella import construir_panel_sanitario_legionella
 from modules.informes.informe_legionella import generar_informe_legionella
 from modules.espacios import (
     obtener_plantas_espacios,
+    crear_espacio,
 )
 
 
@@ -42,8 +43,7 @@ CENTROS = {
     },
 
     "Pearson 9": {
-        "Anexo Servicios": [],
-        "Sala calderas": [
+        "Anexo Servicios": [
             ("ACS", "Acumulador ACS Principal", "acumulador", "Cuarto calderas"),
             ("ACS", "Retorno ACS Principal", "retorno", "Cuarto calderas"),
         ],
@@ -112,6 +112,140 @@ def obtener_plantas_legionella(centro, edificio):
         for planta in plantas or []
         if str(planta or "").strip()
     ]
+
+
+
+def sincronizar_puntos_anexo_p9_catalogo():
+    """
+    Normaliza los puntos activos de Legionella del Anexo Servicios de Pearson 9.
+
+    - Mantiene el nombre real del punto como espacio del catálogo central.
+    - Convierte ubicaciones antiguas (Taller, Sala calderas, Vestuarios...)
+      a Pearson 9 · Anexo Servicios · <zona>.
+    - Actualiza la planificación ligada por punto_id.
+    - No modifica históricos ni OT ya creadas.
+    """
+    zonas = [
+        "Taller",
+        "Vestuarios chicas",
+        "Sala calderas",
+        "Vestuarios chicos",
+    ]
+
+    df = leer_df("""
+        SELECT id, centro, edificio, planta, nombre_punto, tipo_punto
+        FROM legionella_puntos
+        WHERE centro = ?
+          AND activo = 1
+        ORDER BY id
+    """, ("Pearson 9",))
+
+    if df.empty:
+        return 0, 0, 0
+
+    normalizados = 0
+    espacios_creados = 0
+    espacios_existentes = 0
+
+    for _, fila in df.iterrows():
+        punto_id = int(fila["id"])
+        edificio_actual = str(fila.get("edificio") or "").strip()
+        planta_actual = str(fila.get("planta") or "").strip()
+        nombre_punto = str(fila.get("nombre_punto") or "").strip()
+
+        if not nombre_punto:
+            continue
+
+        zona = ""
+
+        # Ubicaciones antiguas donde el propio edificio era la zona.
+        for candidata in zonas:
+            if edificio_actual.lower() == candidata.lower():
+                zona = candidata
+                break
+
+        # Ubicación ya normalizada: Anexo Servicios + planta/zona.
+        if not zona and edificio_actual == "Anexo Servicios":
+            for candidata in zonas:
+                if planta_actual.lower() == candidata.lower():
+                    zona = candidata
+                    break
+
+        # Compatibilidad con valores antiguos tipo "Exterior/Taller".
+        if not zona:
+            texto_planta = planta_actual.lower()
+            for candidata in zonas:
+                if candidata.lower() in texto_planta:
+                    zona = candidata
+                    break
+
+        if not zona:
+            continue
+
+        if (
+            edificio_actual != "Anexo Servicios"
+            or planta_actual != zona
+        ):
+            ejecutar("""
+                UPDATE legionella_puntos
+                SET edificio = ?,
+                    planta = ?
+                WHERE id = ?
+            """, (
+                "Anexo Servicios",
+                zona,
+                punto_id,
+            ))
+
+            ejecutar("""
+                UPDATE legionella_tareas
+                SET edificio = ?,
+                    planta = ?,
+                    punto = ?
+                WHERE punto_id = ?
+            """, (
+                "Anexo Servicios",
+                zona,
+                nombre_punto,
+                punto_id,
+            ))
+
+            normalizados += 1
+
+        creado = crear_espacio(
+            centro="Pearson 9",
+            edificio="Anexo Servicios",
+            planta=zona,
+            espacio=nombre_punto,
+            tipo="Punto Legionella",
+            qr_habilitado=0,
+        )
+
+        if creado:
+            # crear_espacio devuelve True tanto al crear como al reactivar/actualizar;
+            # contamos por separado verificando si ya existía antes.
+            df_espacio = leer_df("""
+                SELECT COUNT(*) AS total
+                FROM espacios
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND planta = ?
+                  AND espacio = ?
+                  AND activo = 1
+            """, (
+                "Pearson 9",
+                "Anexo Servicios",
+                zona,
+                nombre_punto,
+            ))
+
+            if not df_espacio.empty and int(df_espacio.iloc[0]["total"] or 0) > 0:
+                espacios_creados += 1
+            else:
+                espacios_existentes += 1
+
+    st.cache_data.clear()
+    return normalizados, espacios_creados, espacios_existentes
 
 
 def adaptar_sql(sql):
@@ -3133,7 +3267,28 @@ def pantalla_legionella():
         )
 
     with st.expander("🛡️ Mantenimiento de datos Legionella", expanded=False):
-        st.caption("Limpia registros antiguos incompletos. No toca los registros correctos.")
+        st.caption(
+            "Herramientas de mantenimiento seguro. "
+            "No modifican históricos ni OT ya creadas."
+        )
+
+        if st.button(
+            "🧭 Sincronizar Anexo Servicios P9 con catálogo",
+            use_container_width=True,
+            key="leg_sync_anexo_p9_catalogo",
+        ):
+            try:
+                normalizados, espacios_creados, _ = sincronizar_puntos_anexo_p9_catalogo()
+                st.success(
+                    "Sincronización finalizada · "
+                    f"{normalizados} punto(s) normalizado(s) · "
+                    f"{espacios_creados} espacio(s) asegurado(s) en catálogo."
+                )
+                st.rerun()
+            except Exception as e:
+                st.error(f"No se pudo sincronizar el Anexo Servicios P9: {e}")
+
+        st.markdown("---")
 
         if st.button("🧹 Limpiar registros inválidos (None)", use_container_width=True):
             try:
