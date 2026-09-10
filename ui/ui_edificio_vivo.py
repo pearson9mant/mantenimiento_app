@@ -718,28 +718,71 @@ def _pintar_anexo_servicios_p9(resumen):
 def _datos_entrada_general_p9(resumen):
     """
     Recupera las OT de Pearson 9 ubicadas en Entrada general · Exterior.
-    No modifica la base de datos ni mueve órdenes.
-    """
-    datos = (resumen or {}).get(
-        ("Pearson 9", "Entrada general", "Exterior"),
-        {},
-    )
 
-    return {
-        "total": int(datos.get("total") or 0),
-        "ejecutables": int(datos.get("ejecutables") or 0),
-        "bloqueadas": int(datos.get("bloqueadas") or 0),
-        "en_curso": int(datos.get("en_curso") or 0),
-        "urgentes": int(datos.get("urgentes") or 0),
-        "altas": int(datos.get("altas") or 0),
-        "ordenes": list(datos.get("ordenes", []) or []),
-        "ordenes_ejecutables": list(
-            datos.get("ordenes_ejecutables", []) or []
-        ),
-        "ordenes_bloqueadas": list(
-            datos.get("ordenes_bloqueadas", []) or []
-        ),
+    Compatibilidad:
+    normalizar_planta() conserva históricamente "Exterior" como
+    "Acceso Pearson 22". En P9 no debemos perder esas OT por ese alias
+    heredado. Solo se acepta cuando el centro es Pearson 9 y el edificio
+    es Entrada general, por lo que no se mezcla con Pearson 22.
+    """
+    acumulado = {
+        "total": 0,
+        "ejecutables": 0,
+        "bloqueadas": 0,
+        "en_curso": 0,
+        "urgentes": 0,
+        "altas": 0,
+        "ordenes": [],
+        "ordenes_ejecutables": [],
+        "ordenes_bloqueadas": [],
     }
+
+    for clave, datos in (resumen or {}).items():
+        try:
+            centro_clave, edificio_clave, planta_clave = clave
+        except Exception:
+            continue
+
+        if normalizar_centro(centro_clave) != "Pearson 9":
+            continue
+
+        if normalizar_edificio(
+            edificio_clave,
+            "Pearson 9",
+        ) != "Entrada general":
+            continue
+
+        planta_txt = str(planta_clave or "").strip()
+
+        if planta_txt not in {
+            "Exterior",
+            "Acceso Pearson 22",
+        }:
+            continue
+
+        for campo in [
+            "total",
+            "ejecutables",
+            "bloqueadas",
+            "en_curso",
+            "urgentes",
+            "altas",
+        ]:
+            acumulado[campo] += int(
+                datos.get(campo) or 0
+            )
+
+        acumulado["ordenes"].extend(
+            datos.get("ordenes", []) or []
+        )
+        acumulado["ordenes_ejecutables"].extend(
+            datos.get("ordenes_ejecutables", []) or []
+        )
+        acumulado["ordenes_bloqueadas"].extend(
+            datos.get("ordenes_bloqueadas", []) or []
+        )
+
+    return acumulado
 
 
 def _pintar_entrada_general_p9(resumen):
