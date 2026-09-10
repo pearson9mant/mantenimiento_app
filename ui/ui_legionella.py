@@ -990,6 +990,23 @@ def crear_ot_legionella(
     if df_ot_creada.empty:
         return False
 
+    # crear_orden() mantiene compatibilidad histórica por posición y,
+    # en la versión actual, no persiste el elemento 28 (planta).
+    # Dejamos la ubicación real de la OT escrita explícitamente aquí
+    # para que Colegio Vivo pueda situarla correctamente.
+    if planta:
+        ejecutar(
+            """
+            UPDATE ordenes_trabajo
+            SET planta = ?
+            WHERE numero_ot = ?
+            """,
+            (
+                planta,
+                str(numero_creado),
+            ),
+        )
+
     if punto_id:
         vincular_origen_ot(
             numero_ot=numero_creado,
