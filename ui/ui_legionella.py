@@ -42,6 +42,7 @@ CENTROS = {
     },
 
     "Pearson 9": {
+        "Anexo Servicios": [],
         "Sala calderas": [
             ("ACS", "Acumulador ACS Principal", "acumulador", "Cuarto calderas"),
             ("ACS", "Retorno ACS Principal", "retorno", "Cuarto calderas"),
@@ -80,6 +81,20 @@ def _edificio_catalogo_legionella(edificio):
 
 
 def obtener_plantas_legionella(centro, edificio):
+    centro = str(centro or "").strip()
+    edificio = str(edificio or "").strip()
+
+    if centro == "Pearson 9" and edificio == "Anexo Servicios":
+        return [
+            "Taller",
+            "Vestuarios chicas",
+            "Sala calderas",
+            "Vestuarios chicos",
+        ]
+
+    if centro == "Pearson 9" and edificio == "Entrada general":
+        return ["Exterior"]
+
     edificio_catalogo = _edificio_catalogo_legionella(
         edificio
     )
@@ -840,7 +855,10 @@ def existe_incidencia_seguimiento_afs_p9_abierta():
         SELECT COUNT(*) AS total
         FROM legionella_incidencias
         WHERE centro = ?
-          AND tarea = ?
+          AND (
+                UPPER(COALESCE(tarea, '')) = 'SEGUIMIENTO AFS P9'
+                OR UPPER(COALESCE(descripcion, '')) LIKE '%SEGUIMIENTO AFS P9%'
+          )
           AND LOWER(COALESCE(estado, '')) NOT IN (
                 'cerrada',
                 'cerrado',
@@ -850,7 +868,7 @@ def existe_incidencia_seguimiento_afs_p9_abierta():
                 'cancelado'
           )
         """,
-        ("Pearson 9", "SEGUIMIENTO AFS P9"),
+        ("Pearson 9",),
     )
 
     if df.empty:
@@ -867,7 +885,7 @@ def existe_ot_seguimiento_afs_p9_abierta():
         WHERE centro = ?
           AND area = 'Legionella'
           AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
-          AND descripcion LIKE ?
+          AND UPPER(COALESCE(descripcion, '')) LIKE ?
           AND LOWER(COALESCE(estado, '')) NOT IN (
                 'finalizada',
                 'finalizado',
@@ -2198,53 +2216,54 @@ def registrar_control(
     if es_seguimiento_afs_p9:
         incidencia_existente = existe_incidencia_seguimiento_afs_p9_abierta()
         ot_existente = existe_ot_seguimiento_afs_p9_abierta()
-        incidencia_creada = False
-        ot_creada = False
 
-        if not incidencia_existente:
-            ejecutar(
-                """
-                INSERT INTO legionella_incidencias
-                (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
-                VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
-                """,
-                (
-                    centro,
-                    edificio,
-                    planta,
-                    punto_nombre,
-                    "SEGUIMIENTO AFS P9",
-                    (
-                        "Desviación conocida AFS en Entrada general de Pearson 9 en seguimiento. "
-                        + resultado
-                        + (" | " + observaciones if observaciones else "")
-                    ),
-                    operario,
-                ),
-            )
-            incidencia_creada = True
+        seguimiento_existente = (
+            incidencia_existente
+            or ot_existente
+        )
 
-        if not ot_existente:
-            ot_creada = crear_ot_legionella(
-                centro,
-                edificio,
-                punto_nombre,
-                "CORRECTIVO LEGIONELLA - SEGUIMIENTO AFS P9",
-                operario,
-                punto_id=punto_id,
-                planta=planta,
-            )
-
-        if incidencia_creada or ot_creada:
-            resultado_salida = (
-                f"{resultado} · Desviación AFS de Entrada general Pearson 9 abierta en seguimiento. "
-                "Se mantiene una única actuación activa para controlar esta situación."
-            )
-        else:
+        if seguimiento_existente:
             resultado_salida = (
                 f"{resultado} · Desviación AFS de Entrada general Pearson 9 conocida y en seguimiento. "
                 "Se guarda la medición real sin generar un nuevo correctivo."
             )
+            return "SEGUIMIENTO", resultado_salida
+
+        ejecutar(
+            """
+            INSERT INTO legionella_incidencias
+            (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
+            VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+            """,
+            (
+                centro,
+                edificio,
+                planta,
+                punto_nombre,
+                "SEGUIMIENTO AFS P9",
+                (
+                    "Desviación conocida AFS en Entrada general de Pearson 9 en seguimiento. "
+                    + resultado
+                    + (" | " + observaciones if observaciones else "")
+                ),
+                operario,
+            ),
+        )
+
+        crear_ot_legionella(
+            centro,
+            edificio,
+            punto_nombre,
+            "CORRECTIVO LEGIONELLA - SEGUIMIENTO AFS P9",
+            operario,
+            punto_id=punto_id,
+            planta=planta,
+        )
+
+        resultado_salida = (
+            f"{resultado} · Desviación AFS de Entrada general Pearson 9 abierta en seguimiento. "
+            "Se mantiene una única actuación activa para controlar esta situación."
+        )
 
         return "SEGUIMIENTO", resultado_salida
 
@@ -2484,6 +2503,23 @@ def actualizar_punto_legionella(
         subcategoria_panel,
         codigo_panel,
         int(punto_id)
+    ))
+
+    ejecutar("""
+        UPDATE legionella_tareas
+        SET centro = ?,
+            edificio = ?,
+            planta = ?,
+            instalacion = ?,
+            punto = ?
+        WHERE punto_id = ?
+    """, (
+        centro,
+        edificio,
+        str(planta or "").strip(),
+        instalacion,
+        nombre_punto,
+        int(punto_id),
     ))
 
 
