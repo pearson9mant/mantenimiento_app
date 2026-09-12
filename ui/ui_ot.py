@@ -3748,9 +3748,9 @@ def mostrar_tarjeta_ot(
             expanded=False,
         ):
             st.caption(
-                "Puedes hacer una foto directamente con la cámara "
-                "trasera del móvil o elegir una imagen de la galería. "
-                "La OT permanece abierta."
+                "Pulsa HACER FOTO AHORA: Android abrirá directamente "
+                "la cámara trasera. Al aceptar la foto se guardará en "
+                "esta OT y permanecerás en la misma orden."
             )
 
             resultado_camara = _CAMARA_MOVIL_OT(
@@ -3794,25 +3794,58 @@ def mostrar_tarjeta_ot(
                     )
 
                 if contenido_camara:
-                    ok_camara, error_camara = (
-                        guardar_foto_directa_bytes(
-                            numero_ot=num_ot,
-                            id_orden=id_orden,
-                            nombre_original=nombre_camara,
-                            contenido=contenido_camara,
-                        )
+                    import hashlib
+
+                    huella_foto = hashlib.sha256(
+                        contenido_camara
+                    ).hexdigest()
+
+                    clave_ultima_foto = (
+                        f"{modo}_ultima_foto_camara_"
+                        f"{id_orden}"
                     )
 
-                    if ok_camara:
-                        st.session_state[clave_fotos_ot] = True
-                        st.success(
-                            "📷 Foto guardada en la OT."
+                    foto_ya_procesada = (
+                        st.session_state.get(
+                            clave_ultima_foto
                         )
-                    else:
-                        st.error(
-                            "No se ha podido guardar la fotografía: "
-                            f"{error_camara}"
+                        == huella_foto
+                    )
+
+                    if not foto_ya_procesada:
+                        ok_camara, error_camara = (
+                            guardar_foto_directa_bytes(
+                                numero_ot=num_ot,
+                                id_orden=id_orden,
+                                nombre_original=nombre_camara,
+                                contenido=contenido_camara,
+                            )
                         )
+
+                        if ok_camara:
+                            st.session_state[
+                                clave_ultima_foto
+                            ] = huella_foto
+                            st.session_state[
+                                clave_fotos_ot
+                            ] = True
+                            st.session_state[
+                                f"{modo}_foto_camara_guardada_{id_orden}"
+                            ] = True
+                            st.rerun()
+                        else:
+                            st.error(
+                                "No se ha podido guardar la fotografía: "
+                                f"{error_camara}"
+                            )
+
+            if st.session_state.pop(
+                f"{modo}_foto_camara_guardada_{id_orden}",
+                False,
+            ):
+                st.success(
+                    "✅ Foto hecha con la cámara y guardada en la OT."
+                )
 
             st.markdown("---")
             st.markdown("#### 🖼️ Elegir de galería")
