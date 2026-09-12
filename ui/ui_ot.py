@@ -3209,16 +3209,14 @@ def mostrar_compartir_ot(
             "Para enviar también las fotografías, descarga el PDF y adjúntalo."
         )
 
-        try:
-            fotos_pdf = obtener_fotos_ot(numero_ot)
-        except Exception:
-            fotos_pdf = []
-
+        # El PDF se prepara sin cargar automáticamente las fotos.
+        # Esto evita descargar todos los binarios en cada rerun de la OT,
+        # incluso cuando el expander Compartir está cerrado.
         try:
             pdf_ot = generar_pdf_compartir_ot(
                 texto=texto,
                 numero_ot=numero_ot,
-                fotos=fotos_pdf,
+                fotos=[],
             )
         except Exception as error:
             st.caption(f"No se ha podido preparar el PDF: {error}")
@@ -3230,6 +3228,10 @@ def mostrar_compartir_ot(
                 mime="application/pdf",
                 key=f"{modo}_pdf_compartir_ot_{id_orden}",
                 use_container_width=True,
+            )
+            st.caption(
+                "El PDF ligero no carga fotografías automáticamente. "
+                "Las fotos siguen disponibles en la propia OT."
             )
 
 
