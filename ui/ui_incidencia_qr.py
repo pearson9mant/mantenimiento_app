@@ -22,6 +22,64 @@ def limpiar_nombre_archivo(texto):
     return texto.replace(" ", "_")
 
 
+
+def _clave_fotos_camara_qr(codigo_espacio):
+    return f"qr_fotos_camara_persistidas_{codigo_espacio}"
+
+
+def _obtener_fotos_camara_qr(codigo_espacio):
+    fotos = st.session_state.get(
+        _clave_fotos_camara_qr(codigo_espacio),
+        [],
+    )
+    return fotos if isinstance(fotos, list) else []
+
+
+def _guardar_foto_camara_qr(codigo_espacio, foto):
+    """Conserva la foto de cámara entre reruns sin perder la descripción."""
+    if foto is None:
+        return
+
+    try:
+        contenido = foto.getvalue()
+    except Exception:
+        return
+
+    if not contenido:
+        return
+
+    fotos = list(_obtener_fotos_camara_qr(codigo_espacio))
+
+    # st.camera_input conserva el último valor tras un rerun:
+    # evitamos añadir la misma captura repetidamente.
+    firma = (len(contenido), contenido[:32])
+    for existente in fotos:
+        contenido_existente = existente.get("contenido") or b""
+        if (len(contenido_existente), contenido_existente[:32]) == firma:
+            return
+
+    if len(fotos) >= MAX_FOTOS:
+        return
+
+    fotos.append({
+        "nombre": limpiar_nombre_archivo(
+            getattr(foto, "name", "camara.jpg") or "camara.jpg"
+        ),
+        "contenido": bytes(contenido),
+    })
+
+    st.session_state[
+        _clave_fotos_camara_qr(codigo_espacio)
+    ] = fotos
+
+
+def _limpiar_fotos_camara_qr(codigo_espacio):
+    st.session_state.pop(
+        _clave_fotos_camara_qr(codigo_espacio),
+        None,
+    )
+
+
 def operario_por_centro(centro):
     centro = str(centro or "").strip()
 
@@ -302,8 +360,51 @@ def pantalla_incidencia_qr():
         key=f"qr_descripcion_{codigo_espacio}",
     )
 
+    st.markdown("### 📷 Fotografías (opcional)")
+    st.caption(
+        f"Máximo {MAX_FOTOS} fotografías · {MAX_MB_FOTO} MB por foto."
+    )
+
+    foto_camara = st.camera_input(
+        "📷 Hacer foto ahora",
+        key=f"qr_camara_{codigo_espacio}",
+    )
+
+    if foto_camara is not None:
+        _guardar_foto_camara_qr(
+            codigo_espacio,
+            foto_camara,
+        )
+
+    fotos_camara = _obtener_fotos_camara_qr(
+        codigo_espacio
+    )
+
+    if fotos_camara:
+        st.caption(
+            f"Fotos hechas con cámara: {len(fotos_camara)}"
+        )
+
+        columnas_camara = st.columns(2)
+
+        for indice, foto_guardada in enumerate(fotos_camara):
+            with columnas_camara[indice % 2]:
+                st.image(
+                    foto_guardada["contenido"],
+                    caption=f"Cámara {indice + 1}",
+                    use_container_width=True,
+                )
+
+        if st.button(
+            "🗑️ Borrar fotos hechas con cámara",
+            key=f"qr_borrar_camara_{codigo_espacio}",
+            use_container_width=True,
+        ):
+            _limpiar_fotos_camara_qr(codigo_espacio)
+            st.rerun()
+
     fotos = st.file_uploader(
-        "Añadir fotografías (opcional)",
+        "🖼️ Elegir de galería",
         type=["jpg", "jpeg", "png"],
         accept_multiple_files=True,
         key=f"qr_fotos_{codigo_espacio}",
@@ -312,10 +413,29 @@ def pantalla_incidencia_qr():
     fotos_validas = []
     error_fotos = False
 
-    if fotos:
-        if len(fotos) > MAX_FOTOS:
+    # Primero incorporamos las capturas directas de cámara.
+    for indice, foto_guardada in enumerate(fotos_camara, start=1):
+        contenido = foto_guardada.get("contenido") or b""
+
+        if len(contenido) > MAX_MB_FOTO * 1024 * 1024:
             st.warning(
-                f"Puedes añadir un máximo de {MAX_FOTOS} fotografías."
+                f"La fotografía de cámara {indice} supera "
+                f"{MAX_MB_FOTO} MB."
+            )
+            error_fotos = True
+            continue
+
+        fotos_validas.append((
+            foto_guardada.get("nombre") or f"camara_{indice}.jpg",
+            contenido,
+        ))
+
+    # Después añadimos las elegidas de galería.
+    if fotos:
+        if len(fotos_camara) + len(fotos) > MAX_FOTOS:
+            st.warning(
+                f"Puedes añadir un máximo de {MAX_FOTOS} fotografías "
+                "entre cámara y galería."
             )
             error_fotos = True
         else:
@@ -336,9 +456,10 @@ def pantalla_incidencia_qr():
                 with columnas[indice % 2]:
                     st.image(
                         contenido,
-                        caption=f"Foto {indice + 1}",
+                        caption=f"Galería {indice + 1}",
                         use_container_width=True,
                     )
+
         st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -476,6 +597,10 @@ def pantalla_incidencia_qr():
         st.session_state[
             clave_envio
         ] = numero_ot
+
+        _limpiar_fotos_camara_qr(
+            codigo_espacio
+        )
 
         clave_error_fotos = (
             f"incidencia_qr_error_fotos_{codigo_espacio}"
