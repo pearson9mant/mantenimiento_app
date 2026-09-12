@@ -94,6 +94,49 @@ def codigo_ot_no_traducible(numero_ot):
     )
 
 
+
+def _clave_foto_camara_ot(modo, id_orden):
+    return f"{modo}_foto_camara_persistida_{id_orden}"
+
+
+def _guardar_foto_camara_en_sesion(modo, id_orden, foto):
+    """Copia la foto de cámara a session_state para conservarla entre reruns."""
+    if foto is None:
+        return None
+
+    try:
+        contenido = foto.getvalue()
+    except Exception:
+        return None
+
+    if not contenido:
+        return None
+
+    datos = {
+        "nombre": limpiar_nombre_archivo(
+            getattr(foto, "name", "camara.jpg") or "camara.jpg"
+        ),
+        "mime": str(getattr(foto, "type", "image/jpeg") or "image/jpeg"),
+        "contenido": bytes(contenido),
+    }
+
+    st.session_state[_clave_foto_camara_ot(modo, id_orden)] = datos
+    return datos
+
+
+def _obtener_foto_camara_sesion(modo, id_orden):
+    datos = st.session_state.get(_clave_foto_camara_ot(modo, id_orden))
+    if not isinstance(datos, dict):
+        return None
+    if not datos.get("contenido"):
+        return None
+    return datos
+
+
+def _limpiar_foto_camara_sesion(modo, id_orden):
+    st.session_state.pop(_clave_foto_camara_ot(modo, id_orden), None)
+
+
 def limpiar_nombre_archivo(texto):
     texto = str(texto or "")
 
@@ -3491,13 +3534,97 @@ def mostrar_tarjeta_ot(
             expanded=False,
         ):
             st.caption(
-                "Haz la foto con la cámara del móvil o elige una imagen "
-                "ya guardada. Se guarda directamente en esta OT y no "
-                "cambia su estado ni la finaliza."
+                "Puedes hacer una foto directamente con la cámara "
+                "o elegir una imagen de la galería. "
+                "La OT permanece abierta en todo momento."
             )
 
+            st.markdown("#### 📷 Hacer foto ahora")
+
+            foto_camara = st.camera_input(
+                "Cámara",
+                key=f"{modo}_camara_directa_ot_{id_orden}",
+                label_visibility="collapsed",
+            )
+
+            if foto_camara is not None:
+                datos_camara = _guardar_foto_camara_en_sesion(
+                    modo=modo,
+                    id_orden=id_orden,
+                    foto=foto_camara,
+                )
+            else:
+                datos_camara = _obtener_foto_camara_sesion(
+                    modo=modo,
+                    id_orden=id_orden,
+                )
+
+            if datos_camara:
+                tamano_camara = len(datos_camara.get("contenido") or b"")
+
+                if tamano_camara > MAX_MB_FOTO_OT * 1024 * 1024:
+                    st.error(f"La fotografía supera {MAX_MB_FOTO_OT} MB.")
+                else:
+                    st.success(
+                        "📷 Foto preparada. Pulsa Guardar foto en la OT."
+                    )
+
+                    c_guardar, c_descartar = st.columns(2)
+
+                    with c_guardar:
+                        if st.button(
+                            "💾 Guardar foto",
+                            key=f"{modo}_guardar_foto_camara_ot_{id_orden}",
+                            use_container_width=True,
+                            type="primary",
+                        ):
+                            try:
+                                nombres_existentes = obtener_nombres_fotos_ot(num_ot)
+                                secuencia = len(nombres_existentes) + 1
+                                nombre_original = limpiar_nombre_archivo(
+                                    datos_camara.get("nombre") or "camara.jpg"
+                                )
+                                nombre_foto_nueva = limpiar_nombre_archivo(
+                                    f"{num_ot}_OT_{id_orden}_{secuencia}_{nombre_original}"
+                                )
+
+                                while nombre_foto_nueva in nombres_existentes:
+                                    secuencia += 1
+                                    nombre_foto_nueva = limpiar_nombre_archivo(
+                                        f"{num_ot}_OT_{id_orden}_{secuencia}_{nombre_original}"
+                                    )
+
+                                guardar_foto_ot(
+                                    numero_ot=num_ot,
+                                    nombre_foto=nombre_foto_nueva,
+                                    foto_data=datos_camara["contenido"],
+                                )
+
+                                _limpiar_foto_camara_sesion(modo, id_orden)
+                                st.session_state[clave_fotos_ot] = True
+                                st.success("Fotografía guardada en la OT.")
+                                st.rerun()
+
+                            except Exception as error:
+                                st.error(
+                                    "No se ha podido guardar la fotografía: "
+                                    f"{error}"
+                                )
+
+                    with c_descartar:
+                        if st.button(
+                            "🗑️ Descartar",
+                            key=f"{modo}_descartar_foto_camara_ot_{id_orden}",
+                            use_container_width=True,
+                        ):
+                            _limpiar_foto_camara_sesion(modo, id_orden)
+                            st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### 🖼️ Elegir de galería")
+
             foto_nueva = st.file_uploader(
-                "📸 Hacer o elegir foto",
+                "Seleccionar imagen",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=False,
                 key=f"{modo}_foto_directa_ot_{id_orden}",
@@ -3521,14 +3648,10 @@ def mostrar_tarjeta_ot(
                     st.error(error_foto_nueva)
 
             if st.button(
-                "💾 Guardar foto en la OT",
+                "💾 Guardar imagen de galería",
                 key=f"{modo}_guardar_foto_directa_ot_{id_orden}",
                 use_container_width=True,
-                type="primary",
-                disabled=(
-                    foto_nueva is None
-                    or bool(error_foto_nueva)
-                ),
+                disabled=(foto_nueva is None or bool(error_foto_nueva)),
             ):
                 try:
                     contenido_foto = foto_nueva.getvalue()
@@ -3540,21 +3663,17 @@ def mostrar_tarjeta_ot(
                     else:
                         nombres_existentes = obtener_nombres_fotos_ot(num_ot)
                         secuencia = len(nombres_existentes) + 1
-
                         nombre_original = limpiar_nombre_archivo(
                             getattr(foto_nueva, "name", "foto.jpg")
                         )
-
                         nombre_foto_nueva = limpiar_nombre_archivo(
-                            f"{num_ot}_OT_{id_orden}_"
-                            f"{secuencia}_{nombre_original}"
+                            f"{num_ot}_OT_{id_orden}_{secuencia}_{nombre_original}"
                         )
 
                         while nombre_foto_nueva in nombres_existentes:
                             secuencia += 1
                             nombre_foto_nueva = limpiar_nombre_archivo(
-                                f"{num_ot}_OT_{id_orden}_"
-                                f"{secuencia}_{nombre_original}"
+                                f"{num_ot}_OT_{id_orden}_{secuencia}_{nombre_original}"
                             )
 
                         guardar_foto_ot(
@@ -3564,11 +3683,8 @@ def mostrar_tarjeta_ot(
                         )
 
                         st.session_state[clave_fotos_ot] = True
-
-                        st.success(
-                            "Fotografía guardada en la OT. "
-                            "Puedes seleccionar otra fotografía."
-                        )
+                        st.success("Fotografía guardada en la OT.")
+                        st.rerun()
 
                 except Exception as error:
                     st.error(
@@ -3834,6 +3950,7 @@ def mostrar_tarjeta_ot(
                         finalizar_orden(id_orden, "")
                         st.session_state[f"{modo}_confirmar_fin_rapido_{id_orden}"] = False
                         st.session_state.pop(f"legionella_guardada_{id_orden}", None)
+                        _limpiar_foto_camara_sesion(modo, id_orden)
                         preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
                         st.rerun()
 
@@ -4036,6 +4153,11 @@ def mostrar_tarjeta_ot(
                                             None,
                                         )
 
+                                        _limpiar_foto_camara_sesion(
+                                            modo,
+                                            id_orden,
+                                        )
+
                                         preparar_siguiente_mision_corazon(
                                             num_ot,
                                             id_orden,
@@ -4084,6 +4206,11 @@ def mostrar_tarjeta_ot(
                                 st.session_state.pop(
                                     f"legionella_guardada_{id_orden}",
                                     None,
+                                )
+
+                                _limpiar_foto_camara_sesion(
+                                    modo,
+                                    id_orden,
                                 )
 
                                 preparar_siguiente_mision_corazon(
