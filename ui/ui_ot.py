@@ -3367,122 +3367,53 @@ def mostrar_tarjeta_ot(
         # -------------------------------------------------
         # FOTOS DE LA OT · CARGA BAJO DEMANDA
         # -------------------------------------------------
-        clave_fotos_ot = (
-            f"{modo}_mostrar_fotos_ot_{id_orden}"
+        clave_fotos_ot = f"{modo}_mostrar_fotos_ot_{id_orden}"
+
+        mostrar_fotos_ot = st.toggle(
+            "📷 Mostrar fotos de la OT",
+            key=clave_fotos_ot,
+            help="Activa para cargar las fotos. Desactiva para ocultarlas.",
         )
 
-        mostrar_fotos_ot = bool(
-            st.session_state.get(
-                clave_fotos_ot,
-                False,
-            )
-        )
-
-        if not mostrar_fotos_ot:
-            if st.button(
-                "📷 Ver fotos de la OT",
-                key=f"{modo}_ver_fotos_ot_{id_orden}",
-                use_container_width=True,
-            ):
-                st.session_state[
-                    clave_fotos_ot
-                ] = True
-                st.rerun()
-
-        else:
-            if st.button(
-                "🙈 Ocultar fotos de la OT",
-                key=f"{modo}_ocultar_fotos_ot_{id_orden}",
-                use_container_width=True,
-            ):
-                st.session_state[
-                    clave_fotos_ot
-                ] = False
-                st.rerun()
-
+        if mostrar_fotos_ot:
             try:
-                fotos_db = obtener_fotos_ot(
-                    num_ot
-                )
+                fotos_db = obtener_fotos_ot(num_ot)
 
                 if fotos_db:
-                    cols_fotos = st.columns(3)
+                    for i, (nombre_foto, foto_data) in enumerate(fotos_db, start=1):
+                        try:
+                            st.image(
+                                bytes(foto_data),
+                                caption=nombre_foto or f"Foto {i}",
+                                use_container_width=True,
+                            )
+                        except Exception as error:
+                            st.caption(f"📷 Foto no disponible: {error}")
 
-                    for i, (
-                        nombre_foto,
-                        foto_data,
-                    ) in enumerate(
-                        fotos_db
-                    ):
-                        with cols_fotos[
-                            i % 3
-                        ]:
-                            try:
-                                st.image(
-                                    bytes(
-                                        foto_data
-                                    ),
-                                    caption=(
-                                        nombre_foto
-                                        or f"Foto {i + 1}"
-                                    ),
-                                    use_container_width=True,
-                                )
-                            except Exception as error:
-                                st.caption(
-                                    "📷 Foto no disponible: "
-                                    f"{error}"
-                                )
-
-                elif (
-                    foto
-                    and str(
-                        foto
-                    ).strip().lower()
-                    != "postgres_fotos"
-                ):
+                elif foto and str(foto).strip().lower() != "postgres_fotos":
                     fotos_legacy = [
                         ruta.strip()
-                        for ruta in str(
-                            foto
-                        ).split("|")
+                        for ruta in str(foto).split("|")
                         if ruta.strip()
                     ]
 
                     if fotos_legacy:
-                        cols_fotos = st.columns(3)
-
-                        for i, ruta_foto in enumerate(
-                            fotos_legacy
-                        ):
-                            with cols_fotos[
-                                i % 3
-                            ]:
-                                try:
-                                    st.image(
-                                        ruta_foto,
-                                        caption=f"Foto {i + 1}",
-                                        use_container_width=True,
-                                    )
-                                except Exception:
-                                    st.caption(
-                                        "📷 Foto no disponible."
-                                    )
+                        for i, ruta_foto in enumerate(fotos_legacy, start=1):
+                            try:
+                                st.image(
+                                    ruta_foto,
+                                    caption=f"Foto {i}",
+                                    use_container_width=True,
+                                )
+                            except Exception:
+                                st.caption("📷 Foto no disponible.")
                     else:
-                        st.info(
-                            "Esta OT no tiene fotos."
-                        )
-
+                        st.info("Esta OT no tiene fotos.")
                 else:
-                    st.info(
-                        "Esta OT no tiene fotos."
-                    )
+                    st.info("Esta OT no tiene fotos.")
 
             except Exception as error:
-                st.caption(
-                    "📷 No se pudieron cargar las fotos: "
-                    f"{error}"
-                )
+                st.caption(f"📷 No se pudieron cargar las fotos: {error}")
 
         # -------------------------------------------------
         # AÑADIR FOTO A LA OT · SIN FINALIZARLA
