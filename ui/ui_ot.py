@@ -3184,6 +3184,29 @@ def mostrar_compartir_ot(
             )
 
 
+
+def fijar_ot_trabajo_activa(id_orden, numero_ot="", modo="operario"):
+    """Mantiene la OT abierta durante los rerun del trabajo de campo."""
+    if str(modo or "").strip().lower() != "operario":
+        return
+
+    st.session_state["operario_ot_abierta_id"] = id_orden
+    st.session_state["ot_trabajo_activa"] = id_orden
+    st.session_state["ot_trabajo_activa_numero"] = str(numero_ot or "").strip()
+
+
+def liberar_ot_trabajo_activa(id_orden=None):
+    """Libera la OT persistente solo cuando corresponde."""
+    activa = st.session_state.get("ot_trabajo_activa")
+
+    if id_orden is not None and activa not in [None, id_orden]:
+        return
+
+    st.session_state.pop("operario_ot_abierta_id", None)
+    st.session_state.pop("ot_trabajo_activa", None)
+    st.session_state.pop("ot_trabajo_activa_numero", None)
+
+
 def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
     """
     Libera la OT finalizada y solicita al Corazón una nueva misión.
@@ -3194,7 +3217,7 @@ def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
     if str(modo or "").strip().lower() != "operario":
         return
 
-    st.session_state.pop("operario_ot_abierta_id", None)
+    liberar_ot_trabajo_activa(id_orden)
     st.session_state["corazon_mision_finalizada"] = {
         "id": id_orden,
         "numero_ot": str(num_ot or "").strip(),
@@ -3230,6 +3253,13 @@ def mostrar_tarjeta_ot(
 
     if es_operario() and normalizar_operario_nombre(operario) != normalizar_operario_nombre(nombre_operario_actual()):
         return
+
+    # Al abrirla, la OT queda fijada. Los rerun internos deben volver aquí.
+    fijar_ot_trabajo_activa(
+        id_orden=id_orden,
+        numero_ot=num_ot,
+        modo=modo,
+    )
 
     # La fila ligera histórica no incluye siempre planta.
     # Al abrir una única OT podemos consultar su ubicación real.
