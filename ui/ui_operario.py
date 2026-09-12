@@ -989,6 +989,7 @@ def mostrar_resumen_ot_operario(fila):
             ):
                 try:
                     st.session_state["operario_ot_abierta_id"] = int(id_ot)
+                    st.session_state["ot_trabajo_activa"] = int(id_ot)
                 except (TypeError, ValueError):
                     st.error("No se ha podido abrir esta orden.")
                 else:
@@ -1348,6 +1349,9 @@ def _mostrar_fila_jornada_operario(fila):
                     st.session_state[
                         "operario_ot_abierta_id"
                     ] = int(id_ot)
+                    st.session_state[
+                        "ot_trabajo_activa"
+                    ] = int(id_ot)
                 except (TypeError, ValueError):
                     st.error(
                         "No se ha podido abrir esta orden."
@@ -1413,6 +1417,7 @@ def _buscar_fila_mision_en_ordenes(ordenes_activas, mision):
 def _abrir_ot_desde_corazon(id_ot):
     try:
         st.session_state["operario_ot_abierta_id"] = int(id_ot)
+        st.session_state["ot_trabajo_activa"] = int(id_ot)
     except (TypeError, ValueError):
         st.error("No se ha podido abrir la misión seleccionada.")
         return False
@@ -2012,6 +2017,17 @@ def pantalla_operario(modo="ordenes"):
         "operario_ot_abierta_id"
     )
 
+    # Recupera la OT de trabajo si un rerun interno perdió la clave de vista.
+    if not solo_historico and id_ot_abierta is None:
+        id_ot_persistente = st.session_state.get(
+            "ot_trabajo_activa"
+        )
+        if id_ot_persistente is not None:
+            st.session_state[
+                "operario_ot_abierta_id"
+            ] = id_ot_persistente
+            id_ot_abierta = id_ot_persistente
+
     ot_abierta = (
         id_ot_abierta is not None
     )
@@ -2020,6 +2036,14 @@ def pantalla_operario(modo="ordenes"):
     if solo_historico:
         st.session_state.pop(
             "operario_ot_abierta_id",
+            None,
+        )
+        st.session_state.pop(
+            "ot_trabajo_activa",
+            None,
+        )
+        st.session_state.pop(
+            "ot_trabajo_activa_numero",
             None,
         )
 
@@ -2050,6 +2074,14 @@ def pantalla_operario(modo="ordenes"):
 
             st.session_state.pop(
                 "operario_ot_abierta_id",
+                None,
+            )
+            st.session_state.pop(
+                "ot_trabajo_activa",
+                None,
+            )
+            st.session_state.pop(
+                "ot_trabajo_activa_numero",
                 None,
             )
 
