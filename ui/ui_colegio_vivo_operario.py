@@ -1,8 +1,8 @@
 import html
+import time
 
 import streamlit as st
 import pandas as pd
-from streamlit_autorefresh import st_autorefresh
 
 from modules.colegio_vivo import obtener_colegio_vivo
 from modules.corazon_sistema import (
@@ -19,6 +19,33 @@ from ui.ui_edificio_vivo import (
     pintar_campus_operario,
     volver_colegio_vivo,
 )
+
+
+
+@st.fragment(run_every="30s")
+def _latido_nativo_colegio_vivo():
+    """
+    Refresco nativo de Streamlit para Colegio Vivo.
+
+    El primer render no recarga la app.
+    A partir de ahí, cada ~30 segundos fuerza un rerun completo
+    para recoger nuevas incidencias/OT sin usar streamlit_autorefresh.
+
+    Este fragmento solo existe mientras Colegio Vivo está visible,
+    por lo que no interfiere cuando el operario ya está trabajando
+    dentro de una OT.
+    """
+    ahora = time.time()
+    clave = "_colegio_vivo_ultimo_refresco_nativo"
+    ultimo = st.session_state.get(clave)
+
+    if ultimo is None:
+        st.session_state[clave] = ahora
+        return
+
+    if ahora - float(ultimo) >= 28:
+        st.session_state[clave] = ahora
+        st.rerun()
 
 
 ORDEN_PRIORIDAD = {
@@ -1079,15 +1106,11 @@ def _mostrar_ots_sin_planta(ordenes):
 def pantalla_colegio_vivo_operario():
 
     # =====================================================
-    # LATIDO AUTOMÁTICO · COLEGIO VIVO
-    # Refresca únicamente esta pantalla cada 30 segundos.
-    # Permite detectar nuevas OT/QR sin tocar ningún botón.
+    # LATIDO AUTOMÁTICO NATIVO · COLEGIO VIVO
+    # Mantiene la actualización de nuevas OT/QR cada ~30 s
+    # sin depender del componente externo streamlit_autorefresh.
     # =====================================================
-    st_autorefresh(
-        interval=30_000,
-        limit=None,
-        key="latido_colegio_vivo_operario"
-    )
+    _latido_nativo_colegio_vivo()
 
     _css_pantalla_operario()
     css_edificio_vivo()
