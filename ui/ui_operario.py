@@ -1954,7 +1954,19 @@ def _redirigir_regreso_colegio_vivo():
         return False
 
     # -------------------------------------------------
-    # ¿La OT acaba de ser finalizada?
+    # Mientras exista una OT abierta, ningún rerun interno
+    # puede sacarnos de ella.
+    #
+    # "recalcular_corazon" también se usa durante acciones
+    # normales de la app, por lo que NO puede interpretarse
+    # como señal de que esta OT se ha finalizado.
+    # -------------------------------------------------
+    if id_ot_abierta is not None:
+        return False
+
+    # -------------------------------------------------
+    # Solo cuando la OT ya ha liberado su ID comprobamos
+    # si el cierre pidió recalcular el Corazón.
     # -------------------------------------------------
     finalizada = bool(
         st.session_state.pop(
@@ -1962,13 +1974,6 @@ def _redirigir_regreso_colegio_vivo():
             False,
         )
     )
-
-    # -------------------------------------------------
-    # Si la OT sigue abierta y no se ha finalizado,
-    # seguimos trabajando en ella.
-    # -------------------------------------------------
-    if id_ot_abierta is not None and not finalizada:
-        return False
 
     # -------------------------------------------------
     # Entramos otra vez en Colegio Vivo
