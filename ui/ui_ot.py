@@ -189,6 +189,54 @@ def obtener_nombres_fotos_ot(numero_ot):
         conn.close()
 
 
+def eliminar_foto_ot(numero_ot, nombre_foto):
+    """
+    Elimina una sola foto de la tabla ordenes_fotos.
+    No modifica la OT, su estado ni ninguna otra fotografía.
+    """
+    numero_ot = str(numero_ot or "").strip()
+    nombre_foto = str(nombre_foto or "").strip()
+
+    if not numero_ot or not nombre_foto:
+        return False, "Faltan datos de la fotografía."
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            DELETE FROM ordenes_fotos
+            WHERE numero_ot = ?
+              AND nombre_foto = ?
+        """), (
+            numero_ot,
+            nombre_foto,
+        ))
+
+        borradas = int(
+            getattr(cur, "rowcount", 0)
+            or 0
+        )
+
+        conn.commit()
+
+        if borradas <= 0:
+            return False, "La fotografía ya no estaba disponible."
+
+        return True, ""
+
+    except Exception as error:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+        return False, str(error)
+
+    finally:
+        conn.close()
+
+
 def guardar_fotos_cierre_ot(
     numero_ot,
     id_orden,
@@ -3389,6 +3437,41 @@ def mostrar_tarjeta_ot(
                             )
                         except Exception as error:
                             st.caption(f"📷 Foto no disponible: {error}")
+
+                        nombre_foto_txt = str(
+                            nombre_foto or ""
+                        ).strip()
+
+                        if nombre_foto_txt:
+                            confirmar_borrado = st.checkbox(
+                                "Confirmo que quiero borrar esta foto",
+                                key=(
+                                    f"{modo}_confirmar_borrar_foto_"
+                                    f"{id_orden}_{i}_{nombre_foto_txt}"
+                                ),
+                            )
+
+                            if st.button(
+                                "🗑️ Borrar esta foto",
+                                key=(
+                                    f"{modo}_borrar_foto_"
+                                    f"{id_orden}_{i}_{nombre_foto_txt}"
+                                ),
+                                use_container_width=True,
+                                disabled=not confirmar_borrado,
+                            ):
+                                ok_borrado, error_borrado = eliminar_foto_ot(
+                                    numero_ot=num_ot,
+                                    nombre_foto=nombre_foto_txt,
+                                )
+
+                                if ok_borrado:
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "No se ha podido borrar la foto: "
+                                        f"{error_borrado}"
+                                    )
 
                 elif foto and str(foto).strip().lower() != "postgres_fotos":
                     fotos_legacy = [
