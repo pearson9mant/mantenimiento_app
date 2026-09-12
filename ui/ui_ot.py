@@ -3708,31 +3708,77 @@ def mostrar_tarjeta_ot(
                 "picos de memoria en Render."
             )
 
-            resultado_foto = _CAMARA_DIRECTA_OT(
-                default={
-                    "photo_camera": None,
-                    "photo_gallery": None,
-                },
-                key=f"{modo}_fotos_ot_estable_{id_orden}",
-                on_photo_camera_change=lambda: None,
-                on_photo_gallery_change=lambda: None,
+            clave_componente_fotos = (
+                f"{modo}_fotos_ot_estable_{id_orden}"
+            )
+
+            clave_pendiente_camara = (
+                f"{modo}_foto_pendiente_camara_{id_orden}"
+            )
+
+            clave_pendiente_galeria = (
+                f"{modo}_foto_pendiente_galeria_{id_orden}"
+            )
+
+            def _guardar_trigger_foto_pendiente(
+                campo,
+                clave_destino,
+            ):
+                estado_componente = st.session_state.get(
+                    clave_componente_fotos
+                )
+
+                if not estado_componente:
+                    return
+
+                try:
+                    valor = getattr(
+                        estado_componente,
+                        campo,
+                        None,
+                    )
+                except Exception:
+                    try:
+                        valor = estado_componente.get(
+                            campo
+                        )
+                    except Exception:
+                        valor = None
+
+                if valor:
+                    st.session_state[
+                        clave_destino
+                    ] = valor
+
+            _CAMARA_DIRECTA_OT(
+                key=clave_componente_fotos,
+                on_photo_camera_change=lambda: (
+                    _guardar_trigger_foto_pendiente(
+                        "photo_camera",
+                        clave_pendiente_camara,
+                    )
+                ),
+                on_photo_gallery_change=lambda: (
+                    _guardar_trigger_foto_pendiente(
+                        "photo_gallery",
+                        clave_pendiente_galeria,
+                    )
+                ),
                 width="stretch",
             )
 
             eventos_foto = [
                 (
                     "CAMARA",
-                    getattr(
-                        resultado_foto,
-                        "photo_camera",
+                    st.session_state.pop(
+                        clave_pendiente_camara,
                         None,
                     ),
                 ),
                 (
                     "GALERIA",
-                    getattr(
-                        resultado_foto,
-                        "photo_gallery",
+                    st.session_state.pop(
+                        clave_pendiente_galeria,
                         None,
                     ),
                 ),
