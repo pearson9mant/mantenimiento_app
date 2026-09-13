@@ -3490,23 +3490,28 @@ def obtener_plano_general_legionella(centro):
     if not nombre_archivo:
         return None
 
-    ruta = (
+    # Los planos están en la raíz del proyecto:
+    # assets/planos_legionella/<archivo.pdf>
+    # No se abre ni se lee el PDF aquí; solo comprobamos la ruta.
+    rutas = [
+        Path("assets") / "planos_legionella" / nombre_archivo,
         Path(__file__).resolve().parent.parent
         / "assets"
         / "planos_legionella"
-        / nombre_archivo
-    )
+        / nombre_archivo,
+    ]
 
-    try:
-        if not ruta.is_file():
-            return None
+    for ruta in rutas:
+        try:
+            if ruta.is_file():
+                return {
+                    "nombre": nombre_archivo,
+                    "ruta": ruta,
+                }
+        except Exception:
+            continue
 
-        return {
-            "nombre": nombre_archivo,
-            "ruta": ruta,
-        }
-    except Exception:
-        return None
+    return None
 
 
 def cargar_plano_punto_legionella(punto_id):
