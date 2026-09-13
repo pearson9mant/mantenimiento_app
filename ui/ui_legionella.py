@@ -1247,7 +1247,10 @@ def tareas_por_tipo_punto(tipo_punto, tipo_control_punto=""):
     elif tipo_control_punto == "Retorno":
         tareas.insert(0, "Temperatura retorno")
 
-    elif tipo_control_punto == "Solo AFS":
+    elif tipo_control_punto in [
+        "Solo AFS",
+        "Seguimiento AFS (sin correctiva)",
+    ]:
         tareas.insert(0, "Control AFS")
 
     elif tipo_control_punto == "Solo ACS":
@@ -2061,32 +2064,10 @@ def generar_ots_legionella_planificadas():
         )
 
         if creada:
+            # Igual que en Preventivo: crear la OT NO mueve el vencimiento.
+            # La próxima fecha se recalcula únicamente cuando el control
+            # queda realmente registrado, desde la fecha real de ejecución.
             creadas += 1
-
-            frecuencia = int(fila["frecuencia_dias"] or 30)
-
-            proxima = ajustar_proxima_fecha_legionella(
-                fila["proxima_fecha"],
-                frecuencia
-            )
-
-            # Mantener calendario maestro sin generar una cascada
-            # de OT atrasadas. Si la tarea acumuló varios periodos
-            # vencidos, avanzamos hasta el siguiente vencimiento futuro.
-            while proxima.date() <= date.today():
-                proxima = ajustar_proxima_fecha_legionella(
-                    proxima,
-                    frecuencia
-                )
-
-            ejecutar("""
-                UPDATE legionella_tareas
-                SET proxima_fecha = ?
-                WHERE id = ?
-            """, (
-                proxima.strftime("%Y-%m-%d"),
-                int(fila["id"])
-            ))
         else:
             ya_existia += 1
 
@@ -2256,6 +2237,20 @@ def registrar_control(
         valor_4
     )
 
+    es_seguimiento_afs_p9 = (
+        centro == "Pearson 9"
+        and str(punto_nombre or "").strip() == "Entrada general AFS"
+        and str(punto.get("tipo_control_punto") or "").strip()
+        == "Seguimiento AFS (sin correctiva)"
+        and str(tipo_control or "").strip() == "Control AFS"
+    )
+
+    if es_seguimiento_afs_p9:
+        resultado = (
+            f"Seguimiento AFS sin correctiva automática · {resultado}"
+        )
+        estado = "SEGUIMIENTO"
+
     ejecutar(
         """
         INSERT INTO legionella_registros
@@ -2351,67 +2346,10 @@ def registrar_control(
             f"tras registrar control: {type(e).__name__}: {e}"
         )
 
-    es_seguimiento_afs_p9 = (
-        centro == "Pearson 9"
-        and str(edificio or "").strip() == "Entrada general"
-        and str(punto_nombre or "").strip() == "Entrada general AFS"
-        and str(tipo_control or "").strip() == "Control AFS"
-        and estado == "RIESGO"
-    )
-
+    # Este punto es únicamente de seguimiento temporal. Registra valores
+    # reales de temperatura/cloro, pero nunca abre incidencia ni correctivo.
     if es_seguimiento_afs_p9:
-        incidencia_existente = existe_incidencia_seguimiento_afs_p9_abierta()
-        ot_existente = existe_ot_seguimiento_afs_p9_abierta()
-
-        seguimiento_existente = (
-            incidencia_existente
-            or ot_existente
-        )
-
-        if seguimiento_existente:
-            resultado_salida = (
-                f"{resultado} · Desviación AFS de Entrada general Pearson 9 conocida y en seguimiento. "
-                "Se guarda la medición real sin generar un nuevo correctivo."
-            )
-            return "SEGUIMIENTO", resultado_salida
-
-        ejecutar(
-            """
-            INSERT INTO legionella_incidencias
-            (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
-            VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
-            """,
-            (
-                centro,
-                edificio,
-                planta,
-                punto_nombre,
-                "SEGUIMIENTO AFS P9",
-                (
-                    "Desviación conocida AFS en Entrada general de Pearson 9 en seguimiento. "
-                    + resultado
-                    + (" | " + observaciones if observaciones else "")
-                ),
-                operario,
-            ),
-        )
-
-        crear_ot_legionella(
-            centro,
-            edificio,
-            punto_nombre,
-            "CORRECTIVO LEGIONELLA - SEGUIMIENTO AFS P9",
-            operario,
-            punto_id=punto_id,
-            planta=planta,
-        )
-
-        resultado_salida = (
-            f"{resultado} · Desviación AFS de Entrada general Pearson 9 abierta en seguimiento. "
-            "Se mantiene una única actuación activa para controlar esta situación."
-        )
-
-        return "SEGUIMIENTO", resultado_salida
+        return "SEGUIMIENTO", resultado
 
     if estado in ["RIESGO", "INCIDENCIA"]:
         if centro and edificio and punto_nombre and tarea:
@@ -4136,11 +4074,10 @@ def pantalla_legionella():
                             st.success(f"✅ Control guardado correctamente: {resultado}")
 
                         elif estado == "SEGUIMIENTO":
-                            st.warning(f"🟡 DESVIACIÓN CONOCIDA EN SEGUIMIENTO: {resultado}")
+                            st.warning(f"🟡 AFS EN SEGUIMIENTO: {resultado}")
                             st.info(
-                                "Los valores reales quedan registrados. "
-                                "No se duplican incidencias ni correctivos mientras exista "
-                                "la actuación AFS de Entrada general de Pearson 9 abierta."
+                                "Los valores reales de temperatura y cloro quedan registrados. "
+                                "Este control de seguimiento no genera incidencia ni correctivo automático."
                             )
                             st.toast("🟡 AFS Entrada general P9 en seguimiento", icon="🟡")
 
@@ -4517,6 +4454,7 @@ def pantalla_legionella():
                     "Tipo de control",
                     [
                         "Solo AFS",
+                        "Seguimiento AFS (sin correctiva)",
                         "Solo ACS",
                         "ACS terminal mezclada",
                         "ACS + AFS",
@@ -4899,7 +4837,8 @@ def pantalla_legionella():
                         )
 
                         opciones_tipo_control = [
-                            "Solo AFS", "Solo ACS", "ACS terminal mezclada", "ACS + AFS",
+                            "Solo AFS", "Seguimiento AFS (sin correctiva)",
+                            "Solo ACS", "ACS terminal mezclada", "ACS + AFS",
                             "Acumulador", "Retorno", "Muestra", "Depósitos solares",
                             "Sala ACS completa", "Válvula termostática", "Solo temperatura",
                             "Choque térmico", "Circuito mezclado duchas",
