@@ -3475,8 +3475,8 @@ def obtener_plano_general_legionella(centro):
     """
     Devuelve solo la ruta del plano general de Legionella.
 
-    Importante: aquí NO se leen los bytes del PDF. El archivo se carga
-    únicamente cuando el operario pulsa el botón para verlo.
+    No lee el PDF. Solo localiza assets/planos_legionella dentro
+    del proyecto; los bytes se cargan únicamente al pulsar Ver plano.
     """
     centro_txt = str(centro or "").strip().lower()
 
@@ -3490,26 +3490,21 @@ def obtener_plano_general_legionella(centro):
     if not nombre_archivo:
         return None
 
-    # Los planos están en la raíz del proyecto:
-    # assets/planos_legionella/<archivo.pdf>
-    # No se abre ni se lee el PDF aquí; solo comprobamos la ruta.
-    rutas = [
-        Path("assets") / "planos_legionella" / nombre_archivo,
-        Path(__file__).resolve().parent.parent
-        / "assets"
-        / "planos_legionella"
-        / nombre_archivo,
-    ]
+    archivo_actual = Path(__file__).resolve()
 
-    for ruta in rutas:
-        try:
-            if ruta.is_file():
-                return {
-                    "nombre": nombre_archivo,
-                    "ruta": ruta,
-                }
-        except Exception:
-            continue
+    for carpeta_base in [archivo_actual.parent, *archivo_actual.parents]:
+        ruta = (
+            carpeta_base
+            / "assets"
+            / "planos_legionella"
+            / nombre_archivo
+        )
+
+        if ruta.is_file():
+            return {
+                "nombre": nombre_archivo,
+                "ruta": ruta,
+            }
 
     return None
 
