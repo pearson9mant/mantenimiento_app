@@ -15,6 +15,7 @@ from modules.pedidos_material import (
 )
 
 from modules.ordenes import obtener_fotos_ot
+from modules.pedidos_ot import obtener_ot_de_pedido
 from modules.inventario import (
     obtener_materiales_para_select,
     categorias_inventario_disponibles,
@@ -1679,15 +1680,71 @@ def ui_pedidos_abel():
             "observaciones"
         ]
 
+        try:
+            contexto_ot = obtener_ot_de_pedido(
+                id_pedido
+            )
+        except Exception:
+            contexto_ot = None
+
+        descripcion_ot = ""
+        numero_ot = ""
+        ubicacion_ot = ""
+
+        if contexto_ot:
+            descripcion_ot = str(
+                contexto_ot.get("descripcion_ot") or ""
+            ).strip()
+            numero_ot = str(
+                contexto_ot.get("numero_ot") or ""
+            ).strip()
+            ubicacion_ot = " · ".join(
+                str(contexto_ot.get(campo) or "").strip()
+                for campo in [
+                    "centro",
+                    "edificio",
+                    "planta",
+                    "espacio",
+                ]
+                if str(
+                    contexto_ot.get(campo) or ""
+                ).strip()
+            )
+
+        es_ampliacion = (
+            "AMPLIACIÓN DEL PEDIDO"
+            in str(observaciones or "").upper()
+        )
+
+        asunto_pedido = (
+            descripcion_ot
+            or material
+            or "Pedido material"
+        )
+
+        marca_ampliacion = (
+            " · ➕ AMPLIACIÓN"
+            if es_ampliacion
+            else ""
+        )
+
         titulo = (
             f"📦 {numero_pedido} · "
-            f"{material or 'Pedido material'} · "
+            f"{asunto_pedido}"
+            f"{marca_ampliacion} · "
             f"{operario}"
         )
 
         with st.expander(
             titulo
         ):
+            if contexto_ot:
+                st.info(
+                    f"🔗 **OT:** {numero_ot or '-'}\n\n"
+                    f"🛠️ **Trabajo:** {descripcion_ot or '-'}\n\n"
+                    f"📍 **Ubicación:** {ubicacion_ot or '-'}"
+                )
+
             col_a, col_b = st.columns(2)
 
             with col_a:
@@ -1711,7 +1768,7 @@ def ui_pedidos_abel():
 
             if observaciones:
                 st.write(
-                    f"**OT / observaciones:** {observaciones}"
+                    f"**Observaciones:** {observaciones}"
                 )
 
             mostrar_lineas_pedido(
