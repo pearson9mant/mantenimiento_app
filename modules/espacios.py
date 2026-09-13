@@ -42,14 +42,9 @@ PLANTAS_BASE = {
             "Planta 1",
             "Planta 0",
         ],
-        "Anexo Servicios": [
-            "Taller",
-            "Vestuarios chicas",
-            "Sala calderas",
-            "Vestuarios chicos",
-        ],
-        "Entrada general": [
-            "Exterior",
+        "Anexos": [
+            "Planta 1",
+            "Planta 0",
         ],
     },
 }
