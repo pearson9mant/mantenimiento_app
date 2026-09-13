@@ -1,5 +1,6 @@
 import streamlit as st
 import base64
+from pathlib import Path
 
 try:
     from st_keyup import st_keyup
@@ -2290,231 +2291,6 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
         return st.session_state.get(f"legionella_guardada_{id_orden}", False)
 
     return True
-
-def obtener_plano_punto_legionella_ot(id_orden):
-    """
-    Devuelve el plano del punto de Legionella asociado a la OT.
-
-    Prioridad de búsqueda:
-    1) vínculo directo id_punto_legionella;
-    2) origen_id cuando origen_tabla = legionella_puntos;
-    3) punto_id de la tarea Legionella vinculada;
-    4) coincidencia exacta centro + nombre del punto (espacio de la OT),
-       priorizando además edificio y planta.
-
-    Los pasos se hacen por separado para mantener compatibilidad con OT
-    antiguas y con instalaciones donde alguna columna de vínculo no exista.
-    """
-    conn = conectar()
-    cur = conn.cursor()
-
-    try:
-        # -------------------------------------------------
-        # 1. DATOS BÁSICOS DE LA OT (siempre necesarios)
-        # -------------------------------------------------
-        cur.execute(_sql("""
-            SELECT centro, edificio, planta, espacio
-            FROM ordenes_trabajo
-            WHERE id = ?
-            LIMIT 1
-        """), (id_orden,))
-
-        ot = cur.fetchone()
-
-        if not ot:
-            return None
-
-        centro = str(ot[0] or "").strip()
-        edificio = str(ot[1] or "").strip()
-        planta = str(ot[2] or "").strip()
-        punto_nombre = str(ot[3] or "").strip()
-
-        candidatos_id = []
-
-        # -------------------------------------------------
-        # 2. VÍNCULO DIRECTO / ORIGEN DE LA OT
-        # -------------------------------------------------
-        try:
-            cur.execute(_sql("""
-                SELECT id_punto_legionella, origen_tabla, origen_id
-                FROM ordenes_trabajo
-                WHERE id = ?
-                LIMIT 1
-            """), (id_orden,))
-
-            vinculo = cur.fetchone()
-
-            if vinculo:
-                if vinculo[0] is not None:
-                    candidatos_id.append(int(vinculo[0]))
-
-                origen_tabla = str(vinculo[1] or "").strip().lower()
-                if origen_tabla == "legionella_puntos" and vinculo[2] is not None:
-                    candidatos_id.append(int(vinculo[2]))
-        except Exception:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-
-        # -------------------------------------------------
-        # 3. VÍNCULO A TRAVÉS DE LA TAREA LEGIONELLA
-        # -------------------------------------------------
-        try:
-            cur.execute(_sql("""
-                SELECT id_tarea_legionella
-                FROM ordenes_trabajo
-                WHERE id = ?
-                LIMIT 1
-            """), (id_orden,))
-
-            fila_tarea = cur.fetchone()
-
-            if fila_tarea and fila_tarea[0] is not None:
-                cur.execute(_sql("""
-                    SELECT punto_id
-                    FROM legionella_tareas
-                    WHERE id = ?
-                    LIMIT 1
-                """), (int(fila_tarea[0]),))
-
-                punto_tarea = cur.fetchone()
-
-                if punto_tarea and punto_tarea[0] is not None:
-                    candidatos_id.append(int(punto_tarea[0]))
-        except Exception:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-
-        # Elimina duplicados conservando el orden.
-        candidatos_id = list(dict.fromkeys(candidatos_id))
-
-        # -------------------------------------------------
-        # 4. BUSCAR PLANO POR LOS VÍNCULOS REALES
-        # -------------------------------------------------
-        for punto_id in candidatos_id:
-            try:
-                cur.execute(_sql("""
-                    SELECT plano_nombre,
-                           plano_data,
-                           nombre_punto,
-                           ubicacion_exacta,
-                           ubicacion
-                    FROM legionella_puntos
-                    WHERE id = ?
-                    LIMIT 1
-                """), (punto_id,))
-
-                fila = cur.fetchone()
-
-                if fila and fila[1]:
-                    return {
-                        "plano_nombre": str(
-                            fila[0] or "plano_punto_legionella.pdf"
-                        ).strip(),
-                        "plano_data": bytes(fila[1]),
-                        "nombre_punto": str(fila[2] or "").strip(),
-                        "ubicacion_exacta": str(
-                            fila[3] or fila[4] or ""
-                        ).strip(),
-                    }
-            except Exception:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-
-        # -------------------------------------------------
-        # 5. RESPALDO PARA OT ANTIGUAS SIN VÍNCULO
-        # La OT de Legionella guarda el nombre del punto en espacio.
-        # -------------------------------------------------
-        if centro and punto_nombre:
-            try:
-                cur.execute(_sql("""
-                    SELECT plano_nombre,
-                           plano_data,
-                           nombre_punto,
-                           ubicacion_exacta,
-                           ubicacion
-                    FROM legionella_puntos
-                    WHERE TRIM(COALESCE(centro, '')) = ?
-                      AND TRIM(COALESCE(nombre_punto, '')) = ?
-                      AND plano_data IS NOT NULL
-                    ORDER BY
-                        CASE
-                            WHEN TRIM(COALESCE(edificio, '')) = ? THEN 0
-                            ELSE 1
-                        END,
-                        CASE
-                            WHEN TRIM(COALESCE(planta, '')) = ? THEN 0
-                            ELSE 1
-                        END,
-                        id DESC
-                    LIMIT 1
-                """), (
-                    centro,
-                    punto_nombre,
-                    edificio,
-                    planta,
-                ))
-
-                fila = cur.fetchone()
-
-                if fila and fila[1]:
-                    return {
-                        "plano_nombre": str(
-                            fila[0] or "plano_punto_legionella.pdf"
-                        ).strip(),
-                        "plano_data": bytes(fila[1]),
-                        "nombre_punto": str(fila[2] or "").strip(),
-                        "ubicacion_exacta": str(
-                            fila[3] or fila[4] or ""
-                        ).strip(),
-                    }
-            except Exception:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-
-        return None
-
-    finally:
-        conn.close()
-
-
-def mostrar_plano_punto_legionella_ot(id_orden, area, origen, desc, modo):
-    """Muestra el plano del punto cuando la OT es de Legionella."""
-    if not es_ot_legionella(area, origen, desc):
-        return
-
-    plano = obtener_plano_punto_legionella_ot(id_orden)
-
-    if not plano:
-        return
-
-    with st.container(border=True):
-        st.markdown("### 🗺️ Plano del punto Legionella")
-
-        if plano["nombre_punto"]:
-            st.caption(f"Punto: {plano['nombre_punto']}")
-
-        if plano["ubicacion_exacta"]:
-            st.info(f"📍 {plano['ubicacion_exacta']}")
-
-        st.download_button(
-            "🗺️ ABRIR / DESCARGAR PLANO",
-            data=plano["plano_data"],
-            file_name=plano["plano_nombre"],
-            mime="application/pdf",
-            key=f"{modo}_plano_legionella_{id_orden}",
-            use_container_width=True,
-            type="primary",
-        )
-
-
 def puede_corregir_ubicacion():
     return rol_actual() in [
         "admin",
@@ -3692,6 +3468,142 @@ def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
     st.session_state["recalcular_corazon"] = True
 
 
+
+
+
+def obtener_plano_general_legionella(centro):
+    """
+    Devuelve el plano general de puntos de Legionella guardado en assets.
+
+    Los planos forman parte del repositorio y no dependen de la base de datos.
+    """
+    centro_txt = str(centro or "").strip().lower()
+
+    nombres = {
+        "pearson 22": "Puntos_control_legionella.pdf",
+        "pearson 9": "Puntos_control_legionella_Pearson_9_v2.pdf",
+    }
+
+    nombre_archivo = nombres.get(centro_txt)
+
+    if not nombre_archivo:
+        return None
+
+    ruta = (
+        Path(__file__).resolve().parent.parent
+        / "assets"
+        / "planos_legionella"
+        / nombre_archivo
+    )
+
+    try:
+        if not ruta.is_file():
+            return None
+
+        return {
+            "nombre": nombre_archivo,
+            "data": ruta.read_bytes(),
+        }
+    except Exception:
+        return None
+
+def obtener_plano_punto_legionella_ot(id_orden):
+    """
+    Recupera el plano del punto de Legionella vinculado a una OT.
+
+    Prioriza la vinculación técnica de la OT (id_punto_legionella /
+    origen_id). Como respaldo para OT antiguas no vinculadas, busca
+    el punto por centro + edificio + nombre exacto del punto.
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT id_punto_legionella,
+                   origen_tabla,
+                   origen_id,
+                   centro,
+                   edificio,
+                   espacio
+            FROM ordenes_trabajo
+            WHERE id = ?
+        """), (id_orden,))
+
+        ot = cur.fetchone()
+
+        if not ot:
+            return None
+
+        punto_id = ot[0]
+        origen_tabla = str(ot[1] or "").strip().lower()
+        origen_id = ot[2]
+        centro_ot = str(ot[3] or "").strip()
+        edificio_ot = str(ot[4] or "").strip()
+        punto_ot = str(ot[5] or "").strip()
+
+        if not punto_id and origen_tabla == "legionella_puntos":
+            punto_id = origen_id
+
+        fila_punto = None
+
+        if punto_id:
+            cur.execute(_sql("""
+                SELECT id, nombre_punto, ubicacion_exacta,
+                       plano_nombre, plano_data
+                FROM legionella_puntos
+                WHERE id = ?
+                LIMIT 1
+            """), (punto_id,))
+            fila_punto = cur.fetchone()
+
+        # Respaldo para OT antiguas que no llegaron a guardar la vinculación.
+        if not fila_punto and centro_ot and punto_ot:
+            cur.execute(_sql("""
+                SELECT id, nombre_punto, ubicacion_exacta,
+                       plano_nombre, plano_data
+                FROM legionella_puntos
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND nombre_punto = ?
+                ORDER BY id DESC
+                LIMIT 1
+            """), (centro_ot, edificio_ot, punto_ot))
+            fila_punto = cur.fetchone()
+
+        if not fila_punto and centro_ot and punto_ot:
+            cur.execute(_sql("""
+                SELECT id, nombre_punto, ubicacion_exacta,
+                       plano_nombre, plano_data
+                FROM legionella_puntos
+                WHERE centro = ?
+                  AND nombre_punto = ?
+                ORDER BY id DESC
+                LIMIT 1
+            """), (centro_ot, punto_ot))
+            fila_punto = cur.fetchone()
+
+        if not fila_punto:
+            return None
+
+        return {
+            "punto_id": fila_punto[0],
+            "nombre_punto": str(fila_punto[1] or "").strip(),
+            "ubicacion_exacta": str(fila_punto[2] or "").strip(),
+            "plano_nombre": str(fila_punto[3] or "").strip(),
+            "plano_data": fila_punto[4],
+        }
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+
+    finally:
+        conn.close()
+
 def mostrar_tarjeta_ot(
     fila,
     materiales_select,
@@ -3807,13 +3719,64 @@ def mostrar_tarjeta_ot(
             st.caption(f"Fecha origen: {fecha_origen}")
 
 
-        mostrar_plano_punto_legionella_ot(
-            id_orden=id_orden,
-            area=area,
-            origen=origen,
-            desc=desc,
-            modo=modo,
-        )
+
+        if es_ot_legionella(area, origen, desc):
+            plano_mostrado = False
+            plano_punto = obtener_plano_punto_legionella_ot(
+                id_orden
+            )
+
+            if plano_punto:
+                ubicacion_exacta = str(
+                    plano_punto.get("ubicacion_exacta") or ""
+                ).strip()
+
+                if ubicacion_exacta:
+                    st.info(
+                        f"📍 Ubicación exacta del punto: {ubicacion_exacta}"
+                    )
+
+                plano_data = plano_punto.get("plano_data")
+
+                if plano_data is not None and plano_data != b"":
+                    try:
+                        plano_bytes = bytes(plano_data)
+                    except Exception:
+                        plano_bytes = None
+
+                    if plano_bytes:
+                        nombre_plano = (
+                            plano_punto.get("plano_nombre")
+                            or f"plano_{num_ot}.pdf"
+                        )
+
+                        st.download_button(
+                            "🗺️ Ver / descargar plano del punto",
+                            data=plano_bytes,
+                            file_name=nombre_plano,
+                            mime="application/pdf",
+                            key=f"{modo}_plano_legionella_{id_orden}",
+                            use_container_width=True,
+                        )
+                        plano_mostrado = True
+
+            # Respaldo fijo: los planos generales ya están en el repositorio.
+            # Así el operario siempre puede localizarlos aunque el punto no
+            # tenga un PDF individual guardado en la base de datos.
+            if not plano_mostrado:
+                plano_general = obtener_plano_general_legionella(
+                    centro_mostrar
+                )
+
+                if plano_general:
+                    st.download_button(
+                        f"🗺️ Ver plano de puntos · {centro_mostrar}",
+                        data=plano_general["data"],
+                        file_name=plano_general["nombre"],
+                        mime="application/pdf",
+                        key=f"{modo}_plano_general_legionella_{id_orden}",
+                        use_container_width=True,
+                    )
 
         mostrar_compartir_ot(
             numero_ot=num_ot,
