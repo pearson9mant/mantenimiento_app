@@ -1053,81 +1053,47 @@ def crear_ot_legionella(
 
     from modules.ordenes import vincular_origen_ot
 
-    planta = str(planta or "").strip()
-
-    # La ubicación del punto es la fuente de verdad para Colegio Vivo.
-    # Aunque una planificación antigua conserve edificio/planta vacíos,
-    # la OT se crea en la ubicación actual del punto de Legionella.
-    punto_id_real = None
+    # La ubicación real del punto es la fuente de verdad para la OT.
+    # No dependemos de la planta copiada en la planificación, que puede
+    # estar vacía o haber quedado desactualizada.
+    planta_planificacion = str(planta or "").strip()
+    planta = planta_planificacion
 
     try:
-        if punto_id is not None and pd.notna(punto_id):
-            punto_id_real = int(punto_id)
-    except Exception:
-        punto_id_real = None
-
-    if punto_id_real is not None:
-        try:
+        if punto_id:
             df_punto_ot = leer_df(
                 """
-                SELECT centro, edificio, planta
+                SELECT planta
                 FROM legionella_puntos
                 WHERE id = ?
                 LIMIT 1
                 """,
-                (punto_id_real,),
+                (int(punto_id),),
             )
-
-            if not df_punto_ot.empty:
-                punto_real = df_punto_ot.iloc[0]
-
-                centro_punto = str(
-                    punto_real.get("centro") or ""
-                ).strip()
-                edificio_punto = str(
-                    punto_real.get("edificio") or ""
-                ).strip()
-                planta_punto = str(
-                    punto_real.get("planta") or ""
-                ).strip()
-
-                if centro_punto:
-                    centro = centro_punto
-
-                if edificio_punto:
-                    edificio = edificio_punto
-
-                if planta_punto and planta_punto.lower() != "nan":
-                    planta = planta_punto
-        except Exception:
-            pass
-
-    # Si una tarea antigua conserva un punto_id obsoleto, recuperamos la
-    # ubicación por el nombre real del punto. Evita que AFS-08 (y futuros
-    # puntos recreados) nazcan como "Sin planta" en Colegio Vivo.
-    if not planta or planta.lower() == "nan":
-        try:
-            df_punto_nombre = leer_df(
+        else:
+            df_punto_ot = leer_df(
                 """
-                SELECT id, centro, edificio, planta
+                SELECT planta
                 FROM legionella_puntos
-                WHERE activo = 1
+                WHERE centro = ?
+                  AND edificio = ?
                   AND TRIM(COALESCE(nombre_punto, '')) = ?
-                  AND TRIM(COALESCE(centro, '')) = ?
+                  AND activo = 1
                 ORDER BY id DESC
                 LIMIT 1
                 """,
-                (str(punto or "").strip(), str(centro or "").strip()),
+                (centro, edificio, str(punto or "").strip()),
             )
 
-            if not df_punto_nombre.empty:
-                punto_real = df_punto_nombre.iloc[0]
-                punto_id_real = int(punto_real.get("id"))
-                centro = str(punto_real.get("centro") or centro).strip()
-                edificio = str(punto_real.get("edificio") or edificio).strip()
-                planta = str(punto_real.get("planta") or "").strip()
-        except Exception:
-            pass
+        if not df_punto_ot.empty:
+            planta_punto = str(
+                df_punto_ot.iloc[0].get("planta")
+                or ""
+            ).strip()
+            if planta_punto:
+                planta = planta_punto
+    except Exception:
+        planta = planta_planificacion
 
     if str(tarea).startswith("CORRECTIVO LEGIONELLA"):
         descripcion = (
@@ -1196,10 +1162,9 @@ def crear_ot_legionella(
     if df_ot_creada.empty:
         return False
 
-    # crear_orden() mantiene compatibilidad histórica por posición y,
-    # en la versión actual, no persiste el elemento 28 (planta).
-    # Dejamos la ubicación real de la OT escrita explícitamente aquí
-    # para que Colegio Vivo pueda situarla correctamente.
+    # Refuerzo de compatibilidad: crear_orden() ya persiste planta, pero
+    # mantenemos esta escritura explícita para asegurar la ubicación real
+    # del punto en instalaciones que todavía usen una versión anterior.
     if planta:
         ejecutar(
             """
@@ -1213,15 +1178,15 @@ def crear_ot_legionella(
             ),
         )
 
-    if punto_id_real is not None:
+    if punto_id:
         vincular_origen_ot(
             numero_ot=numero_creado,
             origen_tabla="legionella_puntos",
-            origen_id=punto_id_real,
-            id_punto_legionella=punto_id_real,
+            origen_id=int(punto_id),
+            id_punto_legionella=int(punto_id),
             id_tarea_legionella=(
                 int(tarea_id)
-                if tarea_id is not None and pd.notna(tarea_id)
+                if tarea_id is not None
                 else None
             ),
         )
@@ -2070,70 +2035,7 @@ def ajustar_proxima_fecha_legionella(fecha_base, frecuencia_dias):
     return proxima
 
 
-def reubicar_ots_legionella_sin_planta():
-    """
-    Coloca las OT activas de Legionella que quedaron sin planta
-    en la planta real de su punto vinculado.
-
-    Solo corrige OT con planta vacía. No toca OT ya ubicadas.
-    """
-    df = leer_df(
-        """
-        SELECT
-            ot.numero_ot,
-            p.centro,
-            p.edificio,
-            p.planta
-        FROM ordenes_trabajo ot
-        INNER JOIN legionella_puntos p
-            ON p.id = ot.id_punto_legionella
-        WHERE UPPER(COALESCE(ot.origen, '')) = 'LEGIONELLA'
-          AND TRIM(COALESCE(ot.planta, '')) = ''
-          AND TRIM(COALESCE(p.planta, '')) <> ''
-        """
-    )
-
-    if df.empty:
-        return 0
-
-    corregidas = 0
-
-    for _, fila in df.iterrows():
-        numero_ot = str(fila.get("numero_ot") or "").strip()
-        centro = str(fila.get("centro") or "").strip()
-        edificio = str(fila.get("edificio") or "").strip()
-        planta = str(fila.get("planta") or "").strip()
-
-        if not numero_ot or not planta:
-            continue
-
-        ejecutar(
-            """
-            UPDATE ordenes_trabajo
-            SET centro = ?,
-                edificio = ?,
-                planta = ?
-            WHERE numero_ot = ?
-              AND TRIM(COALESCE(planta, '')) = ''
-            """,
-            (
-                centro,
-                edificio,
-                planta,
-                numero_ot,
-            ),
-        )
-
-        corregidas += 1
-
-    return corregidas
-
-
 def generar_ots_legionella_planificadas():
-    # Repara primero cualquier OT de Legionella ya creada que haya quedado
-    # sin planta, usando el punto vinculado como ubicación real.
-    reubicadas = reubicar_ots_legionella_sin_planta()
-
     hoy_txt = date.today().strftime("%Y-%m-%d")
 
     df = leer_df("""
@@ -2148,12 +2050,6 @@ def generar_ots_legionella_planificadas():
     """, (hoy_txt,))
 
     if df.empty:
-        if reubicadas > 0:
-            return (
-                0,
-                f"Se han recolocado {reubicadas} OT de Legionella en su planta correcta."
-            )
-
         return 0, "No hay controles planificados que toquen hoy."
 
     creadas = 0
@@ -2202,24 +2098,9 @@ def generar_ots_legionella_planificadas():
             ya_existia += 1
 
     if creadas > 0:
-        mensaje = f"Se han creado {creadas} OT de Legionella planificadas."
-
-        if reubicadas > 0:
-            mensaje += (
-                f" Además, se han recolocado {reubicadas} OT "
-                "en su planta correcta."
-            )
-
-        return creadas, mensaje
+        return creadas, f"Se han creado {creadas} OT de Legionella planificadas."
 
     if ya_existia > 0:
-        if reubicadas > 0:
-            return (
-                0,
-                f"Las OT ya existían y se han recolocado {reubicadas} "
-                "en su planta correcta."
-            )
-
         return 0, "Ya existen OT abiertas para esos controles."
 
     return 0, "No se ha creado ninguna OT."
