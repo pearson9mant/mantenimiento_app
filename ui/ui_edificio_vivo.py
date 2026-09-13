@@ -29,8 +29,8 @@ EDIFICIOS = {
         ],
     },
     "Pearson 9": {
-        # Estructura física real de los tres edificios principales.
-        # El Anexo Servicios se pinta aparte porque no pertenece a A/B/C.
+        # Estructura física real del campus.
+        # Anexos es ya un edificio normal con sus dos plantas.
         "Edificio A": [
             "Planta 2",
             "Planta 1",
@@ -42,6 +42,10 @@ EDIFICIOS = {
         "Edificio C": [
             "Planta 2",
             "Planta 1",
+        ],
+        "Anexos": [
+            "Planta 1",
+            "Planta 0",
         ],
     },
 }
@@ -141,25 +145,17 @@ def normalizar_centro(valor):
 def normalizar_edificio(valor, centro=""):
     texto = _norm(valor)
 
-    # Pearson 9 tiene una entrada general exterior independiente
-    # de los edificios A/B/C y del Anexo Servicios.
-    if centro == "Pearson 9" and any(
-        alias in texto
-        for alias in [
-            "entrada general",
-            "entrada general afs",
-        ]
-    ):
-        return "Entrada general"
-
-    # Pearson 9 tiene un anexo de servicios independiente de A/B/C.
-    # Nunca debe confundirse con la Llar de Pearson 22.
+    # Pearson 9: el antiguo Anexo Servicios y la Entrada general
+    # pasan a la estructura canónica del edificio Anexos.
     if centro == "Pearson 9":
         if any(
             alias in texto
             for alias in [
                 "anexo",
+                "anexos",
                 "anexo servicios",
+                "entrada general",
+                "entrada general afs",
                 "taller",
                 "vestuario",
                 "vestuarios",
@@ -168,7 +164,7 @@ def normalizar_edificio(valor, centro=""):
                 "sala tecnica",
             ]
         ):
-            return "Anexo Servicios"
+            return "Anexos"
 
     if any(
         alias in texto
@@ -2028,42 +2024,76 @@ def pintar_campus_operario(
         unsafe_allow_html=True,
     )
 
-    # Pearson 9: la entrada general exterior queda arriba de A/B/C.
     if centro == "Pearson 9":
-        _pintar_entrada_general_p9(
-            resumen,
+        # A/B/C continúan juntos en la fila principal.
+        principales = [
+            edificio
+            for edificio in [
+                "Edificio A",
+                "Edificio B",
+                "Edificio C",
+            ]
+            if edificio in edificios_visibles
+        ]
+
+        if principales:
+            columnas = st.columns(
+                len(principales),
+                gap="small",
+            )
+
+            for columna, edificio in zip(
+                columnas,
+                principales,
+            ):
+                with columna:
+                    _pintar_edificio(
+                        centro,
+                        edificio,
+                        edificios_visibles[edificio],
+                        resumen,
+                    )
+
+        # Anexos se representa como un edificio real de dos plantas,
+        # centrado debajo de A/B/C.
+        if "Anexos" in edificios_visibles:
+            _izquierda, centro_anexos, _derecha = st.columns(
+                [1, 1, 1],
+                gap="small",
+            )
+
+            with centro_anexos:
+                _pintar_edificio(
+                    centro,
+                    "Anexos",
+                    edificios_visibles["Anexos"],
+                    resumen,
+                )
+
+    else:
+        columnas = st.columns(
+            len(edificios_visibles),
+            gap="small",
         )
 
-    columnas = st.columns(
-        len(edificios_visibles),
-        gap="small",
-    )
-
-    for columna, (
-        edificio,
-        plantas,
-    ) in zip(
-        columnas,
-        edificios_visibles.items(),
-    ):
-        with columna:
-            _pintar_edificio(
-                centro,
-                edificio,
-                plantas,
-                resumen,
-            )
+        for columna, (
+            edificio,
+            plantas,
+        ) in zip(
+            columnas,
+            edificios_visibles.items(),
+        ):
+            with columna:
+                _pintar_edificio(
+                    centro,
+                    edificio,
+                    plantas,
+                    resumen,
+                )
 
     # Pearson 22: zonas externas configurables.
     # Se pintan aparte para no modificar el dibujo físico existente.
     if centro == "Pearson 22":
         _pintar_zonas_externas_p22(
-            resumen,
-        )
-
-    # Pearson 9 tiene además un anexo real, independiente de A/B/C,
-    # formado por cuatro espacios consecutivos en una sola planta.
-    if centro == "Pearson 9":
-        _pintar_anexo_servicios_p9(
             resumen,
         )
