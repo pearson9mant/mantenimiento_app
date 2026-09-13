@@ -1055,25 +1055,52 @@ def crear_ot_legionella(
 
     planta = str(planta or "").strip()
 
-    if punto_id and not planta:
+    # La ubicación del punto es la fuente de verdad para Colegio Vivo.
+    # Aunque una planificación antigua conserve edificio/planta vacíos,
+    # la OT se crea en la ubicación actual del punto de Legionella.
+    punto_id_real = None
+
+    try:
+        if punto_id is not None and pd.notna(punto_id):
+            punto_id_real = int(punto_id)
+    except Exception:
+        punto_id_real = None
+
+    if punto_id_real is not None:
         try:
             df_punto_ot = leer_df(
                 """
-                SELECT planta
+                SELECT centro, edificio, planta
                 FROM legionella_puntos
                 WHERE id = ?
                 LIMIT 1
                 """,
-                (int(punto_id),),
+                (punto_id_real,),
             )
 
             if not df_punto_ot.empty:
-                planta = str(
-                    df_punto_ot.iloc[0].get("planta")
-                    or ""
+                punto_real = df_punto_ot.iloc[0]
+
+                centro_punto = str(
+                    punto_real.get("centro") or ""
                 ).strip()
+                edificio_punto = str(
+                    punto_real.get("edificio") or ""
+                ).strip()
+                planta_punto = str(
+                    punto_real.get("planta") or ""
+                ).strip()
+
+                if centro_punto:
+                    centro = centro_punto
+
+                if edificio_punto:
+                    edificio = edificio_punto
+
+                if planta_punto:
+                    planta = planta_punto
         except Exception:
-            planta = ""
+            pass
 
     if str(tarea).startswith("CORRECTIVO LEGIONELLA"):
         descripcion = (
@@ -1159,15 +1186,15 @@ def crear_ot_legionella(
             ),
         )
 
-    if punto_id:
+    if punto_id_real is not None:
         vincular_origen_ot(
             numero_ot=numero_creado,
             origen_tabla="legionella_puntos",
-            origen_id=int(punto_id),
-            id_punto_legionella=int(punto_id),
+            origen_id=punto_id_real,
+            id_punto_legionella=punto_id_real,
             id_tarea_legionella=(
                 int(tarea_id)
-                if tarea_id is not None
+                if tarea_id is not None and pd.notna(tarea_id)
                 else None
             ),
         )
@@ -2016,7 +2043,70 @@ def ajustar_proxima_fecha_legionella(fecha_base, frecuencia_dias):
     return proxima
 
 
+def reubicar_ots_legionella_sin_planta():
+    """
+    Coloca las OT activas de Legionella que quedaron sin planta
+    en la planta real de su punto vinculado.
+
+    Solo corrige OT con planta vacía. No toca OT ya ubicadas.
+    """
+    df = leer_df(
+        """
+        SELECT
+            ot.numero_ot,
+            p.centro,
+            p.edificio,
+            p.planta
+        FROM ordenes_trabajo ot
+        INNER JOIN legionella_puntos p
+            ON p.id = ot.id_punto_legionella
+        WHERE UPPER(COALESCE(ot.origen, '')) = 'LEGIONELLA'
+          AND TRIM(COALESCE(ot.planta, '')) = ''
+          AND TRIM(COALESCE(p.planta, '')) <> ''
+        """
+    )
+
+    if df.empty:
+        return 0
+
+    corregidas = 0
+
+    for _, fila in df.iterrows():
+        numero_ot = str(fila.get("numero_ot") or "").strip()
+        centro = str(fila.get("centro") or "").strip()
+        edificio = str(fila.get("edificio") or "").strip()
+        planta = str(fila.get("planta") or "").strip()
+
+        if not numero_ot or not planta:
+            continue
+
+        ejecutar(
+            """
+            UPDATE ordenes_trabajo
+            SET centro = ?,
+                edificio = ?,
+                planta = ?
+            WHERE numero_ot = ?
+              AND TRIM(COALESCE(planta, '')) = ''
+            """,
+            (
+                centro,
+                edificio,
+                planta,
+                numero_ot,
+            ),
+        )
+
+        corregidas += 1
+
+    return corregidas
+
+
 def generar_ots_legionella_planificadas():
+    # Repara primero cualquier OT de Legionella ya creada que haya quedado
+    # sin planta, usando el punto vinculado como ubicación real.
+    reubicadas = reubicar_ots_legionella_sin_planta()
+
     hoy_txt = date.today().strftime("%Y-%m-%d")
 
     df = leer_df("""
@@ -2031,6 +2121,12 @@ def generar_ots_legionella_planificadas():
     """, (hoy_txt,))
 
     if df.empty:
+        if reubicadas > 0:
+            return (
+                0,
+                f"Se han recolocado {reubicadas} OT de Legionella en su planta correcta."
+            )
+
         return 0, "No hay controles planificados que toquen hoy."
 
     creadas = 0
@@ -2079,9 +2175,24 @@ def generar_ots_legionella_planificadas():
             ya_existia += 1
 
     if creadas > 0:
-        return creadas, f"Se han creado {creadas} OT de Legionella planificadas."
+        mensaje = f"Se han creado {creadas} OT de Legionella planificadas."
+
+        if reubicadas > 0:
+            mensaje += (
+                f" Además, se han recolocado {reubicadas} OT "
+                "en su planta correcta."
+            )
+
+        return creadas, mensaje
 
     if ya_existia > 0:
+        if reubicadas > 0:
+            return (
+                0,
+                f"Las OT ya existían y se han recolocado {reubicadas} "
+                "en su planta correcta."
+            )
+
         return 0, "Ya existen OT abiertas para esos controles."
 
     return 0, "No se ha creado ninguna OT."
