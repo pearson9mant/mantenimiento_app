@@ -466,6 +466,22 @@ def mostrar_pedido_material_desde_ot(
     except Exception:
         pedidos = []
 
+    numero_pedido_anterior = ""
+
+    if pedidos:
+        try:
+            pedido_anterior = max(
+                pedidos,
+                key=lambda item: int(item[0] or 0),
+            )
+            numero_pedido_anterior = str(
+                pedido_anterior[1] or ""
+            ).strip()
+        except Exception:
+            numero_pedido_anterior = str(
+                pedidos[0][1] or ""
+            ).strip()
+
     if pedidos:
         st.markdown(
             "### 📦 Pedidos vinculados a esta OT"
@@ -651,8 +667,14 @@ def mostrar_pedido_material_desde_ot(
         clave_abrir,
         False,
     ):
+        texto_boton_pedido = (
+            "➕ Añadir otro pedido de material a esta OT"
+            if pedidos
+            else "📦 Solicitar material para esta OT"
+        )
+
         if st.button(
-            "📦 Solicitar material para esta OT",
+            texto_boton_pedido,
             key=f"{base}_abrir",
             use_container_width=True,
         ):
@@ -772,9 +794,23 @@ def mostrar_pedido_material_desde_ot(
             key=f"{base}_prioridad",
         )
 
+        clave_observaciones = (
+            f"{base}_observaciones_generales"
+        )
+
+        if (
+            pedidos
+            and numero_pedido_anterior
+            and clave_observaciones not in st.session_state
+        ):
+            st.session_state[clave_observaciones] = (
+                "AMPLIACIÓN DEL PEDIDO "
+                f"{numero_pedido_anterior} · Misma OT"
+            )
+
         observaciones_generales = st.text_area(
             "Observaciones generales del pedido",
-            key=f"{base}_observaciones_generales",
+            key=clave_observaciones,
         )
 
         catalogo = _catalogo_inventario()
