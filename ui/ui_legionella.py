@@ -43,9 +43,9 @@ CENTROS = {
     },
 
     "Pearson 9": {
-        "Anexo Servicios": [
-            ("ACS", "Acumulador ACS Principal", "acumulador", "Cuarto calderas"),
-            ("ACS", "Retorno ACS Principal", "retorno", "Cuarto calderas"),
+        "Anexos": [
+            ("ACS", "Acumulador ACS Principal", "acumulador", "Sala calderas"),
+            ("ACS", "Retorno ACS Principal", "retorno", "Sala calderas"),
         ],
         "Edif. A": [
             ("AFCH", "Grifo representativo", "grifo", "Edif. A"),
@@ -72,6 +72,10 @@ def _edificio_catalogo_legionella(edificio):
     equivalencias = {
         "Edif. Infantil/Primaria": "Infantil/Primaria",
         "Edif. Llar (Anexo)": "Llar",
+        "Edif. A": "Edificio A",
+        "Edif. B": "Edificio B",
+        "Edif. C": "Edificio C",
+        "Anexo Servicios": "Anexos",
     }
 
     return equivalencias.get(
@@ -83,17 +87,6 @@ def _edificio_catalogo_legionella(edificio):
 def obtener_plantas_legionella(centro, edificio):
     centro = str(centro or "").strip()
     edificio = str(edificio or "").strip()
-
-    if centro == "Pearson 9" and edificio == "Anexo Servicios":
-        return [
-            "Taller",
-            "Vestuarios chicas",
-            "Sala calderas",
-            "Vestuarios chicos",
-        ]
-
-    if centro == "Pearson 9" and edificio == "Entrada general":
-        return ["Exterior"]
 
     edificio_catalogo = _edificio_catalogo_legionella(
         edificio
