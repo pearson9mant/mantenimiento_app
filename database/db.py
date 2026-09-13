@@ -1,4 +1,5 @@
 import os
+import time
 import sqlite3
 from pathlib import Path
 from config import DB
@@ -7,6 +8,12 @@ try:
     import psycopg2
 except Exception:
     psycopg2 = None
+
+
+ZONA_HORARIA_APP = "Europe/Madrid"
+os.environ["TZ"] = ZONA_HORARIA_APP
+if hasattr(time, "tzset"):
+    time.tzset()
 
 
 def _es_postgres():
@@ -37,7 +44,19 @@ def conectar():
     database_url = os.getenv("DATABASE_URL")
 
     if database_url and psycopg2:
-        return psycopg2.connect(database_url)
+        conn = psycopg2.connect(database_url)
+
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SET TIME ZONE %s", (ZONA_HORARIA_APP,))
+            cursor.close()
+        except Exception as e:
+            _log_db_warning(
+                "Configurando zona horaria de PostgreSQL",
+                e
+            )
+
+        return conn
 
     Path(DB).parent.mkdir(parents=True, exist_ok=True)
 
