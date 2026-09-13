@@ -486,6 +486,24 @@ def mostrar_pedido_material_desde_ot(
             "### 📦 Pedidos vinculados a esta OT"
         )
 
+        clave_abrir = f"{base}_abierto"
+
+        if not st.session_state.get(
+            clave_abrir,
+            False,
+        ):
+            if st.button(
+                "➕ Añadir otro pedido de material a esta OT",
+                key=f"{base}_abrir",
+                use_container_width=True,
+            ):
+                st.session_state[
+                    clave_abrir
+                ] = True
+
+                _obtener_lineas_ui(id_orden)
+                st.rerun()
+
         for (
             id_pedido,
             numero_pedido,
@@ -662,18 +680,12 @@ def mostrar_pedido_material_desde_ot(
 
     clave_abrir = f"{base}_abierto"
 
-    texto_boton_pedido = (
-        "➕ Añadir otro pedido de material a esta OT"
-        if pedidos
-        else "📦 Solicitar material para esta OT"
-    )
-
-    if not st.session_state.get(
+    if not pedidos and not st.session_state.get(
         clave_abrir,
         False,
     ):
         if st.button(
-            texto_boton_pedido,
+            "📦 Solicitar material para esta OT",
             key=f"{base}_abrir",
             use_container_width=True,
         ):
@@ -684,6 +696,12 @@ def mostrar_pedido_material_desde_ot(
             _obtener_lineas_ui(id_orden)
             st.rerun()
 
+        return
+
+    if pedidos and not st.session_state.get(
+        clave_abrir,
+        False,
+    ):
         return
 
     with st.container(border=True):
