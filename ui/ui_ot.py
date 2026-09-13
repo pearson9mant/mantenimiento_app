@@ -3473,9 +3473,10 @@ def preparar_siguiente_mision_corazon(num_ot, id_orden, modo="operario"):
 
 def obtener_plano_general_legionella(centro):
     """
-    Devuelve el plano general de puntos de Legionella guardado en assets.
+    Devuelve solo la ruta del plano general de Legionella.
 
-    Los planos forman parte del repositorio y no dependen de la base de datos.
+    Importante: aquí NO se leen los bytes del PDF. El archivo se carga
+    únicamente cuando el operario pulsa el botón para verlo.
     """
     centro_txt = str(centro or "").strip().lower()
 
@@ -3502,10 +3503,45 @@ def obtener_plano_general_legionella(centro):
 
         return {
             "nombre": nombre_archivo,
-            "data": ruta.read_bytes(),
+            "ruta": ruta,
         }
     except Exception:
         return None
+
+
+def cargar_plano_punto_legionella(punto_id):
+    """Carga el PDF individual solo bajo demanda."""
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT plano_nombre, plano_data
+            FROM legionella_puntos
+            WHERE id = ?
+            LIMIT 1
+        """), (punto_id,))
+
+        fila = cur.fetchone()
+
+        if not fila or fila[1] is None or fila[1] == b"":
+            return None
+
+        return {
+            "nombre": str(fila[0] or "").strip(),
+            "data": bytes(fila[1]),
+        }
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+
+    finally:
+        conn.close()
+
 
 def obtener_plano_punto_legionella_ot(id_orden):
     """
@@ -3550,7 +3586,8 @@ def obtener_plano_punto_legionella_ot(id_orden):
         if punto_id:
             cur.execute(_sql("""
                 SELECT id, nombre_punto, ubicacion_exacta,
-                       plano_nombre, plano_data
+                       plano_nombre,
+                       CASE WHEN plano_data IS NOT NULL THEN 1 ELSE 0 END
                 FROM legionella_puntos
                 WHERE id = ?
                 LIMIT 1
@@ -3561,7 +3598,8 @@ def obtener_plano_punto_legionella_ot(id_orden):
         if not fila_punto and centro_ot and punto_ot:
             cur.execute(_sql("""
                 SELECT id, nombre_punto, ubicacion_exacta,
-                       plano_nombre, plano_data
+                       plano_nombre,
+                       CASE WHEN plano_data IS NOT NULL THEN 1 ELSE 0 END
                 FROM legionella_puntos
                 WHERE centro = ?
                   AND edificio = ?
@@ -3574,7 +3612,8 @@ def obtener_plano_punto_legionella_ot(id_orden):
         if not fila_punto and centro_ot and punto_ot:
             cur.execute(_sql("""
                 SELECT id, nombre_punto, ubicacion_exacta,
-                       plano_nombre, plano_data
+                       plano_nombre,
+                       CASE WHEN plano_data IS NOT NULL THEN 1 ELSE 0 END
                 FROM legionella_puntos
                 WHERE centro = ?
                   AND nombre_punto = ?
@@ -3591,7 +3630,7 @@ def obtener_plano_punto_legionella_ot(id_orden):
             "nombre_punto": str(fila_punto[1] or "").strip(),
             "ubicacion_exacta": str(fila_punto[2] or "").strip(),
             "plano_nombre": str(fila_punto[3] or "").strip(),
-            "plano_data": fila_punto[4],
+            "tiene_plano": bool(fila_punto[4]),
         }
 
     except Exception:
@@ -3721,7 +3760,6 @@ def mostrar_tarjeta_ot(
 
 
         if es_ot_legionella(area, origen, desc):
-            plano_mostrado = False
             plano_punto = obtener_plano_punto_legionella_ot(
                 id_orden
             )
@@ -3736,47 +3774,68 @@ def mostrar_tarjeta_ot(
                         f"📍 Ubicación exacta del punto: {ubicacion_exacta}"
                     )
 
-                plano_data = plano_punto.get("plano_data")
+            clave_abrir_plano = (
+                f"{modo}_abrir_plano_legionella_{id_orden}"
+            )
 
-                if plano_data is not None and plano_data != b"":
-                    try:
-                        plano_bytes = bytes(plano_data)
-                    except Exception:
-                        plano_bytes = None
+            if not st.session_state.get(clave_abrir_plano, False):
+                if st.button(
+                    "🗺️ Ver plano de puntos",
+                    key=f"{modo}_btn_abrir_plano_legionella_{id_orden}",
+                    use_container_width=True,
+                ):
+                    st.session_state[clave_abrir_plano] = True
+                    st.rerun()
 
-                    if plano_bytes:
-                        nombre_plano = (
-                            plano_punto.get("plano_nombre")
-                            or f"plano_{num_ot}.pdf"
-                        )
+            else:
+                plano_cargado = None
 
-                        st.download_button(
-                            "🗺️ Ver / descargar plano del punto",
-                            data=plano_bytes,
-                            file_name=nombre_plano,
-                            mime="application/pdf",
-                            key=f"{modo}_plano_legionella_{id_orden}",
-                            use_container_width=True,
-                        )
-                        plano_mostrado = True
+                # Si el punto tiene un plano individual, se carga ahora,
+                # nunca al abrir la OT.
+                if plano_punto and plano_punto.get("tiene_plano"):
+                    plano_cargado = cargar_plano_punto_legionella(
+                        plano_punto.get("punto_id")
+                    )
 
-            # Respaldo fijo: los planos generales ya están en el repositorio.
-            # Así el operario siempre puede localizarlos aunque el punto no
-            # tenga un PDF individual guardado en la base de datos.
-            if not plano_mostrado:
-                plano_general = obtener_plano_general_legionella(
-                    centro_mostrar
-                )
+                # Si no hay plano individual, usa el plano general del centro.
+                if not plano_cargado:
+                    plano_general = obtener_plano_general_legionella(
+                        centro_mostrar
+                    )
 
-                if plano_general:
+                    if plano_general:
+                        try:
+                            plano_cargado = {
+                                "nombre": plano_general["nombre"],
+                                "data": plano_general["ruta"].read_bytes(),
+                            }
+                        except Exception:
+                            plano_cargado = None
+
+                if plano_cargado:
                     st.download_button(
-                        f"🗺️ Ver plano de puntos · {centro_mostrar}",
-                        data=plano_general["data"],
-                        file_name=plano_general["nombre"],
+                        "🗺️ Abrir / descargar plano",
+                        data=plano_cargado["data"],
+                        file_name=(
+                            plano_cargado.get("nombre")
+                            or f"plano_{num_ot}.pdf"
+                        ),
                         mime="application/pdf",
-                        key=f"{modo}_plano_general_legionella_{id_orden}",
+                        key=f"{modo}_descargar_plano_legionella_{id_orden}",
                         use_container_width=True,
                     )
+                else:
+                    st.warning(
+                        "No se ha encontrado el plano de Legionella."
+                    )
+
+                if st.button(
+                    "✖️ Cerrar plano",
+                    key=f"{modo}_cerrar_plano_legionella_{id_orden}",
+                    use_container_width=True,
+                ):
+                    st.session_state[clave_abrir_plano] = False
+                    st.rerun()
 
         mostrar_compartir_ot(
             numero_ot=num_ot,
