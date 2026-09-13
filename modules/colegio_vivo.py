@@ -81,6 +81,10 @@ EDIFICIOS = {
             "Planta 1",
             "Planta 0",
         ],
+        "Anexos": [
+            "Planta 1",
+            "Planta 0",
+        ],
     },
 }
 
@@ -177,15 +181,17 @@ def _normalizar_edificio(valor, centro, ot=None):
     else:
         texto_apoyo = texto
 
-    # Pearson 9: Entrada general es una zona propia, anterior a A/B/C.
+    # Pearson 9: zonas auxiliares unificadas en el edificio Anexos.
     if centro == "Pearson 9" and any(
         alias in texto_apoyo
         for alias in [
+            "anexos",
+            "anexo servicios",
             "entrada general",
             "entrada general afs",
         ]
     ):
-        return "Entrada general"
+        return "Anexos"
 
     if any(
         alias in texto_apoyo
@@ -580,21 +586,11 @@ def obtener_colegio_vivo(operario):
             ot,
         )
 
-        # Pearson 9 · Entrada general conserva "Exterior" como zona real.
-        # No debe convertirse al alias histórico "Acceso Pearson 22".
-        if (
-            centro == "Pearson 9"
-            and edificio == "Entrada general"
-            and _normalizar_texto(ot.get("planta")) == "exterior"
-        ):
-            planta = "Exterior"
-            sin_ubicar = False
-        else:
-            planta, sin_ubicar = _obtener_planta_con_respaldo(
-                ot,
-                centro,
-                edificio,
-            )
+        planta, sin_ubicar = _obtener_planta_con_respaldo(
+            ot,
+            centro,
+            edificio,
+        )
 
         ot["_estado_normalizado"] = estado
         ot["_centro_normalizado"] = centro
