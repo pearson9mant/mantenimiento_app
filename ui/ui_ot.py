@@ -2290,6 +2290,64 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
         return st.session_state.get(f"legionella_guardada_{id_orden}", False)
 
     return True
+
+def obtener_plano_punto_legionella_ot(id_orden):
+    """Devuelve el plano del punto vinculado a una OT de Legionella."""
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            SELECT p.plano_nombre, p.plano_data, p.nombre_punto, p.ubicacion_exacta
+            FROM ordenes_trabajo ot
+            JOIN legionella_puntos p
+              ON p.id = ot.id_punto_legionella
+            WHERE ot.id = ?
+              AND p.plano_data IS NOT NULL
+            LIMIT 1
+        """), (id_orden,))
+
+        fila = cur.fetchone()
+
+        if not fila or not fila[1]:
+            return None
+
+        return {
+            "plano_nombre": str(fila[0] or "plano_punto_legionella.pdf").strip(),
+            "plano_data": bytes(fila[1]),
+            "nombre_punto": str(fila[2] or "").strip(),
+            "ubicacion_exacta": str(fila[3] or "").strip(),
+        }
+
+    except Exception:
+        return None
+
+    finally:
+        conn.close()
+
+
+def mostrar_plano_punto_legionella_ot(id_orden, area, origen, desc, modo):
+    """Muestra el plano solo en OT de Legionella que tengan uno guardado."""
+    if not es_ot_legionella(area, origen, desc):
+        return
+
+    plano = obtener_plano_punto_legionella_ot(id_orden)
+
+    if not plano:
+        return
+
+    if plano["ubicacion_exacta"]:
+        st.caption(f"📍 Ubicación exacta: {plano['ubicacion_exacta']}")
+
+    st.download_button(
+        "🗺️ Ver / descargar plano del punto",
+        data=plano["plano_data"],
+        file_name=plano["plano_nombre"],
+        mime="application/pdf",
+        key=f"{modo}_plano_legionella_{id_orden}",
+        use_container_width=True,
+    )
+
 def puede_corregir_ubicacion():
     return rol_actual() in [
         "admin",
@@ -3580,6 +3638,15 @@ def mostrar_tarjeta_ot(
 
         if fecha_origen:
             st.caption(f"Fecha origen: {fecha_origen}")
+
+
+        mostrar_plano_punto_legionella_ot(
+            id_orden=id_orden,
+            area=area,
+            origen=origen,
+            desc=desc,
+            modo=modo,
+        )
 
         mostrar_compartir_ot(
             numero_ot=num_ot,
