@@ -4910,6 +4910,19 @@ def pantalla_legionella():
                         type="primary",
                     )
 
+                if row.get("plano_data") is not None and row.get("plano_data") != b"":
+                    st.download_button(
+                        "🗺️ Ver / descargar plano actual",
+                        data=bytes(row["plano_data"]),
+                        file_name=(
+                            row.get("plano_nombre")
+                            or f"plano_punto_{row['id']}.pdf"
+                        ),
+                        mime="application/pdf",
+                        key=f"descargar_plano_punto_{row['id']}",
+                        use_container_width=True,
+                    )
+
                 if guardar_punto:
                     if not str(planta_edit_guardar or "").strip():
                         st.error("Selecciona la planta real antes de guardar.")
