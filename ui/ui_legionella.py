@@ -1097,8 +1097,35 @@ def crear_ot_legionella(
                 if edificio_punto:
                     edificio = edificio_punto
 
-                if planta_punto:
+                if planta_punto and planta_punto.lower() != "nan":
                     planta = planta_punto
+        except Exception:
+            pass
+
+    # Si una tarea antigua conserva un punto_id obsoleto, recuperamos la
+    # ubicación por el nombre real del punto. Evita que AFS-08 (y futuros
+    # puntos recreados) nazcan como "Sin planta" en Colegio Vivo.
+    if not planta or planta.lower() == "nan":
+        try:
+            df_punto_nombre = leer_df(
+                """
+                SELECT id, centro, edificio, planta
+                FROM legionella_puntos
+                WHERE activo = 1
+                  AND TRIM(COALESCE(nombre_punto, '')) = ?
+                  AND TRIM(COALESCE(centro, '')) = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (str(punto or "").strip(), str(centro or "").strip()),
+            )
+
+            if not df_punto_nombre.empty:
+                punto_real = df_punto_nombre.iloc[0]
+                punto_id_real = int(punto_real.get("id"))
+                centro = str(punto_real.get("centro") or centro).strip()
+                edificio = str(punto_real.get("edificio") or edificio).strip()
+                planta = str(punto_real.get("planta") or "").strip()
         except Exception:
             pass
 
