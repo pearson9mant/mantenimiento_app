@@ -482,7 +482,6 @@ def mostrar_pedido_material_desde_ot(
                 pedidos[0][1] or ""
             ).strip()
 
-    if pedidos:
         st.markdown(
             "### 📦 Pedidos vinculados a esta OT"
         )
@@ -663,16 +662,16 @@ def mostrar_pedido_material_desde_ot(
 
     clave_abrir = f"{base}_abierto"
 
+    texto_boton_pedido = (
+        "➕ Añadir otro pedido de material a esta OT"
+        if pedidos
+        else "📦 Solicitar material para esta OT"
+    )
+
     if not st.session_state.get(
         clave_abrir,
         False,
     ):
-        texto_boton_pedido = (
-            "➕ Añadir otro pedido de material a esta OT"
-            if pedidos
-            else "📦 Solicitar material para esta OT"
-        )
-
         if st.button(
             texto_boton_pedido,
             key=f"{base}_abrir",
@@ -794,9 +793,7 @@ def mostrar_pedido_material_desde_ot(
             key=f"{base}_prioridad",
         )
 
-        clave_observaciones = (
-            f"{base}_observaciones_generales"
-        )
+        clave_observaciones = f"{base}_observaciones_generales"
 
         if (
             pedidos
