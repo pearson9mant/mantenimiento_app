@@ -4149,6 +4149,58 @@ def mostrar_tarjeta_ot(
                 )
 
         # -------------------------------------------------
+        # CONTROLES INTELIGENTES DE OT
+        # -------------------------------------------------
+        if es_preventivo_cuadro_ot(
+            area,
+            desc,
+            num_ot
+        ):
+            mostrar_preventivo_cuadro_operario(
+                num_ot=num_ot,
+                operario=operario,
+            )
+
+        elif es_preventivo_aulas_ot(
+            area,
+            desc,
+            num_ot
+        ):
+            mostrar_preventivo_aula_operario(
+                num_ot=num_ot,
+                operario=operario,
+            )
+
+        elif es_ot_preventiva(origen, desc, num_ot):
+            mostrar_checklist_preventivo_operario(
+                num_ot=num_ot,
+                desc=desc,
+                operario=operario
+            )
+
+        elif es_ot_legionella(area, origen, desc):
+            if "CORRECTIVO LEGIONELLA" in str(desc or "").upper():
+                mostrar_checklist_correctivo_legionella_operario(
+                    num_ot=num_ot,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    desc=desc,
+                    planta=planta_mostrar,
+                )
+            else:
+                mostrar_ejecucion_legionella_operario(
+                    id_orden=id_orden,
+                    num_ot=num_ot,
+                    desc=desc,
+                    centro=centro,
+                    edificio=edificio,
+                    espacio=espacio,
+                    operario=operario,
+                    planta=planta_mostrar,
+                )
+
+        # -------------------------------------------------
         # PEDIDO DE MATERIAL VINCULADO A ESTA OT
         # -------------------------------------------------
         if es_operario():
