@@ -3055,12 +3055,10 @@ EDIFICIOS_GERENCIA = {
         "Edificio A": ["Planta 2", "Planta 1"],
         "Edificio B": ["Planta 2", "Planta 1"],
         "Edificio C": ["Planta 2", "Planta 1"],
-        # El anexo no pertenece a A/B/C y físicamente es una sola planta.
+        # Misma estructura real que Colegio Vivo del operario.
         "Anexos": [
-            "Taller",
-            "Vestuarios chicas",
-            "Sala calderas",
-            "Vestuarios chicos",
+            "Planta 1",
+            "Planta 0",
         ],
     },
 }
@@ -3073,17 +3071,11 @@ ALIAS_EDIFICIOS_GERENCIA = {
     "Edificio B": ["edificio b", "edif b", "bloque b"],
     "Edificio C": ["edificio c", "edif c", "bloque c"],
     "Anexos": [
+        "anexos",
         "anexo servicios",
         "anexo",
-        "taller",
-        "vestuarios chicas",
-        "vestuario chicas",
-        "vestuarios chicos",
-        "vestuario chicos",
-        "sala calderas",
-        "sala de calderas",
-        "sala tecnica",
-        "sala técnica",
+        "entrada general",
+        "entrada general afs",
     ],
 }
 
@@ -3518,39 +3510,79 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
         return datos
 
     # -------------------------------------------------
-    # ANEXO SERVICIOS · PEARSON 9
+    # ANEXOS · PEARSON 9
     # -------------------------------------------------
-    # Taller, Vestuarios chicas, Sala calderas y Vestuarios chicos
-    # son espacios de una única planta y no pertenecen a A/B/C.
+    # Replica el criterio que ya usa Colegio Vivo del operario:
+    # - reconoce nombres históricos (Anexo Servicios / Entrada general);
+    # - la planta real manda si existe;
+    # - si falta, intenta recuperarla de espacio/edificio/descripción/
+    #   observaciones, sin modificar ninguna OT.
     if centro == "Pearson 9" and edificio == "Anexos":
-        espacio_texto = datos["espacio"].fillna("").astype(str)
-
-        mascara = espacio_texto.apply(
-            lambda valor: _coincide_zona_anexo_gerencia(
-                valor,
-                planta,
+        def _es_ot_anexos_gerencia(fila):
+            texto_apoyo = " ".join(
+                str(fila.get(campo) or "")
+                for campo in [
+                    "edificio",
+                    "planta",
+                    "espacio",
+                    "descripcion",
+                    "solicitante",
+                    "observaciones",
+                    "observaciones_estado",
+                ]
+                if campo in fila.index
             )
+
+            texto_n = normalizar_busqueda(texto_apoyo)
+
+            return any(
+                alias in texto_n
+                for alias in [
+                    "anexos",
+                    "anexo servicios",
+                    "entrada general",
+                    "entrada general afs",
+                ]
+            )
+
+        datos = datos[
+            datos.apply(
+                _es_ot_anexos_gerencia,
+                axis=1,
+            )
+        ].copy()
+
+        if datos.empty:
+            return datos
+
+        planta_obj = _normalizar_planta(planta)
+
+        def _planta_ot_anexos_gerencia(fila):
+            candidatos = [
+                fila.get("planta", ""),
+                fila.get("espacio", ""),
+                fila.get("edificio", ""),
+                fila.get("descripcion", ""),
+                fila.get("observaciones", ""),
+                fila.get("observaciones_estado", ""),
+            ]
+
+            for candidato in candidatos:
+                planta_n = _normalizar_planta(candidato)
+
+                if planta_n:
+                    return planta_n
+
+            return ""
+
+        datos["_planta_norm"] = datos.apply(
+            _planta_ot_anexos_gerencia,
+            axis=1,
         )
 
-        # Compatibilidad con órdenes antiguas donde la ubicación
-        # pudiera haber quedado en descripción o edificio.
-        if not mascara.any():
-            apoyo = (
-                datos["espacio"].fillna("").astype(str)
-                + " "
-                + datos["edificio"].fillna("").astype(str)
-                + " "
-                + datos["descripcion"].fillna("").astype(str)
-            )
-
-            mascara = apoyo.apply(
-                lambda valor: _coincide_zona_anexo_gerencia(
-                    valor,
-                    planta,
-                )
-            )
-
-        return datos[mascara].copy()
+        return datos[
+            datos["_planta_norm"] == planta_obj
+        ].copy()
 
     # -------------------------------------------------
     # ACCESOS Y EXTERIORES · PEARSON 22
@@ -3932,10 +3964,7 @@ def mostrar_edificio_cv(df, centro, edificio, plantas):
     seleccionado_centro = st.session_state.get("gerencia_cv_centro")
     for col, planta in zip(columnas, plantas):
         icono, cantidad, _ = _estado_planta(df, centro, edificio, planta)
-        if edificio == "Anexos":
-            etiqueta_planta = planta
-        else:
-            etiqueta_planta = planta.replace("Planta ", "P")
+        etiqueta_planta = planta.replace("Planta ", "P")
 
         sufijo = f"\n{cantidad}" if cantidad else "\nOK"
         seleccionada = centro == seleccionado_centro and edificio == seleccionado_edificio and planta == seleccionado_planta
@@ -4020,78 +4049,24 @@ def _pintar_edificio_visual_gerencia(
 
 
 def _pintar_anexo_visual_gerencia(df):
-    zonas = EDIFICIOS_GERENCIA[
-        "Pearson 9"
-    ]["Anexos"]
-
-    st.markdown(
-        (
-            '<div class="cv-map-annex-wrap">'
-            '<div class="cv-map-annex-title">'
-            'ANEXOS'
-            '</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True,
+    """
+    Dibuja ANEXOS igual que Colegio Vivo del operario:
+    edificio real con Planta 1 y Planta 0, centrado bajo A/B/C.
+    """
+    _izquierda, centro_anexos, _derecha = st.columns(
+        [1, 1, 1],
+        gap="small",
     )
 
-    iconos_zona = {
-        "Taller": "🔧",
-        "Vestuarios chicas": "🚿",
-        "Sala calderas": "🔥",
-        "Vestuarios chicos": "🚿",
-    }
-
-    seleccionado_centro = st.session_state.get("gerencia_cv_centro")
-    seleccionado_edificio = st.session_state.get("gerencia_cv_edificio")
-    seleccionado_planta = st.session_state.get("gerencia_cv_planta")
-
-    with st.container(key="gerencia_anexo_p9"):
-        columnas = st.columns(
-            len(zonas),
-            gap="small",
+    with centro_anexos:
+        _pintar_edificio_visual_gerencia(
+            df,
+            "Pearson 9",
+            "Anexos",
+            EDIFICIOS_GERENCIA[
+                "Pearson 9"
+            ]["Anexos"],
         )
-
-        for columna, zona in zip(
-            columnas,
-            zonas,
-        ):
-            icono_estado, _, _ = _estado_planta(
-                df,
-                "Pearson 9",
-                "Anexos",
-                zona,
-            )
-
-            pendientes, finalizadas = _carga_total_planta(
-                df,
-                "Pearson 9",
-                "Anexos",
-                zona,
-            )
-
-            icono_zona = iconos_zona.get(zona, "📍")
-
-            seleccionada = (
-                seleccionado_centro == "Pearson 9"
-                and seleccionado_edificio == "Anexos"
-                and seleccionado_planta == zona
-            )
-
-            with columna:
-                st.button(
-                    f"{icono_estado} {icono_zona} {zona}\n"
-                    f"🔴 {pendientes}  💙 {finalizadas}",
-                    key=f"cv_visual_p9_anexo_{zona}",
-                    use_container_width=True,
-                    on_click=_seleccionar_planta_cv,
-                    args=(
-                        "Pearson 9",
-                        "Anexos",
-                        zona,
-                    ),
-                    type="primary" if seleccionada else "secondary",
-                )
 
 
 def _pintar_zonas_externas_p22_gerencia(df):
@@ -4378,11 +4353,7 @@ def mostrar_panel_planta_cv(df):
         _solo_correctivas_reales(datos)
     )
 
-    texto_contexto = (
-        "Situación operativa de la zona seleccionada"
-        if edificio == "Anexos"
-        else "Situación operativa de la planta seleccionada"
-    )
+    texto_contexto = "Situación operativa de la planta seleccionada"
 
     st.markdown(
         f"<div class='cv-panel-title'>📍 {centro} · {edificio} · {planta}</div>"
@@ -4540,16 +4511,10 @@ def mostrar_panel_planta_cv(df):
                 "limitado a la planta seleccionada."
             )
 
-    if edificio == "Anexos":
-        st.markdown("#### Actuaciones pendientes de esta zona")
-    else:
-        st.markdown("#### Actuaciones pendientes de esta planta")
+    st.markdown("#### Actuaciones pendientes de esta planta")
 
     if pendientes_totales.empty:
-        if edificio == "Anexos":
-            st.success("Zona sin actuaciones pendientes.")
-        else:
-            st.success("Planta sin actuaciones pendientes.")
+        st.success("Planta sin actuaciones pendientes.")
     else:
         vista = pendientes_totales.copy()
 
