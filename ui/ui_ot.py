@@ -4373,6 +4373,26 @@ def mostrar_tarjeta_ot(
             key=f"{modo}_observacion_estado_{id_orden}"
         )
 
+        if st.session_state.pop(
+            f"{modo}_observacion_estado_guardada_{id_orden}",
+            False,
+        ):
+            st.success("💾 Observación guardada. La OT continúa abierta.")
+
+        if st.button(
+            "💾 Guardar observación",
+            key=f"{modo}_guardar_observacion_estado_{id_orden}",
+            use_container_width=True,
+        ):
+            actualizar_observaciones_estado(
+                id_orden,
+                observacion_estado_nueva,
+            )
+            st.session_state[
+                f"{modo}_observacion_estado_guardada_{id_orden}"
+            ] = True
+            st.rerun()
+
         b1, b2, b3 = st.columns(3)
 
         with b1:
