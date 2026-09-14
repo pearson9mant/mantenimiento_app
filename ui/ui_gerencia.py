@@ -3056,7 +3056,7 @@ EDIFICIOS_GERENCIA = {
         "Edificio B": ["Planta 2", "Planta 1"],
         "Edificio C": ["Planta 2", "Planta 1"],
         # El anexo no pertenece a A/B/C y físicamente es una sola planta.
-        "Anexo Servicios": [
+        "Anexos": [
             "Taller",
             "Vestuarios chicas",
             "Sala calderas",
@@ -3072,7 +3072,7 @@ ALIAS_EDIFICIOS_GERENCIA = {
     "Edificio A": ["edificio a", "edif a", "bloque a"],
     "Edificio B": ["edificio b", "edif b", "bloque b"],
     "Edificio C": ["edificio c", "edif c", "bloque c"],
-    "Anexo Servicios": [
+    "Anexos": [
         "anexo servicios",
         "anexo",
         "taller",
@@ -3522,7 +3522,7 @@ def filtrar_por_ubicacion_gerencia(df, centro, edificio, planta):
     # -------------------------------------------------
     # Taller, Vestuarios chicas, Sala calderas y Vestuarios chicos
     # son espacios de una única planta y no pertenecen a A/B/C.
-    if centro == "Pearson 9" and edificio == "Anexo Servicios":
+    if centro == "Pearson 9" and edificio == "Anexos":
         espacio_texto = datos["espacio"].fillna("").astype(str)
 
         mascara = espacio_texto.apply(
@@ -3932,7 +3932,7 @@ def mostrar_edificio_cv(df, centro, edificio, plantas):
     seleccionado_centro = st.session_state.get("gerencia_cv_centro")
     for col, planta in zip(columnas, plantas):
         icono, cantidad, _ = _estado_planta(df, centro, edificio, planta)
-        if edificio == "Anexo Servicios":
+        if edificio == "Anexos":
             etiqueta_planta = planta
         else:
             etiqueta_planta = planta.replace("Planta ", "P")
@@ -4022,13 +4022,13 @@ def _pintar_edificio_visual_gerencia(
 def _pintar_anexo_visual_gerencia(df):
     zonas = EDIFICIOS_GERENCIA[
         "Pearson 9"
-    ]["Anexo Servicios"]
+    ]["Anexos"]
 
     st.markdown(
         (
             '<div class="cv-map-annex-wrap">'
             '<div class="cv-map-annex-title">'
-            'ANEXO SERVICIOS · PLANTA ÚNICA'
+            'ANEXOS'
             '</div>'
             '</div>'
         ),
@@ -4059,14 +4059,14 @@ def _pintar_anexo_visual_gerencia(df):
             icono_estado, _, _ = _estado_planta(
                 df,
                 "Pearson 9",
-                "Anexo Servicios",
+                "Anexos",
                 zona,
             )
 
             pendientes, finalizadas = _carga_total_planta(
                 df,
                 "Pearson 9",
-                "Anexo Servicios",
+                "Anexos",
                 zona,
             )
 
@@ -4074,7 +4074,7 @@ def _pintar_anexo_visual_gerencia(df):
 
             seleccionada = (
                 seleccionado_centro == "Pearson 9"
-                and seleccionado_edificio == "Anexo Servicios"
+                and seleccionado_edificio == "Anexos"
                 and seleccionado_planta == zona
             )
 
@@ -4087,7 +4087,7 @@ def _pintar_anexo_visual_gerencia(df):
                     on_click=_seleccionar_planta_cv,
                     args=(
                         "Pearson 9",
-                        "Anexo Servicios",
+                        "Anexos",
                         zona,
                     ),
                     type="primary" if seleccionada else "secondary",
@@ -4380,7 +4380,7 @@ def mostrar_panel_planta_cv(df):
 
     texto_contexto = (
         "Situación operativa de la zona seleccionada"
-        if edificio == "Anexo Servicios"
+        if edificio == "Anexos"
         else "Situación operativa de la planta seleccionada"
     )
 
@@ -4540,13 +4540,13 @@ def mostrar_panel_planta_cv(df):
                 "limitado a la planta seleccionada."
             )
 
-    if edificio == "Anexo Servicios":
+    if edificio == "Anexos":
         st.markdown("#### Actuaciones pendientes de esta zona")
     else:
         st.markdown("#### Actuaciones pendientes de esta planta")
 
     if pendientes_totales.empty:
-        if edificio == "Anexo Servicios":
+        if edificio == "Anexos":
             st.success("Zona sin actuaciones pendientes.")
         else:
             st.success("Planta sin actuaciones pendientes.")
