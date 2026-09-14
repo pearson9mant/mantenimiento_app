@@ -2239,15 +2239,12 @@ def registrar_control(
 
     es_seguimiento_afs_p9 = (
         centro == "Pearson 9"
-        and str(punto_nombre or "").strip() == "Entrada general AFS"
-        and str(punto.get("tipo_control_punto") or "").strip()
-        == "Seguimiento AFS (sin correctiva)"
         and str(tipo_control or "").strip() == "Control AFS"
     )
 
     if es_seguimiento_afs_p9:
         resultado = (
-            f"Seguimiento AFS sin correctiva automática · {resultado}"
+            f"SEGUIMIENTO TEMPORAL · AFS Pearson 9 sin correctiva automática · {resultado}"
         )
         estado = "SEGUIMIENTO"
 
