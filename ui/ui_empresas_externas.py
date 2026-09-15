@@ -166,7 +166,6 @@ def pantalla_empresas_externas():
                motivo_gestion_externa
         FROM ordenes_trabajo
         WHERE LOWER(TRIM(COALESCE(gestor_externo, ''))) = 'abel vasquez'
-          AND estado IN ('Pendiente proveedor', 'Pendiente presupuesto')
           AND NOT EXISTS (
               SELECT 1
               FROM empresas_externas ee
@@ -619,6 +618,3 @@ def pantalla_empresas_externas():
 
                             st.success("Registro eliminado.")
                             st.rerun()
-
-                        except Exception as e:
-                            st.error(f"Error al borrar: {e}")
