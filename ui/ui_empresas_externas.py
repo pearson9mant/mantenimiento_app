@@ -618,3 +618,5 @@ def pantalla_empresas_externas():
 
                             st.success("Registro eliminado.")
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al borrar: {e}")
