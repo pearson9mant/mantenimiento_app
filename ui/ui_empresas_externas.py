@@ -45,6 +45,7 @@ TIPOS_SERVICIO = [
     "Climatización",
     "Electricidad",
     "Fontanería",
+    "Térmico",
     "PCI / Contra incendios",
     "Ascensores",
     "Puertas automáticas",
