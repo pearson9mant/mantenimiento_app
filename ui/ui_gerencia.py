@@ -5005,7 +5005,7 @@ def _pedidos_pendientes_gerencia(limite=40):
         marcas = ", ".join([marcador] * len(ids))
         cur.execute(
             f"""
-            SELECT pedido_id, material, cantidad
+            SELECT pedido_id, id, material, cantidad, precio_unitario
             FROM pedidos_material_lineas
             WHERE pedido_id IN ({marcas})
             ORDER BY pedido_id DESC, id ASC
@@ -5016,29 +5016,60 @@ def _pedidos_pendientes_gerencia(limite=40):
     finally:
         conn.close()
 
-    materiales = {}
-    for pedido_id, material, cantidad in lineas:
-        materiales.setdefault(int(pedido_id), []).append(
-            f"{material} × {float(cantidad or 0):g}"
-        )
+    por_pedido = {}
+    for pedido_id, id_linea, material, cantidad, precio_unitario in lineas:
+        try:
+            cantidad_num = float(cantidad or 0)
+        except Exception:
+            cantidad_num = 0.0
+        try:
+            precio_num = float(precio_unitario or 0)
+        except Exception:
+            precio_num = 0.0
 
-    return [
-        {
-            "id": int(f[0]),
-            "numero": f[1] or f"PED-MAT-{int(f[0]):04d}",
+        por_pedido.setdefault(int(pedido_id), []).append({
+            "id": int(id_linea),
+            "material": str(material or "Material").strip(),
+            "cantidad": cantidad_num,
+            "precio": precio_num,
+            "total": cantidad_num * precio_num if precio_num > 0 else 0.0,
+        })
+
+    pedidos = []
+    for f in cabeceras:
+        id_pedido = int(f[0])
+        lineas_pedido = por_pedido.get(id_pedido, [])
+        precios_completos = bool(lineas_pedido) and all(
+            float(linea.get("precio") or 0) > 0
+            for linea in lineas_pedido
+        )
+        total_pedido = sum(
+            float(linea.get("total") or 0)
+            for linea in lineas_pedido
+        ) if precios_completos else 0.0
+
+        pedidos.append({
+            "id": id_pedido,
+            "numero": f[1] or f"PED-MAT-{id_pedido:04d}",
             "fecha": f[2] or "",
             "operario": f[3] or "",
             "centro": f[4] or "",
             "prioridad": f[5] or "",
             "estado": f[6] or "",
             "observaciones": f[7] or "",
-            "materiales": materiales.get(int(f[0]), []),
-        }
-        for f in cabeceras
-    ]
+            "lineas": lineas_pedido,
+            "precios_completos": precios_completos,
+            "total": total_pedido,
+        })
+
+    return pedidos
 
 
-def _aprobar_pedido_gerencia(id_pedido):
+def _aprobar_pedidos_gerencia(ids_pedido):
+    ids = [int(x) for x in ids_pedido if x is not None]
+    if not ids:
+        return False
+
     conn = conectar()
     cur = conn.cursor()
     m = _marcador_pedido_gerencia(conn)
@@ -5047,22 +5078,19 @@ def _aprobar_pedido_gerencia(id_pedido):
         or st.session_state.get("nombre")
         or "Gerencia"
     ).strip()
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M")
     try:
-        cur.execute(
-            f"""
-            UPDATE pedidos_material
-            SET aprobacion_gerencia = {m},
-                fecha_aprobacion_gerencia = {m},
-                aprobado_por = {m}
-            WHERE id = {m}
-            """,
-            (
-                "Aprobado",
-                datetime.now().strftime("%Y-%m-%d %H:%M"),
-                usuario,
-                int(id_pedido),
-            ),
-        )
+        for id_pedido in ids:
+            cur.execute(
+                f"""
+                UPDATE pedidos_material
+                SET aprobacion_gerencia = {m},
+                    fecha_aprobacion_gerencia = {m},
+                    aprobado_por = {m}
+                WHERE id = {m}
+                """,
+                ("Aprobado", ahora, usuario, id_pedido),
+            )
         conn.commit()
         return True
     except Exception:
@@ -5075,13 +5103,9 @@ def _aprobar_pedido_gerencia(id_pedido):
 def mostrar_pedidos_gerencia_ligero():
     st.markdown("## 📦 Pedidos de material")
     st.caption(
-        "Pendientes de aprobación. Esta vista no carga fotos, "
-        "inventario ni históricos."
+        "Gerencia aprueba únicamente pedidos con todos los precios informados. "
+        "Esta vista no carga fotos, inventario ni históricos."
     )
-
-    if st.button("⬅ Volver", key="gerencia_pedidos_volver"):
-        st.session_state["gerencia_vista_principal"] = None
-        st.rerun()
 
     try:
         pedidos = _pedidos_pendientes_gerencia(40)
@@ -5093,56 +5117,80 @@ def mostrar_pedidos_gerencia_ligero():
         st.success("✅ No hay pedidos pendientes de aprobación.")
         return
 
+    seleccionados = []
+    total_seleccionado = 0.0
+
     for pedido in pedidos:
+        completo = pedido["precios_completos"]
+        estado_precio = (
+            "🟡 Pendiente aprobación"
+            if completo
+            else "💶 Pendiente de precio"
+        )
+
         with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
+            c1, c2 = st.columns([4, 1.2])
             with c1:
                 st.markdown(
-                    f"**{pedido['numero']} · {pedido['centro']}**"
+                    f"**{pedido['numero']} · {pedido['centro']}** · {estado_precio}"
                 )
                 st.caption(
                     f"{pedido['fecha']} · {pedido['operario']} · "
                     f"Prioridad: {pedido['prioridad']}"
                 )
-                if pedido["materiales"]:
-                    st.write(" · ".join(pedido["materiales"][:6]))
-                    if len(pedido["materiales"]) > 6:
-                        st.caption(
-                            f"+ {len(pedido['materiales']) - 6} materiales más"
+
+                for linea in pedido["lineas"]:
+                    cantidad = float(linea["cantidad"] or 0)
+                    precio = float(linea["precio"] or 0)
+                    if precio > 0:
+                        st.write(
+                            f"{linea['material']} × {cantidad:g} · "
+                            f"{euros(precio)} / ud. · **{euros(cantidad * precio)}**"
                         )
+                    else:
+                        st.write(
+                            f"{linea['material']} × {cantidad:g} · "
+                            "**💶 Pendiente de precio**"
+                        )
+
                 if pedido["observaciones"]:
                     st.caption(pedido["observaciones"])
 
             with c2:
-                if st.checkbox(
-                    "Aprobar",
-                    key=f"gerencia_aprobar_{pedido['id']}",
-                ):
-                    if st.button(
-                        "✅ Confirmar",
-                        key=f"gerencia_confirmar_{pedido['id']}",
-                        use_container_width=True,
-                    ):
-                        if _aprobar_pedido_gerencia(pedido["id"]):
-                            st.rerun()
-                        st.error("No se pudo guardar la aprobación.")
+                if completo:
+                    st.metric("Total", euros(pedido["total"]))
+                    marcado = st.checkbox(
+                        "Seleccionar",
+                        key=f"gerencia_seleccionar_{pedido['id']}",
+                    )
+                    if marcado:
+                        seleccionados.append(pedido["id"])
+                        total_seleccionado += float(pedido["total"] or 0)
+                else:
+                    st.metric("Total", "Pendiente")
+                    st.caption("Abel debe completar el precio antes de aprobar.")
+
+    st.markdown("---")
+    r1, r2 = st.columns([1, 1])
+    r1.metric("Pedidos seleccionados", len(seleccionados))
+    r2.metric("TOTAL A APROBAR", euros(total_seleccionado))
+
+    if st.button(
+        f"✅ Aprobar {len(seleccionados)} pedido(s) · {euros(total_seleccionado)}",
+        key="gerencia_aprobar_seleccionados",
+        use_container_width=True,
+        disabled=not seleccionados,
+    ):
+        if _aprobar_pedidos_gerencia(seleccionados):
+            st.success(
+                f"✅ {len(seleccionados)} pedido(s) aprobados · "
+                f"Total autorizado: {euros(total_seleccionado)}"
+            )
+            st.rerun()
+        else:
+            st.error("No se pudo guardar la aprobación.")
 
 
-def mostrar_menu_principal_gerencia():
-    st.markdown("## 🏫 Gerencia")
-    c1, c2, c3 = st.columns([1, 0.8, 1])
-    with c1:
-        if st.button("🏫 Pearson 22", key="gerencia_entrada_p22", use_container_width=True):
-            st.session_state["gerencia_vista_principal"] = "Pearson 22"
-            st.rerun()
-    with c2:
-        if st.button("📦 Pedidos", key="gerencia_entrada_pedidos", use_container_width=True):
-            st.session_state["gerencia_vista_principal"] = "Pedidos"
-            st.rerun()
-    with c3:
-        if st.button("🏫 Pearson 9", key="gerencia_entrada_p9", use_container_width=True):
-            st.session_state["gerencia_vista_principal"] = "Pearson 9"
-            st.rerun()
 
 def pantalla_gerencia():
     aplicar_estilo_gerencia()
@@ -5165,8 +5213,14 @@ def pantalla_gerencia():
             return
 
         if vista_gerencia not in ["Pearson 22", "Pearson 9"]:
-            mostrar_menu_principal_gerencia()
-            return
+            centro_sesion = str(
+                st.session_state.get("gerencia_cv_centro") or ""
+            ).strip()
+            if centro_sesion in ["Pearson 22", "Pearson 9"]:
+                vista_gerencia = centro_sesion
+                st.session_state["gerencia_vista_principal"] = vista_gerencia
+            else:
+                return
 
     df = preparar_ordenes()
 
@@ -5209,9 +5263,6 @@ def pantalla_gerencia():
 
     if perfil_actual == "gerencia":
         centro_objetivo = vista_gerencia
-        if st.button("⬅ Volver a Gerencia", key="gerencia_volver_menu_principal"):
-            st.session_state["gerencia_vista_principal"] = None
-            st.rerun()
 
     mostrar_colegio_vivo_gerencia(
         df,
