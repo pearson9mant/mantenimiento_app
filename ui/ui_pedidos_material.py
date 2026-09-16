@@ -732,7 +732,6 @@ def mostrar_lineas_pedido(
 
             if (
                 modo_abel
-                and es_compra
                 and datos_recepcion
             ):
                 cantidad_pedida = float(
