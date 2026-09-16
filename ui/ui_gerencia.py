@@ -5209,7 +5209,11 @@ def mostrar_pedidos_gerencia_ligero():
                                     "La OT está vinculada, pero no tiene descripción disponible."
                                 )
                     else:
-                        st.caption("Este pedido no tiene una OT vinculada disponible.")
+                        motivo_pedido = str(pedido.get("observaciones") or "").strip()
+                        if motivo_pedido:
+                            st.markdown(f"**📝 Motivo del pedido:** {motivo_pedido}")
+                        else:
+                            st.caption("Este pedido no tiene una OT vinculada ni motivo informado.")
 
             with c2:
                 if completo:
