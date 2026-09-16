@@ -2,6 +2,7 @@ import re
 import unicodedata
 import streamlit as st
 
+from database.db import conectar, _sql
 from config import CENTROS
 
 from modules.pedidos_material import (
@@ -521,6 +522,65 @@ def mostrar_link_material(
         )
 
 
+def _guardar_precio_linea_abel(id_linea, precio_unitario):
+    """Guarda solo el precio de una línea. No registra recepción ni mueve stock."""
+    try:
+        precio = float(precio_unitario or 0)
+    except Exception:
+        return False, "El precio no es válido."
+
+    if precio <= 0:
+        return False, "Indica un precio mayor que 0,00 €."
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            _sql("""
+                UPDATE pedidos_material_lineas
+                SET precio_unitario = ?
+                WHERE id = ?
+            """),
+            (precio, int(id_linea)),
+        )
+        conn.commit()
+        return True, "Precio guardado."
+    except Exception as e:
+        conn.rollback()
+        return False, f"No se pudo guardar el precio: {e}"
+    finally:
+        conn.close()
+
+
+def _aprobaciones_gerencia_por_pedido(ids_pedido):
+    """Lee las aprobaciones visibles de Abel en una sola consulta."""
+    ids = [int(x) for x in ids_pedido if x is not None]
+    if not ids:
+        return {}
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        modulo = conn.__class__.__module__.lower()
+        marcador = "?" if "sqlite" in modulo else "%s"
+        marcas = ", ".join([marcador] * len(ids))
+        try:
+            cur.execute(
+                f"""
+                SELECT id, aprobacion_gerencia
+                FROM pedidos_material
+                WHERE id IN ({marcas})
+                """,
+                tuple(ids),
+            )
+            return {int(f[0]): str(f[1] or "").strip() for f in cur.fetchall()}
+        except Exception:
+            conn.rollback()
+            return {}
+    finally:
+        conn.close()
+
+
 def mostrar_lineas_pedido(
     id_pedido,
     modo_abel=False,
@@ -712,6 +772,32 @@ def mostrar_lineas_pedido(
                         f"💶 Precio unitario: "
                         f"{precio_guardado:.2f} €"
                     )
+                else:
+                    st.warning("💶 Pendiente de precio")
+
+                precio_abel = st.number_input(
+                    "Precio unitario (€)",
+                    min_value=0.0,
+                    value=float(precio_guardado if precio_guardado > 0 else 0.0),
+                    step=0.01,
+                    format="%.2f",
+                    key=f"precio_abel_{id_linea}",
+                )
+
+                if st.button(
+                    "💾 Guardar precio",
+                    key=f"guardar_precio_abel_{id_linea}",
+                    use_container_width=True,
+                ):
+                    ok_precio, mensaje_precio = _guardar_precio_linea_abel(
+                        id_linea,
+                        precio_abel,
+                    )
+                    if ok_precio:
+                        st.success(mensaje_precio)
+                        st.rerun()
+                    else:
+                        st.error(mensaje_precio)
 
             if (
                 not modo_abel
@@ -1656,6 +1742,10 @@ def ui_pedidos_abel():
         )
         return
 
+    aprobaciones_gerencia = _aprobaciones_gerencia_por_pedido(
+        [leer_pedido(p).get("id_pedido") for p in pedidos]
+    )
+
     for p in pedidos:
         datos = leer_pedido(
             p
@@ -1765,6 +1855,10 @@ def ui_pedidos_abel():
                 st.write(
                     f"**Situación del pedido:** {estado}"
                 )
+                if aprobaciones_gerencia.get(int(id_pedido)) == "Aprobado":
+                    st.success("✅ Aprobado por Gerencia · puede comprarse")
+                else:
+                    st.caption("🟡 Pendiente de aprobación de Gerencia")
 
             if observaciones:
                 st.write(
