@@ -1080,7 +1080,7 @@ if perfil == "gerencia":
             unsafe_allow_html=True
         )
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button(
@@ -1095,6 +1095,15 @@ if perfil == "gerencia":
                 st.rerun()
 
         with col2:
+            if st.button(
+                "📦\nPedidos",
+                key="btn_gerencia_pedidos",
+                use_container_width=True
+            ):
+                st.session_state["seccion_actual"] = "Gerencia Pedidos"
+                st.rerun()
+
+        with col3:
             if st.button(
                 "🏫\nPearson 9",
                 key="btn_gerencia_p9",
@@ -1254,6 +1263,11 @@ elif perfil == "gerencia":
 
     elif seccion == "Gerencia Pearson 9":
         st.session_state["gerencia_cv_centro"] = "Pearson 9"
+        pantalla_gerencia()
+
+    elif seccion == "Gerencia Pedidos":
+        st.session_state["gerencia_cv_centro"] = None
+        st.session_state["gerencia_vista_pedidos"] = True
         pantalla_gerencia()
 
 elif perfil == "comunicacion":
