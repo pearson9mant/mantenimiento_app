@@ -1091,6 +1091,7 @@ if perfil == "gerencia":
                 st.session_state["gerencia_cv_centro"] = "Pearson 22"
                 st.session_state["gerencia_cv_edificio"] = None
                 st.session_state["gerencia_cv_planta"] = None
+                st.session_state["gerencia_vista_principal"] = "Pearson 22"
                 st.session_state["seccion_actual"] = "Gerencia Pearson 22"
                 st.rerun()
 
@@ -1100,6 +1101,7 @@ if perfil == "gerencia":
                 key="btn_gerencia_pedidos",
                 use_container_width=True
             ):
+                st.session_state["gerencia_vista_principal"] = "Pedidos"
                 st.session_state["seccion_actual"] = "Gerencia Pedidos"
                 st.rerun()
 
@@ -1112,6 +1114,7 @@ if perfil == "gerencia":
                 st.session_state["gerencia_cv_centro"] = "Pearson 9"
                 st.session_state["gerencia_cv_edificio"] = None
                 st.session_state["gerencia_cv_planta"] = None
+                st.session_state["gerencia_vista_principal"] = "Pearson 9"
                 st.session_state["seccion_actual"] = "Gerencia Pearson 9"
                 st.rerun()
 
@@ -1259,15 +1262,17 @@ elif perfil == "gerencia":
 
     if seccion == "Gerencia Pearson 22":
         st.session_state["gerencia_cv_centro"] = "Pearson 22"
+        st.session_state["gerencia_vista_principal"] = "Pearson 22"
         pantalla_gerencia()
 
     elif seccion == "Gerencia Pearson 9":
         st.session_state["gerencia_cv_centro"] = "Pearson 9"
+        st.session_state["gerencia_vista_principal"] = "Pearson 9"
         pantalla_gerencia()
 
     elif seccion == "Gerencia Pedidos":
         st.session_state["gerencia_cv_centro"] = None
-        st.session_state["gerencia_vista_pedidos"] = True
+        st.session_state["gerencia_vista_principal"] = "Pedidos"
         pantalla_gerencia()
 
 elif perfil == "comunicacion":
