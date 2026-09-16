@@ -4992,8 +4992,8 @@ def _pedidos_pendientes_gerencia(limite=40):
                    prioridad, estado, observaciones
             FROM pedidos_material
             WHERE COALESCE(aprobacion_gerencia, '') <> 'Aprobado'
-              AND COALESCE(estado, '') NOT IN
-                  ('Entregado', 'Cancelado', 'Archivado')
+              AND COALESCE(estado, '') IN
+                  ('Pendiente', 'Preparado', 'Sin stock')
             ORDER BY id DESC
             LIMIT {int(limite)}
         """)
@@ -5011,21 +5011,8 @@ def _pedidos_pendientes_gerencia(limite=40):
                 pml.id,
                 pml.material,
                 pml.cantidad,
-                COALESCE(
-                    NULLIF(pml.precio_unitario, 0),
-                    inv.precio_unitario,
-                    0
-                ) AS precio_unitario
+                COALESCE(pml.precio_unitario, 0) AS precio_unitario
             FROM pedidos_material_lineas pml
-            LEFT JOIN (
-                SELECT
-                    codigo,
-                    MAX(COALESCE(precio_unitario, 0)) AS precio_unitario
-                FROM inventario
-                WHERE COALESCE(codigo, '') <> ''
-                GROUP BY codigo
-            ) inv
-                ON inv.codigo = pml.codigo_material
             WHERE pml.pedido_id IN ({marcas})
             ORDER BY pml.pedido_id DESC, pml.id ASC
             """,
@@ -5105,10 +5092,13 @@ def _aprobar_pedidos_gerencia(ids_pedido):
                 UPDATE pedidos_material
                 SET aprobacion_gerencia = {m},
                     fecha_aprobacion_gerencia = {m},
-                    aprobado_por = {m}
+                    aprobado_por = {m},
+                    estado_gestion = 'Aprobado',
+                    fecha_aprobacion_noemi =
+                        COALESCE(NULLIF(fecha_aprobacion_noemi, ''), {m})
                 WHERE id = {m}
                 """,
-                ("Aprobado", ahora, usuario, id_pedido),
+                ("Aprobado", ahora, usuario, ahora, id_pedido),
             )
         conn.commit()
         return True
