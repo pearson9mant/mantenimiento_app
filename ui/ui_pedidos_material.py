@@ -1687,15 +1687,90 @@ def ui_pedidos_operario(
             )
 
 
+
+def _situacion_pedidos_abel(ids_pedido):
+    """Lee precios y aprobación de varios pedidos en una sola consulta."""
+    ids = []
+    for valor in ids_pedido or []:
+        try:
+            ids.append(int(valor))
+        except Exception:
+            continue
+
+    if not ids:
+        return {}
+
+    conn = conectar()
+    cur = conn.cursor()
+    modulo = conn.__class__.__module__.lower()
+    marcador = "?" if "sqlite" in modulo else "%s"
+    marcas = ", ".join([marcador] * len(ids))
+
+    try:
+        try:
+            cur.execute(
+                f"""
+                SELECT
+                    p.id,
+                    COALESCE(p.aprobacion_gerencia, ''),
+                    COUNT(l.id),
+                    SUM(CASE
+                        WHEN COALESCE(l.precio_unitario, 0) > 0 THEN 0
+                        ELSE 1
+                    END)
+                FROM pedidos_material p
+                LEFT JOIN pedidos_material_lineas l ON l.pedido_id = p.id
+                WHERE p.id IN ({marcas})
+                GROUP BY p.id, p.aprobacion_gerencia
+                """,
+                tuple(ids),
+            )
+            return {
+                int(pid): {
+                    "aprobado": str(apr or "") == "Aprobado",
+                    "total_lineas": int(total or 0),
+                    "sin_precio": int(sin_precio or 0),
+                }
+                for pid, apr, total, sin_precio in cur.fetchall()
+            }
+        except Exception:
+            conn.rollback()
+            cur = conn.cursor()
+            cur.execute(
+                f"""
+                SELECT
+                    pedido_id,
+                    COUNT(id),
+                    SUM(CASE
+                        WHEN COALESCE(precio_unitario, 0) > 0 THEN 0
+                        ELSE 1
+                    END)
+                FROM pedidos_material_lineas
+                WHERE pedido_id IN ({marcas})
+                GROUP BY pedido_id
+                """,
+                tuple(ids),
+            )
+            return {
+                int(pid): {
+                    "aprobado": False,
+                    "total_lineas": int(total or 0),
+                    "sin_precio": int(sin_precio or 0),
+                }
+                for pid, total, sin_precio in cur.fetchall()
+            }
+    finally:
+        conn.close()
+
 def ui_pedidos_abel():
     st.subheader(
         "📥 Solicitudes de material"
     )
 
     st.caption(
-        "Aquí ves los materiales solicitados por los operarios. "
-        "No tienes que marcar estados ni gestionar aprobaciones en la app. "
-        "La recepción física la registra el operario desde su OT."
+        "Nuevo flujo: completa únicamente los precios que falten. "
+        "Cuando todos estén informados, Gerencia puede aprobar el pedido. "
+        "Los pedidos no se borran: pasan de fase y quedan en histórico."
     )
 
     catalogo = _catalogo_inventario()
@@ -1706,35 +1781,51 @@ def ui_pedidos_abel():
     filtro = st.selectbox(
         "Mostrar",
         [
-            "Pendientes",
-            "Todos",
+            "Por completar precio",
+            "Esperando Gerencia",
+            "Aprobados para comprar",
+            "Histórico",
         ],
         key="filtro_pedidos_abel",
     )
 
-    pedidos = obtener_pedidos_material(
+    pedidos_todos = obtener_pedidos_material(
         operario=None,
         solo_pendientes=False,
         limite=300,
     )
 
-    if filtro == "Pendientes":
-        pedidos = [
-            p
-            for p in pedidos
-            if str(
-                leer_pedido(p).get(
-                    "estado",
-                    "",
-                )
-                or ""
-            ).strip()
-            not in [
-                "Entregado",
-                "Cancelado",
-                "Archivado",
-            ]
-        ]
+    situacion = _situacion_pedidos_abel(
+        [leer_pedido(p).get("id_pedido") for p in pedidos_todos]
+    )
+
+    pedidos = []
+    for p in pedidos_todos:
+        d = leer_pedido(p)
+        pedido_id = int(d.get("id_pedido") or 0)
+        estado_pedido = str(d.get("estado") or "").strip()
+        activo = estado_pedido in ["Pendiente", "Preparado", "Sin stock"]
+        s = situacion.get(
+            pedido_id,
+            {"aprobado": False, "total_lineas": 0, "sin_precio": 0},
+        )
+        precios_completos = (
+            int(s.get("total_lineas") or 0) > 0
+            and int(s.get("sin_precio") or 0) == 0
+        )
+        aprobado = bool(s.get("aprobado"))
+
+        if filtro == "Por completar precio":
+            mostrar = activo and not aprobado and not precios_completos
+        elif filtro == "Esperando Gerencia":
+            mostrar = activo and not aprobado and precios_completos
+        elif filtro == "Aprobados para comprar":
+            mostrar = activo and aprobado
+        else:
+            mostrar = not activo
+
+        if mostrar:
+            pedidos.append(p)
 
     if not pedidos:
         st.info(
@@ -1886,25 +1977,21 @@ def ui_pedidos_abel():
                 "Cancelado",
                 "Archivado",
             ]:
-                if st.button(
-                    "📁 Quitar de pendientes",
-                    key=f"archivar_pedido_abel_{id_pedido}",
-                    use_container_width=True,
-                ):
-                    ok_archivar, mensaje_archivar = (
-                        archivar_pedido_material(
-                            id_pedido
-                        )
+                situacion_pedido = situacion.get(
+                    int(id_pedido),
+                    {"aprobado": False, "total_lineas": 0, "sin_precio": 0},
+                )
+                if situacion_pedido.get("aprobado"):
+                    st.success(
+                        "✅ Aprobado por Gerencia · pendiente de compra/recepción."
                     )
-
-                    if ok_archivar:
-                        st.success(
-                            "Pedido quitado de Pendientes. "
-                            "Sigue disponible en Todos."
-                        )
-                        st.rerun()
-                    else:
-                        st.error(
-                            mensaje_archivar
-                        )
+                elif int(situacion_pedido.get("sin_precio") or 0) > 0:
+                    st.info(
+                        "💶 Completa los precios que falten. "
+                        "Después pasará a Esperando Gerencia."
+                    )
+                else:
+                    st.info(
+                        "🟡 Precios completos · esperando aprobación de Gerencia."
+                    )
 
