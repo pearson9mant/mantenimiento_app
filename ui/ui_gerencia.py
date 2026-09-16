@@ -5,6 +5,7 @@ import unicodedata
 
 from database.db import conectar
 from modules.corazon_sistema import construir_prioridades_globales
+from modules.pedidos_ot import obtener_ot_de_pedido
 
 
 CENTROS_GERENCIA = ["Pearson 9", "Pearson 22"]
@@ -5005,10 +5006,28 @@ def _pedidos_pendientes_gerencia(limite=40):
         marcas = ", ".join([marcador] * len(ids))
         cur.execute(
             f"""
-            SELECT pedido_id, id, material, cantidad, precio_unitario
-            FROM pedidos_material_lineas
-            WHERE pedido_id IN ({marcas})
-            ORDER BY pedido_id DESC, id ASC
+            SELECT
+                pml.pedido_id,
+                pml.id,
+                pml.material,
+                pml.cantidad,
+                COALESCE(
+                    NULLIF(pml.precio_unitario, 0),
+                    inv.precio_unitario,
+                    0
+                ) AS precio_unitario
+            FROM pedidos_material_lineas pml
+            LEFT JOIN (
+                SELECT
+                    codigo,
+                    MAX(COALESCE(precio_unitario, 0)) AS precio_unitario
+                FROM inventario
+                WHERE COALESCE(codigo, '') <> ''
+                GROUP BY codigo
+            ) inv
+                ON inv.codigo = pml.codigo_material
+            WHERE pml.pedido_id IN ({marcas})
+            ORDER BY pml.pedido_id DESC, pml.id ASC
             """,
             tuple(ids),
         )
@@ -5155,6 +5174,52 @@ def mostrar_pedidos_gerencia_ligero():
 
                 if pedido["observaciones"]:
                     st.caption(pedido["observaciones"])
+
+                clave_ot = f"gerencia_pedido_ot_abierta_{pedido['id']}"
+                ot_abierta = bool(st.session_state.get(clave_ot, False))
+
+                if st.button(
+                    "🔧 Ver OT / motivo del pedido" if not ot_abierta else "🙈 Ocultar OT",
+                    key=f"gerencia_ver_ot_{pedido['id']}",
+                    use_container_width=False,
+                ):
+                    st.session_state[clave_ot] = not ot_abierta
+                    st.rerun()
+
+                if st.session_state.get(clave_ot, False):
+                    try:
+                        contexto_ot = obtener_ot_de_pedido(pedido["id"])
+                    except Exception as e:
+                        contexto_ot = None
+                        st.caption(f"No se pudo consultar la OT: {e}")
+
+                    if contexto_ot:
+                        numero_ot = str(
+                            contexto_ot.get("numero_ot") or "OT vinculada"
+                        ).strip()
+                        descripcion_ot = str(
+                            contexto_ot.get("descripcion_ot")
+                            or contexto_ot.get("descripcion")
+                            or ""
+                        ).strip()
+                        ubicacion_ot = " · ".join(
+                            str(contexto_ot.get(campo) or "").strip()
+                            for campo in ["centro", "edificio", "planta", "espacio"]
+                            if str(contexto_ot.get(campo) or "").strip()
+                        )
+
+                        with st.container(border=True):
+                            st.markdown(f"**🔧 {numero_ot}**")
+                            if ubicacion_ot:
+                                st.caption(f"📍 {ubicacion_ot}")
+                            if descripcion_ot:
+                                st.write(descripcion_ot)
+                            else:
+                                st.caption(
+                                    "La OT está vinculada, pero no tiene descripción disponible."
+                                )
+                    else:
+                        st.caption("Este pedido no tiene una OT vinculada disponible.")
 
             with c2:
                 if completo:
