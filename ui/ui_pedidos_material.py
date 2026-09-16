@@ -927,35 +927,31 @@ def mostrar_lineas_pedido(
 
 
 
-def _eliminar_solo_pedidos_prueba():
-    """Limpieza puntual: elimina solo PED-MAT-0054, 0055 y 0056, nunca la OT."""
-    ids_prueba = (54, 55, 56)
+def _borrar_pedido_seguro(id_pedido):
+    """Borra un pedido y su vínculo con OT, pero nunca borra la OT."""
     conn = conectar()
     cur = conn.cursor()
 
     try:
-        for id_pedido in ids_prueba:
-            cur.execute(
-                _sql("DELETE FROM pedidos_material_ot WHERE pedido_id = ?"),
-                (id_pedido,),
-            )
-            cur.execute(
-                _sql("DELETE FROM pedidos_material_lineas WHERE pedido_id = ?"),
-                (id_pedido,),
-            )
-            cur.execute(
-                _sql("DELETE FROM pedidos_material WHERE id = ?"),
-                (id_pedido,),
-            )
-
+        cur.execute(
+            _sql("DELETE FROM pedidos_material_ot WHERE pedido_id = ?"),
+            (int(id_pedido),),
+        )
+        cur.execute(
+            _sql("DELETE FROM pedidos_material_lineas WHERE pedido_id = ?"),
+            (int(id_pedido),),
+        )
+        cur.execute(
+            _sql("DELETE FROM pedidos_material WHERE id = ?"),
+            (int(id_pedido),),
+        )
         conn.commit()
-        return True, "PED-MAT-0054, PED-MAT-0055 y PED-MAT-0056 eliminados."
+        return True, "Pedido eliminado."
     except Exception as e:
         conn.rollback()
-        return False, f"No se pudieron eliminar los pedidos de prueba: {e}"
+        return False, f"No se pudo eliminar el pedido: {e}"
     finally:
         conn.close()
-
 
 def ui_pedidos_material():
     st.title(
@@ -971,27 +967,6 @@ def ui_pedidos_material():
         return
 
     if es_admin():
-        with st.expander("🧹 Limpieza puntual de pruebas"):
-            st.warning(
-                "Elimina exclusivamente PED-MAT-0054, PED-MAT-0055 y PED-MAT-0056. "
-                "No elimina ninguna OT."
-            )
-            confirmar_limpieza = st.checkbox(
-                "Confirmo que quiero borrar solo estos 3 pedidos de prueba",
-                key="confirmar_limpieza_pedidos_0054_0055_0056",
-            )
-            if st.button(
-                "🗑️ Eliminar 0054, 0055 y 0056",
-                disabled=not confirmar_limpieza,
-                key="eliminar_pedidos_prueba_0054_0055_0056",
-            ):
-                ok, mensaje = _eliminar_solo_pedidos_prueba()
-                if ok:
-                    st.success(mensaje)
-                    st.rerun()
-                else:
-                    st.error(mensaje)
-
         tab1, tab2 = st.tabs([
             "➕ Nuevo pedido",
             "📥 Pedidos recibidos",
@@ -1735,6 +1710,28 @@ def ui_pedidos_operario(
                 id_pedido,
                 contexto="operario",
             )
+
+            if estado not in ["Entregado", "Archivado"]:
+                with st.expander("🗑️ Eliminar pedido"):
+                    st.warning(
+                        "El pedido se eliminará definitivamente. "
+                        "Si está vinculado a una OT, la OT NO se eliminará."
+                    )
+                    confirmar = st.checkbox(
+                        f"Confirmo que quiero eliminar {numero_pedido}",
+                        key=f"confirmar_borrar_pedido_{id_pedido}",
+                    )
+                    if st.button(
+                        "🗑️ Eliminar definitivamente",
+                        disabled=not confirmar,
+                        key=f"borrar_pedido_{id_pedido}",
+                    ):
+                        ok, mensaje = _borrar_pedido_seguro(id_pedido)
+                        if ok:
+                            st.success(mensaje)
+                            st.rerun()
+                        else:
+                            st.error(mensaje)
 
 
 
