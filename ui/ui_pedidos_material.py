@@ -20,6 +20,7 @@ from modules.pedidos_ot import obtener_ot_de_pedido
 from modules.inventario import (
     obtener_materiales_para_select,
     categorias_inventario_disponibles,
+    actualizar_precio_material_desde_pedido,
 )
 
 
@@ -523,7 +524,7 @@ def mostrar_link_material(
 
 
 def _guardar_precio_linea_abel(id_linea, precio_unitario):
-    """Guarda solo el precio de una línea. No registra recepción ni mueve stock."""
+    """Guarda el precio de una línea y lo sincroniza con Inventario."""
     try:
         precio = float(precio_unitario or 0)
     except Exception:
@@ -537,39 +538,37 @@ def _guardar_precio_linea_abel(id_linea, precio_unitario):
     try:
         cur.execute(
             _sql("""
+                SELECT codigo_material
+                FROM pedidos_material_lineas
+                WHERE id = ?
+            """),
+            (int(id_linea),),
+        )
+        fila = cur.fetchone()
+        codigo_material = str(fila[0] or "").strip() if fila else ""
+
+        cur.execute(
+            _sql("""
                 UPDATE pedidos_material_lineas
                 SET precio_unitario = ?
                 WHERE id = ?
             """),
             (precio, int(id_linea)),
         )
-
-        cur.execute(
-            _sql("""
-                UPDATE inventario
-                SET precio_unitario = ?
-                WHERE codigo = (
-                    SELECT codigo_material
-                    FROM pedidos_material_lineas
-                    WHERE id = ?
-                )
-                  AND COALESCE((
-                    SELECT codigo_material
-                    FROM pedidos_material_lineas
-                    WHERE id = ?
-                  ), '') <> ''
-            """),
-            (precio, int(id_linea), int(id_linea)),
-        )
-
         conn.commit()
+
+        if codigo_material:
+            actualizar_precio_material_desde_pedido(
+                codigo_material,
+                precio,
+            )
+
         return True, "Precio guardado en pedido e Inventario."
     except Exception as e:
         conn.rollback()
         return False, f"No se pudo guardar el precio: {e}"
     finally:
         conn.close()
-
 
 def _aprobaciones_gerencia_por_pedido(ids_pedido):
     """Lee las aprobaciones visibles de Abel en una sola consulta."""
