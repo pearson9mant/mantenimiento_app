@@ -543,8 +543,27 @@ def _guardar_precio_linea_abel(id_linea, precio_unitario):
             """),
             (precio, int(id_linea)),
         )
+
+        cur.execute(
+            _sql("""
+                UPDATE inventario
+                SET precio_unitario = ?
+                WHERE codigo = (
+                    SELECT codigo_material
+                    FROM pedidos_material_lineas
+                    WHERE id = ?
+                )
+                  AND COALESCE((
+                    SELECT codigo_material
+                    FROM pedidos_material_lineas
+                    WHERE id = ?
+                  ), '') <> ''
+            """),
+            (precio, int(id_linea), int(id_linea)),
+        )
+
         conn.commit()
-        return True, "Precio guardado."
+        return True, "Precio guardado en pedido e Inventario."
     except Exception as e:
         conn.rollback()
         return False, f"No se pudo guardar el precio: {e}"
