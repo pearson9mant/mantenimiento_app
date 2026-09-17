@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from urllib.parse import quote
 import streamlit as st
 
 from database.db import conectar, _sql
@@ -984,27 +985,11 @@ def ui_pedidos_material():
         )
         return
 
-    if es_admin():
-        tab1, tab2 = st.tabs([
-            "➕ Nuevo pedido",
-            "📥 Pedidos recibidos",
-        ])
-
-        with tab1:
-            ui_pedidos_operario(
-                usuario
-            )
-
-        with tab2:
-            ui_pedidos_abel()
-
-    elif es_abel():
-        ui_pedidos_abel()
-
-    else:
-        ui_pedidos_operario(
-            usuario
-        )
+    # Operarios y Administración trabajan con el mismo flujo normal.
+    # Abel ya no necesita entrar en la app para gestionar pedidos.
+    ui_pedidos_operario(
+        usuario
+    )
 
 
 def _mostrar_selector_material(
@@ -1637,12 +1622,79 @@ def ui_pedidos_operario(
                 fotos_pedido,
             )
 
+        numero_pedido = referencia_pedido(
+            id_pedido
+        )
+
+        cuerpo_email = [
+            f"PEDIDO DE MATERIAL · {numero_pedido}",
+            "",
+            f"Operario: {operario}",
+            f"Centro: {centro}",
+            f"Prioridad: {prioridad}",
+        ]
+
+        if observaciones_generales:
+            cuerpo_email.extend([
+                f"Motivo / observaciones: {observaciones_generales}",
+            ])
+
+        cuerpo_email.extend([
+            "",
+            "MATERIAL SOLICITADO:",
+        ])
+
+        for linea in lineas_validas:
+            texto_linea = (
+                f"- {linea['material']} · "
+                f"Cantidad: {linea['cantidad']:g}"
+            )
+            cuerpo_email.append(
+                texto_linea
+            )
+
+            obs_linea = str(
+                linea.get("observaciones") or ""
+            ).strip()
+            if obs_linea:
+                cuerpo_email.append(
+                    f"  Observaciones: {obs_linea}"
+                )
+
+            link_linea = str(
+                linea.get("link_material") or ""
+            ).strip()
+            if link_linea:
+                cuerpo_email.append(
+                    f"  Enlace: {link_linea}"
+                )
+
+        texto_email = "\n".join(
+            cuerpo_email
+        )
+        asunto_email = (
+            f"Pedido de material {numero_pedido} · {centro}"
+        )
+        email_url = (
+            "mailto:?subject="
+            + quote(asunto_email)
+            + "&body="
+            + quote(texto_email)
+        )
+
         limpiar_lineas_pedido()
 
         st.success(
-            "Pedido enviado a almacén."
+            f"Pedido {numero_pedido} guardado correctamente."
         )
-        st.rerun()
+        st.link_button(
+            "✉️ Abrir email",
+            email_url,
+            use_container_width=True,
+        )
+        st.caption(
+            "El destinatario queda libre. Elige Abel, Gerencia o quien corresponda en tu correo."
+        )
 
     st.divider()
 
