@@ -42,6 +42,9 @@ def categorias_pedido_material():
             "Iluminación",
         )
 
+    if "Herramientas" not in categorias:
+        categorias.append("Herramientas")
+
     return categorias
 
 
