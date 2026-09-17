@@ -21,13 +21,13 @@ USUARIOS = {
     },
 
     "abel": {
-        "password": "abel2026",
+        "password": "nuevaabel",
         "perfil": "abel",
         "nombre": "Abel Vasquez"
     },
 
     "gerencia": {
-        "password": "gerencia2026",
+        "password": "nuevagerencia",
         "perfil": "gerencia",
         "nombre": "Gerencia"
     },
