@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+from database.db import conectar
+
 try:
     import altair as alt
 except Exception:
@@ -15,6 +17,7 @@ COLUMNAS_EVOLUCION = [
     "mes",
     "Preventivos realizados",
     "Incidencias creadas",
+    "Controles Legionella",
 ]
 
 
@@ -47,12 +50,18 @@ def _preparar_evolucion(evolucion):
         errors="coerce",
     ).fillna(0).astype(int)
 
+    datos["Controles Legionella"] = pd.to_numeric(
+        datos["Controles Legionella"],
+        errors="coerce",
+    ).fillna(0).astype(int)
+
     # Orden cronológico: se conserva el orden que ya trae Gerencia.
     datos["_orden"] = range(len(datos))
 
     con_datos = datos[
         (datos["Preventivos realizados"] > 0)
         | (datos["Incidencias creadas"] > 0)
+        | (datos["Controles Legionella"] > 0)
     ].copy()
 
     return con_datos.sort_values("_orden").drop(columns=["_orden"])
@@ -64,6 +73,7 @@ def _ultimo_mes(datos):
             "mes": "Sin datos",
             "Preventivos realizados": 0,
             "Incidencias creadas": 0,
+            "Controles Legionella": 0,
         }
 
     fila = datos.iloc[-1]
@@ -75,6 +85,9 @@ def _ultimo_mes(datos):
         ),
         "Incidencias creadas": int(
             fila.get("Incidencias creadas") or 0
+        ),
+        "Controles Legionella": int(
+            fila.get("Controles Legionella") or 0
         ),
     }
 
@@ -90,6 +103,7 @@ def _datos_largos(datos):
         value_vars=[
             "Incidencias creadas",
             "Preventivos realizados",
+            "Controles Legionella",
         ],
         var_name="Tipo",
         value_name="Cantidad",
@@ -98,6 +112,7 @@ def _datos_largos(datos):
     largos["Tipo"] = largos["Tipo"].replace({
         "Incidencias creadas": "Incidencias correctivas",
         "Preventivos realizados": "Preventivos realizados",
+        "Controles Legionella": "Controles Legionella",
     })
 
     return largos
@@ -132,7 +147,7 @@ def grafico_preventivo_incidencias_vertical(evolucion):
     if alt is None:
         st.bar_chart(
             datos.set_index("mes")[
-                ["Incidencias creadas", "Preventivos realizados"]
+                ["Incidencias creadas", "Preventivos realizados", "Controles Legionella"]
             ],
             use_container_width=True,
             height=300,
@@ -216,11 +231,13 @@ def grafico_preventivo_incidencias_horizontal(evolucion):
                 "Cantidad": [
                     ultimo["Incidencias creadas"],
                     ultimo["Preventivos realizados"],
+                    ultimo["Controles Legionella"],
                 ]
             },
             index=[
                 "Incidencias correctivas",
                 "Preventivos realizados",
+                "Controles Legionella",
             ],
         )
 
@@ -244,6 +261,7 @@ def grafico_preventivo_incidencias_horizontal(evolucion):
                 sort=[
                     "Incidencias correctivas",
                     "Preventivos realizados",
+                    "Controles Legionella",
                 ],
             ),
             x=alt.X(
@@ -299,7 +317,7 @@ def grafico_preventivo_incidencias_compacto(evolucion):
 
     ultimo = _ultimo_mes(datos)
 
-    c1, c2, c3 = st.columns([1, 1, 1.25])
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1.25])
 
     with c1:
         st.metric(
@@ -313,12 +331,18 @@ def grafico_preventivo_incidencias_compacto(evolucion):
             ultimo["Preventivos realizados"],
         )
 
+    with c3:
+        st.metric(
+            "Controles Legionella",
+            ultimo["Controles Legionella"],
+        )
+
     diferencia = (
         ultimo["Preventivos realizados"]
         - ultimo["Incidencias creadas"]
     )
 
-    with c3:
+    with c4:
         st.metric(
             f"Balance · {ultimo['mes']}",
             diferencia,
@@ -491,26 +515,31 @@ def grafico_preventivo_incidencias_lineas(evolucion):
                 "mes": "Abr 26",
                 "Incidencias creadas": 10,
                 "Preventivos realizados": 2,
+                "Controles Legionella": 1,
             },
             {
                 "mes": "May 26",
                 "Incidencias creadas": 9,
                 "Preventivos realizados": 3,
+                "Controles Legionella": 2,
             },
             {
                 "mes": "Jun 26",
                 "Incidencias creadas": 8,
                 "Preventivos realizados": 4,
+                "Controles Legionella": 3,
             },
             {
                 "mes": "Jul 26",
                 "Incidencias creadas": 7,
                 "Preventivos realizados": 5,
+                "Controles Legionella": 4,
             },
             {
                 "mes": ultimo["mes"],
                 "Incidencias creadas": ultimo["Incidencias creadas"],
                 "Preventivos realizados": ultimo["Preventivos realizados"],
+                "Controles Legionella": ultimo["Controles Legionella"],
             },
         ])
 
@@ -525,7 +554,7 @@ def grafico_preventivo_incidencias_lineas(evolucion):
     if alt is None:
         st.line_chart(
             datos_grafico.set_index("mes")[
-                ["Incidencias creadas", "Preventivos realizados"]
+                ["Incidencias creadas", "Preventivos realizados", "Controles Legionella"]
             ],
             use_container_width=True,
             height=300,
@@ -625,7 +654,8 @@ def pantalla_laboratorio_preventivo_incidencias(
     st.caption(
         f"Datos actuales · {ultimo['mes']} · "
         f"{ultimo['Incidencias creadas']} incidencias correctivas · "
-        f"{ultimo['Preventivos realizados']} preventivos realizados"
+        f"{ultimo['Preventivos realizados']} preventivos realizados · "
+        f"{ultimo['Controles Legionella']} controles Legionella"
     )
 
     tab_a, tab_b, tab_c, tab_d, tab_e = st.tabs([
@@ -668,22 +698,114 @@ def pantalla_laboratorio_preventivo_incidencias(
 
 def datos_demo_actuales():
     """
-    Demo visual con los datos que ahora mismo estamos viendo en Gerencia:
-    6 incidencias correctivas y 7 preventivos realizados.
+    Datos reales mensuales para el laboratorio:
+    - incidencias correctivas y preventivos desde historico_ordenes;
+    - controles Legionella desde legionella_registros.
+
+    No modifica ningún registro.
     """
-    return pd.DataFrame([
-        {
-            "periodo": "2026-08",
-            "mes": "Ago 26",
-            "Preventivos realizados": 7,
-            "Incidencias creadas": 6,
-        }
-    ])
+    conn = conectar()
+    try:
+        historico = pd.read_sql_query("""
+            SELECT fecha_cierre, origen, descripcion
+            FROM historico_ordenes
+            WHERE fecha_cierre IS NOT NULL
+            ORDER BY fecha_cierre
+        """, conn)
+
+        legionella = pd.read_sql_query("""
+            SELECT fecha
+            FROM legionella_registros
+            WHERE fecha IS NOT NULL
+            ORDER BY fecha
+        """, conn)
+    except Exception:
+        return pd.DataFrame(columns=COLUMNAS_EVOLUCION)
+    finally:
+        conn.close()
+
+    bloques = []
+
+    if not historico.empty:
+        historico["fecha"] = pd.to_datetime(
+            historico["fecha_cierre"], errors="coerce"
+        )
+        historico = historico[historico["fecha"].notna()].copy()
+        historico["periodo"] = historico["fecha"].dt.to_period("M").astype(str)
+
+        origen = (
+            historico["origen"].fillna("").astype(str).str.strip().str.upper()
+        )
+        descripcion = (
+            historico["descripcion"].fillna("").astype(str).str.upper()
+        )
+
+        es_preventivo = (
+            (origen == "PREVENTIVO")
+            | descripcion.str.startswith("[PREVENTIVO]")
+        )
+        es_legionella_ot = origen == "LEGIONELLA"
+        es_incidencia = origen.isin(
+            ["APP", "OUTLOOK", "PROFESORES", "INVENTARIO", "EXTERNA"]
+        )
+
+        # Legionella no se cuenta aquí como OT: se cuenta por control sanitario real.
+        correctivas = historico[es_incidencia & ~es_preventivo & ~es_legionella_ot]
+        preventivos = historico[es_preventivo & ~es_legionella_ot]
+
+        if not correctivas.empty:
+            bloques.append(
+                correctivas.groupby("periodo").size().rename("Incidencias creadas")
+            )
+        if not preventivos.empty:
+            bloques.append(
+                preventivos.groupby("periodo").size().rename("Preventivos realizados")
+            )
+
+    if not legionella.empty:
+        legionella["fecha_real"] = pd.to_datetime(
+            legionella["fecha"], errors="coerce"
+        )
+        legionella = legionella[legionella["fecha_real"].notna()].copy()
+        legionella["periodo"] = (
+            legionella["fecha_real"].dt.to_period("M").astype(str)
+        )
+        if not legionella.empty:
+            bloques.append(
+                legionella.groupby("periodo").size().rename("Controles Legionella")
+            )
+
+    if not bloques:
+        return pd.DataFrame(columns=COLUMNAS_EVOLUCION)
+
+    datos = pd.concat(bloques, axis=1).fillna(0).reset_index()
+
+    for columna in [
+        "Incidencias creadas",
+        "Preventivos realizados",
+        "Controles Legionella",
+    ]:
+        if columna not in datos.columns:
+            datos[columna] = 0
+        datos[columna] = datos[columna].astype(int)
+
+    fechas_mes = pd.to_datetime(datos["periodo"] + "-01", errors="coerce")
+    meses = {
+        1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic",
+    }
+    datos["mes"] = [
+        f"{meses.get(fecha.month, '')} {str(fecha.year)[-2:]}"
+        if pd.notna(fecha) else str(periodo)
+        for fecha, periodo in zip(fechas_mes, datos["periodo"])
+    ]
+
+    return datos.sort_values("periodo").reset_index(drop=True)
 
 
 def pantalla_demo_graficos_gerencia():
     """
-    Permite probar el laboratorio sin depender de la base de datos.
+    Muestra el laboratorio con los datos reales disponibles en la base de datos.
     """
     pantalla_laboratorio_preventivo_incidencias(
         datos_demo_actuales(),
