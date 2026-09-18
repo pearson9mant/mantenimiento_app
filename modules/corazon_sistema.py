@@ -1155,10 +1155,43 @@ def _peso_tipo_prioridad_corazon(valor):
     return 0
 
 
+def _es_legionella_corazon(item):
+    texto = " ".join([
+        str(item.get("area") or ""),
+        str(item.get("origen") or ""),
+        str(item.get("titulo") or ""),
+    ]).lower()
+
+    return (
+        str(item.get("tipo_prioridad") or "").strip() == "Sanitaria"
+        or "legionella" in texto
+    )
+
+
+def _peso_area_despues_antiguedad_corazon(item):
+    area = normalizar(item.get("area"))
+    titulo = normalizar(item.get("titulo"))
+    texto = f"{area} {titulo}"
+
+    if any(palabra in texto for palabra in ["agua", "fontan"]):
+        return 2
+
+    if any(palabra in texto for palabra in ["electr", "enchufe", "tension", "tensión", "cuadro"]):
+        return 1
+
+    return 0
+
+
 def _clave_decision_prioridades_corazon(item):
     """
-    Evita que varias OT empatadas visualmente a 100 pierdan matices.
-    Mantiene el score visible 0-100, pero ordena con más información.
+    Orden operativo de Colegio Vivo:
+    1. Legionella.
+    2. Antigüedad.
+    3. Agua / fontanería y electricidad.
+    4. Resto de criterios existentes como desempate.
+
+    Los riesgos críticos siguen utilizándose para interrumpir una OT en curso;
+    esta clave decide la cola normal cuando no hay una interrupción crítica.
     """
     historial = item.get("historial_espacio", {}) or {}
 
@@ -1184,12 +1217,13 @@ def _clave_decision_prioridades_corazon(item):
         dias = 0
 
     return (
+        1 if _es_legionella_corazon(item) else 0,
+        dias,
+        _peso_area_despues_antiguedad_corazon(item),
         1 if bool(item.get("riesgo_operativo_critico")) else 0,
-        1 if str(item.get("tipo_prioridad") or "").strip() == "Sanitaria" else 0,
         _peso_tipo_prioridad_corazon(item.get("tipo_prioridad")),
         _peso_prioridad_declarada_corazon(item.get("prioridad")),
         int(item.get("score", 0) or 0),
-        dias,
         recurrencia,
         int(item.get("concentracion_planta_ejecutable", 0) or 0),
         int(item.get("bonus_ubicacion", 0) or 0),
