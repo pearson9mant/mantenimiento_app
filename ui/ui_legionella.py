@@ -714,9 +714,10 @@ def evaluar_resultado(
         except Exception:
             return "INCIDENCIA", "Temperaturas de válvula no válidas"
 
-        if salida < 38 or salida > 50:
-            return "RIESGO", "Salida mezclada de válvula fuera de rango 38-50 ºC"
-
+        # La salida mezclada es la temperatura de servicio de las duchas.
+        # Se registra como dato de funcionamiento de la VTM, pero no se
+        # fuerza aquí un rango general 38-50 ºC: las deficiencias del
+        # checklist se evalúan al registrar el control.
         return "OK", "Válvula termostática correcta"
 
     if tipo_control == "Control circuito duchas mezclado":
@@ -2237,14 +2238,40 @@ def registrar_control(
         valor_4
     )
 
+    # En las válvulas termostáticas, las temperaturas quedan registradas
+    # como datos de funcionamiento. Las anomalías que generan correctiva
+    # proceden del checklist técnico realizado por el operario.
+    if str(tipo_control or "").strip() == "Control válvula termostática":
+        texto_checklist = str(observaciones or "")
+        deficiencias_vtm = []
+
+        if "Sin fugas: No" in texto_checklist:
+            deficiencias_vtm.append("Fuga detectada en válvula termostática")
+        if "Cabezal correcto: No" in texto_checklist:
+            deficiencias_vtm.append("Cabezal termostático a revisar")
+        if "Regulación estable: No" in texto_checklist:
+            deficiencias_vtm.append("Regulación de válvula termostática inestable")
+        if "Acceso revisado: No" in texto_checklist:
+            deficiencias_vtm.append("Acceso a válvula termostática deficiente o pendiente de adecuar")
+
+        if deficiencias_vtm:
+            estado = "INCIDENCIA"
+            resultado = " · ".join(deficiencias_vtm)
+        else:
+            estado = "OK"
+            resultado = "Válvula termostática correcta"
+
     es_seguimiento_afs_p9 = (
         centro == "Pearson 9"
+        and str(punto_nombre or "").strip() == "Entrada general AFS"
+        and str(punto.get("tipo_control_punto") or "").strip()
+        == "Seguimiento AFS (sin correctiva)"
         and str(tipo_control or "").strip() == "Control AFS"
     )
 
     if es_seguimiento_afs_p9:
         resultado = (
-            f"SEGUIMIENTO TEMPORAL · AFS Pearson 9 sin correctiva automática · {resultado}"
+            f"Seguimiento AFS sin correctiva automática · {resultado}"
         )
         estado = "SEGUIMIENTO"
 
@@ -4905,19 +4932,6 @@ def pantalla_legionella():
                         "💾 Guardar cambios del punto",
                         use_container_width=True,
                         type="primary",
-                    )
-
-                if row.get("plano_data") is not None and row.get("plano_data") != b"":
-                    st.download_button(
-                        "🗺️ Ver / descargar plano actual",
-                        data=bytes(row["plano_data"]),
-                        file_name=(
-                            row.get("plano_nombre")
-                            or f"plano_punto_{row['id']}.pdf"
-                        ),
-                        mime="application/pdf",
-                        key=f"descargar_plano_punto_{row['id']}",
-                        use_container_width=True,
                     )
 
                 if guardar_punto:
