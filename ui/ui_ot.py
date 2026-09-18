@@ -2270,21 +2270,23 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
 
         causa = str(checklist.get("causa_detectada") or "").strip()
 
-        temperatura_final = float(
+        valor_final = float(
             checklist.get("temperatura_final", 0) or 0
         )
+        es_correctivo_cloro = "CLORO FUERA DE RANGO" in desc_txt
         es_correctivo_afs = "AFS" in desc_txt
 
-        temperatura_correcta = (
-            0 < temperatura_final <= 25
-            if es_correctivo_afs
-            else temperatura_final >= 50
-        )
+        if es_correctivo_cloro:
+            medicion_correcta = 0.2 <= valor_final <= 1.0
+        elif es_correctivo_afs:
+            medicion_correcta = 0 < valor_final <= 25
+        else:
+            medicion_correcta = valor_final >= 50
 
         return (
             causa != ""
             and bool(checklist.get("nueva_medicion", 0))
-            and temperatura_correcta
+            and medicion_correcta
         )
 
     if es_ot_legionella(area, origen, desc):
