@@ -732,11 +732,9 @@ def evaluar_resultado(
         delta_chicas = vmt_01 - rt_01
         delta_chicos = vmt_02 - rt_02
 
-        if vmt_01 < 38 or vmt_01 > 50:
-            return "RIESGO", f"VMT-01 fuera de rango 38-50 ºC ({vmt_01:.1f} ºC)"
-
-        if vmt_02 < 38 or vmt_02 > 50:
-            return "RIESGO", f"VMT-02 fuera de rango 38-50 ºC ({vmt_02:.1f} ºC)"
+        # VMT-01/VMT-02 y RT-01/RT-02 pertenecen al circuito ya mezclado.
+        # Sus temperaturas y ΔT se conservan como datos técnicos de seguimiento,
+        # sin aplicarles automáticamente el rango 38-50 ºC como criterio Legionella.
 
         return (
             "OK",
