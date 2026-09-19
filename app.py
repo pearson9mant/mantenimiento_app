@@ -33,6 +33,7 @@ from modules.auth import barra_sesion, USUARIOS
 from database.db import inicializar_db
 from ui.ui_planos_legionella import pantalla_planos_legionella
 from ui.ui_panel import pantalla_panel
+from ui.ui_incidencias_profesores import pantalla_incidencias_profesores
 from ui.ui_ordenes import pantalla_ordenes
 from ui.ui_ordenes_lectura import pantalla_ordenes_lectura
 from ui.ui_inventario import pantalla_inventario
