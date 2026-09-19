@@ -1031,6 +1031,10 @@ def mostrar_checklist_correctivo_legionella_operario(
     desc_txt = str(desc or "").upper()
     es_correctivo_cloro = "CLORO FUERA DE RANGO" in desc_txt
     es_correctivo_afs = "AFS" in desc_txt
+    es_correctivo_vtm = (
+        "CONTROL VÁLVULA TERMOSTÁTICA" in desc_txt
+        or "CONTROL VALVULA TERMOSTATICA" in desc_txt
+    )
 
     if es_correctivo_cloro:
         st.info(
@@ -1042,6 +1046,12 @@ def mostrar_checklist_correctivo_legionella_operario(
         st.info(
             "Correctivo de temperatura AFS: la nueva medición será correcta "
             "cuando la temperatura final sea ≤ 25 °C."
+        )
+    elif es_correctivo_vtm:
+        st.info(
+            "Correctivo de válvula termostática: revisa la anomalía detectada "
+            "y registra la temperatura mezclada real. En este correctivo no "
+            "se exige alcanzar 50 °C en la salida mezclada."
         )
 
     if es_correctivo_cloro:
@@ -1070,6 +1080,31 @@ def mostrar_checklist_correctivo_legionella_operario(
             value=bool(checklist.get("revisar_recirculacion", 0)),
             key=f"leg_recirculacion_op_{num_ot}",
         )
+        revisar_bomba = False
+        purgar_aire = False
+        esperar_recuperacion = False
+    elif es_correctivo_vtm:
+        revisar_consigna = st.checkbox(
+            "Acceso a la válvula revisado / adecuado",
+            value=bool(checklist.get("revisar_consigna", 0)),
+            key=f"leg_consigna_op_{num_ot}",
+        )
+        revisar_termostato = st.checkbox(
+            "Válvula y conexiones sin fugas",
+            value=bool(checklist.get("revisar_termostato", 0)),
+            key=f"leg_termostato_op_{num_ot}",
+        )
+        revisar_caldera = st.checkbox(
+            "Cabezal termostático revisado",
+            value=bool(checklist.get("revisar_caldera", 0)),
+            key=f"leg_caldera_op_{num_ot}",
+        )
+        revisar_resistencia = st.checkbox(
+            "Regulación / funcionamiento estable revisado",
+            value=bool(checklist.get("revisar_resistencia", 0)),
+            key=f"leg_resistencia_op_{num_ot}",
+        )
+        revisar_recirculacion = False
         revisar_bomba = False
         purgar_aire = False
         esperar_recuperacion = False
@@ -1133,7 +1168,15 @@ def mostrar_checklist_correctivo_legionella_operario(
     nueva_medicion = st.checkbox(
         "Realizar nueva medición de cloro"
         if es_correctivo_cloro
-        else ("Realizar nueva medición de AFS" if es_correctivo_afs else "Realizar nueva medición"),
+        else (
+            "Realizar nueva medición de AFS"
+            if es_correctivo_afs
+            else (
+                "Registrar nueva medición de salida mezclada"
+                if es_correctivo_vtm
+                else "Realizar nueva medición"
+            )
+        ),
         value=bool(checklist.get("nueva_medicion", 0)),
         key=f"leg_medicion_op_{num_ot}"
     )
@@ -1146,6 +1189,16 @@ def mostrar_checklist_correctivo_legionella_operario(
             "Desviación general de suministro",
             "Desviación localizada en el punto",
             "Pendiente responsable / empresa externa",
+            "Otra",
+        ]
+    elif es_correctivo_vtm:
+        opciones_causa = [
+            "",
+            "Acceso deficiente / pendiente de adecuar",
+            "Fuga en válvula o conexiones",
+            "Cabezal termostático",
+            "Regulación inestable",
+            "Revisión preventiva / sin anomalía actual",
             "Otra",
         ]
     else:
@@ -1173,7 +1226,15 @@ def mostrar_checklist_correctivo_legionella_operario(
     valor_final = st.number_input(
         "Cloro residual final mg/L"
         if es_correctivo_cloro
-        else ("Temperatura final AFS ºC" if es_correctivo_afs else "Temperatura final ºC"),
+        else (
+            "Temperatura final AFS ºC"
+            if es_correctivo_afs
+            else (
+                "Temperatura salida mezclada ºC"
+                if es_correctivo_vtm
+                else "Temperatura final ºC"
+            )
+        ),
         min_value=0.0,
         max_value=5.0 if es_correctivo_cloro else 100.0,
         value=float(checklist.get("temperatura_final", 0) or 0),
@@ -1191,6 +1252,11 @@ def mostrar_checklist_correctivo_legionella_operario(
             st.success("✅ Temperatura AFS dentro de criterio: ≤ 25 °C.")
         else:
             st.error("⚠️ La temperatura AFS sigue por encima de 25 °C.")
+    elif es_correctivo_vtm and nueva_medicion and valor_final > 0:
+        st.success(
+            f"✅ Temperatura mezclada registrada: {valor_final:.1f} °C. "
+            "Se conserva como dato de control sin exigir ≥ 50 °C."
+        )
 
     empresa_externa_leg = st.text_input(
         "Empresa externa / técnico",
