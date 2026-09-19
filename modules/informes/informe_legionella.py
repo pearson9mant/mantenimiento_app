@@ -217,14 +217,27 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         SELECT fecha_apertura, centro, edificio, punto, tarea, descripcion,
                estado, prioridad, operario, fecha_cierre, observaciones_cierre
         FROM legionella_incidencias
-        WHERE SUBSTR(fecha_apertura, 1, 10) BETWEEN ? AND ?
+        WHERE (
+                SUBSTR(fecha_apertura, 1, 10) BETWEEN ? AND ?
+                OR (
+                    (fecha_apertura IS NULL OR TRIM(fecha_apertura) = '')
+                    AND (
+                        LOWER(COALESCE(estado, '')) NOT IN ('cerrada', 'cerrado', 'finalizada', 'finalizado')
+                        OR SUBSTR(fecha_cierre, 1, 10) BETWEEN ? AND ?
+                    )
+                )
+              )
           AND centro = ?
           AND centro IS NOT NULL
           AND edificio IS NOT NULL
           AND punto IS NOT NULL
           AND tarea IS NOT NULL
         ORDER BY fecha_apertura DESC
-    """, (fecha_inicio_txt, fecha_fin_txt, centro_filtro))
+    """, (
+        fecha_inicio_txt, fecha_fin_txt,
+        fecha_inicio_txt, fecha_fin_txt,
+        centro_filtro
+    ))
 
     df_puntos = leer_df("""
         SELECT centro, edificio, instalacion, tipo_punto, tipo_control_punto,
@@ -915,7 +928,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         [
             Paragraph("CONTROLES", estilo_kpi_titulo),
             Paragraph("CORRECTOS", estilo_kpi_titulo),
-            Paragraph("INCIDENCIAS", estilo_kpi_titulo),
+            Paragraph("DESVIACIONES", estilo_kpi_titulo),
             Paragraph("CUMPLIMIENTO", estilo_kpi_titulo),
         ],
         [
