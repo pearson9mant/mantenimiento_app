@@ -1165,21 +1165,24 @@ def mostrar_checklist_correctivo_legionella_operario(
             disabled=es_correctivo_afs,
         )
 
-    nueva_medicion = st.checkbox(
-        "Realizar nueva medición de cloro"
-        if es_correctivo_cloro
-        else (
-            "Realizar nueva medición de AFS"
-            if es_correctivo_afs
+    if es_correctivo_vtm:
+        nueva_medicion = bool(checklist.get("nueva_medicion", 0))
+        st.caption(
+            "La temperatura mezclada corresponde al control ya realizado. "
+            "No es necesario repetir la medición para cerrar este correctivo."
+        )
+    else:
+        nueva_medicion = st.checkbox(
+            "Realizar nueva medición de cloro"
+            if es_correctivo_cloro
             else (
-                "Registrar nueva medición de salida mezclada"
-                if es_correctivo_vtm
+                "Realizar nueva medición de AFS"
+                if es_correctivo_afs
                 else "Realizar nueva medición"
-            )
-        ),
-        value=bool(checklist.get("nueva_medicion", 0)),
-        key=f"leg_medicion_op_{num_ot}"
-    )
+            ),
+            value=bool(checklist.get("nueva_medicion", 0)),
+            key=f"leg_medicion_op_{num_ot}"
+        )
 
     if es_correctivo_cloro:
         opciones_causa = [
@@ -1230,7 +1233,7 @@ def mostrar_checklist_correctivo_legionella_operario(
             "Temperatura final AFS ºC"
             if es_correctivo_afs
             else (
-                "Temperatura salida mezclada ºC"
+                "Temperatura mezclada del control ºC"
                 if es_correctivo_vtm
                 else "Temperatura final ºC"
             )
@@ -1252,10 +1255,10 @@ def mostrar_checklist_correctivo_legionella_operario(
             st.success("✅ Temperatura AFS dentro de criterio: ≤ 25 °C.")
         else:
             st.error("⚠️ La temperatura AFS sigue por encima de 25 °C.")
-    elif es_correctivo_vtm and nueva_medicion and valor_final > 0:
+    elif es_correctivo_vtm and valor_final > 0:
         st.success(
-            f"✅ Temperatura mezclada registrada: {valor_final:.1f} °C. "
-            "Se conserva como dato de control sin exigir ≥ 50 °C."
+            f"✅ Temperatura mezclada del control: {valor_final:.1f} °C. "
+            "Se conserva como dato de referencia; no se exige una nueva medición."
         )
 
     empresa_externa_leg = st.text_input(
