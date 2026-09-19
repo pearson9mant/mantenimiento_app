@@ -5848,7 +5848,7 @@ def pantalla_legionella():
     
                 obs_cierre = st.text_area(
                     "Observaciones de cierre",
-                    key="cerrar_incidencia_legionella_obs",
+                    key=f"cerrar_incidencia_legionella_obs_{incidencia_id}",
                 )
     
                 if st.button(
