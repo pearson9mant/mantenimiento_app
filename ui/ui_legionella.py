@@ -2378,10 +2378,11 @@ def registrar_control(
             ejecutar(
                 """
                 INSERT INTO legionella_incidencias
-                (centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
-                VALUES (?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
+                (fecha_apertura, centro, edificio, planta, punto, tarea, descripcion, estado, prioridad, operario)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Abierta', 'Alta', ?)
                 """,
                 (
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     centro,
                     edificio,
                     planta,
