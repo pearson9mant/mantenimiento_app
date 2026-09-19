@@ -2285,16 +2285,10 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
         elif es_correctivo_afs:
             medicion_correcta = 0 < valor_final <= 25
         elif es_correctivo_vtm:
-            actuacion_vtm = any(
-                bool(checklist.get(campo, 0))
-                for campo in (
-                    "revisar_consigna",
-                    "revisar_termostato",
-                    "revisar_caldera",
-                    "revisar_resistencia",
-                )
-            )
-            medicion_correcta = valor_final > 0 and actuacion_vtm
+            observacion_vtm = str(
+                checklist.get("observaciones") or ""
+            ).strip()
+            return causa != "" and observacion_vtm != ""
         else:
             medicion_correcta = valor_final >= 50
 
