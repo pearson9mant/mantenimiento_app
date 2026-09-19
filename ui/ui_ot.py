@@ -2275,11 +2275,26 @@ def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
         )
         es_correctivo_cloro = "CLORO FUERA DE RANGO" in desc_txt
         es_correctivo_afs = "AFS" in desc_txt
+        es_correctivo_vtm = (
+            "CONTROL VÁLVULA TERMOSTÁTICA" in desc_txt
+            or "CONTROL VALVULA TERMOSTATICA" in desc_txt
+        )
 
         if es_correctivo_cloro:
             medicion_correcta = 0.2 <= valor_final <= 1.0
         elif es_correctivo_afs:
             medicion_correcta = 0 < valor_final <= 25
+        elif es_correctivo_vtm:
+            actuacion_vtm = any(
+                bool(checklist.get(campo, 0))
+                for campo in (
+                    "revisar_consigna",
+                    "revisar_termostato",
+                    "revisar_caldera",
+                    "revisar_resistencia",
+                )
+            )
+            medicion_correcta = valor_final > 0 and actuacion_vtm
         else:
             medicion_correcta = valor_final >= 50
 
