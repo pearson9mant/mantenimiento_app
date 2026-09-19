@@ -2259,6 +2259,111 @@ def puede_finalizar_preventivo(num_ot, origen, desc, area=''):
     return True
 
 
+def cerrar_incidencia_legionella_desde_ot(num_ot, desc):
+    """
+    Sincroniza el cierre de una OT correctiva con su incidencia Legionella.
+
+    Usa el checklist ya guardado como fuente del cierre. Si no es una OT
+    correctiva, no hay checklist o no encuentra una incidencia abierta
+    coincidente, no modifica nada ni bloquea el cierre de la OT.
+    """
+    desc_txt = str(desc or "").upper()
+
+    if "CORRECTIVO LEGIONELLA" not in desc_txt:
+        return False
+
+    checklist = obtener_checklist_correctivo_legionella(num_ot)
+
+    if not checklist:
+        return False
+
+    centro = str(checklist.get("centro") or "").strip()
+    edificio = str(checklist.get("edificio") or "").strip()
+    punto = str(checklist.get("punto") or "").strip()
+    tarea = str(checklist.get("tarea") or "").strip()
+    causa = str(checklist.get("causa_detectada") or "").strip()
+    observaciones = str(checklist.get("observaciones") or "").strip()
+    empresa = str(checklist.get("empresa_externa") or "").strip()
+
+    try:
+        valor_final = float(checklist.get("temperatura_final", 0) or 0)
+    except Exception:
+        valor_final = 0.0
+
+    partes_cierre = []
+
+    if causa:
+        partes_cierre.append(f"Causa detectada: {causa}")
+
+    if "CONTROL VÁLVULA TERMOSTÁTICA" in desc_txt or "CONTROL VALVULA TERMOSTATICA" in desc_txt:
+        if valor_final > 0:
+            partes_cierre.append(
+                f"Temperatura mezclada del control: {valor_final:.1f} °C"
+            )
+    elif "CLORO FUERA DE RANGO" in desc_txt:
+        if valor_final > 0:
+            partes_cierre.append(
+                f"Cloro residual final: {valor_final:.2f} mg/L"
+            )
+    elif valor_final > 0:
+        partes_cierre.append(
+            f"Temperatura final: {valor_final:.1f} °C"
+        )
+
+    if observaciones:
+        partes_cierre.append(observaciones)
+
+    if empresa:
+        partes_cierre.append(f"Empresa externa / técnico: {empresa}")
+
+    observaciones_cierre = " · ".join(partes_cierre).strip()
+
+    if not all([centro, edificio, punto, tarea]):
+        return False
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(_sql("""
+            UPDATE legionella_incidencias
+            SET estado = 'Cerrada',
+                fecha_cierre = CURRENT_TIMESTAMP,
+                observaciones_cierre = ?
+            WHERE id = (
+                SELECT id
+                FROM legionella_incidencias
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND punto = ?
+                  AND tarea = ?
+                  AND estado = 'Abierta'
+                ORDER BY id DESC
+                LIMIT 1
+            )
+        """), (
+            observaciones_cierre,
+            centro,
+            edificio,
+            punto,
+            tarea,
+        ))
+
+        actualizadas = int(getattr(cur, "rowcount", 0) or 0)
+        conn.commit()
+        return actualizadas > 0
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+
+    finally:
+        conn.close()
+
+
 def puede_finalizar_legionella(id_orden, area, origen, desc, num_ot=None):
     desc_txt = str(desc or "").upper()
 
@@ -4357,6 +4462,7 @@ def mostrar_tarjeta_ot(
                     else:
                         actualizar_observaciones_estado(id_orden, observacion_estado_nueva)
                         finalizar_orden(id_orden, "")
+                        cerrar_incidencia_legionella_desde_ot(num_ot, desc)
                         st.session_state[f"{modo}_confirmar_fin_rapido_{id_orden}"] = False
                         st.session_state.pop(f"legionella_guardada_{id_orden}", None)
                         preparar_siguiente_mision_corazon(num_ot, id_orden, modo)
@@ -4546,6 +4652,10 @@ def mostrar_tarjeta_ot(
                                             id_orden,
                                             observaciones_fin,
                                         )
+                                        cerrar_incidencia_legionella_desde_ot(
+                                            num_ot,
+                                            desc,
+                                        )
 
                                         st.session_state[
                                             f"{modo}_confirmar_fin_completo_{id_orden}"
@@ -4595,6 +4705,10 @@ def mostrar_tarjeta_ot(
                                 finalizar_orden(
                                     id_orden,
                                     observaciones_fin,
+                                )
+                                cerrar_incidencia_legionella_desde_ot(
+                                    num_ot,
+                                    desc,
                                 )
 
                                 st.session_state[
