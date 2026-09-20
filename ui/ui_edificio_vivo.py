@@ -1,9 +1,11 @@
 import html
 import re
 import unicodedata
+from datetime import date
 
 import streamlit as st
 
+from database.db import conectar, _sql
 from modules.espacios import obtener_plantas_config, obtener_espacios
 
 
@@ -1476,15 +1478,141 @@ def _sumatorio_ordenes_abiertas(resumen, centro):
     }
 
 
+def _resumen_trabajo_hoy(centro):
+    operario = str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("usuario")
+        or ""
+    ).strip()
+
+    hoy = date.today().isoformat()
+    filas = []
+
+    if not operario or not centro:
+        return {
+            "nuevas": 0,
+            "finalizadas": 0,
+            "incidencias": 0,
+            "legionella": 0,
+            "preventivo": 0,
+        }
+
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+
+        for tabla in ("ordenes_trabajo", "historico_ordenes"):
+            try:
+                cursor.execute(
+                    _sql(f"""
+                        SELECT
+                            numero_ot,
+                            fecha_creacion,
+                            fecha_cierre
+                        FROM {tabla}
+                        WHERE centro = ?
+                          AND operario = ?
+                          AND (
+                              SUBSTR(COALESCE(fecha_creacion, ''), 1, 10) = ?
+                              OR SUBSTR(COALESCE(fecha_cierre, ''), 1, 10) = ?
+                          )
+                    """),
+                    (centro, operario, hoy, hoy),
+                )
+
+                for fila in cursor.fetchall():
+                    filas.append({
+                        "numero_ot": str(fila[0] or "").strip(),
+                        "fecha_creacion": str(fila[1] or "").strip(),
+                        "fecha_cierre": str(fila[2] or "").strip(),
+                    })
+            except Exception:
+                continue
+    finally:
+        conn.close()
+
+    unicas = {}
+    for fila in filas:
+        numero = fila["numero_ot"]
+        clave = numero or (
+            fila["fecha_creacion"],
+            fila["fecha_cierre"],
+        )
+        if clave not in unicas:
+            unicas[clave] = fila
+        else:
+            if fila["fecha_creacion"]:
+                unicas[clave]["fecha_creacion"] = fila["fecha_creacion"]
+            if fila["fecha_cierre"]:
+                unicas[clave]["fecha_cierre"] = fila["fecha_cierre"]
+
+    nuevas = [
+        fila for fila in unicas.values()
+        if fila["fecha_creacion"][:10] == hoy
+    ]
+    finalizadas = [
+        fila for fila in unicas.values()
+        if fila["fecha_cierre"][:10] == hoy
+    ]
+
+    incidencias = 0
+    legionella = 0
+    preventivo = 0
+
+    for fila in nuevas:
+        numero = fila["numero_ot"].upper()
+        if numero.startswith("LEG-"):
+            legionella += 1
+        elif numero.startswith("PREV-"):
+            preventivo += 1
+        else:
+            incidencias += 1
+
+    return {
+        "nuevas": len(nuevas),
+        "finalizadas": len(finalizadas),
+        "incidencias": incidencias,
+        "legionella": legionella,
+        "preventivo": preventivo,
+    }
+
+
 def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
     datos = _sumatorio_ordenes_abiertas(
         resumen,
         centro,
     )
+    hoy = _resumen_trabajo_hoy(centro)
+
+    diferencia = hoy["nuevas"] - hoy["finalizadas"]
+
+    if diferencia < 0:
+        icono_balance = "⬇️"
+        texto_balance = f"{diferencia} · GANAMOS TERRENO"
+        clase_balance = "cv-daily-good"
+    elif diferencia > 0:
+        icono_balance = "⬆️"
+        texto_balance = f"+{diferencia} · AUMENTA CARGA"
+        clase_balance = "cv-daily-bad"
+    else:
+        icono_balance = "➡️"
+        texto_balance = "0 · CARGA ESTABLE"
+        clase_balance = "cv-daily-stable"
 
     st.markdown(
         f"""
         <div class="cv-open-summary-wrap">
+            <div class="cv-daily-summary">
+                <div class="cv-open-summary-title">📥 HOY</div>
+                <div><span>Nuevas</span><b>{hoy["nuevas"]}</b></div>
+                <div><span>Finalizadas</span><b>{hoy["finalizadas"]}</b></div>
+                <div class="cv-daily-detail">
+                    Inc. {hoy["incidencias"]} · Leg. {hoy["legionella"]} · Prev. {hoy["preventivo"]}
+                </div>
+                <div class="cv-daily-balance {clase_balance}">
+                    {icono_balance} {texto_balance}
+                </div>
+            </div>
             <div class="cv-open-summary">
                 <div class="cv-open-summary-title">📊 ABIERTAS</div>
                 <div><span>Incidencias</span><b>{datos["incidencias"]}</b></div>
@@ -1533,11 +1661,46 @@ def css_edificio_vivo():
             line-height:1.35;
         }
 
+        .cv-daily-summary{
+            position:absolute;
+            right:154px;
+            top:-82px;
+            width:184px;
+            padding:7px 9px 6px;
+            border:1px solid #d6deea;
+            border-radius:8px;
+            background:rgba(255,255,255,.96);
+            box-shadow:0 2px 8px rgba(15,39,71,.08);
+            color:#334155;
+            font-size:10px;
+            line-height:1.35;
+        }
+
+        .cv-daily-summary > div:not(.cv-open-summary-title):not(.cv-daily-detail):not(.cv-daily-balance),
         .cv-open-summary > div:not(.cv-open-summary-title){
             display:flex;
             justify-content:space-between;
             gap:8px;
         }
+
+        .cv-daily-detail{
+            margin-top:3px;
+            padding-top:3px;
+            border-top:1px solid #e2e8f0;
+            white-space:nowrap;
+            font-size:9px;
+        }
+
+        .cv-daily-balance{
+            margin-top:3px;
+            font-size:9px;
+            font-weight:950;
+            white-space:nowrap;
+        }
+
+        .cv-daily-good{ color:#15803d; }
+        .cv-daily-bad{ color:#b91c1c; }
+        .cv-daily-stable{ color:#475569; }
 
         .cv-open-summary-title{
             margin-bottom:3px;
