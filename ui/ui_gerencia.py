@@ -4636,6 +4636,129 @@ def _cumplimiento_simple(df, centro, palabra):
     return round((cerradas / max(total, 1)) * 100)
 
 
+
+def mostrar_pulso_diario_ordenes_gerencia(df, centro):
+    """
+    Resumen ligero de las OT que entran y se cierran hoy.
+
+    Trabaja únicamente con el DataFrame que Gerencia ya tiene cargado:
+    no abre fotos, inventario, históricos adicionales ni hace consultas
+    nuevas a base de datos.
+    """
+    if df.empty:
+        return
+
+    centro = str(centro or "").strip()
+    datos = df[df["centro"] == centro].copy()
+
+    if datos.empty:
+        return
+
+    hoy = pd.Timestamp.today().normalize()
+
+    creadas_hoy = datos[
+        datos["fecha_dt"].notna()
+        & (datos["fecha_dt"].dt.normalize() == hoy)
+    ].copy()
+
+    cerradas_hoy = datos[
+        datos["fecha_cierre_dt"].notna()
+        & (datos["fecha_cierre_dt"].dt.normalize() == hoy)
+    ].copy()
+
+    # Protección ante una eventual presencia simultánea de la misma OT
+    # en activa e histórico durante una transición de estado.
+    if "numero_ot" in creadas_hoy.columns:
+        creadas_hoy = creadas_hoy.drop_duplicates(
+            subset=["numero_ot"],
+            keep="last",
+        )
+
+    if "numero_ot" in cerradas_hoy.columns:
+        cerradas_hoy = cerradas_hoy.drop_duplicates(
+            subset=["numero_ot"],
+            keep="last",
+        )
+
+    entradas = len(creadas_hoy)
+    salidas = len(cerradas_hoy)
+    balance = entradas - salidas
+
+    correctivas = 0
+    preventivo = 0
+    legionella = 0
+
+    if not creadas_hoy.empty:
+        correctivas = int(
+            creadas_hoy.apply(
+                _es_correctiva_real_fila,
+                axis=1,
+            ).sum()
+        )
+
+        origen_n = creadas_hoy["origen"].fillna("").astype(str).apply(
+            normalizar_busqueda
+        )
+        numero_n = creadas_hoy["numero_ot"].fillna("").astype(str).apply(
+            normalizar_busqueda
+        )
+        descripcion_n = creadas_hoy["descripcion"].fillna("").astype(str).apply(
+            normalizar_busqueda
+        )
+
+        mascara_prev = (
+            origen_n.eq("preventivo")
+            | numero_n.str.startswith("prev ")
+            | descripcion_n.str.contains("preventivo", na=False)
+        )
+        mascara_leg = (
+            origen_n.eq("legionella")
+            | numero_n.str.startswith("leg ")
+            | descripcion_n.str.contains("legionella", na=False)
+        )
+
+        preventivo = int(mascara_prev.sum())
+        legionella = int(mascara_leg.sum())
+
+    def _porcentaje(valor):
+        if entradas <= 0:
+            return "0%"
+        return f"{round((valor / entradas) * 100)}%"
+
+    with st.container(border=True):
+        st.markdown("#### 📥 Pulso diario · Entradas de órdenes")
+        st.caption(
+            f"{centro} · {hoy.strftime('%d/%m/%Y')} · "
+            "solo OT creadas y cerradas durante el día"
+        )
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Entradas hoy", entradas)
+        c2.metric("Finalizadas hoy", salidas)
+        c3.metric("Balance del día", f"{balance:+d}")
+        c4.metric(
+            "Carga correctiva activa",
+            len(_activas_gerencia(datos)),
+        )
+
+        d1, d2, d3 = st.columns(3)
+        d1.metric(
+            "Correctivas",
+            correctivas,
+            _porcentaje(correctivas),
+        )
+        d2.metric(
+            "Preventivo",
+            preventivo,
+            _porcentaje(preventivo),
+        )
+        d3.metric(
+            "Legionella",
+            legionella,
+            _porcentaje(legionella),
+        )
+
+
 def mostrar_resumen_inferior_cv(df):
     centro = st.session_state["gerencia_cv_centro"]
     color, porcentaje, mensaje = evaluar_estado_centro(df, centro)
@@ -4756,6 +4879,11 @@ def mostrar_colegio_vivo_gerencia(
             )
 
             mostrar_capa_ejecutiva_gerencia(
+                df,
+                centro_objetivo,
+            )
+
+            mostrar_pulso_diario_ordenes_gerencia(
                 df,
                 centro_objetivo,
             )
@@ -4905,6 +5033,11 @@ def mostrar_colegio_vivo_gerencia(
         )
 
         mostrar_capa_ejecutiva_gerencia(
+            df,
+            centro_ejecutivo,
+        )
+
+        mostrar_pulso_diario_ordenes_gerencia(
             df,
             centro_ejecutivo,
         )
