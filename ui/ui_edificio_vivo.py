@@ -1670,14 +1670,9 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
                 <div class="cv-daily-month">
                     <span>Terminadas este mes</span><b>{hoy["finalizadas_mes"]}</b>
                 </div>
-        '<div class="cv-daily-row cv-daily-month">'
-        '<span>Efectividad mensual</span>'
-        f'<b>{texto_efectividad_mes}</b>'
-        '</div>'
-        '<div class="cv-daily-row cv-daily-month">'
-        '<span>Efectividad mensual</span>'
-        f'<b>{texto_efectividad_mes}</b>'
-        '</div>' 
+                <div class="cv-daily-month">
+                    <span>Efectividad mensual</span><b>{texto_efectividad_mes}</b>
+                </div>
             </div>
             <div class="cv-open-summary">
                 <div class="cv-open-summary-title">📊 ABIERTAS</div>
