@@ -1922,6 +1922,8 @@ def mostrar_preventivo_aula_operario(
             f"{error}"
         )
 
+    lineas_inventario_vivo = []
+
     if not inventario_vivo:
         st.info(
             "No hay elementos registrados actualmente "
@@ -1965,6 +1967,104 @@ def mostrar_preventivo_aula_operario(
                 for elemento, cantidad in lineas_inventario_vivo
             )
         )
+
+    clave_editar_inventario = (
+        f"ot_aula_editar_inventario_{num_ot}"
+    )
+
+    if st.button(
+        (
+            "✖ Cerrar edición de inventario"
+            if st.session_state.get(clave_editar_inventario, False)
+            else "✏️ Actualizar inventario"
+        ),
+        key=f"boton_{clave_editar_inventario}",
+        use_container_width=True,
+    ):
+        st.session_state[clave_editar_inventario] = not bool(
+            st.session_state.get(clave_editar_inventario, False)
+        )
+        st.rerun()
+
+    if st.session_state.get(clave_editar_inventario, False):
+        st.caption(
+            "Actualiza únicamente el inventario real de este espacio. "
+            "Puedes cambiar cantidades, añadir elementos o eliminar filas. "
+            "El catálogo maestro de Administración no se modifica."
+        )
+
+        lineas_edicion = [
+            {
+                "categoria": "General",
+                "elemento": elemento,
+                "cantidad": cantidad,
+            }
+            for elemento, cantidad in lineas_inventario_vivo
+        ]
+
+        inventario_actualizado = st.data_editor(
+            lineas_edicion,
+            num_rows="dynamic",
+            use_container_width=True,
+            hide_index=True,
+            column_order=[
+                "categoria",
+                "elemento",
+                "cantidad",
+            ],
+            column_config={
+                "categoria": st.column_config.TextColumn(
+                    "Categoría",
+                ),
+                "elemento": st.column_config.TextColumn(
+                    "Elemento real",
+                    required=True,
+                ),
+                "cantidad": st.column_config.NumberColumn(
+                    "Cantidad",
+                    min_value=0,
+                    step=1,
+                    format="%d",
+                    required=True,
+                ),
+            },
+            key=f"ot_aula_inventario_actualizar_{num_ot}",
+        )
+
+        if st.button(
+            "💾 Guardar cambios de inventario",
+            key=f"ot_aula_guardar_inventario_actualizado_{num_ot}",
+            use_container_width=True,
+            type="primary",
+        ):
+            try:
+                if hasattr(inventario_actualizado, "to_dict"):
+                    lineas_guardar = inventario_actualizado.to_dict(
+                        orient="records"
+                    )
+                else:
+                    lineas_guardar = list(
+                        inventario_actualizado or []
+                    )
+
+                guardar_inventario_inicial_flexible_revision_aula(
+                    revision_id=revision_id,
+                    lineas_inventario=lineas_guardar,
+                )
+
+            except Exception as error:
+                st.error(
+                    "No se han podido guardar los cambios del inventario."
+                )
+                st.caption(str(error))
+
+            else:
+                st.session_state[clave_editar_inventario] = False
+                st.success(
+                    "Inventario actualizado. Los cambios ya quedan "
+                    "guardados en el inventario vivo del espacio."
+                )
+                st.rerun()
 
     # =====================================================
     # REVISIÓN GENERAL
