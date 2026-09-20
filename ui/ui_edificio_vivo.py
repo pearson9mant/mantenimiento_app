@@ -1586,6 +1586,13 @@ def _resumen_trabajo_hoy(centro):
                         ):
                             cierres_mes.append(numero_mes)
             except Exception:
+                # PostgreSQL deja la transacción abortada tras un error SQL.
+                # La restablecemos para que el fallo de una tabla no impida
+                # consultar la siguiente (especialmente historico_ordenes).
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 continue
     finally:
         conn.close()
