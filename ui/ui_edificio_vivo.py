@@ -1532,11 +1532,25 @@ def _resumen_trabajo_hoy(centro):
 
                 cursor.execute(
                     _sql(f"""
-                        SELECT numero_ot
+                        SELECT
+                            numero_ot,
+                            fecha_cierre,
+                            fecha_creacion,
+                            estado
                         FROM {tabla}
                         WHERE centro = ?
                           AND operario = ?
-                          AND SUBSTR(COALESCE(fecha_cierre, ''), 1, 7) = ?
+                          AND LOWER(COALESCE(estado, '')) IN (
+                              'finalizada', 'finalizado', 'cerrada', 'cerrado'
+                          )
+                          AND SUBSTR(
+                              COALESCE(
+                                  NULLIF(fecha_cierre, ''),
+                                  fecha_creacion,
+                                  ''
+                              ),
+                              1, 7
+                          ) = ?
                     """),
                     (centro, operario, mes_actual),
                 )
@@ -1948,16 +1962,42 @@ def css_edificio_vivo():
 
             .cv-open-summary{
                 right:2px;
-                top:-68px;
-                width:118px;
-                padding:5px 7px 4px;
-                font-size:8.5px;
-                line-height:1.25;
+                top:-62px;
+                width:102px;
+                padding:4px 6px 3px;
+                font-size:7.5px;
+                line-height:1.18;
+            }
+
+            .cv-daily-summary{
+                right:110px;
+                top:-62px;
+                width:126px;
+                padding:4px 6px 3px;
+                font-size:7.5px;
+                line-height:1.18;
             }
 
             .cv-open-summary-title{
                 margin-bottom:2px;
-                font-size:8.5px;
+                font-size:7.5px;
+            }
+
+            .cv-daily-detail,
+            .cv-daily-balance,
+            .cv-daily-month{
+                margin-top:2px;
+                padding-top:2px;
+                font-size:7px;
+            }
+
+            .cv-daily-month span{
+                font-size:0;
+            }
+
+            .cv-daily-month span::after{
+                content:"Terminadas mes";
+                font-size:7px;
             }
 
             /*
