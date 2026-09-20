@@ -1530,36 +1530,61 @@ def _resumen_trabajo_hoy(centro):
                         "fecha_cierre": str(fila[2] or "").strip(),
                     })
 
-                cursor.execute(
-                    _sql(f"""
-                        SELECT
-                            numero_ot,
-                            fecha_cierre,
-                            fecha_creacion,
-                            estado
-                        FROM {tabla}
-                        WHERE centro = ?
-                          AND operario = ?
-                          AND LOWER(COALESCE(estado, '')) IN (
-                              'finalizada', 'finalizado', 'cerrada', 'cerrado'
-                          )
-                          AND SUBSTR(
-                              COALESCE(
-                                  NULLIF(fecha_cierre, ''),
-                                  fecha_creacion,
-                                  ''
-                              ),
-                              1, 7
-                          ) = ?
-                    """),
-                    (centro, operario, mes_actual),
-                )
+                if tabla == "historico_ordenes":
+                    cursor.execute(
+                        _sql("""
+                            SELECT
+                                numero_ot,
+                                fecha_cierre,
+                                fecha_creacion
+                            FROM historico_ordenes
+                            WHERE centro = ?
+                              AND operario = ?
+                        """),
+                        (centro, operario),
+                    )
 
-                cierres_mes.extend(
-                    str(fila[0] or "").strip()
-                    for fila in cursor.fetchall()
-                    if str(fila[0] or "").strip()
-                )
+                    for fila_mes in cursor.fetchall():
+                        numero_mes = str(fila_mes[0] or "").strip()
+                        fecha_cierre_mes = str(fila_mes[1] or "").strip()
+                        fecha_creacion_mes = str(fila_mes[2] or "").strip()
+                        fecha_ref_mes = fecha_cierre_mes or fecha_creacion_mes
+
+                        if numero_mes and fecha_ref_mes[:7] == mes_actual:
+                            cierres_mes.append(numero_mes)
+                else:
+                    cursor.execute(
+                        _sql("""
+                            SELECT
+                                numero_ot,
+                                fecha_cierre,
+                                fecha_creacion,
+                                estado
+                            FROM ordenes_trabajo
+                            WHERE centro = ?
+                              AND operario = ?
+                        """),
+                        (centro, operario),
+                    )
+
+                    for fila_mes in cursor.fetchall():
+                        numero_mes = str(fila_mes[0] or "").strip()
+                        fecha_cierre_mes = str(fila_mes[1] or "").strip()
+                        fecha_creacion_mes = str(fila_mes[2] or "").strip()
+                        estado_mes = _norm(fila_mes[3])
+                        fecha_ref_mes = fecha_cierre_mes or fecha_creacion_mes
+
+                        if (
+                            numero_mes
+                            and estado_mes in {
+                                "finalizada",
+                                "finalizado",
+                                "cerrada",
+                                "cerrado",
+                            }
+                            and fecha_ref_mes[:7] == mes_actual
+                        ):
+                            cierres_mes.append(numero_mes)
             except Exception:
                 continue
     finally:
