@@ -1486,12 +1486,15 @@ def _resumen_trabajo_hoy(centro):
     ).strip()
 
     hoy = date.today().isoformat()
+    mes_actual = hoy[:7]
     filas = []
+    cierres_mes = []
 
     if not operario or not centro:
         return {
             "nuevas": 0,
             "finalizadas": 0,
+            "finalizadas_mes": 0,
             "incidencias": 0,
             "legionella": 0,
             "preventivo": 0,
@@ -1526,6 +1529,23 @@ def _resumen_trabajo_hoy(centro):
                         "fecha_creacion": str(fila[1] or "").strip(),
                         "fecha_cierre": str(fila[2] or "").strip(),
                     })
+
+                cursor.execute(
+                    _sql(f"""
+                        SELECT numero_ot
+                        FROM {tabla}
+                        WHERE centro = ?
+                          AND operario = ?
+                          AND SUBSTR(COALESCE(fecha_cierre, ''), 1, 7) = ?
+                    """),
+                    (centro, operario, mes_actual),
+                )
+
+                cierres_mes.extend(
+                    str(fila[0] or "").strip()
+                    for fila in cursor.fetchall()
+                    if str(fila[0] or "").strip()
+                )
             except Exception:
                 continue
     finally:
@@ -1571,6 +1591,7 @@ def _resumen_trabajo_hoy(centro):
     return {
         "nuevas": len(nuevas),
         "finalizadas": len(finalizadas),
+        "finalizadas_mes": len(set(cierres_mes)),
         "incidencias": incidencias,
         "legionella": legionella,
         "preventivo": preventivo,
@@ -1611,6 +1632,9 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
                 </div>
                 <div class="cv-daily-balance {clase_balance}">
                     {icono_balance} {texto_balance}
+                </div>
+                <div class="cv-daily-month">
+                    <span>Terminadas este mes</span><b>{hoy["finalizadas_mes"]}</b>
                 </div>
             </div>
             <div class="cv-open-summary">
@@ -1696,6 +1720,21 @@ def css_edificio_vivo():
             font-size:9px;
             font-weight:950;
             white-space:nowrap;
+        }
+
+        .cv-daily-month{
+            display:flex;
+            justify-content:space-between;
+            gap:8px;
+            margin-top:3px;
+            padding-top:3px;
+            border-top:1px solid #e2e8f0;
+            white-space:nowrap;
+        }
+
+        .cv-daily-month b{
+            color:#0f2747;
+            font-weight:950;
         }
 
         .cv-daily-good{ color:#15803d; }
