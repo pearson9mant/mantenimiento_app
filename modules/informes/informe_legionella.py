@@ -390,8 +390,9 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
 
     total = len(df)
     ok = len(df[df["estado"] == "OK"]) if not df.empty and "estado" in df.columns else 0
-    no_ok = total - ok
-    cumplimiento = round((ok / total) * 100, 2) if total else 0
+    seguimiento = len(df[df["estado"] == "SEGUIMIENTO"]) if not df.empty and "estado" in df.columns else 0
+    no_ok = total - ok - seguimiento
+    cumplimiento = round(((ok + seguimiento) / total) * 100, 2) if total else 0
     fecha_informe = datetime.now().strftime("%d/%m/%Y %H:%M")
 
     # ---------------------------------------------------------
@@ -934,14 +935,14 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         [
             Paragraph("CONTROLES", estilo_kpi_titulo),
             Paragraph("CORRECTOS", estilo_kpi_titulo),
+            Paragraph("SEGUIMIENTO", estilo_kpi_titulo),
             Paragraph("DESVIACIONES", estilo_kpi_titulo),
-            Paragraph("CUMPLIMIENTO", estilo_kpi_titulo),
         ],
         [
             Paragraph(str(total), estilo_kpi_valor),
             Paragraph(str(ok), estilo_kpi_valor),
+            Paragraph(str(seguimiento), estilo_kpi_valor),
             Paragraph(str(no_ok), estilo_kpi_valor),
-            Paragraph(f"{cumplimiento}%", estilo_kpi_valor),
         ],
     ]
     
@@ -1125,6 +1126,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             [
                 ["Registros realizados", str(total)],
                 ["Registros correctos", str(ok)],
+                ["Registros en seguimiento", str(seguimiento)],
                 ["Registros con riesgo / incidencia", str(no_ok)],
                 ["Incidencias abiertas", str(incidencias_abiertas)],
                 ["Incidencias cerradas", str(incidencias_cerradas)],
@@ -1188,7 +1190,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         if seguimiento_temporal_activo and incidencias_abiertas == 0:
             texto_estado = (
                 f"Se han registrado {total} controles en el periodo. "
-                f"Constan {no_ok} resultado(s) con desviación/seguimiento y no hay "
+                f"Constan {seguimiento} resultado(s) en seguimiento y {no_ok} desviación(es), sin "
                 "incidencias correctivas abiertas. Se mantiene seguimiento temporal "
                 "de AFS en Pearson 9 por temperatura elevada y control del desinfectante, "
                 "con registro de valores y sin generación automática de correctivo "
@@ -1828,8 +1830,8 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     else:
         if seguimiento_temporal_activo and incidencias_abiertas == 0:
             diagnostico_periodo = (
-                f"Durante el periodo se han registrado {total} controles, de los cuales {ok} son correctos "
-                f"y {no_ok} requieren revisión o seguimiento. No permanecen incidencias correctivas abiertas. "
+                f"Durante el periodo se han registrado {total} controles: {ok} correctos, "
+                f"{seguimiento} en seguimiento y {no_ok} con desviación. No permanecen incidencias correctivas abiertas. "
                 "Pearson 9 mantiene seguimiento temporal de AFS por temperatura elevada y control del "
                 "desinfectante, documentando la evolución de los valores."
             )
