@@ -1582,6 +1582,12 @@ def guardar_inventario_inicial_flexible_revision_aula(
             "No está disponible la sincronización con Inventario espacios."
         )
 
+    inventario_antes = _inventario_actual_por_elemento(
+        centro,
+        edificio,
+        espacio,
+    )
+
     for _categoria, elemento, cantidad in limpias:
         ok = guardar_o_actualizar_espacio(
             centro=centro,
@@ -1605,6 +1611,43 @@ def guardar_inventario_inicial_flexible_revision_aula(
                 f"No se ha podido guardar '{elemento}' "
                 "en Inventario espacios."
             )
+
+    # El editor flexible representa el inventario REAL completo del espacio.
+    # Si el operario elimina una fila, retiramos también ese elemento del
+    # inventario vivo. El catálogo maestro no se modifica.
+    claves_nuevas = {
+        normalizar_texto(elemento)
+        for _categoria, elemento, _cantidad in limpias
+    }
+    elementos_retirados = [
+        datos.get("elemento", "")
+        for clave, datos in inventario_antes.items()
+        if clave not in claves_nuevas and datos.get("elemento")
+    ]
+
+    if elementos_retirados:
+        conn = conectar()
+        cur = conn.cursor()
+        try:
+            for elemento_retirado in elementos_retirados:
+                cur.execute(_sql("""
+                    DELETE FROM inventario_aulas
+                    WHERE centro = ?
+                      AND edificio = ?
+                      AND espacio = ?
+                      AND elemento = ?
+                """), (
+                    centro,
+                    edificio,
+                    espacio,
+                    elemento_retirado,
+                ))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     marcar_inventario_inicial_aula_completado(revision_id)
     return True
