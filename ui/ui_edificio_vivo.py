@@ -1644,6 +1644,156 @@ def _resumen_trabajo_hoy(centro):
     }
 
 
+
+def _diagnostico_finalizadas_colegio_vivo(centro):
+    """
+    Diagnóstico TEMPORAL.
+    Muestra cómo están guardadas realmente las últimas OT del operario
+    en ordenes_trabajo e historico_ordenes. No modifica ningún dato.
+    """
+    operario = str(
+        st.session_state.get("operario_activo")
+        or st.session_state.get("usuario")
+        or ""
+    ).strip()
+
+    if not operario or not centro:
+        return
+
+    with st.expander("🧪 Diagnóstico temporal · últimas OT del operario", expanded=True):
+        st.caption(
+            f"Operario detectado: {operario} · Centro: {centro}. "
+            "Solo lectura; no modifica la base de datos."
+        )
+
+        conn = conectar()
+        try:
+            for tabla in ("ordenes_trabajo", "historico_ordenes"):
+                st.markdown(f"**{tabla}**")
+
+                try:
+                    cursor = conn.cursor()
+
+                    # Primero averiguamos las columnas reales de la tabla.
+                    cursor.execute(_sql(f"SELECT * FROM {tabla} LIMIT 0"))
+                    columnas = [
+                        str(col[0])
+                        for col in (cursor.description or [])
+                    ]
+
+                    if not columnas:
+                        st.warning("No se han podido leer las columnas.")
+                        continue
+
+                    deseadas = [
+                        "id",
+                        "numero_ot",
+                        "operario",
+                        "centro",
+                        "estado",
+                        "fecha_creacion",
+                        "fecha_cierre",
+                        "fecha_finalizacion",
+                        "fecha",
+                    ]
+                    seleccion = [
+                        col for col in deseadas
+                        if col in columnas
+                    ]
+
+                    if not seleccion:
+                        seleccion = columnas[:8]
+
+                    condiciones = []
+                    parametros = []
+
+                    if "centro" in columnas:
+                        condiciones.append("centro = ?")
+                        parametros.append(centro)
+
+                    if "operario" in columnas:
+                        condiciones.append("operario = ?")
+                        parametros.append(operario)
+
+                    where_sql = (
+                        " WHERE " + " AND ".join(condiciones)
+                        if condiciones
+                        else ""
+                    )
+
+                    orden_col = next(
+                        (
+                            col for col in [
+                                "fecha_cierre",
+                                "fecha_finalizacion",
+                                "fecha_creacion",
+                                "fecha",
+                                "id",
+                            ]
+                            if col in columnas
+                        ),
+                        None,
+                    )
+                    order_sql = (
+                        f" ORDER BY {orden_col} DESC"
+                        if orden_col
+                        else ""
+                    )
+
+                    cursor.execute(
+                        _sql(
+                            f"SELECT {', '.join(seleccion)} "
+                            f"FROM {tabla}"
+                            f"{where_sql}"
+                            f"{order_sql} LIMIT 10"
+                        ),
+                        tuple(parametros),
+                    )
+
+                    filas = cursor.fetchall()
+
+                    if not filas:
+                        st.warning(
+                            "0 filas con el operario/centro detectados. "
+                            "Esto ya nos indica que alguno de esos valores "
+                            "no coincide con lo guardado."
+                        )
+                        st.code(
+                            "Columnas reales: " + ", ".join(columnas),
+                            language=None,
+                        )
+                        continue
+
+                    datos = [
+                        {
+                            seleccion[i]: fila[i]
+                            for i in range(len(seleccion))
+                        }
+                        for fila in filas
+                    ]
+
+                    st.dataframe(
+                        datos,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.caption(
+                        "Columnas reales: " + ", ".join(columnas)
+                    )
+
+                except Exception as exc:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    st.error(
+                        f"No se pudo leer {tabla}: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+        finally:
+            conn.close()
+
+
 def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
     datos = _sumatorio_ordenes_abiertas(
         resumen,
@@ -1696,6 +1846,8 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
         """,
         unsafe_allow_html=True,
     )
+
+    _diagnostico_finalizadas_colegio_vivo(centro)
 
 
 # =========================================================
