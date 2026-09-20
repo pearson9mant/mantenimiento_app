@@ -1492,6 +1492,7 @@ def _resumen_trabajo_hoy(centro):
         "nuevas": 0,
         "finalizadas": 0,
         "finalizadas_mes": 0,
+        "entradas_mes": 0,
         "incidencias": 0,
         "legionella": 0,
         "preventivo": 0,
@@ -1530,6 +1531,35 @@ def _resumen_trabajo_hoy(centro):
                     conn.rollback()
                 except Exception:
                     pass
+
+        # ENTRADAS DEL MES:
+        # una OT creada este mes puede seguir activa o haber pasado al histórico.
+        # Se cuentan números de OT únicos para no duplicar las ya finalizadas.
+        entradas_mes = set()
+        for tabla in ("ordenes_trabajo", "historico_ordenes"):
+            try:
+                cursor.execute(
+                    _sql(f"""
+                        SELECT numero_ot
+                        FROM {tabla}
+                        WHERE centro = ?
+                          AND operario = ?
+                          AND CAST(fecha_creacion AS TEXT) LIKE ?
+                    """),
+                    (centro, operario, f"{mes_actual}%"),
+                )
+                entradas_mes.update(
+                    str(fila[0] or "").strip()
+                    for fila in cursor.fetchall()
+                    if str(fila[0] or "").strip()
+                )
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        resultado["entradas_mes"] = len(entradas_mes)
 
         # FINALIZADAS HOY:
         # confirmado por diagnóstico: fecha_cierre está en historico_ordenes.
@@ -1600,6 +1630,17 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
 
     diferencia = hoy["nuevas"] - hoy["finalizadas"]
 
+    entradas_mes = int(hoy.get("entradas_mes", 0) or 0)
+    finalizadas_mes = int(hoy.get("finalizadas_mes", 0) or 0)
+    efectividad_mes = (
+        (finalizadas_mes / entradas_mes) * 100
+        if entradas_mes > 0
+        else 0.0
+    )
+    texto_efectividad_mes = (
+        f"{efectividad_mes:.1f}".replace(".", ",") + "%"
+    )
+
     if diferencia < 0:
         icono_balance = "⬇️"
         texto_balance = f"{diferencia} · GANAMOS TERRENO"
@@ -1629,6 +1670,14 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
                 <div class="cv-daily-month">
                     <span>Terminadas este mes</span><b>{hoy["finalizadas_mes"]}</b>
                 </div>
+        '<div class="cv-daily-row cv-daily-month">'
+        '<span>Efectividad mensual</span>'
+        f'<b>{texto_efectividad_mes}</b>'
+        '</div>'
+        '<div class="cv-daily-row cv-daily-month">'
+        '<span>Efectividad mensual</span>'
+        f'<b>{texto_efectividad_mes}</b>'
+        '</div>' 
             </div>
             <div class="cv-open-summary">
                 <div class="cv-open-summary-title">📊 ABIERTAS</div>
