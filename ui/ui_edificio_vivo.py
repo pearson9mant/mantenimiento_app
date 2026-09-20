@@ -1487,8 +1487,6 @@ def _resumen_trabajo_hoy(centro):
 
     hoy = date.today().isoformat()
     mes_actual = hoy[:7]
-    filas = []
-    cierres_mes = []
 
     if not operario or not centro:
         return {
@@ -1500,133 +1498,76 @@ def _resumen_trabajo_hoy(centro):
             "preventivo": 0,
         }
 
+    nuevas_numeros = []
+    finalizadas_hoy = 0
+    finalizadas_mes = 0
+
     conn = conectar()
     try:
         cursor = conn.cursor()
 
-        for tabla in ("ordenes_trabajo", "historico_ordenes"):
-            try:
-                cursor.execute(
-                    _sql(f"""
-                        SELECT
-                            numero_ot,
-                            fecha_creacion,
-                            fecha_cierre
-                        FROM {tabla}
-                        WHERE centro = ?
-                          AND operario = ?
-                          AND (
-                              SUBSTR(COALESCE(fecha_creacion, ''), 1, 10) = ?
-                              OR SUBSTR(COALESCE(fecha_cierre, ''), 1, 10) = ?
-                          )
-                    """),
-                    (centro, operario, hoy, hoy),
-                )
+        # ordenes_trabajo NO tiene fecha_cierre.
+        # Aquí solo necesitamos las nuevas creadas hoy.
+        cursor.execute(
+            _sql("""
+                SELECT numero_ot
+                FROM ordenes_trabajo
+                WHERE centro = ?
+                  AND operario = ?
+                  AND SUBSTR(COALESCE(fecha_creacion, ''), 1, 10) = ?
+            """),
+            (centro, operario, hoy),
+        )
+        nuevas_numeros = [
+            str(fila[0] or "").strip()
+            for fila in cursor.fetchall()
+            if str(fila[0] or "").strip()
+        ]
 
-                for fila in cursor.fetchall():
-                    filas.append({
-                        "numero_ot": str(fila[0] or "").strip(),
-                        "fecha_creacion": str(fila[1] or "").strip(),
-                        "fecha_cierre": str(fila[2] or "").strip(),
-                    })
+        # Las OT terminadas están en historico_ordenes,
+        # donde sí existen estado y fecha_cierre.
+        cursor.execute(
+            _sql("""
+                SELECT COUNT(DISTINCT numero_ot)
+                FROM historico_ordenes
+                WHERE centro = ?
+                  AND operario = ?
+                  AND estado = 'Finalizada'
+                  AND SUBSTR(COALESCE(fecha_cierre, ''), 1, 10) = ?
+            """),
+            (centro, operario, hoy),
+        )
+        fila_hoy = cursor.fetchone()
+        finalizadas_hoy = int((fila_hoy[0] if fila_hoy else 0) or 0)
 
-                if tabla == "historico_ordenes":
-                    cursor.execute(
-                        _sql("""
-                            SELECT
-                                numero_ot,
-                                fecha_cierre,
-                                fecha_creacion
-                            FROM historico_ordenes
-                            WHERE centro = ?
-                              AND operario = ?
-                        """),
-                        (centro, operario),
-                    )
+        cursor.execute(
+            _sql("""
+                SELECT COUNT(DISTINCT numero_ot)
+                FROM historico_ordenes
+                WHERE centro = ?
+                  AND operario = ?
+                  AND estado = 'Finalizada'
+                  AND SUBSTR(COALESCE(fecha_cierre, ''), 1, 7) = ?
+            """),
+            (centro, operario, mes_actual),
+        )
+        fila_mes = cursor.fetchone()
+        finalizadas_mes = int((fila_mes[0] if fila_mes else 0) or 0)
 
-                    for fila_mes in cursor.fetchall():
-                        numero_mes = str(fila_mes[0] or "").strip()
-                        fecha_cierre_mes = str(fila_mes[1] or "").strip()
-                        fecha_creacion_mes = str(fila_mes[2] or "").strip()
-                        fecha_ref_mes = fecha_cierre_mes or fecha_creacion_mes
-
-                        if numero_mes and fecha_ref_mes[:7] == mes_actual:
-                            cierres_mes.append(numero_mes)
-                else:
-                    cursor.execute(
-                        _sql("""
-                            SELECT
-                                numero_ot,
-                                fecha_cierre,
-                                fecha_creacion,
-                                estado
-                            FROM ordenes_trabajo
-                            WHERE centro = ?
-                              AND operario = ?
-                        """),
-                        (centro, operario),
-                    )
-
-                    for fila_mes in cursor.fetchall():
-                        numero_mes = str(fila_mes[0] or "").strip()
-                        fecha_cierre_mes = str(fila_mes[1] or "").strip()
-                        fecha_creacion_mes = str(fila_mes[2] or "").strip()
-                        estado_mes = _norm(fila_mes[3])
-                        fecha_ref_mes = fecha_cierre_mes or fecha_creacion_mes
-
-                        if (
-                            numero_mes
-                            and estado_mes in {
-                                "finalizada",
-                                "finalizado",
-                                "cerrada",
-                                "cerrado",
-                            }
-                            and fecha_ref_mes[:7] == mes_actual
-                        ):
-                            cierres_mes.append(numero_mes)
-            except Exception:
-                # PostgreSQL deja la transacción abortada tras un error SQL.
-                # La restablecemos para que el fallo de una tabla no impida
-                # consultar la siguiente (especialmente historico_ordenes).
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-                continue
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
     finally:
         conn.close()
-
-    unicas = {}
-    for fila in filas:
-        numero = fila["numero_ot"]
-        clave = numero or (
-            fila["fecha_creacion"],
-            fila["fecha_cierre"],
-        )
-        if clave not in unicas:
-            unicas[clave] = fila
-        else:
-            if fila["fecha_creacion"]:
-                unicas[clave]["fecha_creacion"] = fila["fecha_creacion"]
-            if fila["fecha_cierre"]:
-                unicas[clave]["fecha_cierre"] = fila["fecha_cierre"]
-
-    nuevas = [
-        fila for fila in unicas.values()
-        if fila["fecha_creacion"][:10] == hoy
-    ]
-    finalizadas = [
-        fila for fila in unicas.values()
-        if fila["fecha_cierre"][:10] == hoy
-    ]
 
     incidencias = 0
     legionella = 0
     preventivo = 0
 
-    for fila in nuevas:
-        numero = fila["numero_ot"].upper()
+    for numero_ot in nuevas_numeros:
+        numero = numero_ot.upper()
         if numero.startswith("LEG-"):
             legionella += 1
         elif numero.startswith("PREV-"):
@@ -1635,163 +1576,14 @@ def _resumen_trabajo_hoy(centro):
             incidencias += 1
 
     return {
-        "nuevas": len(nuevas),
-        "finalizadas": len(finalizadas),
-        "finalizadas_mes": len(set(cierres_mes)),
+        "nuevas": len(set(nuevas_numeros)),
+        "finalizadas": finalizadas_hoy,
+        "finalizadas_mes": finalizadas_mes,
         "incidencias": incidencias,
         "legionella": legionella,
         "preventivo": preventivo,
     }
 
-
-
-def _diagnostico_finalizadas_colegio_vivo(centro):
-    """
-    Diagnóstico TEMPORAL.
-    Muestra cómo están guardadas realmente las últimas OT del operario
-    en ordenes_trabajo e historico_ordenes. No modifica ningún dato.
-    """
-    operario = str(
-        st.session_state.get("operario_activo")
-        or st.session_state.get("usuario")
-        or ""
-    ).strip()
-
-    if not operario or not centro:
-        return
-
-    with st.expander("🧪 Diagnóstico temporal · últimas OT del operario", expanded=True):
-        st.caption(
-            f"Operario detectado: {operario} · Centro: {centro}. "
-            "Solo lectura; no modifica la base de datos."
-        )
-
-        conn = conectar()
-        try:
-            for tabla in ("ordenes_trabajo", "historico_ordenes"):
-                st.markdown(f"**{tabla}**")
-
-                try:
-                    cursor = conn.cursor()
-
-                    # Primero averiguamos las columnas reales de la tabla.
-                    cursor.execute(_sql(f"SELECT * FROM {tabla} LIMIT 0"))
-                    columnas = [
-                        str(col[0])
-                        for col in (cursor.description or [])
-                    ]
-
-                    if not columnas:
-                        st.warning("No se han podido leer las columnas.")
-                        continue
-
-                    deseadas = [
-                        "id",
-                        "numero_ot",
-                        "operario",
-                        "centro",
-                        "estado",
-                        "fecha_creacion",
-                        "fecha_cierre",
-                        "fecha_finalizacion",
-                        "fecha",
-                    ]
-                    seleccion = [
-                        col for col in deseadas
-                        if col in columnas
-                    ]
-
-                    if not seleccion:
-                        seleccion = columnas[:8]
-
-                    condiciones = []
-                    parametros = []
-
-                    if "centro" in columnas:
-                        condiciones.append("centro = ?")
-                        parametros.append(centro)
-
-                    if "operario" in columnas:
-                        condiciones.append("operario = ?")
-                        parametros.append(operario)
-
-                    where_sql = (
-                        " WHERE " + " AND ".join(condiciones)
-                        if condiciones
-                        else ""
-                    )
-
-                    orden_col = next(
-                        (
-                            col for col in [
-                                "fecha_cierre",
-                                "fecha_finalizacion",
-                                "fecha_creacion",
-                                "fecha",
-                                "id",
-                            ]
-                            if col in columnas
-                        ),
-                        None,
-                    )
-                    order_sql = (
-                        f" ORDER BY {orden_col} DESC"
-                        if orden_col
-                        else ""
-                    )
-
-                    cursor.execute(
-                        _sql(
-                            f"SELECT {', '.join(seleccion)} "
-                            f"FROM {tabla}"
-                            f"{where_sql}"
-                            f"{order_sql} LIMIT 10"
-                        ),
-                        tuple(parametros),
-                    )
-
-                    filas = cursor.fetchall()
-
-                    if not filas:
-                        st.warning(
-                            "0 filas con el operario/centro detectados. "
-                            "Esto ya nos indica que alguno de esos valores "
-                            "no coincide con lo guardado."
-                        )
-                        st.code(
-                            "Columnas reales: " + ", ".join(columnas),
-                            language=None,
-                        )
-                        continue
-
-                    datos = [
-                        {
-                            seleccion[i]: fila[i]
-                            for i in range(len(seleccion))
-                        }
-                        for fila in filas
-                    ]
-
-                    st.dataframe(
-                        datos,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    st.caption(
-                        "Columnas reales: " + ", ".join(columnas)
-                    )
-
-                except Exception as exc:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
-                    st.error(
-                        f"No se pudo leer {tabla}: "
-                        f"{type(exc).__name__}: {exc}"
-                    )
-        finally:
-            conn.close()
 
 
 def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
@@ -1847,7 +1639,6 @@ def _pintar_sumatorio_ordenes_abiertas(resumen, centro):
         unsafe_allow_html=True,
     )
 
-    _diagnostico_finalizadas_colegio_vivo(centro)
 
 
 # =========================================================
