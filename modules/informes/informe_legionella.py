@@ -561,6 +561,12 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
     incidencias_abiertas = 0
     incidencias_cerradas = 0
 
+    # Seguimiento temporal acordado para Pearson 9:
+    # AFS de entrada con temperatura elevada / desinfectante bajo observación.
+    # No es una incidencia correctiva abierta, pero debe constar en el informe
+    # mientras se mantenga este criterio de seguimiento.
+    seguimiento_temporal_activo = str(centro_filtro).strip() == "Pearson 9"
+
     if not df_inc.empty:
         incidencias_abiertas = len(
             df_inc[
@@ -1177,15 +1183,25 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             "en el periodo seleccionado. No procede calificar el estado operativo "
             "como favorable hasta disponer de evidencias de ejecución."
         )
-    elif incidencias_abiertas > 0 or no_ok > 0:
+    elif incidencias_abiertas > 0 or no_ok > 0 or seguimiento_temporal_activo:
         estado_operativo = "EN SEGUIMIENTO"
-        texto_estado = (
-            f"Se han registrado {total} controles en el periodo. "
-            f"Constan {no_ok} resultado(s) con riesgo/incidencia y "
-            f"{incidencias_abiertas} incidencia(s) abierta(s). "
-            "Debe mantenerse el seguimiento hasta verificar el cierre efectivo "
-            "de las acciones correctoras."
-        )
+        if seguimiento_temporal_activo and incidencias_abiertas == 0:
+            texto_estado = (
+                f"Se han registrado {total} controles en el periodo. "
+                f"Constan {no_ok} resultado(s) con desviación/seguimiento y no hay "
+                "incidencias correctivas abiertas. Se mantiene seguimiento temporal "
+                "de AFS en Pearson 9 por temperatura elevada y control del desinfectante, "
+                "con registro de valores y sin generación automática de correctivo "
+                "mientras permanezca vigente este criterio."
+            )
+        else:
+            texto_estado = (
+                f"Se han registrado {total} controles en el periodo. "
+                f"Constan {no_ok} resultado(s) con riesgo/incidencia y "
+                f"{incidencias_abiertas} incidencia(s) abierta(s). "
+                "Debe mantenerse el seguimiento hasta verificar el cierre efectivo "
+                "de las acciones correctoras."
+            )
     elif tareas_previstas_periodo and cobertura_periodo < 100:
         estado_operativo = "CONTROL PARCIAL"
         texto_estado = (
@@ -1800,7 +1816,7 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         color_diagnostico_fondo = colors.HexColor("#FFF4E5")
         color_diagnostico_borde = colors.HexColor("#D97706")
         titulo_diagnostico = "PERIODO SIN REGISTROS"
-    elif no_ok == 0 and incidencias_abiertas == 0:
+    elif no_ok == 0 and incidencias_abiertas == 0 and not seguimiento_temporal_activo:
         diagnostico_periodo = (
             f"Durante el periodo se han registrado {total} controles, todos ellos clasificados como correctos. "
             "No constan incidencias abiertas asociadas a los controles revisados. "
@@ -1810,11 +1826,19 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
         color_diagnostico_borde = colors.HexColor("#2E7D32")
         titulo_diagnostico = "EVOLUCIÓN FAVORABLE"
     else:
-        diagnostico_periodo = (
-            f"Durante el periodo se han registrado {total} controles, de los cuales {ok} son correctos "
-            f"y {no_ok} requieren revisión o seguimiento. Permanecen {incidencias_abiertas} incidencia(s) abierta(s). "
-            "Debe mantenerse el seguimiento hasta verificar el cierre efectivo de las acciones correctoras."
-        )
+        if seguimiento_temporal_activo and incidencias_abiertas == 0:
+            diagnostico_periodo = (
+                f"Durante el periodo se han registrado {total} controles, de los cuales {ok} son correctos "
+                f"y {no_ok} requieren revisión o seguimiento. No permanecen incidencias correctivas abiertas. "
+                "Pearson 9 mantiene seguimiento temporal de AFS por temperatura elevada y control del "
+                "desinfectante, documentando la evolución de los valores."
+            )
+        else:
+            diagnostico_periodo = (
+                f"Durante el periodo se han registrado {total} controles, de los cuales {ok} son correctos "
+                f"y {no_ok} requieren revisión o seguimiento. Permanecen {incidencias_abiertas} incidencia(s) abierta(s). "
+                "Debe mantenerse el seguimiento hasta verificar el cierre efectivo de las acciones correctoras."
+            )
         color_diagnostico_fondo = colors.HexColor("#FFF4E5")
         color_diagnostico_borde = colors.HexColor("#D97706")
         titulo_diagnostico = "PERIODO EN SEGUIMIENTO"
@@ -2232,13 +2256,21 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             "operacional. La planificación preventiva permanece activa, pero debe "
             "documentarse la ejecución de los controles previstos."
         )
-    elif incidencias_abiertas > 0 or no_ok > 0:
-        conclusion_tecnica = (
-            "Los registros disponibles muestran controles que requieren seguimiento y/o "
-            "incidencias pendientes. La valoración definitiva queda condicionada al cierre "
-            "documentado de las acciones correctoras y a la verificación posterior de los "
-            "parámetros afectados."
-        )
+    elif incidencias_abiertas > 0 or no_ok > 0 or seguimiento_temporal_activo:
+        if seguimiento_temporal_activo and incidencias_abiertas == 0:
+            conclusion_tecnica = (
+                "No constan incidencias correctivas abiertas. Pearson 9 permanece en seguimiento "
+                "temporal de AFS por temperatura elevada y control del desinfectante, manteniendo "
+                "el registro periódico de valores para comprobar su evolución. Este seguimiento "
+                "se documenta de forma diferenciada de una incidencia correctiva abierta."
+            )
+        else:
+            conclusion_tecnica = (
+                "Los registros disponibles muestran controles que requieren seguimiento y/o "
+                "incidencias pendientes. La valoración definitiva queda condicionada al cierre "
+                "documentado de las acciones correctoras y a la verificación posterior de los "
+                "parámetros afectados."
+            )
     elif tareas_previstas_periodo and cobertura_periodo < 100:
         conclusion_tecnica = (
             f"Los controles registrados son correctos, pero la cobertura documental de "
