@@ -3120,6 +3120,107 @@ def pantalla_legionella():
     else:
         st.info(mensaje)
 
+    # Diagnóstico temporal de duplicados · SOLO LECTURA
+    with st.expander("🧪 Diagnóstico duplicados Legionella", expanded=True):
+        st.caption(
+            "Solo lectura: compara OT activas duplicadas y planificaciones "
+            "activas repetidas. No modifica ningún dato."
+        )
+
+        df_dup_ot = leer_df("""
+            SELECT
+                centro,
+                edificio,
+                planta,
+                descripcion,
+                COUNT(*) AS repeticiones,
+                MIN(fecha_creacion) AS primera_creacion,
+                MAX(fecha_creacion) AS ultima_creacion
+            FROM ordenes_trabajo
+            WHERE area = 'Legionella'
+              AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
+              AND LOWER(COALESCE(estado, '')) NOT IN (
+                    'finalizada', 'finalizado',
+                    'cerrada', 'cerrado',
+                    'cancelada', 'cancelado'
+              )
+            GROUP BY centro, edificio, planta, descripcion
+            HAVING COUNT(*) > 1
+            ORDER BY centro, edificio, planta, descripcion
+        """)
+
+        if df_dup_ot.empty:
+            st.success("No hay grupos de OT activas duplicadas.")
+        else:
+            st.error(
+                f"Detectados {len(df_dup_ot)} grupos de OT activas duplicadas."
+            )
+            st.dataframe(
+                df_dup_ot,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.markdown("**Detalle completo de OT activas Legionella**")
+            df_ot_activas = leer_df("""
+                SELECT
+                    id,
+                    numero_ot,
+                    centro,
+                    edificio,
+                    planta,
+                    descripcion,
+                    estado,
+                    fecha_creacion,
+                    operario,
+                    origen
+                FROM ordenes_trabajo
+                WHERE area = 'Legionella'
+                  AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
+                  AND LOWER(COALESCE(estado, '')) NOT IN (
+                        'finalizada', 'finalizado',
+                        'cerrada', 'cerrado',
+                        'cancelada', 'cancelado'
+                  )
+                ORDER BY centro, edificio, planta, descripcion,
+                         fecha_creacion, id
+            """)
+            st.dataframe(
+                df_ot_activas,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.markdown("**Planificaciones activas duplicadas**")
+        df_dup_plan = leer_df("""
+            SELECT
+                punto_id,
+                tarea,
+                COUNT(*) AS repeticiones,
+                MIN(id) AS primer_id,
+                MAX(id) AS ultimo_id
+            FROM legionella_tareas
+            WHERE activo = 1
+              AND generar_ot = 1
+            GROUP BY punto_id, tarea
+            HAVING COUNT(*) > 1
+            ORDER BY punto_id, tarea
+        """)
+
+        if df_dup_plan.empty:
+            st.success(
+                "No hay planificaciones activas duplicadas por punto/tarea."
+            )
+        else:
+            st.error(
+                f"Detectadas {len(df_dup_plan)} planificaciones duplicadas."
+            )
+            st.dataframe(
+                df_dup_plan,
+                use_container_width=True,
+                hide_index=True,
+            )
+
     st.subheader("💧 Legionella")
 
     st.markdown("### 🧠 Centro de Control Sanitario")
