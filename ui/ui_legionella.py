@@ -1043,6 +1043,70 @@ def crear_ot_legionella(
     if not centro or not edificio or not punto or not tarea:
         return False
 
+    # Protección atómica contra ejecuciones simultáneas.
+    # En PostgreSQL todas las sesiones que intenten crear exactamente el
+    # mismo control Legionella esperan sobre la misma clave. La segunda
+    # sesión solo continúa cuando la primera ya ha terminado y, por tanto,
+    # la comprobación existente ya ve la OT recién creada.
+    bloqueo_conn = None
+    bloqueo_cur = None
+    clave_bloqueo = "|".join([
+        str(centro or "").strip().lower(),
+        str(edificio or "").strip().lower(),
+        str(punto or "").strip().lower(),
+        str(tarea or "").strip().lower(),
+    ])
+
+    if os.getenv("DATABASE_URL"):
+        try:
+            bloqueo_conn = conectar()
+            bloqueo_cur = bloqueo_conn.cursor()
+            bloqueo_cur.execute(
+                "SELECT pg_advisory_lock(hashtext(%s))",
+                (clave_bloqueo,),
+            )
+        except Exception:
+            if bloqueo_conn is not None:
+                try:
+                    bloqueo_conn.close()
+                except Exception:
+                    pass
+            bloqueo_conn = None
+            bloqueo_cur = None
+
+    try:
+        return _crear_ot_legionella_bajo_bloqueo(
+            centro=centro,
+            edificio=edificio,
+            punto=punto,
+            tarea=tarea,
+            operario=operario,
+            punto_id=punto_id,
+            planta=planta,
+            tarea_id=tarea_id,
+        )
+    finally:
+        if bloqueo_conn is not None:
+            try:
+                if bloqueo_cur is not None:
+                    bloqueo_cur.execute(
+                        "SELECT pg_advisory_unlock(hashtext(%s))",
+                        (clave_bloqueo,),
+                    )
+            finally:
+                bloqueo_conn.close()
+
+
+def _crear_ot_legionella_bajo_bloqueo(
+    centro,
+    edificio,
+    punto,
+    tarea,
+    operario=None,
+    punto_id=None,
+    planta="",
+    tarea_id=None,
+):
     from modules.ordenes import vincular_origen_ot
 
     # La ubicación real del punto es la fuente de verdad para la OT.
@@ -3119,107 +3183,6 @@ def pantalla_legionella():
         st.success(mensaje)
     else:
         st.info(mensaje)
-
-    # Diagnóstico temporal de duplicados · SOLO LECTURA
-    with st.expander("🧪 Diagnóstico duplicados Legionella", expanded=True):
-        st.caption(
-            "Solo lectura: compara OT activas duplicadas y planificaciones "
-            "activas repetidas. No modifica ningún dato."
-        )
-
-        df_dup_ot = leer_df("""
-            SELECT
-                centro,
-                edificio,
-                planta,
-                descripcion,
-                COUNT(*) AS repeticiones,
-                MIN(fecha_creacion) AS primera_creacion,
-                MAX(fecha_creacion) AS ultima_creacion
-            FROM ordenes_trabajo
-            WHERE area = 'Legionella'
-              AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
-              AND LOWER(COALESCE(estado, '')) NOT IN (
-                    'finalizada', 'finalizado',
-                    'cerrada', 'cerrado',
-                    'cancelada', 'cancelado'
-              )
-            GROUP BY centro, edificio, planta, descripcion
-            HAVING COUNT(*) > 1
-            ORDER BY centro, edificio, planta, descripcion
-        """)
-
-        if df_dup_ot.empty:
-            st.success("No hay grupos de OT activas duplicadas.")
-        else:
-            st.error(
-                f"Detectados {len(df_dup_ot)} grupos de OT activas duplicadas."
-            )
-            st.dataframe(
-                df_dup_ot,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-            st.markdown("**Detalle completo de OT activas Legionella**")
-            df_ot_activas = leer_df("""
-                SELECT
-                    id,
-                    numero_ot,
-                    centro,
-                    edificio,
-                    planta,
-                    descripcion,
-                    estado,
-                    fecha_creacion,
-                    operario,
-                    origen
-                FROM ordenes_trabajo
-                WHERE area = 'Legionella'
-                  AND UPPER(COALESCE(origen, '')) = 'LEGIONELLA'
-                  AND LOWER(COALESCE(estado, '')) NOT IN (
-                        'finalizada', 'finalizado',
-                        'cerrada', 'cerrado',
-                        'cancelada', 'cancelado'
-                  )
-                ORDER BY centro, edificio, planta, descripcion,
-                         fecha_creacion, id
-            """)
-            st.dataframe(
-                df_ot_activas,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        st.markdown("**Planificaciones activas duplicadas**")
-        df_dup_plan = leer_df("""
-            SELECT
-                punto_id,
-                tarea,
-                COUNT(*) AS repeticiones,
-                MIN(id) AS primer_id,
-                MAX(id) AS ultimo_id
-            FROM legionella_tareas
-            WHERE activo = 1
-              AND generar_ot = 1
-            GROUP BY punto_id, tarea
-            HAVING COUNT(*) > 1
-            ORDER BY punto_id, tarea
-        """)
-
-        if df_dup_plan.empty:
-            st.success(
-                "No hay planificaciones activas duplicadas por punto/tarea."
-            )
-        else:
-            st.error(
-                f"Detectadas {len(df_dup_plan)} planificaciones duplicadas."
-            )
-            st.dataframe(
-                df_dup_plan,
-                use_container_width=True,
-                hide_index=True,
-            )
 
     st.subheader("💧 Legionella")
 
