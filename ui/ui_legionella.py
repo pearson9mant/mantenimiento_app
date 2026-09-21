@@ -1043,11 +1043,7 @@ def crear_ot_legionella(
     if not centro or not edificio or not punto or not tarea:
         return False
 
-    # Protección atómica contra ejecuciones simultáneas.
-    # En PostgreSQL todas las sesiones que intenten crear exactamente el
-    # mismo control Legionella esperan sobre la misma clave. La segunda
-    # sesión solo continúa cuando la primera ya ha terminado y, por tanto,
-    # la comprobación existente ya ve la OT recién creada.
+    # Protección atómica contra ejecuciones simultáneas del mismo control.
     bloqueo_conn = None
     bloqueo_cur = None
     clave_bloqueo = "|".join([
@@ -2324,10 +2320,8 @@ def registrar_control(
             resultado = "Válvula termostática correcta"
 
     es_seguimiento_afs_p9 = (
-        centro == "Pearson 9"
+        str(centro or "").strip() == "Pearson 9"
         and str(punto_nombre or "").strip() == "Entrada general AFS"
-        and str(punto.get("tipo_control_punto") or "").strip()
-        == "Seguimiento AFS (sin correctiva)"
         and str(tipo_control or "").strip() == "Control AFS"
     )
 
