@@ -71,6 +71,7 @@ def asegurar_columnas_observaciones_estado():
         ("coste_estimado", "REAL DEFAULT 0"),
         ("coste_final", "REAL DEFAULT 0"),
         ("foto", "TEXT"),
+        ("fecha_compartida", "TEXT"),
 
         # GESTIONES EXTERNAS SIN PERDER EL OPERARIO TÉCNICO ORIGINAL
         ("gestor_externo", "TEXT"),
@@ -998,6 +999,64 @@ def obtener_detalle_orden_externa(id_orden):
     }
 
 
+def marcar_ot_compartida(numero_ot):
+    """Guarda la fecha/hora del último uso de Compartir en una OT."""
+    asegurar_columnas_observaciones_estado()
+
+    numero_ot = str(numero_ot or "").strip()
+    if not numero_ot:
+        return False
+
+    fecha_compartida = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        actualizadas = 0
+        for tabla in ("ordenes_trabajo", "historico_ordenes"):
+            cursor.execute(_sql(f"""
+                UPDATE {tabla}
+                SET fecha_compartida = ?
+                WHERE numero_ot = ?
+            """), (fecha_compartida, numero_ot))
+            actualizadas += max(cursor.rowcount or 0, 0)
+
+        conn.commit()
+        return actualizadas > 0
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def obtener_fecha_compartida_ot(numero_ot):
+    """Devuelve la fecha/hora guardada de Compartir, activa o histórica."""
+    asegurar_columnas_observaciones_estado()
+
+    numero_ot = str(numero_ot or "").strip()
+    if not numero_ot:
+        return ""
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        for tabla in ("ordenes_trabajo", "historico_ordenes"):
+            cursor.execute(_sql(f"""
+                SELECT fecha_compartida
+                FROM {tabla}
+                WHERE numero_ot = ?
+                LIMIT 1
+            """), (numero_ot,))
+            fila = cursor.fetchone()
+            if fila and fila[0]:
+                return str(fila[0])
+        return ""
+    finally:
+        conn.close()
+
+
 # =====================================================
 # ACTUALIZAR ESTADO / OBSERVACIONES
 # =====================================================
@@ -1484,7 +1543,7 @@ def finalizar_orden(id_orden, observaciones=""):
             gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
             origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
             id_preventivo, id_incidencia,
-            planta
+            planta, fecha_compartida
         ) = orden
 
         if tipo_orden == "Externa":
@@ -1529,9 +1588,10 @@ def finalizar_orden(id_orden, observaciones=""):
                 coste_estimado, coste_final, observaciones_estado,
                 gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
                 origen_tabla, origen_id, id_punto_legionella,
-                id_tarea_legionella, id_preventivo, id_incidencia, planta
+                id_tarea_legionella, id_preventivo, id_incidencia, planta,
+                fecha_compartida
             )
-            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'Finalizada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """), (
             numero_ot, descripcion, fecha_creacion,
             centro, edificio, espacio, area, prioridad, operario, origen,
@@ -1543,7 +1603,8 @@ def finalizar_orden(id_orden, observaciones=""):
             coste_estimado, coste_final, observaciones_estado,
             gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
             origen_tabla, origen_id, id_punto_legionella,
-            id_tarea_legionella, id_preventivo, id_incidencia, planta
+            id_tarea_legionella, id_preventivo, id_incidencia, planta,
+            fecha_compartida
         ))
 
         id_preventivo_real = id_preventivo
