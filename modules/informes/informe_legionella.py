@@ -1728,11 +1728,16 @@ def generar_informe_legionella(fecha_inicio, fecha_fin, centro_filtro):
             ]]
 
             for _, row in df_edificio.iterrows():
-                ubicacion = (
-                    row.get("ubicacion_exacta")
-                    or row.get("ubicacion")
-                    or ""
-                )
+                ubicacion_exacta = row.get("ubicacion_exacta")
+                ubicacion_general = row.get("ubicacion")
+                
+                if pd.isna(ubicacion_exacta) or not str(ubicacion_exacta).strip():
+                    ubicacion = ubicacion_general
+                else:
+                    ubicacion = ubicacion_exacta
+                
+                if pd.isna(ubicacion) or not str(ubicacion).strip():
+                    ubicacion = ""
 
                 tabla_puntos.append([
                     Paragraph(
