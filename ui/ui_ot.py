@@ -15,6 +15,8 @@ from modules.ordenes import (
     crear_correctiva_desde_ot,
     obtener_gestion_externa_ot,
     enviar_a_gestiones_externas,
+    marcar_ot_compartida,
+    obtener_fecha_compartida_ot,
 )
 
 from modules.inventario import (
@@ -3562,7 +3564,15 @@ def mostrar_compartir_ot(
     """
     from urllib.parse import quote
 
-    with st.expander("📤 Compartir OT", expanded=False):
+    fecha_compartida = obtener_fecha_compartida_ot(numero_ot)
+    etiqueta_compartir = "📤 Compartir OT"
+    if fecha_compartida:
+        etiqueta_compartir = "✅ OT compartida · Compartir de nuevo"
+
+    with st.expander(etiqueta_compartir, expanded=False):
+        if fecha_compartida:
+            st.success(f"📤 Compartida: {fecha_compartida}")
+
         st.caption(
             "Puedes compartirla esté abierta o finalizada. "
             "Esta acción no modifica la OT."
@@ -3599,18 +3609,20 @@ def mostrar_compartir_ot(
         c1, c2 = st.columns(2)
 
         with c1:
-            st.link_button(
+            if st.link_button(
                 "🟢 Enviar por WhatsApp",
                 whatsapp_url,
                 use_container_width=True,
-            )
+            ):
+                marcar_ot_compartida(numero_ot)
 
         with c2:
-            st.link_button(
+            if st.link_button(
                 "✉️ Enviar por email",
                 email_url,
                 use_container_width=True,
-            )
+            ):
+                marcar_ot_compartida(numero_ot)
 
         st.caption(
             "WhatsApp y email abren el mensaje ya preparado. "
