@@ -1517,7 +1517,7 @@ def finalizar_orden(id_orden, observaciones=""):
                    gestor_externo, fecha_envio_gestion_externa, motivo_gestion_externa,
                    origen_tabla, origen_id, id_punto_legionella, id_tarea_legionella,
                    id_preventivo, id_incidencia,
-                   planta
+                   planta, fecha_compartida
             FROM ordenes_trabajo
             WHERE id = ?
         """), (id_orden,))
