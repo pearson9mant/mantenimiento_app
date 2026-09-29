@@ -2226,7 +2226,8 @@ def registrar_control(
     operario,
     observaciones,
     ruta_foto="",
-    valor_4=None
+    valor_4=None,
+    tarea_id=None
 ):
     centro = punto.get("centro")
     edificio = punto.get("edificio")
@@ -2261,22 +2262,32 @@ def registrar_control(
                 "Realízala antes de guardar y finalizar esta OT."
             )
 
-    # Buscar consigna configurada para esta tarea/punto
+    # Buscar consigna configurada para esta tarea/punto.
+    # Si la OT conserva la vinculación exacta, usamos ese id de planificación.
     consigna_minima = 0
     controla_consigna = 0
 
     try:
-        df_consigna = leer_df("""
-            SELECT consigna_minima, controla_consigna
-            FROM legionella_tareas
-            WHERE centro = ?
-              AND edificio = ?
-              AND punto = ?
-              AND tarea = ?
-              AND activo = 1
-            ORDER BY id DESC
-            LIMIT 1
-        """, (centro, edificio, punto_nombre, tarea))
+        if tarea_id:
+            df_consigna = leer_df("""
+                SELECT consigna_minima, controla_consigna
+                FROM legionella_tareas
+                WHERE id = ?
+                  AND activo = 1
+                LIMIT 1
+            """, (int(tarea_id),))
+        else:
+            df_consigna = leer_df("""
+                SELECT consigna_minima, controla_consigna
+                FROM legionella_tareas
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND punto = ?
+                  AND tarea = ?
+                  AND activo = 1
+                ORDER BY id DESC
+                LIMIT 1
+            """, (centro, edificio, punto_nombre, tarea))
 
         if not df_consigna.empty:
             consigna_minima = float(df_consigna.iloc[0]["consigna_minima"] or 0)
@@ -2345,7 +2356,7 @@ def registrar_control(
             planta,
             instalacion,
             punto_id,
-            None,
+            int(tarea_id) if tarea_id else None,
             punto_nombre,
             tarea,
             tipo_control,
@@ -2363,17 +2374,27 @@ def registrar_control(
     )
 
     try:
-        df_plan = leer_df("""
-            SELECT id, frecuencia_dias, generar_ot, proxima_fecha
-            FROM legionella_tareas
-            WHERE centro = ?
-              AND edificio = ?
-              AND punto = ?
-              AND tarea = ?
-              AND activo = 1
-            ORDER BY id DESC
-            LIMIT 1
-        """, (centro, edificio, punto_nombre, tarea))
+        if tarea_id:
+            df_plan = leer_df("""
+                SELECT id, frecuencia_dias, generar_ot, proxima_fecha
+                FROM legionella_tareas
+                WHERE id = ?
+                  AND activo = 1
+                LIMIT 1
+            """, (int(tarea_id),))
+        else:
+            # Compatibilidad con controles antiguos o manuales sin vínculo de OT.
+            df_plan = leer_df("""
+                SELECT id, frecuencia_dias, generar_ot, proxima_fecha
+                FROM legionella_tareas
+                WHERE centro = ?
+                  AND edificio = ?
+                  AND punto = ?
+                  AND tarea = ?
+                  AND activo = 1
+                ORDER BY id DESC
+                LIMIT 1
+            """, (centro, edificio, punto_nombre, tarea))
 
         if not df_plan.empty:
             id_plan = int(df_plan.iloc[0]["id"])
