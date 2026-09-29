@@ -177,6 +177,8 @@ def mostrar_ejecucion_legionella_operario(
     ).strip()
 
     punto = None
+    id_punto_legionella = None
+    id_tarea_legionella = None
 
     try:
         vinculacion = obtener_vinculacion_ot(
@@ -558,6 +560,7 @@ def mostrar_ejecucion_legionella_operario(
                 unidad,
                 operario,
                 observaciones_finales,
+                tarea_id=id_tarea_legionella,
             )
 
             if estado == "ERROR":
