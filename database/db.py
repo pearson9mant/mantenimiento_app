@@ -354,6 +354,10 @@ def inicializar_db():
     _add_column(cursor, "ordenes_trabajo", "fecha_programada", "TEXT")
     _add_column(cursor, "historico_ordenes", "fecha_programada", "TEXT")
 
+    # TRAZABILIDAD DE COMPARTICIÓN DE OT
+    _add_column(cursor, "ordenes_trabajo", "fecha_compartida", "TEXT")
+    _add_column(cursor, "historico_ordenes", "fecha_compartida", "TEXT")
+
     try:
         cursor.execute("""
             UPDATE ordenes_trabajo
