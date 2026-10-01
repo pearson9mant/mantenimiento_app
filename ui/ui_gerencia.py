@@ -2261,6 +2261,48 @@ def _mostrar_diagnostico_gerencia(df, centro):
     return diagnostico
 
 
+
+def mostrar_resumen_mes_anterior_gerencia(df, centro):
+    """Resumen ejecutivo del último mes completo, sin alterar el Histórico."""
+    _, periodo_anterior = _periodos_ejecutivos()
+    datos = _datos_centro_ejecutivo(df, centro)
+    if datos.empty:
+        return
+
+    cerradas = datos[es_cerrada(datos)].copy()
+    fecha_cierre = cerradas["fecha_cierre_dt"].copy()
+    fecha_cierre = fecha_cierre.where(fecha_cierre.notna(), cerradas["fecha_dt"])
+    cerradas_mes = cerradas[
+        fecha_cierre.notna()
+        & (fecha_cierre.dt.to_period("M") == periodo_anterior)
+    ].copy()
+
+    incidencias = _incidencias_periodo(df, centro, periodo_anterior)
+    preventivos = cerradas_mes[_es_preventivo_df(cerradas_mes)].copy()
+    texto_legionella = (
+        cerradas_mes["origen"].fillna("").astype(str) + " "
+        + cerradas_mes["numero_ot"].fillna("").astype(str) + " "
+        + cerradas_mes["descripcion"].fillna("").astype(str)
+    ).str.lower()
+    legionella = cerradas_mes[
+        texto_legionella.str.contains("legionella|leg-", na=False)
+    ].copy()
+
+    meses_es = {1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
+    fecha_mes = periodo_anterior.start_time
+    nombre_mes = f"{meses_es[fecha_mes.month]} {fecha_mes.year}"
+
+    st.markdown(f"### 📅 Resumen mensual · {nombre_mes}")
+    st.caption(f"{centro} · último mes completo")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("OT finalizadas", len(cerradas_mes))
+    c2.metric("Incidencias creadas", len(incidencias))
+    c3.metric("Preventivos realizados", len(preventivos))
+    c4.metric("Legionella finalizadas", len(legionella))
+
+
 def mostrar_capa_ejecutiva_gerencia(df, centro):
     diagnostico = _mostrar_diagnostico_gerencia(
         df,
@@ -4883,6 +4925,11 @@ def mostrar_colegio_vivo_gerencia(
                 centro_objetivo,
             )
 
+            mostrar_resumen_mes_anterior_gerencia(
+                df,
+                centro_objetivo,
+            )
+
             mostrar_pulso_diario_ordenes_gerencia(
                 df,
                 centro_objetivo,
@@ -5033,6 +5080,11 @@ def mostrar_colegio_vivo_gerencia(
         )
 
         mostrar_capa_ejecutiva_gerencia(
+            df,
+            centro_ejecutivo,
+        )
+
+        mostrar_resumen_mes_anterior_gerencia(
             df,
             centro_ejecutivo,
         )
