@@ -2261,48 +2261,6 @@ def _mostrar_diagnostico_gerencia(df, centro):
     return diagnostico
 
 
-
-def mostrar_resumen_mes_anterior_gerencia(df, centro):
-    """Resumen ejecutivo del último mes completo, sin alterar el Histórico."""
-    _, periodo_anterior = _periodos_ejecutivos()
-    datos = _datos_centro_ejecutivo(df, centro)
-    if datos.empty:
-        return
-
-    cerradas = datos[es_cerrada(datos)].copy()
-    fecha_cierre = cerradas["fecha_cierre_dt"].copy()
-    fecha_cierre = fecha_cierre.where(fecha_cierre.notna(), cerradas["fecha_dt"])
-    cerradas_mes = cerradas[
-        fecha_cierre.notna()
-        & (fecha_cierre.dt.to_period("M") == periodo_anterior)
-    ].copy()
-
-    incidencias = _incidencias_periodo(df, centro, periodo_anterior)
-    preventivos = cerradas_mes[_es_preventivo_df(cerradas_mes)].copy()
-    texto_legionella = (
-        cerradas_mes["origen"].fillna("").astype(str) + " "
-        + cerradas_mes["numero_ot"].fillna("").astype(str) + " "
-        + cerradas_mes["descripcion"].fillna("").astype(str)
-    ).str.lower()
-    legionella = cerradas_mes[
-        texto_legionella.str.contains("legionella|leg-", na=False)
-    ].copy()
-
-    meses_es = {1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-                5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-                9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
-    fecha_mes = periodo_anterior.start_time
-    nombre_mes = f"{meses_es[fecha_mes.month]} {fecha_mes.year}"
-
-    st.markdown(f"### 📅 Resumen mensual · {nombre_mes}")
-    st.caption(f"{centro} · último mes completo")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("OT finalizadas", len(cerradas_mes))
-    c2.metric("Incidencias creadas", len(incidencias))
-    c3.metric("Preventivos realizados", len(preventivos))
-    c4.metric("Legionella finalizadas", len(legionella))
-
-
 def mostrar_capa_ejecutiva_gerencia(df, centro):
     diagnostico = _mostrar_diagnostico_gerencia(
         df,
@@ -2663,7 +2621,7 @@ def _ubicacion_historico_canonica_gerencia(fila, centro):
     )
 
 
-def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
+def _mostrar_historico_ubicacion_gerencia(df, centro, key_sufijo="principal"):
     """
     Histórico de OT de la ubicación física seleccionada en Colegio Vivo.
 
@@ -2861,6 +2819,204 @@ def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
         hide_index=True,
         height=min(500, 45 + len(detalle_tabla) * 35),
     )
+
+
+def _mostrar_resumen_periodo_gerencia(df, centro, key_sufijo="principal"):
+    """Consulta histórica mensual con filtros encadenados para Gerencia."""
+    st.markdown("### 📊 Resumen por periodo")
+    st.caption(
+        "Consulta las actuaciones finalizadas por mes y combina filtros de ubicación, área y operario."
+    )
+
+    if df.empty:
+        st.info("No hay histórico disponible.")
+        return
+
+    detalle = df[es_cerrada(df)].copy()
+    if detalle.empty:
+        st.info("Todavía no hay OT finalizadas para consultar.")
+        return
+
+    detalle["fecha_resumen_dt"] = detalle["fecha_cierre_dt"].copy()
+    detalle["fecha_resumen_dt"] = detalle["fecha_resumen_dt"].where(
+        detalle["fecha_resumen_dt"].notna(),
+        detalle["fecha_dt"],
+    )
+    detalle = detalle[detalle["fecha_resumen_dt"].notna()].copy()
+
+    if detalle.empty:
+        st.info("No hay OT finalizadas con fecha válida para consultar.")
+        return
+
+    meses_es = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+    }
+
+    detalle["periodo_mes"] = detalle["fecha_resumen_dt"].dt.to_period("M")
+    periodos = sorted(detalle["periodo_mes"].dropna().unique(), reverse=True)
+
+    hoy = pd.Timestamp.today()
+    mes_anterior = (hoy.replace(day=1) - pd.Timedelta(days=1)).to_period("M")
+    indice_mes = periodos.index(mes_anterior) if mes_anterior in periodos else 0
+
+    periodo_sel = st.selectbox(
+        "Mes",
+        periodos,
+        index=indice_mes,
+        format_func=lambda p: f"{meses_es[p.month]} {p.year}",
+        key=f"gerencia_hist_mes_{key_sufijo}",
+    )
+    detalle = detalle[detalle["periodo_mes"] == periodo_sel].copy()
+
+    def _opciones(columna):
+        if columna not in detalle.columns:
+            return []
+        return sorted({
+            str(v).strip()
+            for v in detalle[columna].fillna("").tolist()
+            if str(v or "").strip() and str(v).strip().lower() not in {"nan", "none", "-"}
+        })
+
+    centros = _opciones("centro")
+    centro_preferido = str(centro or "").strip()
+    opciones_centro = ["Todos"] + centros
+    indice_centro = opciones_centro.index(centro_preferido) if centro_preferido in opciones_centro else 0
+    centro_sel = st.selectbox(
+        "Centro",
+        opciones_centro,
+        index=indice_centro,
+        key=f"gerencia_hist_centro_periodo_{key_sufijo}",
+    )
+    if centro_sel != "Todos":
+        detalle = detalle[detalle["centro"].fillna("").astype(str).str.strip() == centro_sel].copy()
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        edificios = _opciones("edificio")
+        edificio_sel = st.selectbox(
+            "Edificio",
+            ["Todos"] + edificios,
+            key=f"gerencia_hist_edificio_periodo_{key_sufijo}",
+        )
+    if edificio_sel != "Todos":
+        detalle = detalle[detalle["edificio"].fillna("").astype(str).str.strip() == edificio_sel].copy()
+
+    with c2:
+        plantas = _opciones("planta")
+        planta_sel = st.selectbox(
+            "Planta / zona",
+            ["Todas"] + plantas,
+            key=f"gerencia_hist_planta_periodo_{key_sufijo}",
+        )
+    if planta_sel != "Todas":
+        detalle = detalle[detalle["planta"].fillna("").astype(str).str.strip() == planta_sel].copy()
+
+    with c3:
+        espacios = _opciones("espacio")
+        espacio_sel = st.selectbox(
+            "Espacio",
+            ["Todos"] + espacios,
+            key=f"gerencia_hist_espacio_periodo_{key_sufijo}",
+        )
+    if espacio_sel != "Todos":
+        detalle = detalle[detalle["espacio"].fillna("").astype(str).str.strip() == espacio_sel].copy()
+
+    c4, c5 = st.columns(2)
+    with c4:
+        areas = _opciones("area")
+        area_sel = st.selectbox(
+            "Área",
+            ["Todas"] + areas,
+            key=f"gerencia_hist_area_periodo_{key_sufijo}",
+        )
+    if area_sel != "Todas":
+        detalle = detalle[detalle["area"].fillna("").astype(str).str.strip() == area_sel].copy()
+
+    with c5:
+        operarios = _opciones("operario")
+        operario_sel = st.selectbox(
+            "Operario",
+            ["Todos"] + operarios,
+            key=f"gerencia_hist_operario_periodo_{key_sufijo}",
+        )
+    if operario_sel != "Todos":
+        detalle = detalle[detalle["operario"].fillna("").astype(str).str.strip() == operario_sel].copy()
+
+    if detalle.empty:
+        st.info("No hay actuaciones finalizadas con estos filtros.")
+        return
+
+    correctivas = _solo_correctivas_reales(detalle)
+    tecnicas = _desglose_actividad_tecnica(detalle)
+    areas_implicadas = len({
+        str(v).strip()
+        for v in detalle["area"].fillna("").tolist()
+        if str(v or "").strip()
+    })
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("OT realizadas", len(detalle))
+    k2.metric("Correctivas", len(correctivas))
+    k3.metric("Preventivas", tecnicas["preventivo"])
+    k4.metric("Legionella", tecnicas["legionella"])
+    k5.metric("Áreas implicadas", areas_implicadas)
+
+    columnas = [
+        "numero_ot", "fecha_creacion", "fecha_cierre", "centro",
+        "edificio", "planta", "espacio", "descripcion", "area",
+        "prioridad", "operario",
+    ]
+    for col in ["observaciones_cierre", "trabajo_realizado", "observaciones"]:
+        if col in detalle.columns:
+            columnas.append(col)
+    columnas = [c for c in columnas if c in detalle.columns]
+
+    renombrar = {
+        "numero_ot": "OT", "fecha_creacion": "Fecha alta",
+        "fecha_cierre": "Fecha cierre", "centro": "Centro",
+        "edificio": "Edificio", "planta": "Planta / zona",
+        "espacio": "Espacio", "descripcion": "Descripción",
+        "area": "Área", "prioridad": "Prioridad", "operario": "Operario",
+        "observaciones_cierre": "Cierre / solución",
+        "trabajo_realizado": "Trabajo realizado",
+        "observaciones": "Observaciones",
+    }
+
+    detalle_tabla = detalle.sort_values(
+        ["fecha_resumen_dt", "fecha_dt"],
+        ascending=[False, False],
+        na_position="last",
+    )
+    st.dataframe(
+        detalle_tabla[columnas].rename(columns=renombrar),
+        use_container_width=True,
+        hide_index=True,
+        height=min(560, 45 + len(detalle_tabla) * 35),
+    )
+
+
+def mostrar_historico_espacios_gerencia(df, centro, key_sufijo="principal"):
+    """Histórico de Gerencia: consulta mensual y ubicación del mapa."""
+    tab_periodo, tab_ubicacion = st.tabs([
+        "📊 Resumen por periodo",
+        "📍 Histórico por ubicación",
+    ])
+
+    with tab_periodo:
+        _mostrar_resumen_periodo_gerencia(
+            df,
+            centro,
+            key_sufijo=key_sufijo,
+        )
+
+    with tab_ubicacion:
+        _mostrar_historico_ubicacion_gerencia(
+            df,
+            centro,
+            key_sufijo=key_sufijo,
+        )
 
 def mostrar_detalle_ordenes(df, centro, tipo, titulo):
     datos = obtener_df_tarjeta(df, centro, tipo)
@@ -4925,11 +5081,6 @@ def mostrar_colegio_vivo_gerencia(
                 centro_objetivo,
             )
 
-            mostrar_resumen_mes_anterior_gerencia(
-                df,
-                centro_objetivo,
-            )
-
             mostrar_pulso_diario_ordenes_gerencia(
                 df,
                 centro_objetivo,
@@ -5080,11 +5231,6 @@ def mostrar_colegio_vivo_gerencia(
         )
 
         mostrar_capa_ejecutiva_gerencia(
-            df,
-            centro_ejecutivo,
-        )
-
-        mostrar_resumen_mes_anterior_gerencia(
             df,
             centro_ejecutivo,
         )
