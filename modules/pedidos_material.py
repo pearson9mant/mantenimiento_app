@@ -153,7 +153,9 @@ def crear_tabla_pedidos_material():
                 fecha_pedido TEXT,
                 pagado INTEGER DEFAULT 0,
                 fecha_pago TEXT,
-                observaciones_gestion TEXT
+                observaciones_gestion TEXT,
+                enviado_email INTEGER DEFAULT 0,
+                fecha_envio_email TEXT
             )
         """))
 
@@ -186,6 +188,8 @@ def crear_tabla_pedidos_material():
             ("pagado", "INTEGER DEFAULT 0"),
             ("fecha_pago", "TEXT"),
             ("observaciones_gestion", "TEXT"),
+            ("enviado_email", "INTEGER DEFAULT 0"),
+            ("fecha_envio_email", "TEXT"),
         ]
 
         for columna, tipo in columnas_cabecera:
@@ -969,7 +973,9 @@ def obtener_pedidos_material(
             foto,
             fecha_preparado,
             fecha_entrega,
-            edificio
+            edificio,
+            COALESCE(enviado_email, 0),
+            fecha_envio_email
         FROM pedidos_material
         WHERE 1=1
     """
@@ -1032,9 +1038,40 @@ def obtener_pedidos_material(
             p[9],
             p[10],
             p[11],
+            p[13],
+            p[14],
         ))
 
     return resultado
+
+
+def marcar_pedido_enviado_email(id_pedido):
+    """Marca que el usuario confirma que el pedido ya se envió por correo."""
+    crear_tabla_pedidos_material()
+
+    conn = conectar()
+    cur = conn.cursor()
+    fecha_envio = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    try:
+        cur.execute(_sql("""
+            UPDATE pedidos_material
+            SET enviado_email = 1,
+                fecha_envio_email = ?
+            WHERE id = ?
+        """), (
+            fecha_envio,
+            id_pedido,
+        ))
+        conn.commit()
+        return True, fecha_envio
+
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+
+    finally:
+        conn.close()
 
 
 def recalcular_estado_pedido(
