@@ -14,6 +14,7 @@ from modules.pedidos_material import (
     obtener_datos_recepcion_linea,
     registrar_recepcion_linea_pedido,
     guardar_fotos_pedido_material,
+    marcar_pedido_enviado_email,
 )
 
 from modules.ordenes import obtener_fotos_ot
@@ -231,6 +232,8 @@ def leer_pedido(p):
             "estado": p[8],
             "observaciones": p[9],
             "link_material": p[10] or "",
+            "enviado_email": bool(p[14]) if len(p) > 14 else False,
+            "fecha_envio_email": p[15] if len(p) > 15 else "",
         }
 
     return {
@@ -247,6 +250,8 @@ def leer_pedido(p):
         "estado": p[7],
         "observaciones": p[8],
         "link_material": "",
+        "enviado_email": False,
+        "fecha_envio_email": "",
     }
 
 
@@ -1742,6 +1747,14 @@ def ui_pedidos_operario(
         observaciones = datos[
             "observaciones"
         ]
+        enviado_email = datos.get(
+            "enviado_email",
+            False,
+        )
+        fecha_envio_email = datos.get(
+            "fecha_envio_email",
+            "",
+        )
 
         icono = icono_estado(
             estado
@@ -1772,6 +1785,37 @@ def ui_pedidos_operario(
                 f"**Observaciones:** "
                 f"{observaciones or '-'}"
             )
+
+            if enviado_email:
+                st.success(
+                    "📨 Pedido enviado por email"
+                    + (
+                        f" · {fecha_envio_email}"
+                        if fecha_envio_email
+                        else ""
+                    )
+                )
+            else:
+                st.warning(
+                    "⏳ El envío por email todavía no está confirmado."
+                )
+                if st.button(
+                    "✅ Marcar como enviado por email",
+                    key=f"marcar_email_enviado_{id_pedido}",
+                    use_container_width=True,
+                ):
+                    ok_envio, dato_envio = marcar_pedido_enviado_email(
+                        id_pedido
+                    )
+                    if ok_envio:
+                        st.success(
+                            f"Envío confirmado · {dato_envio}"
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            f"No se pudo guardar el envío: {dato_envio}"
+                        )
 
             mostrar_lineas_pedido(
                 id_pedido,
