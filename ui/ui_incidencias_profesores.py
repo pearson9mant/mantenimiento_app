@@ -1,6 +1,12 @@
 import streamlit as st
 from datetime import datetime
 
+from modules.espacios import (
+    obtener_centros_espacios,
+    obtener_edificios_espacios,
+    obtener_plantas_espacios,
+    obtener_espacios_por_planta,
+)
 from modules.ordenes import (
     crear_orden,
     obtener_siguiente_numero_ot,
@@ -188,42 +194,55 @@ def pantalla_incidencias_profesores():
         unsafe_allow_html=True,
     )
 
+    centros = obtener_centros_espacios()
     centro = st.selectbox(
         "Centro",
-        ["Pearson 22", "Pearson 9"],
+        centros,
         key="prof_incidencia_centro",
     )
 
-    if centro == "Pearson 22":
-        edificios = ["Infantil/Primaria", "Llar"]
-    else:
-        edificios = ["Edif. A", "Edif. B", "Edif. C"]
-
+    edificios = obtener_edificios_espacios(centro)
     edificio = st.selectbox(
         "Edificio",
         edificios,
         key="prof_incidencia_edificio",
     )
 
-    espacios = ESPACIOS_POR_EDIFICIO.get(
-        edificio,
-        ["General", "Otro"],
+    plantas = obtener_plantas_espacios(centro, edificio)
+    planta = st.selectbox(
+        "Planta",
+        plantas,
+        key="prof_incidencia_planta",
     )
 
-    espacio_seleccionado = st.selectbox(
+    espacios_filas = obtener_espacios_por_planta(
+        centro,
+        edificio,
+        planta,
+    )
+
+    espacios = []
+    for fila in espacios_filas:
+        if isinstance(fila, dict):
+            nombre_espacio = fila.get("espacio") or fila.get("nombre") or ""
+        elif hasattr(fila, "keys") and "espacio" in fila.keys():
+            nombre_espacio = fila["espacio"]
+        else:
+            nombre_espacio = fila[1] if len(fila) > 1 else fila[0]
+
+        nombre_espacio = str(nombre_espacio or "").strip()
+        if nombre_espacio:
+            espacios.append(nombre_espacio)
+
+    if not espacios:
+        st.warning("No hay espacios configurados para esta planta.")
+        return
+
+    espacio = st.selectbox(
         "Espacio / Aula",
         espacios,
         key="prof_incidencia_espacio",
     )
-
-    if espacio_seleccionado == "Otro":
-        espacio = st.text_input(
-            "Escribe el espacio",
-            placeholder="Ejemplo: despacho, almacén, aula...",
-            key="prof_incidencia_otro_espacio",
-        )
-    else:
-        espacio = espacio_seleccionado
 
     descripcion = st.text_area(
         "¿Qué ocurre?",
@@ -379,6 +398,21 @@ def pantalla_incidencias_profesores():
             fecha_origen,
             "postgres_fotos" if fotos_validas else "",
             tipo_solicitante,
+            "Interna",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            0,
+            0,
+            "",
+            planta,
         )
 
         # Primero se crea la OT. Las fotos se guardan después.
