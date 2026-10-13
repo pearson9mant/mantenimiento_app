@@ -221,18 +221,11 @@ def pantalla_incidencias_profesores():
         planta,
     )
 
-    espacios = []
-    for fila in espacios_filas:
-        if isinstance(fila, dict):
-            nombre_espacio = fila.get("espacio") or fila.get("nombre") or ""
-        elif hasattr(fila, "keys") and "espacio" in fila.keys():
-            nombre_espacio = fila["espacio"]
-        else:
-            nombre_espacio = fila[1] if len(fila) > 1 else fila[0]
-
-        nombre_espacio = str(nombre_espacio or "").strip()
-        if nombre_espacio:
-            espacios.append(nombre_espacio)
+    espacios = [
+        fila[0]
+        for fila in espacios_filas
+        if fila and fila[0]
+    ]
 
     if not espacios:
         st.warning("No hay espacios configurados para esta planta.")
