@@ -1,4 +1,3 @@
-import json
 import re
 import unicodedata
 from urllib.parse import quote
@@ -1698,21 +1697,12 @@ def ui_pedidos_operario(
             f"Pedido {numero_pedido} guardado correctamente."
         )
 
-        # Abrimos directamente el cliente de correo después de crear el pedido.
-        # El botón se mantiene como respaldo por si el navegador bloquea la apertura.
-        components.html(
-            "<script>"
-            f"window.parent.location.href = {json.dumps(email_url)};"
-            "</script>",
-            height=0,
-        )
-
         st.info(
-            "📨 Se está abriendo tu correo con el pedido preparado. "
-            "Elige el destinatario y pulsa Enviar en Outlook."
+            "📨 Pedido preparado. Pulsa el botón para abrirlo en tu correo, "
+            "elige el destinatario y pulsa Enviar en Outlook."
         )
         st.link_button(
-            "✉️ Abrir email si no se ha abierto automáticamente",
+            "✉️ Abrir email preparado",
             email_url,
             use_container_width=True,
         )
