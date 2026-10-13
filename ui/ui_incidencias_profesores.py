@@ -1,4 +1,10 @@
+import base64
+import html
+import json
+from pathlib import Path
+
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime
 
 from modules.espacios import (
@@ -92,6 +98,115 @@ ESPACIOS_POR_EDIFICIO = {
 
 MAX_FOTOS = 5
 MAX_MB_FOTO = 5
+
+
+PLANO_P22_P1 = Path("assets/p22_infantil_primaria_planta_1.png")
+
+# Coordenadas en porcentaje sobre el PNG definitivo de P22 · Planta 1.
+# Primera fase: las seis aulas inferiores, claramente identificadas en el plano.
+ZONAS_PLANO_P22_P1 = {
+    "I4C": (11.1, 76.7, 13.2, 21.4),
+    "I4B": (24.4, 76.7, 13.5, 21.4),
+    "I4A": (38.2, 76.7, 12.8, 21.4),
+    "I3C": (51.1, 76.7, 13.0, 21.4),
+    "I3B": (64.2, 76.7, 13.0, 21.4),
+    "I3A": (78.3, 76.7, 18.6, 21.4),
+}
+
+
+def _normalizar_espacio_plano(texto):
+    texto = str(texto or "").strip().upper()
+    texto = texto.replace("AULA", "")
+    return "".join(caracter for caracter in texto if caracter.isalnum())
+
+
+def _es_p22_infantil_primaria_planta_1(centro, edificio, planta):
+    centro_norm = str(centro or "").strip().lower().replace(" ", "")
+    edificio_norm = str(edificio or "").strip().lower().replace(" ", "")
+    planta_norm = str(planta or "").strip().lower().replace(" ", "")
+
+    return (
+        centro_norm in {"pearson22", "p22"}
+        and edificio_norm in {"infantil/primaria", "infantilprimaria"}
+        and planta_norm in {"planta1", "1"}
+    )
+
+
+def _mostrar_plano_p22_p1(espacios):
+    if not PLANO_P22_P1.exists():
+        st.warning("No se encuentra el plano de P22 Planta 1 en assets.")
+        return
+
+    espacios_por_clave = {
+        _normalizar_espacio_plano(espacio): espacio
+        for espacio in espacios
+    }
+
+    zonas_disponibles = []
+    for clave, coordenadas in ZONAS_PLANO_P22_P1.items():
+        espacio_real = espacios_por_clave.get(clave)
+        if espacio_real:
+            zonas_disponibles.append((espacio_real, coordenadas))
+
+    if not zonas_disponibles:
+        st.info(
+            "El plano está disponible, pero las aulas todavía no coinciden "
+            "con los nombres del catálogo de esta planta."
+        )
+        return
+
+    imagen_b64 = base64.b64encode(PLANO_P22_P1.read_bytes()).decode("ascii")
+
+    botones = []
+    for espacio_real, (x, y, ancho, alto) in zonas_disponibles:
+        espacio_js = html.escape(json.dumps(espacio_real), quote=True)
+        titulo = html.escape(str(espacio_real), quote=True)
+        botones.append(
+            f'''<button class="zona"
+                title="{titulo}"
+                aria-label="Seleccionar {titulo}"
+                style="left:{x}%;top:{y}%;width:{ancho}%;height:{alto}%;"
+                onclick="seleccionarEspacio({espacio_js})"></button>'''
+        )
+
+    html_plano = f'''
+    <html>
+    <head>
+    <style>
+        html, body {{ margin: 0; padding: 0; background: transparent; }}
+        .plano {{ position: relative; width: 100%; line-height: 0; }}
+        .plano img {{ width: 100%; height: auto; display: block; }}
+        .zona {{
+            position: absolute;
+            border: 2px solid transparent;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+        }}
+        .zona:hover {{
+            border-color: #ff4b4b;
+            background: rgba(255, 75, 75, 0.12);
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="plano">
+            <img src="data:image/png;base64,{imagen_b64}" alt="Plano P22 Planta 1">
+            {''.join(botones)}
+        </div>
+        <script>
+            function seleccionarEspacio(espacio) {{
+                const url = new URL(window.parent.location.href);
+                url.searchParams.set('plano_espacio', espacio);
+                window.parent.location.href = url.toString();
+            }}
+        </script>
+    </body>
+    </html>
+    '''
+
+    st.caption("Pulsa directamente sobre un aula del plano para seleccionarla.")
+    components.html(html_plano, height=700, scrolling=False)
 
 
 def limpiar_nombre_archivo(texto):
@@ -230,6 +345,27 @@ def pantalla_incidencias_profesores():
     if not espacios:
         st.warning("No hay espacios configurados para esta planta.")
         return
+
+    if _es_p22_infantil_primaria_planta_1(centro, edificio, planta):
+        espacio_plano = st.query_params.get("plano_espacio")
+
+        if espacio_plano:
+            espacio_plano_norm = _normalizar_espacio_plano(espacio_plano)
+            espacio_catalogo = next(
+                (
+                    item
+                    for item in espacios
+                    if _normalizar_espacio_plano(item) == espacio_plano_norm
+                ),
+                None,
+            )
+
+            if espacio_catalogo:
+                st.session_state["prof_incidencia_espacio"] = espacio_catalogo
+
+            del st.query_params["plano_espacio"]
+
+        _mostrar_plano_p22_p1(espacios)
 
     espacio = st.selectbox(
         "Espacio / Aula",
