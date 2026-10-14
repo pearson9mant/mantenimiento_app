@@ -103,7 +103,7 @@ MAX_MB_FOTO = 5
 PLANO_P22_P1 = Path("assets/p22_infantil_primaria_planta_1.png")
 
 # Coordenadas en porcentaje sobre el PNG definitivo de P22 · Planta 1.
-# Primera fase: las seis aulas inferiores, claramente identificadas en el plano.
+# Solo se muestran como clicables las zonas cuyo nombre existe en el catálogo real.
 ZONAS_PLANO_P22_P1 = {
     "I4C": (11.1, 76.7, 13.2, 21.4),
     "I4B": (24.4, 76.7, 13.5, 21.4),
@@ -111,6 +111,13 @@ ZONAS_PLANO_P22_P1 = {
     "I3C": (51.1, 76.7, 13.0, 21.4),
     "I3B": (64.2, 76.7, 13.0, 21.4),
     "I3A": (78.3, 76.7, 18.6, 21.4),
+    "CUARTOLIMPIEZA": (7.0, 55.0, 6.5, 8.5),
+    "SALAPROFESORES": (7.0, 67.0, 15.0, 6.5),
+    "NEVERA": (42.0, 54.0, 8.0, 6.5),
+    "LAVABOS": (49.0, 57.0, 18.0, 11.0),
+    "DESPACHO": (70.0, 53.0, 9.0, 12.0),
+    "PASILLO": (48.0, 67.0, 21.0, 7.0),
+    "CALEFACCION": (82.0, 61.0, 15.0, 11.0),
 }
 
 
@@ -173,7 +180,7 @@ def _mostrar_plano_p22_p1(espacios):
     <html>
     <head>
     <style>
-        html, body {{ margin: 0; padding: 0; background: transparent; }}
+        html, body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
         .plano {{ position: relative; width: 100%; line-height: 0; }}
         .plano img {{ width: 100%; height: auto; display: block; }}
         .zona {{
@@ -195,18 +202,28 @@ def _mostrar_plano_p22_p1(espacios):
             {''.join(botones)}
         </div>
         <script>
+            function ajustarAltura() {{
+                const plano = document.querySelector('.plano');
+                if (!plano) return;
+                const altura = Math.ceil(plano.getBoundingClientRect().height);
+                window.frameElement.style.height = altura + 'px';
+            }}
+
             function seleccionarEspacio(espacio) {{
                 const url = new URL(window.parent.location.href);
                 url.searchParams.set('plano_espacio', espacio);
                 window.parent.location.href = url.toString();
             }}
+
+            window.addEventListener('load', ajustarAltura);
+            window.addEventListener('resize', ajustarAltura);
         </script>
     </body>
     </html>
     '''
 
-    st.caption("Pulsa directamente sobre un aula del plano para seleccionarla.")
-    components.html(html_plano, height=700, scrolling=False)
+    st.caption("Pulsa directamente sobre un espacio del plano para seleccionarlo.")
+    components.html(html_plano, height=520, scrolling=False)
 
 
 def limpiar_nombre_archivo(texto):
