@@ -4114,189 +4114,75 @@ def mostrar_tarjeta_ot(
                 "picos de memoria en Render."
             )
 
-            clave_componente_fotos = (
-                f"{modo}_fotos_ot_estable_{id_orden}"
+            foto_camara_ot = st.camera_input(
+                "📷 Hacer foto ahora",
+                key=f"{modo}_camara_directa_ot_{id_orden}",
             )
 
-            clave_pendiente_camara = (
-                f"{modo}_foto_pendiente_camara_{id_orden}"
+            foto_galeria_ot = st.file_uploader(
+                "🖼️ Elegir de la galería",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=False,
+                key=f"{modo}_galeria_directa_ot_{id_orden}",
             )
 
-            clave_pendiente_galeria = (
-                f"{modo}_foto_pendiente_galeria_{id_orden}"
-            )
+            foto_nueva_ot = foto_camara_ot or foto_galeria_ot
 
-            def _guardar_trigger_foto_pendiente(
-                campo,
-                clave_destino,
-            ):
-                estado_componente = st.session_state.get(
-                    clave_componente_fotos
-                )
+            if foto_nueva_ot is not None:
+                foto_bytes = foto_nueva_ot.getvalue()
 
-                if not estado_componente:
-                    return
-
-                try:
-                    valor = getattr(
-                        estado_componente,
-                        campo,
-                        None,
-                    )
-                except Exception:
-                    try:
-                        valor = estado_componente.get(
-                            campo
-                        )
-                    except Exception:
-                        valor = None
-
-                if valor:
-                    st.session_state[
-                        clave_destino
-                    ] = valor
-
-            _CAMARA_DIRECTA_OT(
-                key=clave_componente_fotos,
-                on_photo_camera_change=lambda: (
-                    _guardar_trigger_foto_pendiente(
-                        "photo_camera",
-                        clave_pendiente_camara,
-                    )
-                ),
-                on_photo_gallery_change=lambda: (
-                    _guardar_trigger_foto_pendiente(
-                        "photo_gallery",
-                        clave_pendiente_galeria,
-                    )
-                ),
-                width="stretch",
-            )
-
-            eventos_foto = [
-                (
-                    "CAMARA",
-                    st.session_state.pop(
-                        clave_pendiente_camara,
-                        None,
-                    ),
-                ),
-                (
-                    "GALERIA",
-                    st.session_state.pop(
-                        clave_pendiente_galeria,
-                        None,
-                    ),
-                ),
-            ]
-
-            for origen_foto, datos_foto in eventos_foto:
-                if not datos_foto:
-                    continue
-
-                try:
-                    contenido_b64 = str(
-                        datos_foto.get("data")
-                        or ""
-                    )
-
-                    foto_bytes = base64.b64decode(
-                        contenido_b64,
-                        validate=True,
-                    )
-
-                    nombre_original = limpiar_nombre_archivo(
-                        datos_foto.get("name")
-                        or "foto.jpg"
-                    )
-
-                except Exception:
-                    foto_bytes = b""
-                    nombre_original = "foto.jpg"
+                if len(foto_bytes) > MAX_MB_FOTO_OT * 1024 * 1024:
                     st.error(
-                        "No se ha podido preparar la fotografía."
+                        f"La fotografía supera {MAX_MB_FOTO_OT} MB."
+                    )
+                else:
+                    st.caption(
+                        "📷 Foto preparada. Pulsa Guardar foto en la OT."
                     )
 
-                if not foto_bytes:
-                    continue
-
-                import hashlib
-
-                huella = hashlib.sha256(
-                    foto_bytes
-                ).hexdigest()
-
-                clave_huella = (
-                    f"{modo}_ultima_foto_"
-                    f"{origen_foto.lower()}_{id_orden}"
-                )
-
-                if (
-                    st.session_state.get(
-                        clave_huella
-                    )
-                    == huella
-                ):
-                    continue
-
-                try:
-                    nombres_existentes = obtener_nombres_fotos_ot(
-                        num_ot
-                    )
-
-                    secuencia = len(
-                        nombres_existentes
-                    ) + 1
-
-                    nombre_foto_nueva = limpiar_nombre_archivo(
-                        f"{num_ot}_{origen_foto}_"
-                        f"{id_orden}_{secuencia}_{nombre_original}"
-                    )
-
-                    while (
-                        nombre_foto_nueva
-                        in nombres_existentes
+                    if st.button(
+                        "💾 Guardar foto en la OT",
+                        key=f"{modo}_guardar_foto_directa_ot_{id_orden}",
+                        use_container_width=True,
+                        type="primary",
                     ):
-                        secuencia += 1
-
-                        nombre_foto_nueva = limpiar_nombre_archivo(
-                            f"{num_ot}_{origen_foto}_"
-                            f"{id_orden}_{secuencia}_{nombre_original}"
-                        )
-
-                    guardar_foto_ot(
-                        numero_ot=num_ot,
-                        nombre_foto=nombre_foto_nueva,
-                        foto_data=foto_bytes,
-                    )
-
-                    st.session_state[
-                        clave_huella
-                    ] = huella
-
-                    st.session_state[
-                        clave_fotos_ot
-                    ] = True
-
-                    st.session_state[
-                        f"{modo}_foto_guardada_{id_orden}"
-                    ] = True
-
-                    st.rerun()
-
-                except Exception as error:
-                    st.error(
-                        "No se ha podido guardar la foto: "
-                        f"{error}"
-                    )
-
-            if st.session_state.pop(
-                f"{modo}_foto_guardada_{id_orden}",
-                False,
-            ):
-                st.success(
-                    "✅ Foto guardada en la OT."
-                )
+                        try:
+                            nombres_existentes = obtener_nombres_fotos_ot(
+                                num_ot
+                            )
+                            secuencia = len(nombres_existentes) + 1
+                            nombre_original = limpiar_nombre_archivo(
+                                getattr(foto_nueva_ot, "name", None)
+                                or "camara.jpg"
+                            )
+                            origen_foto = (
+                                "CAMARA"
+                                if foto_camara_ot is not None
+                                else "GALERIA"
+                            )
+                            nombre_foto_nueva = limpiar_nombre_archivo(
+                                f"{num_ot}_{origen_foto}_"
+                                f"{id_orden}_{secuencia}_{nombre_original}"
+                            )
+                            while nombre_foto_nueva in nombres_existentes:
+                                secuencia += 1
+                                nombre_foto_nueva = limpiar_nombre_archivo(
+                                    f"{num_ot}_{origen_foto}_"
+                                    f"{id_orden}_{secuencia}_{nombre_original}"
+                                )
+                            guardar_foto_ot(
+                                numero_ot=num_ot,
+                                nombre_foto=nombre_foto_nueva,
+                                foto_data=foto_bytes,
+                            )
+                            st.session_state[clave_fotos_ot] = True
+                            st.success("✅ Foto guardada en la OT.")
+                            st.rerun()
+                        except Exception as error:
+                            st.error(
+                                "No se ha podido guardar la foto: "
+                                f"{error}"
+                            )
 
         # -------------------------------------------------
         # CONTROLES INTELIGENTES DE OT
