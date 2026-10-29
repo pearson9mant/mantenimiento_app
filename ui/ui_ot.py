@@ -3912,6 +3912,14 @@ def mostrar_tarjeta_ot(
                 key=f"{modo}_camara_ot_{id_orden}",
             )
 
+            guardar_foto_camara = False
+            if foto_camara is not None:
+                guardar_foto_camara = st.button(
+                    "💾 GUARDAR FOTO DE CÁMARA",
+                    key=f"{modo}_guardar_camara_ot_{id_orden}",
+                    use_container_width=True,
+                )
+
             foto_galeria = st.file_uploader(
                 "🖼️ COGER DE LA GALERÍA",
                 type=["jpg", "jpeg", "png"],
@@ -3921,7 +3929,10 @@ def mostrar_tarjeta_ot(
             )
 
             eventos_foto = [
-                ("CAMARA", foto_camara),
+                (
+                    "CAMARA",
+                    foto_camara if guardar_foto_camara else None,
+                ),
                 ("GALERIA", foto_galeria),
             ]
 
