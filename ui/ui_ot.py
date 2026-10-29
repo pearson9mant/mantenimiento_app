@@ -4006,10 +4006,6 @@ def mostrar_tarjeta_ot(
                     ] = huella
 
                     st.session_state[
-                        clave_fotos_ot
-                    ] = True
-
-                    st.session_state[
                         f"{modo}_foto_guardada_{id_orden}"
                     ] = True
 
