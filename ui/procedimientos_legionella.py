@@ -14,14 +14,31 @@ def _base(tipo_control, unidad, valor=None, valor_2=None, valor_3=None, observac
     }
 
 
-def mostrar_control_sala_acs(id_orden):
-    st.info("Control conjunto de sala ACS: acumulador, impulsión y retorno.")
+def mostrar_control_sala_acs(id_orden, centro=""):
+    centro_txt = str(centro or "").strip()
 
-    valor = st.number_input("Temperatura acumulador ºC", 0.0, 100.0, 60.0, 0.1, key=f"leg_acum_{id_orden}")
-    valor_2 = st.number_input("Temperatura impulsión ACS ºC", 0.0, 100.0, 50.0, 0.1, key=f"leg_impulsion_{id_orden}")
-    valor_3 = st.number_input("Temperatura retorno ACS ºC", 0.0, 100.0, 50.0, 0.1, key=f"leg_retorno_{id_orden}")
+    if centro_txt == "Pearson 9":
+        st.info("Control sala ACS: temperatura del acumulador.")
 
-    obs = f"Control sala ACS: Acumulador: {valor} ºC | Impulsión: {valor_2} ºC | Retorno: {valor_3} ºC"
+        valor = st.number_input(
+            "Temperatura acumulador ºC",
+            0.0,
+            100.0,
+            60.0,
+            0.1,
+            key=f"leg_acum_{id_orden}",
+        )
+        valor_2 = None
+        valor_3 = None
+        obs = f"Control sala ACS: Acumulador: {valor} ºC"
+    else:
+        st.info("Control conjunto de sala ACS: acumulador, impulsión y retorno.")
+
+        valor = st.number_input("Temperatura acumulador ºC", 0.0, 100.0, 60.0, 0.1, key=f"leg_acum_{id_orden}")
+        valor_2 = st.number_input("Temperatura impulsión ACS ºC", 0.0, 100.0, 50.0, 0.1, key=f"leg_impulsion_{id_orden}")
+        valor_3 = st.number_input("Temperatura retorno ACS ºC", 0.0, 100.0, 50.0, 0.1, key=f"leg_retorno_{id_orden}")
+
+        obs = f"Control sala ACS: Acumulador: {valor} ºC | Impulsión: {valor_2} ºC | Retorno: {valor_3} ºC"
 
     return _base("Control sala ACS", "ºC", valor, valor_2, valor_3, obs)
 
