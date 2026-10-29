@@ -1,5 +1,4 @@
 import streamlit as st
-import base64
 from pathlib import Path
 
 try:
@@ -15,8 +14,6 @@ from modules.ordenes import (
     crear_correctiva_desde_ot,
     obtener_gestion_externa_ot,
     enviar_a_gestiones_externas,
-    marcar_ot_compartida,
-    obtener_fecha_compartida_ot,
 )
 
 from modules.inventario import (
@@ -78,196 +75,6 @@ from ui.ui_pedido_ot import mostrar_pedido_material_desde_ot
 
 MAX_FOTOS_CIERRE_OT = 5
 MAX_MB_FOTO_OT = 5
-
-
-_CAMARA_DIRECTA_OT = st.components.v2.component(
-    "mantenimiento_fotos_ot_estable",
-    html="""
-        <label class="foto-ot-btn" for="foto-ot-camara">
-            📷 HACER FOTO AHORA
-        </label>
-        <input
-            id="foto-ot-camara"
-            class="foto-ot-input"
-            type="file"
-            accept="image/*"
-            capture="environment"
-        />
-
-        <label class="foto-ot-btn foto-ot-btn-secundario" for="foto-ot-galeria">
-            🖼️ COGER DE LA GALERÍA
-        </label>
-        <input
-            id="foto-ot-galeria"
-            class="foto-ot-input"
-            type="file"
-            accept="image/*"
-        />
-
-        <div id="foto-ot-estado" class="foto-ot-estado"></div>
-    """,
-    css="""
-        .foto-ot-input {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .foto-ot-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            min-height: 48px;
-            box-sizing: border-box;
-            padding: 10px 14px;
-            margin-bottom: 12px;
-            border-radius: 9px;
-            border: 1px solid var(--st-primary-color);
-            background: var(--st-primary-color);
-            color: white;
-            font-family: var(--st-font);
-            font-weight: 800;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .foto-ot-btn-secundario {
-            background: transparent;
-            color: var(--st-primary-color);
-        }
-
-        .foto-ot-estado {
-            min-height: 20px;
-            margin-top: 2px;
-            font-family: var(--st-font);
-            font-size: 0.88rem;
-            color: var(--st-text-color);
-        }
-    """,
-    js=r"""
-        export default function(component) {
-            const {
-                parentElement,
-                setTriggerValue,
-            } = component;
-
-            const camara = parentElement.querySelector(
-                "#foto-ot-camara"
-            );
-            const galeria = parentElement.querySelector(
-                "#foto-ot-galeria"
-            );
-            const estado = parentElement.querySelector(
-                "#foto-ot-estado"
-            );
-
-            if (!camara || !galeria || !estado) {
-                return;
-            }
-
-            const prepararYEnviar = (file, triggerName) => {
-                if (!file) {
-                    return;
-                }
-
-                estado.textContent = "Preparando foto...";
-
-                const reader = new FileReader();
-
-                reader.onload = () => {
-                    const img = new Image();
-
-                    img.onload = () => {
-                        const maxLado = 1600;
-                        let ancho = img.width;
-                        let alto = img.height;
-
-                        if (ancho > maxLado || alto > maxLado) {
-                            const escala = Math.min(
-                                maxLado / ancho,
-                                maxLado / alto
-                            );
-
-                            ancho = Math.round(ancho * escala);
-                            alto = Math.round(alto * escala);
-                        }
-
-                        const canvas = document.createElement("canvas");
-                        canvas.width = ancho;
-                        canvas.height = alto;
-
-                        const ctx = canvas.getContext("2d", {
-                            alpha: false
-                        });
-
-                        ctx.drawImage(
-                            img,
-                            0,
-                            0,
-                            ancho,
-                            alto
-                        );
-
-                        const contenido = canvas.toDataURL(
-                            "image/jpeg",
-                            0.78
-                        );
-
-                        const coma = contenido.indexOf(",");
-
-                        if (coma < 0) {
-                            estado.textContent =
-                                "No se ha podido preparar la fotografía.";
-                            return;
-                        }
-
-                        setTriggerValue(triggerName, {
-                            name: String(file.name || "foto.jpg"),
-                            type: "image/jpeg",
-                            data: contenido.slice(coma + 1),
-                        });
-
-                        estado.textContent =
-                            "Foto preparada y enviada.";
-                    };
-
-                    img.onerror = () => {
-                        estado.textContent =
-                            "No se ha podido procesar la fotografía.";
-                    };
-
-                    img.src = String(reader.result || "");
-                };
-
-                reader.onerror = () => {
-                    estado.textContent =
-                        "No se ha podido leer la fotografía.";
-                };
-
-                reader.readAsDataURL(file);
-            };
-
-            camara.onchange = () => {
-                prepararYEnviar(
-                    camara.files?.[0],
-                    "photo_camera"
-                );
-                camara.value = "";
-            };
-
-            galeria.onchange = () => {
-                prepararYEnviar(
-                    galeria.files?.[0],
-                    "photo_gallery"
-                );
-                galeria.value = "";
-            };
-        }
-    """,
-)
 
 
 def codigo_ot_no_traducible(numero_ot):
@@ -3564,15 +3371,7 @@ def mostrar_compartir_ot(
     """
     from urllib.parse import quote
 
-    fecha_compartida = obtener_fecha_compartida_ot(numero_ot)
-    etiqueta_compartir = "📤 Compartir OT"
-    if fecha_compartida:
-        etiqueta_compartir = "✅ OT compartida · Compartir de nuevo"
-
-    with st.expander(etiqueta_compartir, expanded=False):
-        if fecha_compartida:
-            st.success(f"📤 Compartida: {fecha_compartida}")
-
+    with st.expander("📤 Compartir OT", expanded=False):
         st.caption(
             "Puedes compartirla esté abierta o finalizada. "
             "Esta acción no modifica la OT."
@@ -3609,20 +3408,18 @@ def mostrar_compartir_ot(
         c1, c2 = st.columns(2)
 
         with c1:
-            if st.link_button(
+            st.link_button(
                 "🟢 Enviar por WhatsApp",
                 whatsapp_url,
                 use_container_width=True,
-            ):
-                marcar_ot_compartida(numero_ot)
+            )
 
         with c2:
-            if st.link_button(
+            st.link_button(
                 "✉️ Enviar por email",
                 email_url,
                 use_container_width=True,
-            ):
-                marcar_ot_compartida(numero_ot)
+            )
 
         st.caption(
             "WhatsApp y email abren el mensaje ya preparado. "
@@ -4099,90 +3896,138 @@ def mostrar_tarjeta_ot(
 
         # -------------------------------------------------
         # AÑADIR FOTO A LA OT · SIN FINALIZARLA
-        # Dos botones del mismo formato:
+        # Controles nativos de Streamlit:
         # 1) cámara directa
         # 2) galería
-        #
-        # Las dos imágenes se reducen en el móvil antes de enviarse.
         # -------------------------------------------------
         with st.container(border=True):
             st.markdown("### 📸 Añadir foto a esta OT")
 
             st.caption(
-                "Haz una foto ahora o coge una de la galería. "
-                "Las dos se optimizan antes de enviarse para evitar "
-                "picos de memoria en Render."
+                "Haz una foto ahora o coge una de la galería."
             )
 
-            foto_camara_ot = st.camera_input(
-                "📷 Hacer foto ahora",
-                key=f"{modo}_camara_directa_ot_{id_orden}",
+            foto_camara = st.camera_input(
+                "📷 HACER FOTO AHORA",
+                key=f"{modo}_camara_ot_{id_orden}",
             )
 
-            foto_galeria_ot = st.file_uploader(
-                "🖼️ Elegir de la galería",
+            foto_galeria = st.file_uploader(
+                "🖼️ COGER DE LA GALERÍA",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=False,
-                key=f"{modo}_galeria_directa_ot_{id_orden}",
+                key=f"{modo}_galeria_ot_{id_orden}",
+                help=f"Máximo {MAX_MB_FOTO_OT} MB por foto.",
             )
 
-            foto_nueva_ot = foto_camara_ot or foto_galeria_ot
+            eventos_foto = [
+                ("CAMARA", foto_camara),
+                ("GALERIA", foto_galeria),
+            ]
 
-            if foto_nueva_ot is not None:
-                foto_bytes = foto_nueva_ot.getvalue()
+            for origen_foto, datos_foto in eventos_foto:
+                if datos_foto is None:
+                    continue
+
+                try:
+                    foto_bytes = datos_foto.getvalue()
+                    nombre_original = limpiar_nombre_archivo(
+                        getattr(datos_foto, "name", None)
+                        or "foto.jpg"
+                    )
+                except Exception:
+                    foto_bytes = b""
+                    nombre_original = "foto.jpg"
+                    st.error(
+                        "No se ha podido preparar la fotografía."
+                    )
+
+                if not foto_bytes:
+                    continue
 
                 if len(foto_bytes) > MAX_MB_FOTO_OT * 1024 * 1024:
                     st.error(
                         f"La fotografía supera {MAX_MB_FOTO_OT} MB."
                     )
-                else:
-                    st.caption(
-                        "📷 Foto preparada. Pulsa Guardar foto en la OT."
+                    continue
+
+                import hashlib
+
+                huella = hashlib.sha256(
+                    foto_bytes
+                ).hexdigest()
+
+                clave_huella = (
+                    f"{modo}_ultima_foto_"
+                    f"{origen_foto.lower()}_{id_orden}"
+                )
+
+                if (
+                    st.session_state.get(
+                        clave_huella
+                    )
+                    == huella
+                ):
+                    continue
+
+                try:
+                    nombres_existentes = obtener_nombres_fotos_ot(
+                        num_ot
                     )
 
-                    if st.button(
-                        "💾 Guardar foto en la OT",
-                        key=f"{modo}_guardar_foto_directa_ot_{id_orden}",
-                        use_container_width=True,
-                        type="primary",
+                    secuencia = len(
+                        nombres_existentes
+                    ) + 1
+
+                    nombre_foto_nueva = limpiar_nombre_archivo(
+                        f"{num_ot}_{origen_foto}_"
+                        f"{id_orden}_{secuencia}_{nombre_original}"
+                    )
+
+                    while (
+                        nombre_foto_nueva
+                        in nombres_existentes
                     ):
-                        try:
-                            nombres_existentes = obtener_nombres_fotos_ot(
-                                num_ot
-                            )
-                            secuencia = len(nombres_existentes) + 1
-                            nombre_original = limpiar_nombre_archivo(
-                                getattr(foto_nueva_ot, "name", None)
-                                or "camara.jpg"
-                            )
-                            origen_foto = (
-                                "CAMARA"
-                                if foto_camara_ot is not None
-                                else "GALERIA"
-                            )
-                            nombre_foto_nueva = limpiar_nombre_archivo(
-                                f"{num_ot}_{origen_foto}_"
-                                f"{id_orden}_{secuencia}_{nombre_original}"
-                            )
-                            while nombre_foto_nueva in nombres_existentes:
-                                secuencia += 1
-                                nombre_foto_nueva = limpiar_nombre_archivo(
-                                    f"{num_ot}_{origen_foto}_"
-                                    f"{id_orden}_{secuencia}_{nombre_original}"
-                                )
-                            guardar_foto_ot(
-                                numero_ot=num_ot,
-                                nombre_foto=nombre_foto_nueva,
-                                foto_data=foto_bytes,
-                            )
-                            st.session_state[clave_fotos_ot] = True
-                            st.success("✅ Foto guardada en la OT.")
-                            st.rerun()
-                        except Exception as error:
-                            st.error(
-                                "No se ha podido guardar la foto: "
-                                f"{error}"
-                            )
+                        secuencia += 1
+
+                        nombre_foto_nueva = limpiar_nombre_archivo(
+                            f"{num_ot}_{origen_foto}_"
+                            f"{id_orden}_{secuencia}_{nombre_original}"
+                        )
+
+                    guardar_foto_ot(
+                        numero_ot=num_ot,
+                        nombre_foto=nombre_foto_nueva,
+                        foto_data=foto_bytes,
+                    )
+
+                    st.session_state[
+                        clave_huella
+                    ] = huella
+
+                    st.session_state[
+                        clave_fotos_ot
+                    ] = True
+
+                    st.session_state[
+                        f"{modo}_foto_guardada_{id_orden}"
+                    ] = True
+
+                    st.rerun()
+
+                except Exception as error:
+                    st.error(
+                        "No se ha podido guardar la foto: "
+                        f"{error}"
+                    )
+
+            if st.session_state.pop(
+                f"{modo}_foto_guardada_{id_orden}",
+                False,
+            ):
+                st.success(
+                    "✅ Foto guardada en la OT."
+                )
 
         # -------------------------------------------------
         # CONTROLES INTELIGENTES DE OT
