@@ -354,7 +354,7 @@ def mostrar_ejecucion_legionella_operario(
         st.info(f"🚿 Terminales incluidos en este punto: {terminales}")
 
     if tarea == "Control sala ACS":
-        resultado_procedimiento = mostrar_control_sala_acs(id_orden)
+        resultado_procedimiento = mostrar_control_sala_acs(id_orden, centro)
 
     elif tarea in [
         "Temperatura acumulador",
