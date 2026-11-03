@@ -3826,18 +3826,28 @@ def mostrar_tarjeta_ot(
                 if fotos_db:
                     for i, (nombre_foto, foto_data) in enumerate(fotos_db, start=1):
                         try:
+                            import base64
+                            import html
                             from io import BytesIO
-                            from PIL import Image as PILImage
+                            from PIL import Image as PILImage, ImageOps
 
-                            imagen_ot = PILImage.open(
-                                BytesIO(bytes(foto_data))
-                            )
-                            imagen_ot.load()
+                            with PILImage.open(BytesIO(bytes(foto_data))) as original:
+                                imagen_ot = ImageOps.exif_transpose(original)
+                                imagen_ot.thumbnail((1000, 1000))
+                                if imagen_ot.mode != "RGB":
+                                    imagen_ot = imagen_ot.convert("RGB")
+                                salida_foto = BytesIO()
+                                imagen_ot.save(salida_foto, format="JPEG", quality=75)
 
-                            st.image(
-                                imagen_ot,
-                                caption=nombre_foto or f"Foto {i}",
-                                use_container_width=True,
+                            foto_b64 = base64.b64encode(salida_foto.getvalue()).decode("ascii")
+                            texto_foto = html.escape(str(nombre_foto or f"Foto {i}"))
+                            st.markdown(
+                                '<img src="data:image/jpeg;base64,' + foto_b64
+                                + '" style="width:100%;max-width:1000px;height:auto;" '
+                                + 'alt="Fotografía de la OT">'
+                                + '<div style="color:gray;font-size:0.8em;overflow-wrap:anywhere;">'
+                                + texto_foto + '</div>',
+                                unsafe_allow_html=True,
                             )
                         except Exception as error:
                             st.caption(f"📷 Foto no disponible: {error}")
