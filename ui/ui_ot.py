@@ -3907,9 +3907,15 @@ def mostrar_tarjeta_ot(
                 "Haz una foto ahora o coge una de la galería."
             )
 
-            foto_camara = st.camera_input(
-                "📷 HACER FOTO AHORA",
+            foto_camara = st.file_uploader(
+                "📷 HACER FOTO / ELEGIR FOTO",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=False,
                 key=f"{modo}_camara_ot_{id_orden}",
+                help=(
+                    "En el móvil, selecciona Cámara para hacer la foto "
+                    "o elige una imagen ya guardada."
+                ),
             )
 
             guardar_foto_camara = False
