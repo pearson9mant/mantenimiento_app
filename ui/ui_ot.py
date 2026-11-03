@@ -3826,8 +3826,16 @@ def mostrar_tarjeta_ot(
                 if fotos_db:
                     for i, (nombre_foto, foto_data) in enumerate(fotos_db, start=1):
                         try:
+                            from io import BytesIO
+                            from PIL import Image as PILImage
+
+                            imagen_ot = PILImage.open(
+                                BytesIO(bytes(foto_data))
+                            )
+                            imagen_ot.load()
+
                             st.image(
-                                bytes(foto_data),
+                                imagen_ot,
                                 caption=nombre_foto or f"Foto {i}",
                                 use_container_width=True,
                             )
