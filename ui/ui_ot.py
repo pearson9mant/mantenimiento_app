@@ -3842,6 +3842,48 @@ def mostrar_tarjeta_ot(
                         except Exception as error:
                             st.caption(f"📷 Foto no disponible: {error}")
 
+                        # Diagnóstico temporal: no modifica la fotografía.
+                        with st.expander(f"🔎 Diagnóstico foto {i}", expanded=False):
+                            try:
+                                from io import BytesIO
+                                from PIL import Image as PILImage
+
+                                datos_diagnostico = bytes(foto_data or b"")
+                                st.write(f"Bytes recuperados: {len(datos_diagnostico):,}")
+                                st.write(
+                                    "Cabecera (hex): "
+                                    + datos_diagnostico[:16].hex(" ")
+                                )
+                                if datos_diagnostico:
+                                    try:
+                                        with PILImage.open(BytesIO(datos_diagnostico)) as prueba:
+                                            formato = prueba.format or "Desconocido"
+                                            dimensiones = prueba.size
+                                            prueba.verify()
+                                        st.success(
+                                            f"Imagen válida: {formato} · "
+                                            f"{dimensiones[0]} × {dimensiones[1]} píxeles"
+                                        )
+                                    except Exception as error_imagen:
+                                        st.error(
+                                            "Pillow no puede verificar la imagen: "
+                                            f"{type(error_imagen).__name__}: {error_imagen}"
+                                        )
+                                    st.download_button(
+                                        "⬇️ Descargar foto original para comprobar",
+                                        data=datos_diagnostico,
+                                        file_name=str(nombre_foto or f"foto_{i}.jpg"),
+                                        mime="application/octet-stream",
+                                        key=f"{modo}_diag_descarga_foto_{id_orden}_{i}",
+                                    )
+                                else:
+                                    st.error("La base de datos devuelve 0 bytes.")
+                            except Exception as error_diagnostico:
+                                st.error(
+                                    "Error al inspeccionar los datos: "
+                                    f"{type(error_diagnostico).__name__}: {error_diagnostico}"
+                                )
+
                         nombre_foto_txt = str(
                             nombre_foto or ""
                         ).strip()
